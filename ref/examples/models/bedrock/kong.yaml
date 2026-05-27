@@ -1,0 +1,265 @@
+_format_version: "3.0"
+
+services:
+- name: ai-gateway
+  url: http://ai-gateway.upstream.local
+  routes:
+    # generate via converse API (Claude on Bedrock)
+    - name: bedrock-converse
+      paths:
+        - ~/ai/model/(?<model_name>[^/]+)/converse(?:-stream)?
+      methods:
+        - GET
+        - POST
+      strip_path: false
+    # Consolidated route: /invoke is reused across 5 modalities on Bedrock
+    # (Claude generate, Titan embeddings, Nova Canvas image, Nova Sonic audio,
+    # Nova Reel video). See plugin block below for caveats on dispatching.
+    - name: bedrock-invoke
+      paths:
+        - ~/ai/model/(?<model_name>[^/]+)/invoke(?:-with-response-stream)?
+      methods:
+        - GET
+        - POST
+      strip_path: false
+    # agentic (Claude on Bedrock — retrieveAndGenerate over a Knowledge Base)
+    - name: bedrock-retrieve
+      paths:
+        - ~/ai/model/(?<model_name>[^/]+)/retrieveAndGenerate(?:Stream)?
+      methods:
+        - GET
+        - POST
+      strip_path: false
+    # rerank (Cohere Rerank via dedicated rerank endpoint)
+    - name: bedrock-rerank
+      paths:
+        - ~/ai/model/(?<model_name>[^/]+)/rerank
+      methods:
+        - GET
+        - POST
+      strip_path: false
+    # batches: kept at 2 paths — the two endpoints have fundamentally different
+    # shapes (model-in-URL vs workspace-level list) and collapsing them into a
+    # single regex would be unreadable for example code.
+    - name: bedrock-batches
+      paths:
+        - ~/ai/model/(?<model_name>[^/]+)/async-invoke
+        - /ai/model-invocations
+      methods:
+        - GET
+        - POST
+      strip_path: false
+
+ai-models:
+- name: claude-3-7-sonnet-bedrock
+  alias: "@bedrock/claude-3-7-sonnet"
+- name: titan-embed-text-v2
+  alias: "@bedrock/titan-embed-text-v2"
+- name: nova-canvas-image
+  alias: "@bedrock/nova-canvas"
+- name: nova-sonic-audio
+  alias: "@bedrock/nova-sonic"
+- name: nova-reel-video
+  alias: "@bedrock/nova-reel"
+- name: cohere-rerank-3-5-bedrock
+  alias: "@bedrock/cohere-rerank-v3.5"
+- name: bedrock-batch-api
+  # alias omitted: batches endpoints carry the model in the URL or job spec,
+  # not the request body.
+
+# Note: Bedrock embeddings/image/audio/video all use the generic
+# /model/{model}/invoke endpoint — the model name in the URL determines
+# modality. The route is consolidated; see the bedrock-invoke plugin block
+# for how (and why imperfectly) all five modalities share one plugin.
+
+plugins:
+# ============================================================================
+# ai-model-selector — Bedrock invoke/converse requests don't have a top-level
+# `model` field (model is in the URL). Skip everywhere.
+# ============================================================================
+
+# ============================================================================
+# ai-proxy-advanced — one per route, all targeting AWS Bedrock
+# ============================================================================
+
+# ---- converse (Claude generate via converse API) ---------------------------
+- name: ai-proxy-advanced
+  route:
+    name: bedrock-converse
+  config:
+    balancer:
+      algorithm: round-robin
+    llm_format: bedrock
+    genai_category: text/generation
+    targets:
+      - route_type: llm/v1/chat
+        auth:
+          aws_access_key_id: "{vault://ai/aws-access-key-id}"
+          aws_secret_access_key: "{vault://ai/aws-secret-access-key}"
+        model:
+          provider: bedrock
+          name: anthropic.claude-3-7-sonnet-20250219-v1:0
+          model_alias: "@bedrock/claude-3-7-sonnet"
+          options:
+            max_tokens: 4096
+            temperature: 1.0
+            bedrock:
+              aws_region: us-east-1
+
+# ---- invoke (5 modalities consolidated) ------------------------------------
+# CAVEAT: this single plugin must serve all five modalities that share the
+# /invoke URL suffix on Bedrock. Several limitations apply:
+#   1. `genai_category` is plugin-level and can only hold one value. We use
+#      `text/generation` (Claude). Embeddings/image/audio/video requests will
+#      be miscategorised for analytics/telemetry purposes.
+#   2. `route_type` is per-target, so each modality gets its proper value
+#      (llm/v1/chat, llm/v1/embeddings, image/v1/images/generations,
+#      audio/v1/audio/speech, video/v1/videos/generations) — but...
+#   3. `ai-model-selector` cannot read URI captures (only body/header), so the
+#      (?<model_name>...) capture in the route path does not drive target
+#      selection. The balancer algorithm (round-robin) picks the target, which
+#      means requests can land on the wrong upstream model.
+#   4. Bedrock invoke bodies don't carry a top-level `model` field, so we
+#      can't fall back to `source: body` either. To wire URL-driven dispatch:
+#      either extend ai-model-selector with `source: uri_capture`, or require
+#      clients to send an `X-Model` header and switch the selector to
+#      `source: header`.
+- name: ai-proxy-advanced
+  route:
+    name: bedrock-invoke
+  config:
+    balancer:
+      algorithm: round-robin
+    llm_format: bedrock
+    genai_category: text/generation
+    targets:
+      - route_type: llm/v1/chat
+        auth:
+          aws_access_key_id: "{vault://ai/aws-access-key-id}"
+          aws_secret_access_key: "{vault://ai/aws-secret-access-key}"
+        model:
+          provider: bedrock
+          name: anthropic.claude-3-7-sonnet-20250219-v1:0
+          model_alias: "@bedrock/claude-3-7-sonnet"
+          options:
+            max_tokens: 4096
+            temperature: 1.0
+            bedrock:
+              aws_region: us-east-1
+      - route_type: llm/v1/embeddings
+        auth:
+          aws_access_key_id: "{vault://ai/aws-access-key-id}"
+          aws_secret_access_key: "{vault://ai/aws-secret-access-key}"
+        model:
+          provider: bedrock
+          name: amazon.titan-embed-text-v2:0
+          model_alias: "@bedrock/titan-embed-text-v2"
+          options:
+            bedrock:
+              aws_region: us-east-1
+              embeddings_normalize: true
+      - route_type: image/v1/images/generations
+        auth:
+          aws_access_key_id: "{vault://ai/aws-access-key-id}"
+          aws_secret_access_key: "{vault://ai/aws-secret-access-key}"
+        model:
+          provider: bedrock
+          name: amazon.nova-canvas-v1:0
+          model_alias: "@bedrock/nova-canvas"
+          options:
+            bedrock:
+              aws_region: us-east-1
+      - route_type: audio/v1/audio/speech
+        auth:
+          aws_access_key_id: "{vault://ai/aws-access-key-id}"
+          aws_secret_access_key: "{vault://ai/aws-secret-access-key}"
+        model:
+          provider: bedrock
+          name: amazon.nova-sonic-v1:0
+          model_alias: "@bedrock/nova-sonic"
+          options:
+            bedrock:
+              aws_region: us-east-1
+      - route_type: video/v1/videos/generations
+        auth:
+          aws_access_key_id: "{vault://ai/aws-access-key-id}"
+          aws_secret_access_key: "{vault://ai/aws-secret-access-key}"
+        model:
+          provider: bedrock
+          name: amazon.nova-reel-v1:1
+          model_alias: "@bedrock/nova-reel"
+          options:
+            bedrock:
+              aws_region: us-east-1
+              video_output_s3_uri: "s3://kong-bedrock-outputs/nova-reel/"
+
+# ---- retrieveAndGenerate (Claude agentic over a Knowledge Base) ------------
+- name: ai-proxy-advanced
+  route:
+    name: bedrock-retrieve
+  config:
+    balancer:
+      algorithm: round-robin
+    llm_format: bedrock
+    genai_category: text/generation
+    targets:
+      - route_type: llm/v1/responses
+        auth:
+          aws_access_key_id: "{vault://ai/aws-access-key-id}"
+          aws_secret_access_key: "{vault://ai/aws-secret-access-key}"
+        model:
+          provider: bedrock
+          name: anthropic.claude-3-7-sonnet-20250219-v1:0
+          model_alias: "@bedrock/claude-3-7-sonnet"
+          options:
+            max_tokens: 4096
+            temperature: 1.0
+            bedrock:
+              aws_region: us-east-1
+
+# ---- rerank (Cohere Rerank dedicated endpoint) -----------------------------
+- name: ai-proxy-advanced
+  route:
+    name: bedrock-rerank
+  config:
+    balancer:
+      algorithm: round-robin
+    llm_format: bedrock
+    genai_category: text/generation
+    targets:
+      # rerank has no dedicated route_type; the README maps it to llm/v1/chat
+      # by default (Capability table at README.md lines 45-56).
+      - route_type: llm/v1/chat
+        auth:
+          aws_access_key_id: "{vault://ai/aws-access-key-id}"
+          aws_secret_access_key: "{vault://ai/aws-secret-access-key}"
+        model:
+          provider: bedrock
+          name: cohere.rerank-v3-5:0
+          model_alias: "@bedrock/cohere-rerank-v3.5"
+          options:
+            bedrock:
+              aws_region: us-east-1
+
+# ---- batches (async-invoke + model-invocations list) -----------------------
+- name: ai-proxy-advanced
+  route:
+    name: bedrock-batches
+  config:
+    balancer:
+      algorithm: round-robin
+    llm_format: bedrock
+    genai_category: text/generation
+    targets:
+      - route_type: llm/v1/batches
+        auth:
+          aws_access_key_id: "{vault://ai/aws-access-key-id}"
+          aws_secret_access_key: "{vault://ai/aws-secret-access-key}"
+        model:
+          provider: bedrock
+          name: batch-api
+          options:
+            bedrock:
+              aws_region: us-east-1
+              batch_bucket_prefix: "s3://kong-bedrock-batches/jobs/"
+              batch_role_arn: "arn:aws:iam::000000000000:role/BedrockBatchExecutionRole"

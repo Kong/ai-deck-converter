@@ -1,0 +1,305 @@
+providers:
+- name: azure-prod
+  type: azure
+  display_name: "Azure AI Foundry (Prod)"
+  config:
+    instance: kong-az-east
+    auth:
+      type: basic
+      headers:
+      - name: "api-key"
+        value: "{vault://ai/azure-openai-key}"
+
+models:
+  # -------------------------------------------------------------------------
+  # capabilities: generate + agentic  (chat completions + responses)
+  # -------------------------------------------------------------------------
+  - display_name: GPT-5.4 (chat + responses)
+    name: gpt-5-4-chat
+    type: model
+    enabled: true
+    acls:
+      allow: []
+      deny: []
+    config:
+      route:
+        paths:
+          - /ai
+      model:
+        alias: "@azure/gpt-5.4"
+        name_header: true
+      response_streaming: allow
+    capabilities:
+      - generate
+      - agentic
+    formats:
+      - type: openai
+    target_models:
+      - name: gpt-5-4
+        provider:
+          name: azure-prod
+        config:
+          type: azure
+          deployment_id: gpt-5-4
+          api_version: "2024-10-01-preview"
+          max_tokens: 4096
+          temperature: 1.0
+    policies: []
+
+  # -------------------------------------------------------------------------
+  # capabilities: realtime
+  # -------------------------------------------------------------------------
+  - display_name: GPT Realtime
+    name: gpt-realtime
+    type: model
+    enabled: true
+    acls:
+      allow: []
+      deny: []
+    config:
+      route:
+        paths:
+          - /ai
+      model:
+        alias: "@azure/gpt-realtime"
+        name_header: true
+      response_streaming: always
+    capabilities:
+      - realtime
+    formats:
+      - type: openai
+    target_models:
+      - name: gpt-realtime
+        provider:
+          name: azure-prod
+        config:
+          type: azure
+          deployment_id: gpt-realtime
+          api_version: "2024-10-01-preview"
+    policies: []
+
+  # -------------------------------------------------------------------------
+  # capabilities: embeddings
+  # -------------------------------------------------------------------------
+  - display_name: text-embedding-3-large
+    name: text-embedding-3-large
+    type: model
+    enabled: true
+    acls:
+      allow: []
+      deny: []
+    config:
+      route:
+        paths:
+          - /ai
+      model:
+        alias: "@azure/text-embedding-3-large"
+        name_header: true
+      response_streaming: deny
+    capabilities:
+      - embeddings
+    formats:
+      - type: openai
+    target_models:
+      - name: text-embedding-3-large
+        provider:
+          name: azure-prod
+        config:
+          type: azure
+          deployment_id: text-embedding-3-large
+          api_version: "2024-10-01-preview"
+          embeddings_dimensions: 3072
+    policies: []
+
+  # -------------------------------------------------------------------------
+  # capabilities: image
+  # -------------------------------------------------------------------------
+  - display_name: GPT Image 1
+    name: gpt-image-1
+    type: model
+    enabled: true
+    acls:
+      allow: []
+      deny: []
+    config:
+      route:
+        paths:
+          - /ai
+      model:
+        alias: "@azure/gpt-image-1"
+        name_header: true
+      response_streaming: deny
+    capabilities:
+      - image
+    formats:
+      - type: openai
+    target_models:
+      - name: gpt-image-1
+        provider:
+          name: azure-prod
+        config:
+          type: azure
+          deployment_id: gpt-image-1
+          api_version: "2024-10-01-preview"
+    policies: []
+
+  # -------------------------------------------------------------------------
+  # capabilities: audio  (text-to-speech via gpt-4o-mini-tts)
+  # -------------------------------------------------------------------------
+  - display_name: GPT-4o mini TTS
+    name: gpt-4o-mini-tts
+    type: model
+    enabled: true
+    acls:
+      allow: []
+      deny: []
+    config:
+      route:
+        paths:
+          - /ai
+      model:
+        alias: "@azure/gpt-4o-mini-tts"
+        name_header: true
+      response_streaming: allow
+    capabilities:
+      - audio
+    formats:
+      - type: openai
+    target_models:
+      - name: gpt-4o-mini-tts
+        provider:
+          name: azure-prod
+        config:
+          type: azure
+          deployment_id: gpt-4o-mini-tts
+          api_version: "2024-10-01-preview"
+    policies: []
+
+  # -------------------------------------------------------------------------
+  # capabilities: audio  (speech-to-text transcription + translation)
+  # -------------------------------------------------------------------------
+  - display_name: Whisper 1
+    name: whisper-1
+    type: model
+    enabled: true
+    acls:
+      allow: []
+      deny: []
+    config:
+      route:
+        paths:
+          - /ai
+      model:
+        alias: "@azure/whisper-1"
+        name_header: true
+      response_streaming: deny
+      max_request_body_size: 26214400
+    capabilities:
+      - audio
+    formats:
+      - type: openai
+    target_models:
+      - name: whisper-1
+        provider:
+          name: azure-prod
+        config:
+          type: azure
+          deployment_id: whisper-1
+          api_version: "2024-10-01-preview"
+    policies: []
+
+  # -------------------------------------------------------------------------
+  # capabilities: video
+  # -------------------------------------------------------------------------
+  - display_name: Sora 2
+    name: sora-2
+    type: model
+    enabled: true
+    acls:
+      allow: []
+      deny: []
+    config:
+      route:
+        paths:
+          - /ai
+      model:
+        alias: "@azure/sora-2"
+        name_header: true
+      response_streaming: deny
+    capabilities:
+      - video
+    formats:
+      - type: openai
+    target_models:
+      - name: sora-2
+        provider:
+          name: azure-prod
+        config:
+          type: azure
+          deployment_id: sora-2
+          api_version: "2024-10-01-preview"
+    policies: []
+
+  # -------------------------------------------------------------------------
+  # capabilities: batches  (type=api — async batch endpoint, no per-call model)
+  # -------------------------------------------------------------------------
+  - display_name: OpenAI Batch API
+    name: openai-batch-api
+    type: api
+    enabled: true
+    acls:
+      allow: []
+      deny: []
+    config:
+      route:
+        paths:
+          - /ai
+      # The batch API doesn't accept a `model` field in the request body —
+      # per-request models are embedded inside each line of the batch JSONL
+      # file. The required `config.model` is left as an empty object.
+      model: {}
+      response_streaming: deny
+    capabilities:
+      - batches
+    formats:
+      - type: openai
+    target_models:
+      - name: batch-api
+        provider:
+          name: azure-prod
+        config:
+          type: azure
+          api_version: "2024-10-01-preview"
+    policies: []
+
+  # -------------------------------------------------------------------------
+  # capabilities: files  (type=api — file upload/list/download, no model)
+  # -------------------------------------------------------------------------
+  - display_name: OpenAI Files API
+    name: openai-files-api
+    type: api
+    enabled: true
+    acls:
+      allow: []
+      deny: []
+    config:
+      route:
+        paths:
+          - /ai
+      # Files API requests carry no `model` field at all; the required
+      # `config.model` is left as an empty object.
+      model: {}
+      response_streaming: deny
+      max_request_body_size: 536870912
+    capabilities:
+      - files
+    formats:
+      - type: openai
+    target_models:
+      - name: files-api
+        provider:
+          name: azure-prod
+        config:
+          type: azure
+          api_version: "2024-10-01-preview"
+    policies: []

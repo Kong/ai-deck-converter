@@ -1,0 +1,229 @@
+providers:
+- name: bedrock-prod
+  type: bedrock
+  display_name: "AWS Bedrock (Prod)"
+  config:
+    auth:
+      type: aws
+      access_key_id: "{vault://ai/aws-access-key-id}"
+      secret_access_key: "{vault://ai/aws-secret-access-key}"
+
+models:
+  # -------------------------------------------------------------------------
+  # capabilities: generate + agentic
+  # Both converse/invoke (generate) and retrieveAndGenerate (agentic) target
+  # the same Claude deployment on Bedrock. Kong splits these into two routes
+  # because they use different route_types (llm/v1/chat vs llm/v1/responses).
+  # -------------------------------------------------------------------------
+  - display_name: Claude 3.7 Sonnet (Bedrock)
+    name: claude-3-7-sonnet-bedrock
+    type: model
+    enabled: true
+    acls:
+      allow: []
+      deny: []
+    config:
+      route:
+        paths:
+          - /ai
+      model:
+        alias: "@bedrock/claude-3-7-sonnet"
+        name_header: true
+      response_streaming: allow
+    capabilities:
+      - generate
+      - agentic
+    formats:
+      - type: bedrock
+    target_models:
+      - name: anthropic.claude-3-7-sonnet-20250219-v1:0
+        provider:
+          name: bedrock-prod
+        config:
+          type: bedrock
+          max_tokens: 4096
+          temperature: 1.0
+    policies: []
+
+  # -------------------------------------------------------------------------
+  # capabilities: embeddings  (Amazon Titan — uses generic invoke endpoint)
+  # -------------------------------------------------------------------------
+  - display_name: Titan Text Embeddings v2
+    name: titan-embed-text-v2
+    type: model
+    enabled: true
+    acls:
+      allow: []
+      deny: []
+    config:
+      route:
+        paths:
+          - /ai
+      model:
+        alias: "@bedrock/titan-embed-text-v2"
+        name_header: true
+      response_streaming: deny
+    capabilities:
+      - embeddings
+    formats:
+      - type: bedrock
+    target_models:
+      - name: amazon.titan-embed-text-v2:0
+        provider:
+          name: bedrock-prod
+        config:
+          type: bedrock
+          embeddings_normalize: true
+    policies: []
+
+  # -------------------------------------------------------------------------
+  # capabilities: image  (Amazon Nova Canvas — image generation)
+  # -------------------------------------------------------------------------
+  - display_name: Nova Canvas (Image)
+    name: nova-canvas-image
+    type: model
+    enabled: true
+    acls:
+      allow: []
+      deny: []
+    config:
+      route:
+        paths:
+          - /ai
+      model:
+        alias: "@bedrock/nova-canvas"
+        name_header: true
+      response_streaming: deny
+    capabilities:
+      - image
+    formats:
+      - type: bedrock
+    target_models:
+      - name: amazon.nova-canvas-v1:0
+        provider:
+          name: bedrock-prod
+        config:
+          type: bedrock
+    policies: []
+
+  # -------------------------------------------------------------------------
+  # capabilities: audio  (Amazon Nova Sonic — speech-to-speech)
+  # -------------------------------------------------------------------------
+  - display_name: Nova Sonic (Audio)
+    name: nova-sonic-audio
+    type: model
+    enabled: true
+    acls:
+      allow: []
+      deny: []
+    config:
+      route:
+        paths:
+          - /ai
+      model:
+        alias: "@bedrock/nova-sonic"
+        name_header: true
+      response_streaming: allow
+    capabilities:
+      - audio
+    formats:
+      - type: bedrock
+    target_models:
+      - name: amazon.nova-sonic-v1:0
+        provider:
+          name: bedrock-prod
+        config:
+          type: bedrock
+    policies: []
+
+  # -------------------------------------------------------------------------
+  # capabilities: video  (Amazon Nova Reel — async video generation)
+  # -------------------------------------------------------------------------
+  - display_name: Nova Reel (Video)
+    name: nova-reel-video
+    type: model
+    enabled: true
+    acls:
+      allow: []
+      deny: []
+    config:
+      route:
+        paths:
+          - /ai
+      model:
+        alias: "@bedrock/nova-reel"
+        name_header: true
+      response_streaming: deny
+    capabilities:
+      - video
+    formats:
+      - type: bedrock
+    target_models:
+      - name: amazon.nova-reel-v1:1
+        provider:
+          name: bedrock-prod
+        config:
+          type: bedrock
+          video_output_s3_uri: "s3://kong-bedrock-outputs/nova-reel/"
+    policies: []
+
+  # -------------------------------------------------------------------------
+  # capabilities: rerank  (Cohere Rerank on Bedrock — dedicated rerank endpoint)
+  # -------------------------------------------------------------------------
+  - display_name: Cohere Rerank 3.5 (Bedrock)
+    name: cohere-rerank-3-5-bedrock
+    type: model
+    enabled: true
+    acls:
+      allow: []
+      deny: []
+    config:
+      route:
+        paths:
+          - /ai
+      model:
+        alias: "@bedrock/cohere-rerank-v3.5"
+        name_header: true
+      response_streaming: deny
+    capabilities:
+      - rerank
+    formats:
+      - type: bedrock
+    target_models:
+      - name: cohere.rerank-v3-5:0
+        provider:
+          name: bedrock-prod
+        config:
+          type: bedrock
+    policies: []
+
+  # -------------------------------------------------------------------------
+  # capabilities: batches  (type=api — Bedrock async-invoke + model-invocations)
+  # -------------------------------------------------------------------------
+  - display_name: Bedrock Batch / Async Invoke API
+    name: bedrock-batch-api
+    type: api
+    enabled: true
+    acls:
+      allow: []
+      deny: []
+    config:
+      route:
+        paths:
+          - /ai
+      # async-invoke and model-invocations don't carry a top-level `model`
+      # field — the model is in the URL path or the job spec.
+      model: {}
+      response_streaming: deny
+    capabilities:
+      - batches
+    formats:
+      - type: bedrock
+    target_models:
+      - name: batch-api
+        provider:
+          name: bedrock-prod
+        config:
+          type: bedrock
+          batch_bucket_prefix: "s3://kong-bedrock-batches/jobs/"
+    policies: []

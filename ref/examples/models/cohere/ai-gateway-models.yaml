@@ -1,0 +1,41 @@
+providers:
+- name: cohere-prod
+  type: cohere
+  display_name: "Cohere (Prod)"
+  config:
+    auth:
+      type: basic
+      headers:
+      - name: "Authorization"
+        value: "Bearer {vault://ai/cohere-key}"
+
+models:
+  # -------------------------------------------------------------------------
+  # capabilities: rerank  (Cohere's primary public capability)
+  # -------------------------------------------------------------------------
+  - display_name: Cohere Rerank 3.5
+    name: cohere-rerank-3-5
+    type: model
+    enabled: true
+    acls:
+      allow: []
+      deny: []
+    config:
+      route:
+        paths:
+          - /ai
+      model:
+        alias: "@cohere/rerank-v3.5"
+        name_header: true
+      response_streaming: deny
+    capabilities:
+      - rerank
+    formats:
+      - type: cohere
+    target_models:
+      - name: rerank-v3.5
+        provider:
+          name: cohere-prod
+        config:
+          type: cohere
+    policies: []

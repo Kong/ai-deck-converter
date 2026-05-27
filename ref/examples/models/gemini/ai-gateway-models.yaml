@@ -1,0 +1,132 @@
+providers:
+- name: gemini-prod
+  type: gemini
+  display_name: "Google Gemini (Prod)"
+  config:
+    project_id: kong-gemini-project
+    auth:
+      type: gcp
+      service_account_json: "{vault://ai/gcp-service-account-json}"
+
+models:
+  # -------------------------------------------------------------------------
+  # capabilities: generate
+  # -------------------------------------------------------------------------
+  - display_name: Gemini 2.5 Pro
+    name: gemini-2-5-pro
+    type: model
+    enabled: true
+    acls:
+      allow: []
+      deny: []
+    config:
+      route:
+        paths:
+          - /ai
+      model:
+        alias: "@gemini/gemini-2.5-pro"
+        name_header: true
+      response_streaming: allow
+    capabilities:
+      - generate
+    formats:
+      - type: gemini
+    target_models:
+      - name: gemini-2.5-pro
+        provider:
+          name: gemini-prod
+        config:
+          type: gemini
+          max_tokens: 4096
+          temperature: 1.0
+    policies: []
+
+  # -------------------------------------------------------------------------
+  # capabilities: embeddings
+  # -------------------------------------------------------------------------
+  - display_name: Text Embedding 004
+    name: gemini-embedding-004
+    type: model
+    enabled: true
+    acls:
+      allow: []
+      deny: []
+    config:
+      route:
+        paths:
+          - /ai
+      model:
+        alias: "@gemini/text-embedding-004"
+        name_header: true
+      response_streaming: deny
+    capabilities:
+      - embeddings
+    formats:
+      - type: gemini
+    target_models:
+      - name: text-embedding-004
+        provider:
+          name: gemini-prod
+        config:
+          type: gemini
+    policies: []
+
+  # -------------------------------------------------------------------------
+  # capabilities: batches  (type=api — workspace-level batch endpoint)
+  # -------------------------------------------------------------------------
+  - display_name: Gemini Batch API
+    name: gemini-batch-api
+    type: api
+    enabled: true
+    acls:
+      allow: []
+      deny: []
+    config:
+      route:
+        paths:
+          - /ai
+      # Workspace-scoped — per-request models are embedded inside the batch
+      # request payload, not at the top level.
+      model: {}
+      response_streaming: deny
+    capabilities:
+      - batches
+    formats:
+      - type: gemini
+    target_models:
+      - name: batch-api
+        provider:
+          name: gemini-prod
+        config:
+          type: gemini
+    policies: []
+
+  # -------------------------------------------------------------------------
+  # capabilities: files  (type=api — file upload + metadata management)
+  # -------------------------------------------------------------------------
+  - display_name: Gemini Files API
+    name: gemini-files-api
+    type: api
+    enabled: true
+    acls:
+      allow: []
+      deny: []
+    config:
+      route:
+        paths:
+          - /ai
+      # Files API requests carry no `model` field.
+      model: {}
+      response_streaming: deny
+      max_request_body_size: 2147483648
+    capabilities:
+      - files
+    formats:
+      - type: gemini
+    target_models:
+      - name: files-api
+        provider:
+          name: gemini-prod
+        config:
+          type: gemini
+    policies: []

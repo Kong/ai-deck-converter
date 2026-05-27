@@ -1,0 +1,84 @@
+_format_version: "3.0"
+
+services:
+- name: ai-gateway
+  url: http://ai-gateway.upstream.local
+  routes:
+    - name: cohere-rerank-v1
+      paths:
+        - /ai/v1/rerank
+      methods:
+        - POST
+      strip_path: false
+    - name: cohere-rerank-v2
+      paths:
+        - /ai/v2/rerank
+      methods:
+        - POST
+      strip_path: false
+
+ai-models:
+- name: cohere-rerank-3-5
+  alias: "@cohere/rerank-v3.5"
+
+plugins:
+# ============================================================================
+# ai-model-selector — rerank requests include the model name in the body
+# ============================================================================
+- name: ai-model-selector
+  route:
+    name: cohere-rerank-v1
+  config:
+    source: body
+    body_path: model
+    max_request_body_size: 4194304
+
+- name: ai-model-selector
+  route:
+    name: cohere-rerank-v2
+  config:
+    source: body
+    body_path: model
+    max_request_body_size: 4194304
+
+# ============================================================================
+# ai-proxy-advanced — both v1 and v2 rerank routes target the same Cohere model
+# ============================================================================
+# Note: rerank has no dedicated route_type; the README maps it to llm/v1/chat
+# by default (Capability table at README.md lines 45-56).
+
+- name: ai-proxy-advanced
+  route:
+    name: cohere-rerank-v1
+  config:
+    balancer:
+      algorithm: round-robin
+    llm_format: cohere
+    genai_category: text/generation
+    targets:
+      - route_type: llm/v1/chat
+        auth:
+          header_name: Authorization
+          header_value: "Bearer {vault://ai/cohere-key}"
+        model:
+          provider: cohere
+          name: rerank-v3.5
+          model_alias: "@cohere/rerank-v3.5"
+
+- name: ai-proxy-advanced
+  route:
+    name: cohere-rerank-v2
+  config:
+    balancer:
+      algorithm: round-robin
+    llm_format: cohere
+    genai_category: text/generation
+    targets:
+      - route_type: llm/v1/chat
+        auth:
+          header_name: Authorization
+          header_value: "Bearer {vault://ai/cohere-key}"
+        model:
+          provider: cohere
+          name: rerank-v3.5
+          model_alias: "@cohere/rerank-v3.5"

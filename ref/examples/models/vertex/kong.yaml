@@ -1,0 +1,236 @@
+_format_version: "3.0"
+
+# Note: Vertex AI has no distinct `provider` enum in the ai-proxy-advanced
+# plugin schema — it is targeted via `provider: gemini` plus Vertex-specific
+# options (gemini.project_id, gemini.location_id, gemini.api_endpoint). The
+# data-model layer still uses `type: vertex` (see ai-gateway-models.yaml).
+
+services:
+- name: ai-gateway
+  url: http://ai-gateway.upstream.local
+  routes:
+    - name: vertex-generate
+      paths:
+        - ~/ai/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/google/models/(?<model_name>[^:/]+):(?:generateContent|streamGenerateContent)
+      methods:
+        - GET
+        - POST
+      strip_path: false
+    - name: vertex-embeddings
+      paths:
+        - ~/ai/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/google/models/(?<model_name>[^:/]+):(?:embedContent|batchEmbedContent)
+      methods:
+        - GET
+        - POST
+      strip_path: false
+    # Consolidated route: :predictLongRunning is used by both Imagen (image) and
+    # Veo (video). See plugin block below for the routing-among-modalities caveat.
+    - name: vertex-predict-long-running
+      paths:
+        - ~/ai/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/google/models/(?<model_name>[^:/]+):predictLongRunning
+      methods:
+        - GET
+        - POST
+      strip_path: false
+    - name: vertex-ranking
+      paths:
+        - ~/ai/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/rankingConfigs/(?<ranking_config>[^:/]+):rank
+      methods:
+        - GET
+        - POST
+      strip_path: false
+    - name: vertex-batches
+      paths:
+        - ~/ai/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/batchPredictionJobs
+      methods:
+        - GET
+        - POST
+      strip_path: false
+
+ai-models:
+- name: vertex-gemini-2-5-pro
+  alias: "@vertex/gemini-2.5-pro"
+- name: vertex-text-embedding-005
+  alias: "@vertex/text-embedding-005"
+- name: vertex-imagen-3
+  alias: "@vertex/imagen-3.0-generate-001"
+- name: vertex-veo-2
+  alias: "@vertex/veo-2.0-generate-001"
+- name: vertex-ranking-api
+  # alias omitted: rerank is endpoint-keyed (rankingConfig), not model-keyed.
+- name: vertex-batch-api
+  # alias omitted: batch jobs name their model inside the job spec.
+
+plugins:
+# ============================================================================
+# ai-model-selector — only on routes whose request body has a `model` field.
+# Vertex's image/video/ranking/batch routes don't carry a top-level model field,
+# so they're omitted.
+# ============================================================================
+- name: ai-model-selector
+  route:
+    name: vertex-generate
+  config:
+    source: body
+    body_path: model
+    max_request_body_size: 8388608
+
+- name: ai-model-selector
+  route:
+    name: vertex-embeddings
+  config:
+    source: body
+    body_path: model
+    max_request_body_size: 4194304
+
+# ============================================================================
+# ai-proxy-advanced — provider: gemini (Vertex shares the gemini provider in
+# the plugin schema). Vertex-specific options live under options.gemini.*.
+# ============================================================================
+
+# ---- generate --------------------------------------------------------------
+- name: ai-proxy-advanced
+  route:
+    name: vertex-generate
+  config:
+    balancer:
+      algorithm: round-robin
+    llm_format: gemini
+    genai_category: text/generation
+    targets:
+      - route_type: llm/v1/chat
+        auth:
+          gcp_use_service_account: true
+          gcp_service_account_json: "{vault://ai/gcp-service-account-json}"
+        model:
+          provider: gemini
+          name: gemini-2.5-pro
+          model_alias: "@vertex/gemini-2.5-pro"
+          options:
+            max_tokens: 4096
+            temperature: 1.0
+            gemini:
+              project_id: kong-vertex-project
+              location_id: us-central1
+              api_endpoint: us-central1-aiplatform.googleapis.com
+
+# ---- embeddings ------------------------------------------------------------
+- name: ai-proxy-advanced
+  route:
+    name: vertex-embeddings
+  config:
+    balancer:
+      algorithm: round-robin
+    llm_format: gemini
+    genai_category: text/embeddings
+    targets:
+      - route_type: llm/v1/embeddings
+        auth:
+          gcp_use_service_account: true
+          gcp_service_account_json: "{vault://ai/gcp-service-account-json}"
+        model:
+          provider: gemini
+          name: text-embedding-005
+          model_alias: "@vertex/text-embedding-005"
+          options:
+            gemini:
+              project_id: kong-vertex-project
+              location_id: us-central1
+              api_endpoint: us-central1-aiplatform.googleapis.com
+
+# ---- predict-long-running (Imagen + Veo) -----------------------------------
+# CAVEAT: this single plugin must serve both image (Imagen) and video (Veo)
+# because they share the :predictLongRunning URL suffix. Two problems:
+#   1. `genai_category` is plugin-level and can only hold one value. We use
+#      `image/generation` since Imagen is the more common case; Veo requests
+#      will be miscategorised for analytics/telemetry purposes.
+#   2. Even though `route_type` is per-target (so Veo can have
+#      `video/v1/videos/generations`), the balancer (round-robin) decides which
+#      target serves a request. `ai-model-selector` cannot read URI captures
+#      (only body/header), so the (?<model_name>...) capture in the route path
+#      is not used to dispatch among targets. To fix: either extend
+#      ai-model-selector with `source: uri_capture`, or require clients to send
+#      an `X-Model` header and switch the selector to `source: header`.
+- name: ai-proxy-advanced
+  route:
+    name: vertex-predict-long-running
+  config:
+    balancer:
+      algorithm: round-robin
+    llm_format: gemini
+    genai_category: image/generation
+    targets:
+      - route_type: image/v1/images/generations
+        auth:
+          gcp_use_service_account: true
+          gcp_service_account_json: "{vault://ai/gcp-service-account-json}"
+        model:
+          provider: gemini
+          name: imagen-3.0-generate-001
+          model_alias: "@vertex/imagen-3.0-generate-001"
+          options:
+            gemini:
+              project_id: kong-vertex-project
+              location_id: us-central1
+              api_endpoint: us-central1-aiplatform.googleapis.com
+      - route_type: video/v1/videos/generations
+        auth:
+          gcp_use_service_account: true
+          gcp_service_account_json: "{vault://ai/gcp-service-account-json}"
+        model:
+          provider: gemini
+          name: veo-2.0-generate-001
+          model_alias: "@vertex/veo-2.0-generate-001"
+          options:
+            gemini:
+              project_id: kong-vertex-project
+              location_id: us-central1
+              api_endpoint: us-central1-aiplatform.googleapis.com
+
+# ---- rerank (Vertex Ranking API, endpoint-keyed) ---------------------------
+- name: ai-proxy-advanced
+  route:
+    name: vertex-ranking
+  config:
+    balancer:
+      algorithm: round-robin
+    llm_format: gemini
+    genai_category: text/generation
+    targets:
+      # rerank has no dedicated route_type; the README maps it to llm/v1/chat
+      # by default (Capability table at README.md lines 45-56).
+      - route_type: llm/v1/chat
+        auth:
+          gcp_use_service_account: true
+          gcp_service_account_json: "{vault://ai/gcp-service-account-json}"
+        model:
+          provider: gemini
+          name: ranking-api
+          options:
+            gemini:
+              project_id: kong-vertex-project
+              location_id: us-central1
+              api_endpoint: us-central1-aiplatform.googleapis.com
+
+# ---- batches (batch prediction jobs) ---------------------------------------
+- name: ai-proxy-advanced
+  route:
+    name: vertex-batches
+  config:
+    balancer:
+      algorithm: round-robin
+    llm_format: gemini
+    genai_category: text/generation
+    targets:
+      - route_type: llm/v1/batches
+        auth:
+          gcp_use_service_account: true
+          gcp_service_account_json: "{vault://ai/gcp-service-account-json}"
+        model:
+          provider: gemini
+          name: batch-api
+          options:
+            gemini:
+              project_id: kong-vertex-project
+              location_id: us-central1
+              api_endpoint: us-central1-aiplatform.googleapis.com

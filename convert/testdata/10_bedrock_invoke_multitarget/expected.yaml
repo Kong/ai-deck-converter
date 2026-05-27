@@ -1,0 +1,77 @@
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: bedrock-invoke
+        paths:
+          - ~/ai/model/(?<model_name>[^/]+)/invoke(?:-with-response-stream)?
+        methods:
+          - GET
+          - POST
+        strip_path: false
+plugins:
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/embeddings
+      llm_format: bedrock
+      targets:
+        - auth:
+            aws_access_key_id: '{vault://ai/aws-access-key-id}'
+            aws_secret_access_key: '{vault://ai/aws-secret-access-key}'
+          model:
+            model_alias: '@bedrock/titan-embed-text-v2'
+            name: amazon.titan-embed-text-v2:0
+            options:
+              bedrock:
+                aws_region: us-east-1
+                embeddings_normalize: true
+            provider: bedrock
+          route_type: llm/v1/embeddings
+        - auth:
+            aws_access_key_id: '{vault://ai/aws-access-key-id}'
+            aws_secret_access_key: '{vault://ai/aws-secret-access-key}'
+          model:
+            model_alias: '@bedrock/nova-canvas'
+            name: amazon.nova-canvas-v1:0
+            options:
+              bedrock:
+                aws_region: us-east-1
+            provider: bedrock
+          route_type: image/v1/images/generations
+        - auth:
+            aws_access_key_id: '{vault://ai/aws-access-key-id}'
+            aws_secret_access_key: '{vault://ai/aws-secret-access-key}'
+          model:
+            model_alias: '@bedrock/nova-sonic'
+            name: amazon.nova-sonic-v1:0
+            options:
+              bedrock:
+                aws_region: us-east-1
+            provider: bedrock
+          route_type: audio/v1/audio/speech
+        - auth:
+            aws_access_key_id: '{vault://ai/aws-access-key-id}'
+            aws_secret_access_key: '{vault://ai/aws-secret-access-key}'
+          model:
+            model_alias: '@bedrock/nova-reel'
+            name: amazon.nova-reel-v1:1
+            options:
+              bedrock:
+                aws_region: us-east-1
+                video_output_s3_uri: s3://kong/nova-reel/
+            provider: bedrock
+          route_type: video/v1/videos/generations
+    route:
+      name: bedrock-invoke
+ai-models:
+  - name: titan-embed-text-v2
+    alias: '@bedrock/titan-embed-text-v2'
+  - name: nova-canvas-image
+    alias: '@bedrock/nova-canvas'
+  - name: nova-sonic-audio
+    alias: '@bedrock/nova-sonic'
+  - name: nova-reel-video
+    alias: '@bedrock/nova-reel'

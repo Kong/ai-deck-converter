@@ -1,0 +1,437 @@
+_format_version: "3.0"
+
+services:
+- name: ai-gateway
+  url: http://ai-gateway.upstream.local
+  routes:
+    - name: openai-chat
+      paths:
+        - /ai/chat/completions
+      methods:
+        - POST
+      strip_path: false
+    - name: openai-responses
+      paths:
+        - /ai/responses
+      methods:
+        - POST
+      strip_path: false
+    - name: openai-realtime
+      paths:
+        - /ai/realtime
+      methods:
+        - GET
+        - POST
+      strip_path: false
+    - name: openai-embeddings
+      paths:
+        - /ai/embeddings
+      methods:
+        - POST
+      strip_path: false
+    - name: openai-images
+      paths:
+        - /ai/images/generations
+      methods:
+        - POST
+      strip_path: false
+    - name: openai-audio-speech
+      paths:
+        - /ai/audio/speech
+      methods:
+        - POST
+      strip_path: false
+    - name: openai-audio-transcribe
+      paths:
+        - /ai/audio/transcriptions
+      methods:
+        - POST
+      strip_path: false
+    - name: openai-audio-translate
+      paths:
+        - /ai/audio/translations
+      methods:
+        - POST
+      strip_path: false
+    - name: openai-videos
+      paths:
+        - /ai/videos/generations
+      methods:
+        - POST
+      strip_path: false
+    - name: openai-batches
+      paths:
+        - /ai/batches
+      methods:
+        - GET
+        - POST
+      strip_path: false
+    - name: openai-files
+      paths:
+        - /ai/files
+      methods:
+        - GET
+        - POST
+        - DELETE
+      strip_path: false
+
+ai-models:
+- name: gpt-5-4-chat
+  alias: "@azure/gpt-5.4"
+- name: gpt-realtime
+  alias: "@azure/gpt-realtime"
+- name: text-embedding-3-large
+  alias: "@azure/text-embedding-3-large"
+- name: gpt-image-1
+  alias: "@azure/gpt-image-1"
+- name: gpt-4o-mini-tts
+  alias: "@azure/gpt-4o-mini-tts"
+- name: whisper-1
+  alias: "@azure/whisper-1"
+- name: sora-2
+  alias: "@azure/sora-2"
+- name: openai-batch-api
+  # alias omitted: batch API doesn't take a `model` field — per-request
+  # models are embedded inside each line of the batch JSONL file.
+- name: openai-files-api
+  # alias omitted: files API doesn't take a `model` field at all.
+
+plugins:
+# ============================================================================
+# ai-model-selector — extract model from request body for routes that take one
+# ============================================================================
+- name: ai-model-selector
+  route:
+    name: openai-chat
+  config:
+    source: body
+    body_path: model
+    max_request_body_size: 8388608
+
+- name: ai-model-selector
+  route:
+    name: openai-responses
+  config:
+    source: body
+    body_path: model
+    max_request_body_size: 8388608
+
+- name: ai-model-selector
+  route:
+    name: openai-realtime
+  config:
+    source: body
+    body_path: model
+    max_request_body_size: 1048576
+
+- name: ai-model-selector
+  route:
+    name: openai-embeddings
+  config:
+    source: body
+    body_path: model
+    max_request_body_size: 4194304
+
+- name: ai-model-selector
+  route:
+    name: openai-images
+  config:
+    source: body
+    body_path: model
+    max_request_body_size: 1048576
+
+- name: ai-model-selector
+  route:
+    name: openai-audio-speech
+  config:
+    source: body
+    body_path: model
+    max_request_body_size: 1048576
+
+- name: ai-model-selector
+  route:
+    name: openai-audio-transcribe
+  config:
+    source: body
+    body_path: model
+    max_request_body_size: 26214400
+
+- name: ai-model-selector
+  route:
+    name: openai-audio-translate
+  config:
+    source: body
+    body_path: model
+    max_request_body_size: 26214400
+
+- name: ai-model-selector
+  route:
+    name: openai-videos
+  config:
+    source: body
+    body_path: model
+    max_request_body_size: 1048576
+
+# Note: no ai-model-selector on openai-batches or openai-files routes —
+# neither endpoint accepts a `model` field in the request.
+
+# ============================================================================
+# ai-proxy-advanced — one per route, all targeting Azure AI Foundry
+# ============================================================================
+
+# ---- generate + agentic ----------------------------------------------------
+- name: ai-proxy-advanced
+  route:
+    name: openai-chat
+  config:
+    balancer:
+      algorithm: round-robin
+    llm_format: openai
+    genai_category: text/generation
+    targets:
+      - route_type: llm/v1/chat
+        auth:
+          header_name: api-key
+          header_value: "{vault://ai/azure-openai-key}"
+        model:
+          provider: azure
+          name: gpt-5-4
+          model_alias: "@azure/gpt-5.4"
+          options:
+            azure_instance: kong-az-east
+            azure_deployment_id: gpt-5-4
+            azure_api_version: "2024-10-01-preview"
+            max_tokens: 4096
+            temperature: 1.0
+
+- name: ai-proxy-advanced
+  route:
+    name: openai-responses
+  config:
+    balancer:
+      algorithm: round-robin
+    llm_format: openai
+    genai_category: text/generation
+    targets:
+      - route_type: llm/v1/responses
+        auth:
+          header_name: api-key
+          header_value: "{vault://ai/azure-openai-key}"
+        model:
+          provider: azure
+          name: gpt-5-4
+          model_alias: "@azure/gpt-5.4"
+          options:
+            azure_instance: kong-az-east
+            azure_deployment_id: gpt-5-4
+            azure_api_version: "2024-10-01-preview"
+            max_tokens: 4096
+            temperature: 1.0
+
+# ---- realtime --------------------------------------------------------------
+- name: ai-proxy-advanced
+  route:
+    name: openai-realtime
+  config:
+    balancer:
+      algorithm: round-robin
+    llm_format: openai
+    genai_category: realtime/generation
+    targets:
+      - route_type: realtime/v1/realtime
+        auth:
+          header_name: api-key
+          header_value: "{vault://ai/azure-openai-key}"
+        model:
+          provider: azure
+          name: gpt-realtime
+          model_alias: "@azure/gpt-realtime"
+          options:
+            azure_instance: kong-az-east
+            azure_deployment_id: gpt-realtime
+            azure_api_version: "2024-10-01-preview"
+
+# ---- embeddings ------------------------------------------------------------
+- name: ai-proxy-advanced
+  route:
+    name: openai-embeddings
+  config:
+    balancer:
+      algorithm: round-robin
+    llm_format: openai
+    genai_category: text/embeddings
+    targets:
+      - route_type: llm/v1/embeddings
+        auth:
+          header_name: api-key
+          header_value: "{vault://ai/azure-openai-key}"
+        model:
+          provider: azure
+          name: text-embedding-3-large
+          model_alias: "@azure/text-embedding-3-large"
+          options:
+            azure_instance: kong-az-east
+            azure_deployment_id: text-embedding-3-large
+            azure_api_version: "2024-10-01-preview"
+            embeddings_dimensions: 3072
+
+# ---- image -----------------------------------------------------------------
+- name: ai-proxy-advanced
+  route:
+    name: openai-images
+  config:
+    balancer:
+      algorithm: round-robin
+    llm_format: openai
+    genai_category: image/generation
+    targets:
+      - route_type: image/v1/images/generations
+        auth:
+          header_name: api-key
+          header_value: "{vault://ai/azure-openai-key}"
+        model:
+          provider: azure
+          name: gpt-image-1
+          model_alias: "@azure/gpt-image-1"
+          options:
+            azure_instance: kong-az-east
+            azure_deployment_id: gpt-image-1
+            azure_api_version: "2024-10-01-preview"
+
+# ---- audio: speech (TTS) ---------------------------------------------------
+- name: ai-proxy-advanced
+  route:
+    name: openai-audio-speech
+  config:
+    balancer:
+      algorithm: round-robin
+    llm_format: openai
+    genai_category: audio/speech
+    targets:
+      - route_type: audio/v1/audio/speech
+        auth:
+          header_name: api-key
+          header_value: "{vault://ai/azure-openai-key}"
+        model:
+          provider: azure
+          name: gpt-4o-mini-tts
+          model_alias: "@azure/gpt-4o-mini-tts"
+          options:
+            azure_instance: kong-az-east
+            azure_deployment_id: gpt-4o-mini-tts
+            azure_api_version: "2024-10-01-preview"
+
+# ---- audio: transcription --------------------------------------------------
+- name: ai-proxy-advanced
+  route:
+    name: openai-audio-transcribe
+  config:
+    balancer:
+      algorithm: round-robin
+    llm_format: openai
+    genai_category: audio/transcription
+    targets:
+      - route_type: audio/v1/audio/transcriptions
+        auth:
+          header_name: api-key
+          header_value: "{vault://ai/azure-openai-key}"
+        model:
+          provider: azure
+          name: whisper-1
+          model_alias: "@azure/whisper-1"
+          options:
+            azure_instance: kong-az-east
+            azure_deployment_id: whisper-1
+            azure_api_version: "2024-10-01-preview"
+
+# ---- audio: translation ----------------------------------------------------
+- name: ai-proxy-advanced
+  route:
+    name: openai-audio-translate
+  config:
+    balancer:
+      algorithm: round-robin
+    llm_format: openai
+    genai_category: audio/transcription
+    targets:
+      - route_type: audio/v1/audio/translations
+        auth:
+          header_name: api-key
+          header_value: "{vault://ai/azure-openai-key}"
+        model:
+          provider: azure
+          name: whisper-1
+          model_alias: "@azure/whisper-1"
+          options:
+            azure_instance: kong-az-east
+            azure_deployment_id: whisper-1
+            azure_api_version: "2024-10-01-preview"
+
+# ---- video -----------------------------------------------------------------
+- name: ai-proxy-advanced
+  route:
+    name: openai-videos
+  config:
+    balancer:
+      algorithm: round-robin
+    llm_format: openai
+    genai_category: video/generation
+    targets:
+      - route_type: video/v1/videos/generations
+        auth:
+          header_name: api-key
+          header_value: "{vault://ai/azure-openai-key}"
+        model:
+          provider: azure
+          name: sora-2
+          model_alias: "@azure/sora-2"
+          options:
+            azure_instance: kong-az-east
+            azure_deployment_id: sora-2
+            azure_api_version: "2024-10-01-preview"
+
+# ---- batches (async API, no per-call model) --------------------------------
+- name: ai-proxy-advanced
+  route:
+    name: openai-batches
+  config:
+    balancer:
+      algorithm: round-robin
+    llm_format: openai
+    genai_category: text/generation
+    targets:
+      - route_type: llm/v1/batches
+        auth:
+          header_name: api-key
+          header_value: "{vault://ai/azure-openai-key}"
+        model:
+          # Placeholder — Azure's batch endpoint is workspace-scoped, not
+          # deployment-scoped, so azure_deployment_id is intentionally absent.
+          provider: azure
+          name: batch-api
+          options:
+            azure_instance: kong-az-east
+            azure_api_version: "2024-10-01-preview"
+
+# ---- files (upload/list/download referenced by batches & other async ops) --
+- name: ai-proxy-advanced
+  route:
+    name: openai-files
+  config:
+    balancer:
+      algorithm: round-robin
+    llm_format: openai
+    genai_category: text/generation
+    targets:
+      - route_type: llm/v1/files
+        auth:
+          header_name: api-key
+          header_value: "{vault://ai/azure-openai-key}"
+        model:
+          # Placeholder — files endpoint is workspace-scoped; no model needed.
+          provider: azure
+          name: files-api
+          options:
+            azure_instance: kong-az-east
+            azure_api_version: "2024-10-01-preview"
+

@@ -1,0 +1,134 @@
+policies:
+  - display_name: AI Prompt Guard
+    name: ai-prompt-guard-default
+    type: ai-prompt-guard
+    enabled: true
+    config:
+      deny_patterns:
+        - ".*(W|w)ar.*"
+        - ".*(C|c)onflict.*"
+        - ".*(B|b)lood.*"
+        - ".*(V|v)iolence.*"
+
+  - display_name: IP Restriction
+    name: ip-restriction-default
+    type: ip-restriction
+    enabled: true
+    config:
+      allow:
+        - 203.0.113.1
+        - 192.0.2.0/24
+
+  - display_name: Key Auth
+    name: key-auth-default
+    type: key-auth
+    enabled: true
+    config:
+      key_names:
+        - apikey
+      hide_credentials: false
+
+  - display_name: OpenAI Rate Limits
+    name: openai-rate-limits
+    type: ai-rate-limiting-advanced
+    enabled: true
+    config:
+      strategy: local
+      policies:
+      - match:
+        - type: model
+          values: 
+          - "@openai/gpt-5.2"
+        limits:
+        - token_count_strategy: cost
+          limit: 100
+          window_size: 86400
+  
+  - display_name: Anthropic Rate Limits
+    name: anthropic-rate-limits
+    type: ai-rate-limiting-advanced
+    enabled: true
+    config:
+      strategy: local
+      policies:
+      - match:
+        - type: model
+          values: 
+          - "@anthropic/claude-opus-4-6"
+        limits:
+        - token_count_strategy: cost
+          limit: 50
+          window_size: 86400
+
+providers:
+- name: anthropic-prod
+  type: anthropic
+  display_name: "Anthropic Prod"
+  config:
+    type: basic
+    headers:
+    - name: "x-api-key"
+      value: "{vault://ai/anthropic-token}"
+
+- name: openai-prod
+  type: openai
+  display_name: "OpenAI Prod"
+  config:
+    type: basic
+    headers:
+    - name: "Authorization"
+      value: "{vault://ai/openai-token}"
+
+models:
+  - display_name: GPT-5.2
+    name: gpt-5-2
+    type: model
+    enabled: true
+    config:
+      route:
+        paths:
+          - /ai
+      model:
+        alias: "@openai/gpt-5.2"
+      response_streaming: allow
+    capabilities:
+      - chat
+    formats:
+      - type: openai
+    target_models:
+      - name: gpt-5.2
+        provider:
+          name: openai-prod
+    policies:
+      - ai-prompt-guard-default
+      - ip-restriction-default
+      - key-auth-default
+      - openai-rate-limits
+    
+
+  - display_name: Claude Opus 4.6
+    name: claude-opus-4-6
+    type: model
+    enabled: true
+    config:
+      route:
+        paths:
+          - /ai
+      model:
+        alias: "@anthropic/claude-opus-4-6"
+      response_streaming: allow
+    capabilities:
+      - chat
+    formats:
+      - type: anthropic
+    target_models:
+      - name: claude-opus-4-6
+        provider:
+          name: anthropic-prod
+        config:
+          type: anthropic
+    policies:
+      - ai-prompt-guard-default
+      - ip-restriction-default
+      - key-auth-default
+      - anthropic-rate-limits

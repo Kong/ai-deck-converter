@@ -1,0 +1,37 @@
+Method
+Endpoint
+Description
+GET
+/ai-models
+List all the model entities
+POST
+/ai-models
+Create a new model entity
+GET
+/ai-models/:ai_models
+Get a model entity by name/id
+PATCH
+/ai-models/:ai_models
+Update model entity by name/id
+PUT
+/ai-models/:ai_models
+Replace with a new instance 
+DELETE
+/ai-models/:ai_models
+Delete an existing model entity
+GET
+/ai-models/:ai_models/plugins
+list plugins scoped to this model
+POST
+/ai-models/:ai_models/plugins
+Associate a plugin with a model name/id
+GET
+/ai-models/:ai_models/plugins/:plugins
+Get a plugin associated with model entity
+PATCH
+/ai-models/:ai_models/plugins/:plugins
+Change the model entity on the plugin
+DELETE
+/ai-models/:ai_models/plugins/:plugins
+Remove model association with the plugin
+

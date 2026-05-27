@@ -1,0 +1,89 @@
+_format_version: "3.0"
+
+services:
+- name: ai-gateway
+  url: http://ai-gateway.upstream.local
+  routes:
+    - name: anthropic-messages
+      paths:
+        - /ai/v1/messages
+      methods:
+        - POST
+      strip_path: false
+    - name: anthropic-batches
+      paths:
+        - /ai/v1/messages/batches
+      methods:
+        - GET
+        - POST
+      strip_path: false
+
+ai-models:
+- name: claude-opus-4-5-chat
+  alias: "@anthropic/claude-opus-4-5"
+- name: anthropic-batch-api
+  # alias omitted: batch API doesn't take a top-level `model` field — per-request
+  # models are embedded inside each line of the batch JSONL file.
+
+plugins:
+# ============================================================================
+# ai-model-selector — extract model from request body
+# ============================================================================
+- name: ai-model-selector
+  route:
+    name: anthropic-messages
+  config:
+    source: body
+    body_path: model
+    max_request_body_size: 8388608
+
+# Note: no ai-model-selector on anthropic-batches — batch API embeds models
+# inside each line of the batch JSONL, not at the request top-level.
+
+# ============================================================================
+# ai-proxy-advanced — one per route, targeting Anthropic natively
+# ============================================================================
+
+# ---- generate (Messages API) ------------------------------------------------
+- name: ai-proxy-advanced
+  route:
+    name: anthropic-messages
+  config:
+    balancer:
+      algorithm: round-robin
+    llm_format: anthropic
+    genai_category: text/generation
+    targets:
+      - route_type: llm/v1/chat
+        auth:
+          header_name: x-api-key
+          header_value: "{vault://ai/anthropic-key}"
+        model:
+          provider: anthropic
+          name: claude-opus-4-5
+          model_alias: "@anthropic/claude-opus-4-5"
+          options:
+            anthropic_version: "2023-06-01"
+            max_tokens: 4096
+            temperature: 1.0
+
+# ---- batches (Message Batches API, no per-call model) -----------------------
+- name: ai-proxy-advanced
+  route:
+    name: anthropic-batches
+  config:
+    balancer:
+      algorithm: round-robin
+    llm_format: anthropic
+    genai_category: text/generation
+    targets:
+      - route_type: llm/v1/batches
+        auth:
+          header_name: x-api-key
+          header_value: "{vault://ai/anthropic-key}"
+        model:
+          # Placeholder — batches endpoint embeds the model in each JSONL line.
+          provider: anthropic
+          name: batch-api
+          options:
+            anthropic_version: "2023-06-01"

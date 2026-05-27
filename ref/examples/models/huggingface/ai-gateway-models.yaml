@@ -1,0 +1,47 @@
+providers:
+- name: huggingface-prod
+  type: huggingface
+  display_name: "Hugging Face (Prod)"
+  config:
+    auth:
+      type: basic
+      headers:
+      - name: "Authorization"
+        value: "Bearer {vault://ai/hf-token}"
+
+models:
+  # -------------------------------------------------------------------------
+  # capabilities: generate  (Text Generation Inference — TGI endpoints)
+  # -------------------------------------------------------------------------
+  # TGI deployments are single-model: the model is baked into the upstream
+  # endpoint URL, not selected per request. No `model` field in the request
+  # body, so the Kong route has no ai-model-selector plugin.
+  - display_name: Llama 3.3 70B Instruct (TGI)
+    name: hf-llama-3-3-70b-tgi
+    type: model
+    enabled: true
+    acls:
+      allow: []
+      deny: []
+    config:
+      route:
+        paths:
+          - /ai
+      model:
+        alias: "@huggingface/llama-3.3-70b-instruct"
+        name_header: true
+      response_streaming: allow
+    capabilities:
+      - generate
+    formats:
+      - type: huggingface
+    target_models:
+      - name: meta-llama/Llama-3.3-70B-Instruct
+        provider:
+          name: huggingface-prod
+        config:
+          type: huggingface
+          upstream_url: "https://kong-hf-tgi.huggingface.cloud"
+          max_tokens: 4096
+          temperature: 1.0
+    policies: []

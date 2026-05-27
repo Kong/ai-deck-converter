@@ -1,0 +1,177 @@
+_format_version: "3.0"
+
+services:
+- name: ai-gateway
+  url: http://ai-gateway.upstream.local
+  routes:
+    - name: openai-chat
+      paths:
+        - /ai/chat/completions
+      methods:
+        - POST
+      strip_path: false
+    - name: anthropic-messages
+      paths:
+        - /ai/v1/messages
+      methods:
+        - POST
+      strip_path: false
+
+ai-models:
+- name: gpt-5-2
+  alias: "@openai/gpt-5.2"
+- name: claude-opus-4-6
+  alias: "@anthropic/claude-opus-4-6"
+
+plugins:
+# ----------------------------------------------------------------------------------------------------------
+# Per-route model selector to extract model from incoming request - using source: body if model_alias is set
+# ----------------------------------------------------------------------------------------------------------
+- name: ai-model-selector
+  route: 
+    name: openai-chat
+  config:
+    source: body
+    body_path: model
+    max_request_body_size: 8388608
+
+- name: ai-model-selector
+  route: 
+    name: anthropic-messages
+  config:
+    source: body
+    body_path: model
+    max_request_body_size: 4194304
+# ---------------------------------------------------------------------------
+# OpenAI Chat - per-route AI Proxy
+# ---------------------------------------------------------------------------
+- name: ai-proxy-advanced
+  route: 
+    name: openai-chat
+  config:
+    balancer:
+      algorithm: round-robin
+    llm_format: openai
+    targets:
+      - route_type: llm/v1/chat
+        auth:
+          header_name: Authorization
+          header_value: "Bearer {vault://ai/openai-token}"
+        model:
+          provider: openai
+          name: gpt-5.2
+          model_alias: "@openai/gpt-5.2"
+          options:
+            max_tokens: 1024
+            temperature: 1.0
+# ---------------------------------------------------------------------------
+# Anthropic Messages - per-route AI Proxy
+# ---------------------------------------------------------------------------
+- name: ai-proxy-advanced
+  route: 
+    name: anthropic-chat
+  config:
+    balancer:
+      algorithm: round-robin
+    llm_format: anthropic
+    targets:
+      - route_type: llm/v1/chat
+        auth:
+          header_name: x-api-key
+          header_value: "{vault://ai/anthropic-token}"
+        model:
+          provider: anthropic
+          name: claude-opus-4-6
+          model_alias: "@anthropic/claude-opus-4-6"
+          options:
+            max_tokens: 1024
+            temperature: 1.0
+            anthropic_version: "2023-06-01"
+
+# ---------------------------------------------------------------------------
+# Plugins scoped to the gpt-5-2 model entity
+# ---------------------------------------------------------------------------
+- name: ai-prompt-guard
+  model: 
+    name: gpt-5-2
+  config:
+    deny_patterns:
+      - ".*(W|w)ar.*"
+      - ".*(C|c)onflict.*"
+      - ".*(B|b)lood.*"
+      - ".*(V|v)iolence.*"
+
+- name: ip-restriction
+  model: 
+    name: gpt-5-2
+  config:
+    allow:
+      - 203.0.113.1
+      - 192.0.2.0/24
+
+- name: key-auth
+  route: 
+    name: openai-chat
+  config:
+    key_names:
+      - apikey
+    hide_credentials: false
+
+- name: ai-rate-limiting-advanced
+  model: 
+    name: gpt-5-2
+  config:
+    strategy: local
+    policies:
+    - match:
+      - type: model
+        values: 
+        - "@openai/gpt-5.2"
+      limits:
+      - token_count_strategy: cost
+        limit: 100
+        window_size: 86400
+
+# ---------------------------------------------------------------------------
+# Plugins scoped to the anthropic/claude-opus-4-6 model entity
+# ---------------------------------------------------------------------------
+- name: ai-prompt-guard
+  route: 
+    name: claude-opus-4-6
+  config:
+    deny_patterns:
+      - ".*(W|w)ar.*"
+      - ".*(C|c)onflict.*"
+      - ".*(B|b)lood.*"
+      - ".*(V|v)iolence.*"
+
+- name: ip-restriction
+  model: 
+    name: claude-opus-4-6
+  config:
+    allow:
+      - 203.0.113.1
+      - 192.0.2.0/24
+
+- name: key-auth
+  model: 
+    name: anthropic-messages
+  config:
+    key_names:
+      - apikey
+    hide_credentials: false
+
+- name: ai-rate-limiting-advanced
+  model: 
+    name: claude-opus-4-6
+  config:
+    strategy: local
+    policies:
+    - match:
+      - type: model
+        values: 
+        - "@anthropic/claude-opus-4-6"
+      limits:
+      - token_count_strategy: cost
+        limit: 50
+        window_size: 86400

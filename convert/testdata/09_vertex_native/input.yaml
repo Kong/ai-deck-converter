@@ -1,0 +1,50 @@
+providers:
+  - name: vertex-prod
+    type: vertex
+    display_name: Google Vertex AI (Prod)
+    config:
+      project_id: kong-vertex-project
+      auth:
+        type: gcp
+        service_account_json: "{vault://ai/gcp-service-account-json}"
+models:
+  - display_name: Gemini 2.5 Pro (Vertex)
+    name: vertex-gemini-2-5-pro
+    type: model
+    capabilities: [generate]
+    formats:
+      - type: gemini
+    config:
+      route:
+        paths: [/ai]
+      model:
+        alias: "@vertex/gemini-2.5-pro"
+    target_models:
+      - name: gemini-2.5-pro
+        provider: {name: vertex-prod}
+        config:
+          type: gemini
+          location_id: us-central1
+          max_tokens: 4096
+          temperature: 1.0
+    policies: []
+    acls: {allow: [], deny: []}
+  - display_name: Text Embedding 005 (Vertex)
+    name: vertex-text-embedding-005
+    type: model
+    capabilities: [embeddings]
+    formats:
+      - type: gemini
+    config:
+      route:
+        paths: [/ai]
+      model:
+        alias: "@vertex/text-embedding-005"
+    target_models:
+      - name: text-embedding-005
+        provider: {name: vertex-prod}
+        config:
+          type: gemini
+          location_id: us-central1
+    policies: []
+    acls: {allow: [], deny: []}

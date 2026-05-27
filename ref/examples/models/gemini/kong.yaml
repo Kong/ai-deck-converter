@@ -1,0 +1,159 @@
+_format_version: "3.0"
+
+services:
+- name: ai-gateway
+  url: http://ai-gateway.upstream.local
+  routes:
+    - name: gemini-generate
+      paths:
+        - ~/ai/v1beta/models/(?<model_name>[^:/]+):(?:generateContent|streamGenerateContent)
+      methods:
+        - GET
+        - POST
+      strip_path: false
+    - name: gemini-embeddings
+      paths:
+        - ~/ai/v1beta/models/(?<model_name>[^:/]+):(?:embedContent|batchEmbedContent)
+      methods:
+        - GET
+        - POST
+      strip_path: false
+    - name: gemini-batches
+      paths:
+        - /ai/v1beta/batches
+      methods:
+        - GET
+        - POST
+      strip_path: false
+    - name: gemini-files
+      paths:
+        - ~/ai/(?:upload/)?v1beta/files
+      methods:
+        - GET
+        - POST
+      strip_path: false
+
+ai-models:
+- name: gemini-2-5-pro
+  alias: "@gemini/gemini-2.5-pro"
+- name: gemini-embedding-004
+  alias: "@gemini/text-embedding-004"
+- name: gemini-batch-api
+  # alias omitted: batches API embeds per-request models inside the payload.
+- name: gemini-files-api
+  # alias omitted: files API doesn't take a `model` field at all.
+
+plugins:
+# ============================================================================
+# ai-model-selector — only on routes whose request body has a `model` field
+# ============================================================================
+- name: ai-model-selector
+  route:
+    name: gemini-generate
+  config:
+    source: body
+    body_path: model
+    max_request_body_size: 8388608
+
+- name: ai-model-selector
+  route:
+    name: gemini-embeddings
+  config:
+    source: body
+    body_path: model
+    max_request_body_size: 4194304
+
+# Note: no ai-model-selector on gemini-batches or gemini-files — neither
+# endpoint accepts a top-level `model` field.
+
+# ============================================================================
+# ai-proxy-advanced — one per route, native Gemini llm_format
+# ============================================================================
+
+# ---- generate --------------------------------------------------------------
+- name: ai-proxy-advanced
+  route:
+    name: gemini-generate
+  config:
+    balancer:
+      algorithm: round-robin
+    llm_format: gemini
+    genai_category: text/generation
+    targets:
+      - route_type: llm/v1/chat
+        auth:
+          gcp_use_service_account: true
+          gcp_service_account_json: "{vault://ai/gcp-service-account-json}"
+        model:
+          provider: gemini
+          name: gemini-2.5-pro
+          model_alias: "@gemini/gemini-2.5-pro"
+          options:
+            max_tokens: 4096
+            temperature: 1.0
+            gemini:
+              project_id: kong-gemini-project
+
+# ---- embeddings ------------------------------------------------------------
+- name: ai-proxy-advanced
+  route:
+    name: gemini-embeddings
+  config:
+    balancer:
+      algorithm: round-robin
+    llm_format: gemini
+    genai_category: text/embeddings
+    targets:
+      - route_type: llm/v1/embeddings
+        auth:
+          gcp_use_service_account: true
+          gcp_service_account_json: "{vault://ai/gcp-service-account-json}"
+        model:
+          provider: gemini
+          name: text-embedding-004
+          model_alias: "@gemini/text-embedding-004"
+          options:
+            gemini:
+              project_id: kong-gemini-project
+
+# ---- batches (workspace-level, no per-call model) --------------------------
+- name: ai-proxy-advanced
+  route:
+    name: gemini-batches
+  config:
+    balancer:
+      algorithm: round-robin
+    llm_format: gemini
+    genai_category: text/generation
+    targets:
+      - route_type: llm/v1/batches
+        auth:
+          gcp_use_service_account: true
+          gcp_service_account_json: "{vault://ai/gcp-service-account-json}"
+        model:
+          provider: gemini
+          name: batch-api
+          options:
+            gemini:
+              project_id: kong-gemini-project
+
+# ---- files -----------------------------------------------------------------
+- name: ai-proxy-advanced
+  route:
+    name: gemini-files
+  config:
+    balancer:
+      algorithm: round-robin
+    llm_format: gemini
+    genai_category: text/generation
+    targets:
+      - route_type: llm/v1/files
+        auth:
+          gcp_use_service_account: true
+          gcp_service_account_json: "{vault://ai/gcp-service-account-json}"
+        model:
+          provider: gemini
+          name: files-api
+          options:
+            gemini:
+              project_id: kong-gemini-project

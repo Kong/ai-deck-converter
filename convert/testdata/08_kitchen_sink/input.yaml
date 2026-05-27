@@ -1,0 +1,59 @@
+models:
+  - type: model
+    display_name: Prod Chat
+    name: prod-chat
+    capabilities: [generate]
+    labels: {env: prod}
+    formats: [{type: openai}]
+    target_models:
+      - {name: gpt-4o, weight: 80, provider: openai-main, config: {type: openai, temperature: 0.6}}
+      - {name: claude-3-5, weight: 20, provider: anthropic-main, config: {type: anthropic, version: "2023-06-01"}}
+    policies: [prompt-guard]
+    acls: {allow: [premium], deny: []}
+    config:
+      route: {paths: [/ai]}
+      model: {alias: "@prod/prod-chat"}
+      balancer: {algorithm: lowest-latency}
+agents:
+  - type: a2a
+    display_name: Orchestrator
+    name: orchestrator
+    policies: []
+    acls: {allow: [], deny: []}
+    config:
+      url: https://orchestrator.internal/a2a
+      route: {name: orch-route, paths: [/agents/orch]}
+      logging: {statistics: true}
+mcp_servers:
+  - type: passthrough-listener
+    display_name: Tools MCP
+    name: tools-mcp
+    policies: []
+    acls: {allow: [], deny: []}
+    upstream_url: https://tools.internal/mcp
+    config:
+      route: {name: tools-mcp-route, paths: [/mcp/tools]}
+    tools: []
+providers:
+  - type: openai
+    display_name: OpenAI Main
+    name: openai-main
+    config: {auth: {type: basic, headers: [{name: Authorization, value: "{vault://env/openai-key}"}]}}
+  - type: anthropic
+    display_name: Anthropic Main
+    name: anthropic-main
+    config: {auth: {type: basic, headers: [{name: x-api-key, value: "{vault://env/anthropic-key}"}]}}
+policies:
+  - type: ai-prompt-guard
+    name: prompt-guard
+    config: {allow_patterns: ["^safe"]}
+consumers:
+  - name: app-svc
+    type: api-key
+    consumer_groups: [premium]
+    policies: []
+    credentials: [{name: app-key, type: api-key, api_key: app-secret}]
+consumer_groups:
+  - {name: premium, policies: []}
+vaults:
+  - {type: env, name: env-vault, config: {prefix: KONG_}}

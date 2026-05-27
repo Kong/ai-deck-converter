@@ -1,0 +1,77 @@
+providers:
+- name: anthropic-prod
+  type: anthropic
+  display_name: "Anthropic (Prod)"
+  config:
+    auth:
+      type: basic
+      headers:
+      - name: "x-api-key"
+        value: "{vault://ai/anthropic-key}"
+      - name: "anthropic-version"
+        value: "2023-06-01"
+
+models:
+  # -------------------------------------------------------------------------
+  # capabilities: generate  (Messages API)
+  # -------------------------------------------------------------------------
+  - display_name: Claude Opus 4.5
+    name: claude-opus-4-5-chat
+    type: model
+    enabled: true
+    acls:
+      allow: []
+      deny: []
+    config:
+      route:
+        paths:
+          - /ai
+      model:
+        alias: "@anthropic/claude-opus-4-5"
+        name_header: true
+      response_streaming: allow
+    capabilities:
+      - generate
+    formats:
+      - type: anthropic
+    target_models:
+      - name: claude-opus-4-5
+        provider:
+          name: anthropic-prod
+        config:
+          type: anthropic
+          version: "2023-06-01"
+          max_tokens: 4096
+          temperature: 1.0
+    policies: []
+
+  # -------------------------------------------------------------------------
+  # capabilities: batches  (type=api — Message Batches, model is in each JSONL line)
+  # -------------------------------------------------------------------------
+  - display_name: Anthropic Message Batches API
+    name: anthropic-batch-api
+    type: api
+    enabled: true
+    acls:
+      allow: []
+      deny: []
+    config:
+      route:
+        paths:
+          - /ai
+      # Batches API doesn't accept a top-level `model` field — per-request
+      # models are embedded inside each line of the batch JSONL file.
+      model: {}
+      response_streaming: deny
+    capabilities:
+      - batches
+    formats:
+      - type: anthropic
+    target_models:
+      - name: batch-api
+        provider:
+          name: anthropic-prod
+        config:
+          type: anthropic
+          version: "2023-06-01"
+    policies: []

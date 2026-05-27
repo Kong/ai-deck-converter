@@ -1,0 +1,198 @@
+providers:
+- name: vertex-prod
+  type: vertex
+  display_name: "Google Vertex AI (Prod)"
+  config:
+    project_id: kong-vertex-project
+    auth:
+      type: gcp
+      service_account_json: "{vault://ai/gcp-service-account-json}"
+
+models:
+  # -------------------------------------------------------------------------
+  # capabilities: generate  (Gemini family on Vertex)
+  # -------------------------------------------------------------------------
+  - display_name: Gemini 2.5 Pro (Vertex)
+    name: vertex-gemini-2-5-pro
+    type: model
+    enabled: true
+    acls:
+      allow: []
+      deny: []
+    config:
+      route:
+        paths:
+          - /ai
+      model:
+        alias: "@vertex/gemini-2.5-pro"
+        name_header: true
+      response_streaming: allow
+    capabilities:
+      - generate
+    formats:
+      - type: gemini
+    target_models:
+      - name: gemini-2.5-pro
+        provider:
+          name: vertex-prod
+        config:
+          # Vertex shares Gemini's target_model schema (no distinct vertex
+          # target schema exists at the data-model layer).
+          type: gemini
+          location_id: us-central1
+          max_tokens: 4096
+          temperature: 1.0
+    policies: []
+
+  # -------------------------------------------------------------------------
+  # capabilities: embeddings
+  # -------------------------------------------------------------------------
+  - display_name: Text Embedding 005 (Vertex)
+    name: vertex-text-embedding-005
+    type: model
+    enabled: true
+    acls:
+      allow: []
+      deny: []
+    config:
+      route:
+        paths:
+          - /ai
+      model:
+        alias: "@vertex/text-embedding-005"
+        name_header: true
+      response_streaming: deny
+    capabilities:
+      - embeddings
+    formats:
+      - type: gemini
+    target_models:
+      - name: text-embedding-005
+        provider:
+          name: vertex-prod
+        config:
+          type: gemini
+          location_id: us-central1
+    policies: []
+
+  # -------------------------------------------------------------------------
+  # capabilities: image  (Imagen on Vertex — async predictLongRunning)
+  # -------------------------------------------------------------------------
+  - display_name: Imagen 3 (Vertex)
+    name: vertex-imagen-3
+    type: model
+    enabled: true
+    acls:
+      allow: []
+      deny: []
+    config:
+      route:
+        paths:
+          - /ai
+      model:
+        alias: "@vertex/imagen-3.0-generate-001"
+        name_header: true
+      response_streaming: deny
+    capabilities:
+      - image
+    formats:
+      - type: gemini
+    target_models:
+      - name: imagen-3.0-generate-001
+        provider:
+          name: vertex-prod
+        config:
+          type: gemini
+          location_id: us-central1
+    policies: []
+
+  # -------------------------------------------------------------------------
+  # capabilities: video  (Veo on Vertex — async predictLongRunning)
+  # -------------------------------------------------------------------------
+  - display_name: Veo 2 (Vertex)
+    name: vertex-veo-2
+    type: model
+    enabled: true
+    acls:
+      allow: []
+      deny: []
+    config:
+      route:
+        paths:
+          - /ai
+      model:
+        alias: "@vertex/veo-2.0-generate-001"
+        name_header: true
+      response_streaming: deny
+    capabilities:
+      - video
+    formats:
+      - type: gemini
+    target_models:
+      - name: veo-2.0-generate-001
+        provider:
+          name: vertex-prod
+        config:
+          type: gemini
+          location_id: us-central1
+    policies: []
+
+  # -------------------------------------------------------------------------
+  # capabilities: rerank  (type=api — endpoint-keyed by rankingConfig, not model)
+  # -------------------------------------------------------------------------
+  - display_name: Vertex Ranking API
+    name: vertex-ranking-api
+    type: api
+    enabled: true
+    acls:
+      allow: []
+      deny: []
+    config:
+      route:
+        paths:
+          - /ai
+      # Vertex ranking is keyed by rankingConfig name in the URL, not a model
+      # in the request body — treat it as an API entity.
+      model: {}
+      response_streaming: deny
+    capabilities:
+      - rerank
+    formats:
+      - type: gemini
+    target_models:
+      - name: ranking-api
+        provider:
+          name: vertex-prod
+        config:
+          type: gemini
+          location_id: us-central1
+    policies: []
+
+  # -------------------------------------------------------------------------
+  # capabilities: batches  (type=api — Vertex batch prediction jobs)
+  # -------------------------------------------------------------------------
+  - display_name: Vertex Batch Prediction API
+    name: vertex-batch-api
+    type: api
+    enabled: true
+    acls:
+      allow: []
+      deny: []
+    config:
+      route:
+        paths:
+          - /ai
+      model: {}
+      response_streaming: deny
+    capabilities:
+      - batches
+    formats:
+      - type: gemini
+    target_models:
+      - name: batch-api
+        provider:
+          name: vertex-prod
+        config:
+          type: gemini
+          location_id: us-central1
+    policies: []
