@@ -10,8 +10,8 @@ services:
           - name: ai-mcp-proxy
             config:
               default_acl:
-                allow:
-                  - premium
+                - allow:
+                    - premium
               logging:
                 log_audits: true
                 log_statistics: true

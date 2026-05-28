@@ -1,0 +1,54 @@
+mcp_servers:
+  - name: github-mcp
+    type: passthrough
+    config:
+      url: https://api.githubcopilot.com/mcp
+      route:
+        paths:
+        - /github-mcp
+
+  - name: flights-mcp
+    type: conversion-listener
+    config:
+      url: https://mock-e91bb6429fe84bfeb970620df9499e52.mock.insomnia.run
+      route:
+        paths:
+        - /flights-mcp
+    tools:
+    - description: Get KongAir planned flights
+      annotations:
+        title: Get KongAir planned flights
+      method: GET
+      path: /flights
+      parameters:
+        - name: date
+          in: query
+          description: Filter by date (defaults to current day)
+          required: false
+          schema:
+            type: string
+    - description: Get a specific flight by flight number
+      annotations:
+        title: Get a specific flight by flight number
+      method: GET
+      path: /flights/{flightNumber}
+      parameters:
+        - name: flightNumber
+          in: path
+          description: The flight number
+          required: true
+          schema:
+            type: string
+
+    - description: Fetch more details about a flight
+      annotations:
+        title: Fetch more details about a flight
+      method: GET
+      path: /flights/{flightNumber}/details
+      parameters:
+        - name: flightNumber
+          in: path
+          description: The flight number
+          required: true
+          schema:
+            type: string

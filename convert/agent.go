@@ -48,7 +48,12 @@ func (c *Converter) convertAgents() error {
 func a2aPlugin(a *aigw.Agent) kong.Plugin {
 	cfg := map[string]any{}
 	if logging := loggingBlock(a.Config.Logging); logging != nil {
-		cfg["logging"] = logging
+		// log_audits is an ai-mcp-proxy field; the ai-a2a-proxy schema has no
+		// such key, so drop it to avoid emitting an unknown field.
+		delete(logging, "log_audits")
+		if len(logging) > 0 {
+			cfg["logging"] = logging
+		}
 	}
 	if a.Config.MaxRequestBodySize != nil {
 		cfg["max_request_body_size"] = *a.Config.MaxRequestBodySize

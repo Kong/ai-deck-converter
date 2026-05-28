@@ -23,6 +23,7 @@ plugins:
         algorithm: round-robin
       genai_category: text/generation
       llm_format: openai
+      response_streaming: allow
       targets:
         - auth:
             header_name: Authorization

@@ -13,7 +13,11 @@ func (c *Converter) convertMCPServers() error {
 	for i := range c.src.MCPServers {
 		m := &c.src.MCPServers[i]
 		route := buildRoute(m.Config.Route, m.Name)
-		route.Plugins = append(route.Plugins, c.mcpPlugin(m))
+		plugin, err := c.mcpPlugin(m)
+		if err != nil {
+			return err
+		}
+		route.Plugins = append(route.Plugins, plugin)
 
 		// Non-ACL policy plugins still apply at the route; ACLs are folded into
 		// the ai-mcp-proxy plugin above.
@@ -43,7 +47,7 @@ func (c *Converter) convertMCPServers() error {
 	return nil
 }
 
-func (c *Converter) mcpPlugin(m *aigw.MCPServer) kong.Plugin {
+func (c *Converter) mcpPlugin(m *aigw.MCPServer) (kong.Plugin, error) {
 	cfg := map[string]any{"mode": m.Type}
 	if m.Config.MaxRequestBodySize != nil {
 		cfg["max_request_body_size"] = *m.Config.MaxRequestBodySize
@@ -55,25 +59,34 @@ func (c *Converter) mcpPlugin(m *aigw.MCPServer) kong.Plugin {
 		cfg["server"] = m.Config.Server
 	}
 	// default_acl: prefer the explicit default_tool_acls, fall back to server acls.
-	if acl := aclBlock(m.DefaultToolACLs); acl != nil {
+	if acl := defaultACLBlock(m.DefaultToolACLs); acl != nil {
 		cfg["default_acl"] = acl
-	} else if acl := aclBlock(m.ACLs); acl != nil {
+	} else if acl := defaultACLBlock(m.ACLs); acl != nil {
 		cfg["default_acl"] = acl
 	}
-	if tools := mcpTools(m.Tools); tools != nil {
+	tools, err := c.mcpTools(m.Name, m.Tools)
+	if err != nil {
+		return kong.Plugin{}, err
+	}
+	if tools != nil {
 		cfg["tools"] = tools
 	}
-	return kong.Plugin{Name: "ai-mcp-proxy", Config: cfg}
+	return kong.Plugin{Name: "ai-mcp-proxy", Config: cfg}, nil
 }
 
-func mcpTools(tools []aigw.MCPTool) []map[string]any {
+func (c *Converter) mcpTools(serverName string, tools []aigw.MCPTool) ([]map[string]any, error) {
 	if len(tools) == 0 {
-		return nil
+		return nil, nil
 	}
 	out := make([]map[string]any, 0, len(tools))
 	for i := range tools {
 		t := &tools[i]
 		tool := map[string]any{"name": t.Name}
+		if t.Description == "" {
+			if err := c.warn("MCP server %q tool %q has no description; ai-mcp-proxy requires one", serverName, t.Name); err != nil {
+				return nil, err
+			}
+		}
 		setIfNotEmpty(tool, "description", t.Description)
 		setIfNotEmpty(tool, "method", t.Method)
 		setIfNotEmpty(tool, "path", t.Path)
@@ -83,7 +96,9 @@ func mcpTools(tools []aigw.MCPTool) []map[string]any {
 		setIfNotEmptyMap(tool, "query", t.Query)
 		setIfNotEmptyMap(tool, "request_body", t.RequestBody)
 		setIfNotEmptyMap(tool, "responses", t.Responses)
-		setIfNotEmptyMap(tool, "parameters", t.Parameters)
+		if len(t.Parameters) > 0 {
+			tool["parameters"] = t.Parameters
+		}
 		setIfNotEmptyMap(tool, "annotations", t.Annotations)
 		if t.ACLs != nil {
 			if acl := aclBlock(*t.ACLs); acl != nil {
@@ -92,7 +107,7 @@ func mcpTools(tools []aigw.MCPTool) []map[string]any {
 		}
 		out = append(out, tool)
 	}
-	return out
+	return out, nil
 }
 
 func setIfNotEmpty(m map[string]any, key, val string) {

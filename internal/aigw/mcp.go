@@ -32,17 +32,17 @@ type MCPServerConfig struct {
 // MCPTool is a single MCP tool definition. Fields mirror the ai-mcp-proxy
 // config.tools[] shape; ACLs are handled separately (consumer/group references).
 type MCPTool struct {
-	Name        string         `yaml:"name"`
-	Description string         `yaml:"description"`
-	Method      string         `yaml:"method"`
-	Path        string         `yaml:"path"`
-	Scheme      string         `yaml:"scheme"`
-	Host        string         `yaml:"host"`
-	Headers     map[string]any `yaml:"headers"`
-	Query       map[string]any `yaml:"query"`
-	RequestBody map[string]any `yaml:"request_body"`
-	Responses   map[string]any `yaml:"responses"`
-	Parameters  map[string]any `yaml:"parameters"`
-	Annotations map[string]any `yaml:"annotations"`
-	ACLs        *ACLs          `yaml:"acls"`
+	Name        string           `yaml:"name"`
+	Description string           `yaml:"description"`
+	Method      string           `yaml:"method"`
+	Path        string           `yaml:"path"`
+	Scheme      string           `yaml:"scheme"`
+	Host        string           `yaml:"host"`
+	Headers     map[string]any   `yaml:"headers"`
+	Query       map[string]any   `yaml:"query"`
+	RequestBody map[string]any   `yaml:"request_body"`
+	Responses   map[string]any   `yaml:"responses"`
+	Parameters  []map[string]any `yaml:"parameters"`
+	Annotations map[string]any   `yaml:"annotations"`
+	ACLs        *ACLs            `yaml:"acls"`
 }

@@ -22,6 +22,17 @@ func aclBlock(acls aigw.ACLs) map[string]any {
 	return config
 }
 
+// defaultACLBlock wraps an AI Gateway ACL into the ai-mcp-proxy config.default_acl
+// array shape: a list of {scope, allow, deny} entries. Returns nil when empty.
+// scope is left unset (Kong defaults it to "tools") per the omit-defaults policy.
+func defaultACLBlock(acls aigw.ACLs) []map[string]any {
+	block := aclBlock(acls)
+	if block == nil {
+		return nil
+	}
+	return []map[string]any{block}
+}
+
 // aclPlugin builds a Kong acl plugin from an AI Gateway ACL allow/deny list.
 func aclPlugin(acls aigw.ACLs) kong.Plugin {
 	return kong.Plugin{Name: "acl", Config: aclBlock(acls)}

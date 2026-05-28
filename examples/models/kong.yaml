@@ -1,0 +1,145 @@
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: openai-chat
+        paths:
+          - /ai/chat/completions
+        methods:
+          - POST
+        strip_path: false
+      - name: anthropic-messages
+        paths:
+          - /ai/v1/messages
+        methods:
+          - POST
+        strip_path: false
+plugins:
+  - name: ai-model-selector
+    config:
+      body_path: model
+      max_request_body_size: 8388608
+      source: body
+    route:
+      name: openai-chat
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          model:
+            model_alias: '@openai/gpt-5.2'
+            name: gpt-5.2
+            provider: openai
+          route_type: llm/v1/chat
+    route:
+      name: openai-chat
+  - name: ai-model-selector
+    config:
+      body_path: model
+      max_request_body_size: 8388608
+      source: body
+    route:
+      name: anthropic-messages
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      targets:
+        - auth:
+            header_name: x-api-key
+            header_value: '{vault://ai/anthropic-token}'
+          model:
+            model_alias: '@anthropic/claude-opus-4-6'
+            name: claude-opus-4-6
+            provider: anthropic
+          route_type: llm/v1/chat
+    route:
+      name: anthropic-messages
+  - name: ai-prompt-guard
+    config:
+      deny_patterns:
+        - .*(W|w)ar.*
+        - .*(C|c)onflict.*
+        - .*(B|b)lood.*
+        - .*(V|v)iolence.*
+    model:
+      name: gpt-5-2
+  - name: ip-restriction
+    config:
+      allow:
+        - 203.0.113.1
+        - 192.0.2.0/24
+    model:
+      name: gpt-5-2
+  - name: key-auth
+    config:
+      hide_credentials: false
+      key_names:
+        - apikey
+    model:
+      name: gpt-5-2
+  - name: ai-rate-limiting-advanced
+    config:
+      policies:
+        - limits:
+            - limit: 100
+              token_count_strategy: cost
+              window_size: 86400
+          match:
+            - type: model
+              values:
+                - '@openai/gpt-5.2'
+      strategy: local
+    model:
+      name: gpt-5-2
+  - name: ai-prompt-guard
+    config:
+      deny_patterns:
+        - .*(W|w)ar.*
+        - .*(C|c)onflict.*
+        - .*(B|b)lood.*
+        - .*(V|v)iolence.*
+    model:
+      name: claude-opus-4-6
+  - name: ip-restriction
+    config:
+      allow:
+        - 203.0.113.1
+        - 192.0.2.0/24
+    model:
+      name: claude-opus-4-6
+  - name: key-auth
+    config:
+      hide_credentials: false
+      key_names:
+        - apikey
+    model:
+      name: claude-opus-4-6
+  - name: ai-rate-limiting-advanced
+    config:
+      policies:
+        - limits:
+            - limit: 50
+              token_count_strategy: cost
+              window_size: 86400
+          match:
+            - type: model
+              values:
+                - '@anthropic/claude-opus-4-6'
+      strategy: local
+    model:
+      name: claude-opus-4-6
+ai-models:
+  - name: gpt-5-2
+    alias: '@openai/gpt-5.2'
+  - name: claude-opus-4-6
+    alias: '@anthropic/claude-opus-4-6'

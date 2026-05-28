@@ -1,0 +1,52 @@
+models:
+  # Fully-configured model: response_streaming, model.name_header, and
+  # max_request_body_size should all surface on its ai-proxy-advanced plugin.
+  - name: full-model
+    type: model
+    capabilities: [generate]
+    formats:
+      - type: openai
+    config:
+      route:
+        paths: [/ai]
+      response_streaming: deny
+      model:
+        name_header: false
+      max_request_body_size: 2097152
+    target_models:
+      - name: gpt-4o
+        provider:
+          name: openai-prod
+        config:
+          type: openai
+    policies: []
+    acls: {allow: [], deny: []}
+  # Bare model (different capability -> different route group): none of the
+  # three optional fields are set, so none should be emitted (omit-defaults).
+  - name: bare-model
+    type: model
+    capabilities: [embeddings]
+    formats:
+      - type: openai
+    config:
+      route:
+        paths: [/ai]
+      model: {}
+    target_models:
+      - name: text-embedding-3-small
+        provider:
+          name: openai-prod
+        config:
+          type: openai
+    policies: []
+    acls: {allow: [], deny: []}
+providers:
+  - name: openai-prod
+    type: openai
+    display_name: OpenAI Prod
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://ai/openai-token}"

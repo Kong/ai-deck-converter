@@ -18,16 +18,19 @@ const (
 // (section, routeLabel). Multiple models/targets that resolve to the same
 // endpoint contribute one ai-proxy-advanced target each.
 type routeGroup struct {
-	routeName      string
-	path           string
-	methods        []string
-	takesBodyModel bool
-	llmFormat      string
-	genaiCategory  string
-	balancer       map[string]any
-	bodySize       int
-	targets        []map[string]any
-	seen           map[string]bool
+	routeName         string
+	path              string
+	methods           []string
+	takesBodyModel    bool
+	llmFormat         string
+	genaiCategory     string
+	balancer          map[string]any
+	responseStreaming string
+	modelNameHeader   *bool
+	maxBodySize       *int
+	bodySize          int
+	targets           []map[string]any
+	seen              map[string]bool
 }
 
 // convertModels groups all (model, target, capability) tuples into routes under
@@ -74,15 +77,18 @@ func (c *Converter) convertModels() error {
 				g := groups[key]
 				if g == nil {
 					g = &routeGroup{
-						routeName:      sec + "-" + spec.RouteLabel,
-						path:           routePath(base, spec),
-						methods:        spec.Methods,
-						takesBodyModel: spec.TakesBodyModel,
-						llmFormat:      llmFormat(m),
-						genaiCategory:  spec.GenaiCategory,
-						balancer:       balancerConfig(m.Config.Balancer),
-						bodySize:       defaultMaxBodySize,
-						seen:           map[string]bool{},
+						routeName:         sec + "-" + spec.RouteLabel,
+						path:              routePath(base, spec),
+						methods:           spec.Methods,
+						takesBodyModel:    spec.TakesBodyModel,
+						llmFormat:         llmFormat(m),
+						genaiCategory:     spec.GenaiCategory,
+						balancer:          balancerConfig(m.Config.Balancer),
+						responseStreaming: m.Config.ResponseStreaming,
+						modelNameHeader:   m.Config.Model.NameHeader,
+						maxBodySize:       m.Config.MaxRequestBodySize,
+						bodySize:          defaultMaxBodySize,
+						seen:              map[string]bool{},
 					}
 					groups[key] = g
 					order = append(order, key)
@@ -154,12 +160,22 @@ func (c *Converter) convertModels() error {
 
 // proxyConfig assembles the ai-proxy-advanced plugin config for a route group.
 func (g *routeGroup) proxyConfig() map[string]any {
-	return map[string]any{
+	cfg := map[string]any{
 		"balancer":       g.balancer,
 		"llm_format":     g.llmFormat,
 		"genai_category": g.genaiCategory,
 		"targets":        g.targets,
 	}
+	if g.responseStreaming != "" {
+		cfg["response_streaming"] = g.responseStreaming
+	}
+	if g.modelNameHeader != nil {
+		cfg["model_name_header"] = *g.modelNameHeader
+	}
+	if g.maxBodySize != nil {
+		cfg["max_request_body_size"] = *g.maxBodySize
+	}
+	return cfg
 }
 
 // buildTarget builds one ai-proxy-advanced target from a target model.
