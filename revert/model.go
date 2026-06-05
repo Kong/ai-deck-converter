@@ -126,8 +126,10 @@ func (r *Reverter) modelGroupFor(acc *modelAcc, rt *kong.Route, alias, llmFormat
 			r.aiModelUsed[alias] = true
 		} else {
 			name = deriveModelName(alias)
-			if err := r.warn("no ai-models entry for alias %q; deriving model name %q", alias, name); err != nil {
-				return nil, err
+			if r.hasAIModels() {
+				if err := r.warn("no ai-models entry for alias %q; deriving model name %q", alias, name); err != nil {
+					return nil, err
+				}
 			}
 		}
 	} else {
@@ -245,6 +247,9 @@ func (r *Reverter) nameAliaslessGroups(acc *modelAcc) error {
 		}
 		return nil
 	}
+	if !r.hasAIModels() {
+		return nil
+	}
 	for _, g := range unnamed {
 		if err := r.warn("route %q: targets carry no model_alias; using route name as model name", g.routeName); err != nil {
 			return err
@@ -252,6 +257,11 @@ func (r *Reverter) nameAliaslessGroups(acc *modelAcc) error {
 	}
 	return nil
 }
+
+// hasAIModels reports whether the source document declares any ai-models
+// entries. Older gateways predate the entity, so absence is normal and the
+// naming fallbacks run without warning.
+func (r *Reverter) hasAIModels() bool { return len(r.src.AIModels) > 0 }
 
 // isAPIOnly reports whether the capabilities indicate an "api" model
 // (files/batches lifecycle APIs rather than synchronous generation).

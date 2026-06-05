@@ -120,6 +120,85 @@ services:
 	}
 }
 
+func TestLegacyConfigWithoutAIModels(t *testing.T) {
+	// Older gateways predate the ai-models entity and the ai-model-selector
+	// plugin. When the document declares no ai-models entries at all, the
+	// naming fallbacks (derive from alias, route name) run without warning —
+	// and strict mode must succeed.
+	in := []byte(`
+_format_version: "3.0"
+services:
+  - name: gw
+    url: http://gw.invalid
+    routes:
+      - name: openai-chat
+        paths: [/ai/chat/completions]
+        plugins:
+          - name: ai-proxy-advanced
+            config:
+              llm_format: openai
+              targets:
+                - route_type: llm/v1/chat
+                  model: {provider: openai, name: gpt-4o, model_alias: '@openai/gpt-4o'}
+      - name: openai-embeddings
+        paths: [/ai/embeddings]
+        plugins:
+          - name: ai-proxy-advanced
+            config:
+              llm_format: openai
+              targets:
+                - route_type: llm/v1/embeddings
+                  model: {provider: openai, name: text-embedding-3-large}
+`)
+	doc, warnings, err := revertYAML(t, in, Options{Strict: true})
+	if err != nil {
+		t.Fatalf("strict revert: %v (warnings: %v)", err, warnings)
+	}
+	if len(warnings) != 0 {
+		t.Errorf("warnings = %v; want none for a legacy config with no ai-models", warnings)
+	}
+	if len(doc.Models) != 2 || doc.Models[0].Name != "gpt-4o" || doc.Models[1].Name != "openai-embeddings" {
+		t.Errorf("models = %+v; want gpt-4o (derived from alias) and openai-embeddings (route name)", doc.Models)
+	}
+}
+
+func TestMismatchedAliasStillWarns(t *testing.T) {
+	// When ai-models entries exist but a target alias matches none of them,
+	// that is a genuine inconsistency and keeps its warning.
+	in := []byte(`
+_format_version: "3.0"
+services:
+  - name: gw
+    url: http://gw.invalid
+    routes:
+      - name: openai-chat
+        paths: [/ai/chat/completions]
+        plugins:
+          - name: ai-proxy-advanced
+            config:
+              llm_format: openai
+              targets:
+                - route_type: llm/v1/chat
+                  model: {provider: openai, name: gpt-4o, model_alias: '@openai/gpt-4o'}
+ai-models:
+  - name: other-model
+    alias: '@openai/other'
+`)
+	_, warnings, err := revertYAML(t, in, Options{})
+	if err != nil {
+		t.Fatalf("revert: %v", err)
+	}
+	found := false
+	for _, w := range warnings {
+		if strings.Contains(w, "no ai-models entry for alias") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("warnings = %v; want a no-ai-models-entry-for-alias warning", warnings)
+	}
+}
+
 func TestStrictModeMakesDropsFatal(t *testing.T) {
 	in := []byte(`
 _format_version: "3.0"
