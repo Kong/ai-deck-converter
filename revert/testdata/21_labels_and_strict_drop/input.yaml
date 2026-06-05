@@ -1,0 +1,22 @@
+# Exercises tag->label reversal with a prefix (see options.yaml) and entities
+# that only partially convert: a consumer with credentials and prefixed tags,
+# a consumer group, and a service with no routes (warned about and dropped).
+_format_version: "3.0"
+services:
+  - name: orphan-service
+    url: http://nowhere.invalid
+consumers:
+  - username: greg
+    custom_id: emp-42
+    groups:
+      - premium
+    keyauth_credentials:
+      - key: '{vault://env/greg-key}'
+        ttl: 3600
+    tags:
+      - aigw/team:ai-platform
+      - unrelated-tag
+consumer_groups:
+  - name: premium
+    tags:
+      - aigw/tier:gold

@@ -1,0 +1,71 @@
+models:
+  - type: model
+    name: titan-embed-text-v2
+    capabilities:
+      - embeddings
+    formats:
+      - type: bedrock
+    target_models:
+      - name: amazon.titan-embed-text-v2:0
+        provider: bedrock-ai
+        config:
+          aws_region: us-east-1
+          embeddings_normalize: true
+          type: bedrock
+    config:
+      model:
+        alias: '@bedrock/titan-embed-text-v2'
+  - type: model
+    name: nova-canvas-image
+    capabilities:
+      - image
+    formats:
+      - type: bedrock
+    target_models:
+      - name: amazon.nova-canvas-v1:0
+        provider: bedrock-ai
+        config:
+          aws_region: us-east-1
+          type: bedrock
+    config:
+      model:
+        alias: '@bedrock/nova-canvas'
+  - type: model
+    name: nova-sonic-audio
+    capabilities:
+      - audio/speech
+    formats:
+      - type: bedrock
+    target_models:
+      - name: amazon.nova-sonic-v1:0
+        provider: bedrock-ai
+        config:
+          aws_region: us-east-1
+          type: bedrock
+    config:
+      model:
+        alias: '@bedrock/nova-sonic'
+  - type: model
+    name: nova-reel-video
+    capabilities:
+      - video
+    formats:
+      - type: bedrock
+    target_models:
+      - name: amazon.nova-reel-v1:1
+        provider: bedrock-ai
+        config:
+          aws_region: us-east-1
+          type: bedrock
+          video_output_s3_uri: s3://kong/nova-reel/
+    config:
+      model:
+        alias: '@bedrock/nova-reel'
+providers:
+  - type: bedrock
+    name: bedrock-ai
+    config:
+      auth:
+        type: aws
+        access_key_id: '{vault://ai/aws-access-key-id}'
+        secret_access_key: '{vault://ai/aws-secret-access-key}'

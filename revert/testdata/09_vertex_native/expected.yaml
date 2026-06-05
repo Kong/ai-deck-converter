@@ -1,0 +1,41 @@
+models:
+  - type: model
+    name: vertex-gemini-2-5-pro
+    capabilities:
+      - generate
+    formats:
+      - type: gemini
+    target_models:
+      - name: gemini-2.5-pro
+        provider: gemini-ai
+        config:
+          location_id: us-central1
+          max_tokens: 4096
+          temperature: 1
+          type: gemini
+    config:
+      model:
+        alias: '@vertex/gemini-2.5-pro'
+  - type: model
+    name: vertex-text-embedding-005
+    capabilities:
+      - embeddings
+    formats:
+      - type: gemini
+    target_models:
+      - name: text-embedding-005
+        provider: gemini-ai
+        config:
+          location_id: us-central1
+          type: gemini
+    config:
+      model:
+        alias: '@vertex/text-embedding-005'
+providers:
+  - type: gemini
+    name: gemini-ai
+    config:
+      auth:
+        type: gcp
+        service_account_json: '{vault://ai/gcp-service-account-json}'
+      project_id: kong-vertex-project

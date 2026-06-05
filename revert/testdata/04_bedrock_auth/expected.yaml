@@ -1,0 +1,27 @@
+models:
+  - type: model
+    name: claude-bedrock
+    capabilities:
+      - generate
+    formats:
+      - type: bedrock
+    target_models:
+      - name: anthropic.claude-3-5-sonnet
+        provider: bedrock-env
+        config:
+          aws_region: us-east-1
+          max_tokens: 1024
+          type: bedrock
+    config:
+      model:
+        alias: '@bedrock/claude-3-5-sonnet'
+providers:
+  - type: bedrock
+    name: bedrock-env
+    config:
+      auth:
+        type: aws
+        access_key_id: '{vault://env/aws-key-id}'
+        secret_access_key: '{vault://env/aws-secret}'
+        assume_role_arn: arn:aws:iam::123:role/bedrock
+        role_session_name: kong-session

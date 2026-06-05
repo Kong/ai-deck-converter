@@ -1,0 +1,87 @@
+models:
+  - type: model
+    name: prod-chat
+    capabilities:
+      - generate
+    formats:
+      - type: openai
+    target_models:
+      - name: gpt-4o
+        weight: 80
+        provider: openai-env
+        config:
+          temperature: 0.6
+          type: openai
+      - name: claude-3-5
+        weight: 20
+        provider: anthropic-env
+        config:
+          type: anthropic
+          version: "2023-06-01"
+    policies:
+      - ai-prompt-guard
+    acls:
+      allow:
+        - premium
+    config:
+      model:
+        alias: '@prod/prod-chat'
+      balancer:
+        algorithm: lowest-latency
+providers:
+  - type: openai
+    name: openai-env
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: '{vault://env/openai-key}'
+  - type: anthropic
+    name: anthropic-env
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: x-api-key
+            value: '{vault://env/anthropic-key}'
+mcp_servers:
+  - type: passthrough-listener
+    name: tools-mcp
+    config:
+      route:
+        paths:
+          - /mcp/tools
+    upstream_url: https://tools.internal/mcp
+agents:
+  - type: a2a
+    name: orchestrator
+    config:
+      url: https://orchestrator.internal/a2a
+      route:
+        name: orch-route
+        paths:
+          - /agents/orch
+      logging:
+        statistics: true
+policies:
+  - type: ai-prompt-guard
+    name: ai-prompt-guard
+    config:
+      allow_patterns:
+        - ^safe
+consumers:
+  - name: app-svc
+    type: api-key
+    consumer_groups:
+      - premium
+    credentials:
+      - type: api-key
+        api_key: app-secret
+consumer_groups:
+  - name: premium
+vaults:
+  - type: env
+    name: env-vault
+    config:
+      prefix: KONG_

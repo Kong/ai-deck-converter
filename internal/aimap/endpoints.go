@@ -1,9 +1,14 @@
-package convert
+// Package aimap holds the mapping tables shared by the forward converter
+// (AI Gateway -> Kong decK) and the reverse converter (Kong decK -> AI
+// Gateway): the endpoint table, capability normalization, provider enum
+// mapping, option-key nesting sets, and label/tag conversion. Keeping both
+// directions on one table guarantees they cannot drift.
+package aimap
 
-// endpointSpec describes the Kong route that serves a given (section, capability).
+// EndpointSpec describes the Kong route that serves a given (section, capability).
 // Routes are grouped by (section, RouteLabel); specs sharing a label collapse to
 // one route whose ai-proxy-advanced plugin carries one target per capability/model.
-type endpointSpec struct {
+type EndpointSpec struct {
 	RouteLabel     string   // route name suffix, e.g. "chat", "invoke"
 	PathSuffix     string   // appended after the base path (regex body when IsRegex)
 	IsRegex        bool     // emit a Kong regex route ("~" prefix)
@@ -23,18 +28,28 @@ const (
 	catTranscript = "audio/transcription"
 )
 
+// Shared defaults and the converged gateway service identity.
+const (
+	DefaultLLMFormat   = "openai"
+	DefaultBasePath    = "/ai"
+	DefaultMaxBodySize = 8388608
+
+	GatewayServiceName = "ai-gateway"
+	GatewayServiceURL  = "http://ai-gateway.upstream.local"
+)
+
 var (
 	mPost    = []string{"POST"}
 	mGetPost = []string{"GET", "POST"}
 )
 
-// sectionFor selects the endpoint section from the model's llm_format (the
+// SectionFor selects the endpoint section from the model's llm_format (the
 // client-facing wire format that determines the request paths). The only case
 // where the provider type matters is gemini-format traffic served by Vertex,
 // which uses Vertex's project/location URL templates instead of Gemini's.
-func sectionFor(format, providerType string) string {
+func SectionFor(format, providerType string) string {
 	if format == "" {
-		format = defaultLLMFormat
+		format = DefaultLLMFormat
 	}
 	if format == "gemini" && providerType == "vertex" {
 		return "vertex"
@@ -42,9 +57,9 @@ func sectionFor(format, providerType string) string {
 	return format
 }
 
-// endpointTable maps section -> capability -> endpoint spec, derived from
+// EndpointTable maps section -> capability -> endpoint spec, derived from
 // ref/supported-endpoints.md and the reference kong.yaml examples.
-var endpointTable = map[string]map[string]endpointSpec{
+var EndpointTable = map[string]map[string]EndpointSpec{
 	"openai": {
 		"generate":            {"chat", "/chat/completions", false, mPost, "llm/v1/chat", catTextGen, true},
 		"agentic":             {"responses", "/responses", false, mPost, "llm/v1/responses", catTextGen, true},
@@ -94,38 +109,59 @@ var endpointTable = map[string]map[string]endpointSpec{
 	},
 }
 
-// capabilityAliases maps loose capability spellings to canonical keys.
-var capabilityAliases = map[string]string{
+// CapabilityAliases maps loose capability spellings to canonical keys.
+var CapabilityAliases = map[string]string{
 	"chat":  "generate",
 	"batch": "batches",
 }
 
-// normalizeCapability expands a source capability into one or more canonical
+// NormalizeCapability expands a source capability into one or more canonical
 // capability keys. Bare "audio" fans out to speech/transcription/translation.
-func normalizeCapability(c string) []string {
+func NormalizeCapability(c string) []string {
 	if c == "audio" {
 		return []string{"audio/speech", "audio/transcription", "audio/translation"}
 	}
-	if canonical, ok := capabilityAliases[c]; ok {
+	if canonical, ok := CapabilityAliases[c]; ok {
 		return []string{canonical}
 	}
 	return []string{c}
 }
 
-// lookupEndpoint returns the endpoint spec for a section + canonical capability.
-func lookupEndpoint(sec, capability string) (endpointSpec, bool) {
-	caps, ok := endpointTable[sec]
+// LookupEndpoint returns the endpoint spec for a section + canonical capability.
+func LookupEndpoint(sec, capability string) (EndpointSpec, bool) {
+	caps, ok := EndpointTable[sec]
 	if !ok {
-		return endpointSpec{}, false
+		return EndpointSpec{}, false
 	}
 	spec, ok := caps[capability]
 	return spec, ok
 }
 
-// routePath builds the full route path for a spec under the given base path.
-func routePath(base string, spec endpointSpec) string {
+// RoutePath builds the full route path for a spec under the given base path.
+func RoutePath(base string, spec EndpointSpec) string {
 	if spec.IsRegex {
 		return "~" + base + "/" + spec.PathSuffix
 	}
 	return base + spec.PathSuffix
+}
+
+// PluginProvider maps an AI Gateway provider type to the ai-proxy-advanced
+// provider enum. Vertex is served through the gemini provider.
+func PluginProvider(providerType string) string {
+	if providerType == "vertex" {
+		return "gemini"
+	}
+	return providerType
+}
+
+// GeminiOptionKeys are target-config keys that nest under model.options.gemini
+// for the gemini and vertex provider types.
+var GeminiOptionKeys = map[string]bool{
+	"location_id": true, "api_endpoint": true, "endpoint_id": true,
+}
+
+// BedrockOptionKeys are target-config keys that nest under model.options.bedrock.
+var BedrockOptionKeys = map[string]bool{
+	"aws_region": true, "embeddings_normalize": true, "video_output_s3_uri": true,
+	"batch_bucket_prefix": true, "batch_role_arn": true, "performance_config_latency": true,
 }

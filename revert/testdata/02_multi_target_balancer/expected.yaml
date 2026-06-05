@@ -1,0 +1,46 @@
+models:
+  - type: model
+    name: chat-lb
+    capabilities:
+      - generate
+    formats:
+      - type: openai
+    target_models:
+      - name: gpt-4o
+        weight: 70
+        provider: openai-env
+        config:
+          temperature: 0.7
+          type: openai
+      - name: gpt-4o-azure
+        weight: 30
+        provider: azure-env
+        config:
+          api_version: "2024-02-01"
+          deployment_id: gpt4o-dep
+          type: azure
+    config:
+      model:
+        alias: '@openai/chat-lb'
+      balancer:
+        algorithm: round-robin
+        slots: 10000
+providers:
+  - type: openai
+    name: openai-env
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: '{vault://env/openai-key}'
+  - type: azure
+    name: azure-env
+    config:
+      auth:
+        type: basic
+        params:
+          - name: api-key
+            value: '{vault://env/azure-key}'
+            location: query
+      instance: kong-az-east

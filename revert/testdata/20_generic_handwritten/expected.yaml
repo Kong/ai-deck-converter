@@ -1,0 +1,53 @@
+models:
+  - type: model
+    name: chat-v1
+    capabilities:
+      - generate
+    formats:
+      - type: openai
+    target_models:
+      - name: gpt-4o
+        provider: openai-secrets
+        config:
+          temperature: 0.2
+          type: openai
+    policies:
+      - rate-limiting
+    config:
+      route:
+        paths:
+          - /llm
+providers:
+  - type: openai
+    name: openai-secrets
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: '{vault://secrets/openai-key}'
+agents:
+  - type: http
+    name: billing-api
+    config:
+      url: https://billing.internal:8443/v1
+      route:
+        name: billing-route
+        paths:
+          - /billing
+policies:
+  - type: http-log
+    name: http-log
+    global: true
+    config:
+      http_endpoint: https://logs.internal/ingest
+  - type: rate-limiting
+    name: rate-limiting
+    config:
+      minute: 60
+      policy: local
+vaults:
+  - type: env
+    name: secrets
+    config:
+      prefix: SECRET_

@@ -1,0 +1,47 @@
+# A hand-written decK config that does NOT follow the forward converter's
+# conventions: custom service/route names, plugins nested under the route
+# instead of scoped by foreign key, no ai-models entries, an unknown global
+# plugin, and a plain HTTP service with no AI plugins.
+_format_version: "3.0"
+services:
+  - name: llm-frontdoor
+    url: http://upstream.invalid
+    routes:
+      - name: chat-v1
+        paths:
+          - /llm/chat/completions
+        methods:
+          - POST
+        plugins:
+          - name: ai-proxy-advanced
+            config:
+              llm_format: openai
+              targets:
+                - route_type: llm/v1/chat
+                  auth:
+                    header_name: Authorization
+                    header_value: '{vault://secrets/openai-key}'
+                  model:
+                    provider: openai
+                    name: gpt-4o
+                    options:
+                      temperature: 0.2
+          - name: rate-limiting
+            config:
+              minute: 60
+              policy: local
+  - name: billing-api
+    url: https://billing.internal:8443/v1
+    routes:
+      - name: billing-route
+        paths:
+          - /billing
+plugins:
+  - name: http-log
+    config:
+      http_endpoint: https://logs.internal/ingest
+vaults:
+  - prefix: secrets
+    name: env
+    config:
+      prefix: SECRET_

@@ -2,16 +2,8 @@ package convert
 
 import (
 	"github.com/gperanich/ai-deck-converter/internal/aigw"
+	"github.com/gperanich/ai-deck-converter/internal/aimap"
 	"github.com/gperanich/ai-deck-converter/internal/kong"
-)
-
-const (
-	defaultLLMFormat   = "openai"
-	defaultBasePath    = "/ai"
-	defaultMaxBodySize = 8388608
-
-	gatewayServiceName = "ai-gateway"
-	gatewayServiceURL  = "http://ai-gateway.upstream.local"
 )
 
 // routeGroup accumulates everything that maps to a single Kong route, keyed by
@@ -63,10 +55,10 @@ func (c *Converter) convertModels() error {
 					return err
 				}
 			}
-			sec := sectionFor(llmFormat(m), providerType)
+			sec := aimap.SectionFor(llmFormat(m), providerType)
 
 			for _, capability := range caps {
-				spec, ok := lookupEndpoint(sec, capability)
+				spec, ok := aimap.LookupEndpoint(sec, capability)
 				if !ok {
 					if err := c.warn("model %q: provider section %q has no endpoint for capability %q; skipping", m.Name, sec, capability); err != nil {
 						return err
@@ -78,7 +70,7 @@ func (c *Converter) convertModels() error {
 				if g == nil {
 					g = &routeGroup{
 						routeName:         sec + "-" + spec.RouteLabel,
-						path:              routePath(base, spec),
+						path:              aimap.RoutePath(base, spec),
 						methods:           spec.Methods,
 						takesBodyModel:    spec.TakesBodyModel,
 						llmFormat:         llmFormat(m),
@@ -87,7 +79,7 @@ func (c *Converter) convertModels() error {
 						responseStreaming: m.Config.ResponseStreaming,
 						modelNameHeader:   m.Config.Model.NameHeader,
 						maxBodySize:       m.Config.MaxRequestBodySize,
-						bodySize:          defaultMaxBodySize,
+						bodySize:          aimap.DefaultMaxBodySize,
 						seen:              map[string]bool{},
 					}
 					groups[key] = g
@@ -127,7 +119,7 @@ func (c *Converter) convertModels() error {
 		return nil
 	}
 
-	service := kong.Service{Name: gatewayServiceName, URL: gatewayServiceURL}
+	service := kong.Service{Name: aimap.GatewayServiceName, URL: aimap.GatewayServiceURL}
 	for _, key := range order {
 		g := groups[key]
 		service.Routes = append(service.Routes, kong.Route{
@@ -181,7 +173,7 @@ func (g *routeGroup) proxyConfig() map[string]any {
 // buildTarget builds one ai-proxy-advanced target from a target model.
 func (c *Converter) buildTarget(tm *aigw.TargetModel, provider *aigw.Provider, providerType, alias, routeType string) map[string]any {
 	model := map[string]any{
-		"provider": pluginProvider(providerType),
+		"provider": aimap.PluginProvider(providerType),
 		"name":     tm.Name,
 	}
 	if alias != "" {
@@ -211,18 +203,9 @@ func (c *Converter) buildTarget(tm *aigw.TargetModel, provider *aigw.Provider, p
 func (c *Converter) expandCapabilities(m *aigw.Model) []string {
 	var out []string
 	for _, capability := range m.Capabilities {
-		out = append(out, normalizeCapability(capability)...)
+		out = append(out, aimap.NormalizeCapability(capability)...)
 	}
 	return out
-}
-
-// pluginProvider maps an AI Gateway provider type to the ai-proxy-advanced
-// provider enum. Vertex is served through the gemini provider.
-func pluginProvider(providerType string) string {
-	if providerType == "vertex" {
-		return "gemini"
-	}
-	return providerType
 }
 
 func balancerConfig(b *aigw.Balancer) map[string]any {
@@ -245,21 +228,21 @@ func basePath(m *aigw.Model) string {
 	if len(m.Config.Route.Paths) > 0 && m.Config.Route.Paths[0] != "" {
 		return m.Config.Route.Paths[0]
 	}
-	return defaultBasePath
+	return aimap.DefaultBasePath
 }
 
 func llmFormat(m *aigw.Model) string {
 	if len(m.Formats) > 0 && m.Formats[0].Type != "" {
 		return m.Formats[0].Type
 	}
-	return defaultLLMFormat
+	return aimap.DefaultLLMFormat
 }
 
 func bodySizeOrDefault(m *aigw.Model) int {
 	if m.Config.MaxRequestBodySize != nil {
 		return *m.Config.MaxRequestBodySize
 	}
-	return defaultMaxBodySize
+	return aimap.DefaultMaxBodySize
 }
 
 func boolPtr(b bool) *bool { return &b }

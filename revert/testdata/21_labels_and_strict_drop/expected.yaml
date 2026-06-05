@@ -1,0 +1,16 @@
+consumers:
+  - name: greg
+    type: api-key
+    custom_id: emp-42
+    consumer_groups:
+      - premium
+    credentials:
+      - type: api-key
+        ttl: 3600
+        api_key: '{vault://env/greg-key}'
+    labels:
+      team: ai-platform
+consumer_groups:
+  - name: premium
+    labels:
+      tier: gold

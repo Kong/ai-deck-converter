@@ -1,0 +1,38 @@
+models:
+  - type: model
+    name: gpt-5-2
+    capabilities:
+      - generate
+    formats:
+      - type: openai
+    target_models:
+      - name: gpt-5.2
+        provider: openai-ai
+        config:
+          type: openai
+    config:
+      model:
+        alias: '@openai/gpt-5.2'
+  - type: model
+    name: gpt-5-2-mini
+    capabilities:
+      - generate
+    formats:
+      - type: openai
+    target_models:
+      - name: gpt-5.2-mini
+        provider: openai-ai
+        config:
+          type: openai
+    config:
+      model:
+        alias: '@openai/gpt-5.2-mini'
+providers:
+  - type: openai
+    name: openai-ai
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: '{vault://ai/openai-token}'

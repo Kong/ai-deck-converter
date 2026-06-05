@@ -5,12 +5,12 @@ import "gopkg.in/yaml.v3"
 // TargetModel is one backend model a Model routes to. It references a Provider
 // by name; Config carries the provider type plus model options.
 type TargetModel struct {
-	Name              string            `yaml:"name"`
-	Weight            *int              `yaml:"weight"`
-	SemanticDesc      string            `yaml:"semantic_description"`
-	AllowAuthOverride *bool             `yaml:"allow_auth_override"`
-	Provider          ProviderRef       `yaml:"provider"`
-	Config            TargetModelConfig `yaml:"config"`
+	Name              string            `yaml:"name,omitempty"`
+	Weight            *int              `yaml:"weight,omitempty"`
+	SemanticDesc      string            `yaml:"semantic_description,omitempty"`
+	AllowAuthOverride *bool             `yaml:"allow_auth_override,omitempty"`
+	Provider          ProviderRef       `yaml:"provider,omitempty"`
+	Config            TargetModelConfig `yaml:"config,omitempty"`
 }
 
 // ProviderRef references a Provider by name. It accepts either a bare string
@@ -25,13 +25,18 @@ func (r *ProviderRef) UnmarshalYAML(node *yaml.Node) error {
 		return node.Decode(&r.Name)
 	}
 	var obj struct {
-		Name string `yaml:"name"`
+		Name string `yaml:"name,omitempty"`
 	}
 	if err := node.Decode(&obj); err != nil {
 		return err
 	}
 	r.Name = obj.Name
 	return nil
+}
+
+// MarshalYAML emits the reference as a bare string (the compact input form).
+func (r ProviderRef) MarshalYAML() (any, error) {
+	return r.Name, nil
 }
 
 // TargetModelConfig is discriminated by provider `type`. The remaining fields are
@@ -55,4 +60,17 @@ func (c *TargetModelConfig) UnmarshalYAML(node *yaml.Node) error {
 	}
 	c.Options = m
 	return nil
+}
+
+// MarshalYAML re-merges the provider type discriminator with the options map
+// (inverse of UnmarshalYAML, used by the reverse converter).
+func (c TargetModelConfig) MarshalYAML() (any, error) {
+	m := make(map[string]any, len(c.Options)+1)
+	for k, v := range c.Options {
+		m[k] = v
+	}
+	if c.Type != "" {
+		m["type"] = c.Type
+	}
+	return m, nil
 }

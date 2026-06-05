@@ -1,6 +1,9 @@
 package convert
 
-import "github.com/gperanich/ai-deck-converter/internal/aigw"
+import (
+	"github.com/gperanich/ai-deck-converter/internal/aigw"
+	"github.com/gperanich/ai-deck-converter/internal/aimap"
+)
 
 // resolveAuth folds a provider's auth configuration into an ai-proxy-advanced
 // target `auth` block. Returns nil when there is nothing to emit.
@@ -72,18 +75,6 @@ func resolveAuth(p *aigw.Provider, allowOverride *bool) map[string]any {
 	return auth
 }
 
-// geminiOptionKeys are target-config keys that nest under model.options.gemini
-// for the gemini and vertex provider types.
-var geminiOptionKeys = map[string]bool{
-	"location_id": true, "api_endpoint": true, "endpoint_id": true,
-}
-
-// bedrockOptionKeys are target-config keys that nest under model.options.bedrock.
-var bedrockOptionKeys = map[string]bool{
-	"aws_region": true, "embeddings_normalize": true, "video_output_s3_uri": true,
-	"batch_bucket_prefix": true, "batch_role_arn": true, "performance_config_latency": true,
-}
-
 // mapOptions translates a target model's option map into an ai-proxy-advanced
 // model.options map. It renames/nests provider-specific keys per provider type
 // and folds in provider-level fields (azure instance, gemini project id, bedrock
@@ -106,9 +97,9 @@ func mapOptions(opts map[string]any, providerType string, provider *aigw.Provide
 			out["azure_api_version"] = v
 		case providerType == "anthropic" && k == "version":
 			out["anthropic_version"] = v
-		case (providerType == "gemini" || providerType == "vertex") && geminiOptionKeys[k]:
+		case (providerType == "gemini" || providerType == "vertex") && aimap.GeminiOptionKeys[k]:
 			addNested("gemini", k, v)
-		case providerType == "bedrock" && bedrockOptionKeys[k]:
+		case providerType == "bedrock" && aimap.BedrockOptionKeys[k]:
 			addNested("bedrock", k, v)
 		default:
 			out[k] = v
