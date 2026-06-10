@@ -1,0 +1,181 @@
+_format_version: "3.0"
+_transform: false
+services:
+  - id: 947a4e23-b483-5a65-8165-da9aed24565b
+    name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    host: ai-gateway.upstream.local
+    port: 80
+    protocol: http
+routes:
+  - id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+    name: openai-chat
+    service: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /v1/chat/completions/chat/completions
+    hosts:
+      - ai.example.com
+      - ai-internal.example.com
+    methods:
+      - GET
+      - POST
+    protocols:
+      - http
+      - https
+    headers:
+      x-api-version:
+        - v1
+        - v2
+    snis:
+      - ai.example.com
+      - ai-internal.example.com
+    sources:
+      - ip: 192.168.1.0/24
+        port: 8080
+      - ip: 192.168.2.0/24
+        port: 8081
+    destinations:
+      - ip: 10.1.0.0/16
+        port: 443
+      - ip: 10.2.0.0/16
+        port: 8443
+    strip_path: true
+    preserve_host: false
+    https_redirect_status_code: 426
+    regex_priority: 0
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+    tags:
+      - team-ai
+      - env-production
+  - id: 0da1097c-6edc-5c9c-a032-cd042d0db5e4
+    name: openai-embeddings
+    service: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /v1/chat/completions/embeddings
+    hosts:
+      - ai.example.com
+      - ai-internal.example.com
+    methods:
+      - GET
+      - POST
+    protocols:
+      - http
+      - https
+    headers:
+      x-api-version:
+        - v1
+        - v2
+    snis:
+      - ai.example.com
+      - ai-internal.example.com
+    sources:
+      - ip: 192.168.1.0/24
+        port: 8080
+      - ip: 192.168.2.0/24
+        port: 8081
+    destinations:
+      - ip: 10.1.0.0/16
+        port: 443
+      - ip: 10.2.0.0/16
+        port: 8443
+    strip_path: true
+    preserve_host: false
+    https_redirect_status_code: 426
+    regex_priority: 0
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+    tags:
+      - team-ai
+      - env-production
+plugins:
+  - id: 17fa8192-4b9f-5b5a-8379-20ad8bc836a7
+    name: ai-model-selector
+    config:
+      body_path: model
+      max_request_body_size: 8388608
+      source: body
+    route: 8ae36805-da7a-55b9-b056-72bde6bb937d
+  - id: f3adc007-171c-5519-8763-3a0eef79bde3
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: consistent-hashing
+        connect_timeout: 60000
+        fail_timeout: 10000
+        failover_criteria:
+          - error
+          - timeout
+          - http_429
+          - http_500
+        hash_on_header: X-Kong-LLM-Request-ID
+        max_fails: 0
+        read_timeout: 60000
+        retries: 5
+        slots: 10000
+        write_timeout: 60000
+      genai_category: text/generation
+      llm_format: openai
+      max_request_body_size: 8388608
+      model_name_header: true
+      response_streaming: allow
+      targets:
+        - model:
+            model_alias: my-model-alias
+            name: gpt-4o
+            provider: openai
+          route_type: llm/v1/chat
+    route: 8ae36805-da7a-55b9-b056-72bde6bb937d
+  - id: dcebfb31-cc0f-5469-b6d7-9d8807a4e8d2
+    name: ai-model-selector
+    config:
+      body_path: model
+      max_request_body_size: 8388608
+      source: body
+    route: 0da1097c-6edc-5c9c-a032-cd042d0db5e4
+  - id: 75ff22ed-6245-594b-895f-6a9fa36f4581
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: consistent-hashing
+        connect_timeout: 60000
+        fail_timeout: 10000
+        failover_criteria:
+          - error
+          - timeout
+          - http_429
+          - http_500
+        hash_on_header: X-Kong-LLM-Request-ID
+        max_fails: 0
+        read_timeout: 60000
+        retries: 5
+        slots: 10000
+        write_timeout: 60000
+      genai_category: text/embeddings
+      llm_format: openai
+      max_request_body_size: 8388608
+      model_name_header: true
+      response_streaming: allow
+      targets:
+        - model:
+            model_alias: my-model-alias
+            name: gpt-4o
+            provider: openai
+          route_type: llm/v1/embeddings
+    route: 0da1097c-6edc-5c9c-a032-cd042d0db5e4
+  - id: 2501ef6b-218c-5327-ad93-4df6a2133531
+    name: acl
+    config:
+      allow:
+        - consumer-alice
+        - group-admins
+      deny:
+        - consumer-bob
+        - group-blocked
+    model: aab20033-7c80-5942-aadc-52357371dbeb
+ai_models:
+  - id: aab20033-7c80-5942-aadc-52357371dbeb
+    name: my-balancer-ch-model
+    alias: my-model-alias

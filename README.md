@@ -34,6 +34,9 @@ cat input.yaml | ./ai-deck-converter -
 
 # force a direction
 ./ai-deck-converter -direction from-deck kong.yaml
+
+# emit Koko-style db-less output
+./ai-deck-converter -direction to-dbless input.yaml
 ```
 
 ### Flags
@@ -41,7 +44,7 @@ cat input.yaml | ./ai-deck-converter -
 | Flag | Default | Description |
 |---|---|---|
 | `-o` | stdout | Output file path. |
-| `-direction` | `auto` | Conversion direction: `auto`, `to-deck` (AI Gateway → decK), or `from-deck` (decK → AI Gateway). Auto-detection keys off `_format_version`, which only decK documents carry. |
+| `-direction` | `auto` | Conversion direction: `auto`, `to-deck` (AI Gateway → decK), `to-dbless` (AI Gateway → db-less), or `from-deck` (decK → AI Gateway). Auto-detection keys off `_format_version`, which only decK documents carry. |
 | `-strict` | `false` | Treat unresolved references and unconvertible entities as errors instead of warnings. |
 | `-label-tag-prefix` | `""` | Prefix for label-derived tags, e.g. `aigw/` (prepended when converting to decK, stripped when reverting). |
 
