@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	publicaigw "github.com/Kong/ai-deck-converter/aigw"
 	"github.com/Kong/ai-deck-converter/internal/aigw"
 	"gopkg.in/yaml.v3"
 )
@@ -31,6 +32,45 @@ models:
 	}
 	if !containsSubstr(warnings, "unknown provider") {
 		t.Errorf("expected unknown-provider warning, got %v", warnings)
+	}
+}
+
+func TestConvertDocumentToDBLessYAML(t *testing.T) {
+	src := []byte(`
+models:
+  - type: model
+    name: m1
+    capabilities: [chat]
+    formats: [{type: openai}]
+    target_models:
+      - name: gpt-4o
+        provider: p1
+        config: {type: openai}
+    config:
+      route: {paths: [/v1]}
+      model: {alias: m1}
+providers:
+  - name: p1
+    type: openai
+`)
+
+	doc, err := publicaigw.Parse(src)
+	if err != nil {
+		t.Fatalf("parse source: %v", err)
+	}
+
+	got, _, err := ConvertDocumentToDBLessYAML(doc, Options{})
+	if err != nil {
+		t.Fatalf("convert typed db-less: %v", err)
+	}
+
+	want, _, err := Convert(src, Options{OutputMode: "db-less"})
+	if err != nil {
+		t.Fatalf("convert yaml db-less: %v", err)
+	}
+
+	if string(got) != string(want) {
+		t.Fatalf("typed db-less output mismatch\nwant:\n%s\ngot:\n%s", want, got)
 	}
 }
 
