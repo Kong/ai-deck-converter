@@ -6,7 +6,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/gperanich/ai-deck-converter/internal/aimap"
+	"github.com/Kong/ai-deck-converter/internal/aimap"
 )
 
 // endpointMatch is one resolved (capability, spec) pair for a route/target.

@@ -1,8 +1,8 @@
 package revert
 
 import (
-	"github.com/gperanich/ai-deck-converter/internal/aigw"
-	"github.com/gperanich/ai-deck-converter/internal/kong"
+	"github.com/Kong/ai-deck-converter/internal/aigw"
+	"github.com/Kong/ai-deck-converter/internal/kong"
 )
 
 // revertAgent lifts a non-AI service route back into an AI Gateway agent: an

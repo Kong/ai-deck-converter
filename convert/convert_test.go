@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gperanich/ai-deck-converter/internal/aigw"
+	"github.com/Kong/ai-deck-converter/internal/aigw"
 )
 
 func TestConvertWarnsUnknownProvider(t *testing.T) {
