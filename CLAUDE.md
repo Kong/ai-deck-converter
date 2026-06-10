@@ -17,7 +17,7 @@ go test ./revert -run TestGolden -update              # regenerate ALL reverse g
 go test ./revert -run TestRoundTrip                   # forward→reverse→forward must be byte-identical
 ```
 
-Run the tool: `ai-deck-converter input.yaml` (stdout), `-o kong.yaml` to write a file, `-` for stdin. The direction is auto-detected (`_format_version` present → decK→AI Gateway) and can be forced with `-direction to-deck|from-deck`. Flags: `-strict` (unresolved refs / unconvertible entities become errors), `-label-tag-prefix` (namespaces label-derived tags; stripped on revert).
+Run the tool: `ai-deck-converter input.yaml` (stdout), `-o kong.yaml` to write a file, `-` for stdin. The direction is auto-detected (`_format_version` present → decK→AI Gateway) and can be forced with `-direction to-deck|to-dbless|from-deck`. Flags: `-strict` (unresolved refs / unconvertible entities become errors), `-label-tag-prefix` (namespaces label-derived tags; stripped on revert).
 
 ## Architecture
 
