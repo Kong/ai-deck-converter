@@ -28,12 +28,23 @@ type RouteConfig struct {
 	Methods                 []string            `yaml:"methods,omitempty"`
 	Protocols               []string            `yaml:"protocols,omitempty"`
 	Headers                 map[string][]string `yaml:"headers,omitempty"`
+	SNIs                    []string            `yaml:"snis,omitempty"`
+	Sources                 []CIDRPort          `yaml:"sources,omitempty"`
+	Destinations            []CIDRPort          `yaml:"destinations,omitempty"`
 	StripPath               *bool               `yaml:"strip_path,omitempty"`
 	PreserveHost            *bool               `yaml:"preserve_host,omitempty"`
 	HTTPSRedirectStatusCode *int                `yaml:"https_redirect_status_code,omitempty"`
 	RegexPriority           *int                `yaml:"regex_priority,omitempty"`
 	PathHandling            string              `yaml:"path_handling,omitempty"`
+	RequestBuffering        *bool               `yaml:"request_buffering,omitempty"`
+	ResponseBuffering       *bool               `yaml:"response_buffering,omitempty"`
 	Tags                    []string            `yaml:"tags,omitempty"`
+}
+
+// CIDRPort mirrors Kong route source/destination entries.
+type CIDRPort struct {
+	IP   string `yaml:"ip,omitempty"`
+	Port *int   `yaml:"port,omitempty"`
 }
 
 // Logging is the AI Gateway logging configuration. Fields are supersets across

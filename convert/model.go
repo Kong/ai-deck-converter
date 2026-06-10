@@ -10,9 +10,7 @@ import (
 // (section, routeLabel). Multiple models/targets that resolve to the same
 // endpoint contribute one ai-proxy-advanced target each.
 type routeGroup struct {
-	routeName         string
-	path              string
-	methods           []string
+	route             kong.Route
 	takesBodyModel    bool
 	llmFormat         string
 	genaiCategory     string
@@ -69,9 +67,7 @@ func (c *Converter) convertModels() error {
 				g := groups[key]
 				if g == nil {
 					g = &routeGroup{
-						routeName:         sec + "-" + spec.RouteLabel,
-						path:              aimap.RoutePath(base, spec),
-						methods:           spec.Methods,
+						route:             buildModelRoute(m.Config.Route, sec+"-"+spec.RouteLabel, aimap.RoutePath(base, spec), spec.Methods),
 						takesBodyModel:    spec.TakesBodyModel,
 						llmFormat:         llmFormat(m),
 						genaiCategory:     spec.GenaiCategory,
@@ -122,16 +118,11 @@ func (c *Converter) convertModels() error {
 	service := kong.Service{Name: aimap.GatewayServiceName, URL: aimap.GatewayServiceURL}
 	for _, key := range order {
 		g := groups[key]
-		service.Routes = append(service.Routes, kong.Route{
-			Name:      g.routeName,
-			Paths:     []string{g.path},
-			Methods:   g.methods,
-			StripPath: boolPtr(false),
-		})
+		service.Routes = append(service.Routes, g.route)
 		if g.takesBodyModel {
 			c.out.Plugins = append(c.out.Plugins, kong.Plugin{
 				Name:  "ai-model-selector",
-				Route: kong.NewRef(g.routeName),
+				Route: kong.NewRef(g.route.Name),
 				Config: map[string]any{
 					"source":                "body",
 					"body_path":             "model",
@@ -141,7 +132,7 @@ func (c *Converter) convertModels() error {
 		}
 		c.out.Plugins = append(c.out.Plugins, kong.Plugin{
 			Name:   "ai-proxy-advanced",
-			Route:  kong.NewRef(g.routeName),
+			Route:  kong.NewRef(g.route.Name),
 			Config: g.proxyConfig(),
 		})
 	}
