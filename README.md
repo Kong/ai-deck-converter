@@ -14,26 +14,26 @@ the AI Gateway entity model.
 ## Install / build
 
 ```sh
-go build ./cmd/ai-deck-converter
+make build
 ```
 
 ## Usage
 
 ```sh
 # AI Gateway -> Kong decK (direction auto-detected from the input)
-ai-deck-converter input.yaml
+./ai-deck-converter input.yaml
 
 # Kong decK -> AI Gateway (auto-detected: decK docs carry _format_version)
-ai-deck-converter kong.yaml
+./ai-deck-converter kong.yaml
 
 # write to a file
-ai-deck-converter -o kong.yaml input.yaml
+./ai-deck-converter -o kong.yaml input.yaml
 
 # read from stdin
-cat input.yaml | ai-deck-converter -
+cat input.yaml | ./ai-deck-converter -
 
 # force a direction
-ai-deck-converter -direction from-deck kong.yaml
+./ai-deck-converter -direction from-deck kong.yaml
 ```
 
 ### Flags
@@ -52,8 +52,8 @@ entities) are printed to stderr; the converted config still goes to stdout/`-o`.
 
 ```go
 import (
-    "github.com/gperanich/ai-deck-converter/convert"
-    "github.com/gperanich/ai-deck-converter/revert"
+    "github.com/Kong/ai-deck-converter/convert"
+    "github.com/Kong/ai-deck-converter/revert"
 )
 
 // AI Gateway -> Kong decK

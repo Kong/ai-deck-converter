@@ -1,8 +1,8 @@
 package convert
 
 import (
-	"github.com/gperanich/ai-deck-converter/internal/aigw"
-	"github.com/gperanich/ai-deck-converter/internal/aimap"
+	"github.com/Kong/ai-deck-converter/internal/aigw"
+	"github.com/Kong/ai-deck-converter/internal/aimap"
 )
 
 // labelsToTags flattens an AI Gateway label map into a deterministic, sorted

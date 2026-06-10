@@ -1,6 +1,6 @@
 package revert
 
-import "github.com/gperanich/ai-deck-converter/internal/aigw"
+import "github.com/Kong/ai-deck-converter/internal/aigw"
 
 // revertVaults translates Kong vault entities back into AI Gateway vaults. The
 // Kong reference `prefix` becomes the source vault `name`; the Kong backend

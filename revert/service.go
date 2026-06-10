@@ -3,7 +3,7 @@ package revert
 import (
 	"sort"
 
-	"github.com/gperanich/ai-deck-converter/internal/kong"
+	"github.com/Kong/ai-deck-converter/internal/kong"
 )
 
 // revertServices walks every Kong service and classifies each route by the AI

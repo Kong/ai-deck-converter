@@ -1,6 +1,6 @@
 package convert
 
-import "github.com/gperanich/ai-deck-converter/internal/kong"
+import "github.com/Kong/ai-deck-converter/internal/kong"
 
 // convertVaults translates AI Gateway vaults into Kong vault entities. The
 // source vault `name` becomes the Kong reference `prefix`; the source `type`

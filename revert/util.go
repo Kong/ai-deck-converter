@@ -3,8 +3,8 @@ package revert
 import (
 	"fmt"
 
-	"github.com/gperanich/ai-deck-converter/internal/aigw"
-	"github.com/gperanich/ai-deck-converter/internal/kong"
+	"github.com/Kong/ai-deck-converter/internal/aigw"
+	"github.com/Kong/ai-deck-converter/internal/kong"
 )
 
 // Accessors for plugin config maps decoded from YAML (values are untyped).

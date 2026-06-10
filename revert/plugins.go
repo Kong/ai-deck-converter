@@ -1,6 +1,6 @@
 package revert
 
-import "github.com/gperanich/ai-deck-converter/internal/kong"
+import "github.com/Kong/ai-deck-converter/internal/kong"
 
 // pluginIndex normalizes plugin scoping: top-level plugins carry name-based
 // foreign keys, while nested plugins inherit their parent entity. The index

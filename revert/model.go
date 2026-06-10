@@ -4,9 +4,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/gperanich/ai-deck-converter/internal/aigw"
-	"github.com/gperanich/ai-deck-converter/internal/aimap"
-	"github.com/gperanich/ai-deck-converter/internal/kong"
+	"github.com/Kong/ai-deck-converter/internal/aigw"
+	"github.com/Kong/ai-deck-converter/internal/aimap"
+	"github.com/Kong/ai-deck-converter/internal/kong"
 )
 
 // modelGroup accumulates one AI Gateway Model across the routes/targets that
