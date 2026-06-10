@@ -1,8 +1,8 @@
 package convert
 
 import (
-	"github.com/gperanich/ai-deck-converter/internal/aigw"
-	"github.com/gperanich/ai-deck-converter/internal/kong"
+	"github.com/Kong/ai-deck-converter/internal/aigw"
+	"github.com/Kong/ai-deck-converter/internal/kong"
 )
 
 // convertAgents translates AI Gateway agents into a Gateway Service + Route.

@@ -1,4 +1,4 @@
-module github.com/gperanich/ai-deck-converter
+module github.com/Kong/ai-deck-converter
 
 go 1.22.3
 

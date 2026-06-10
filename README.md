@@ -55,8 +55,8 @@ entities) are printed to stderr; the converted config still goes to stdout/`-o`.
 
 ```go
 import (
-    "github.com/gperanich/ai-deck-converter/convert"
-    "github.com/gperanich/ai-deck-converter/revert"
+    "github.com/Kong/ai-deck-converter/convert"
+    "github.com/Kong/ai-deck-converter/revert"
 )
 
 // AI Gateway -> Kong decK

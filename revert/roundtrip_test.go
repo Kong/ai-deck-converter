@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/gperanich/ai-deck-converter/convert"
+	"github.com/Kong/ai-deck-converter/convert"
 	"gopkg.in/yaml.v3"
 )
 

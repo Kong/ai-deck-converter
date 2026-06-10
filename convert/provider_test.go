@@ -5,7 +5,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/gperanich/ai-deck-converter/internal/aigw"
+	"github.com/Kong/ai-deck-converter/internal/aigw"
 )
 
 func ptrBool(b bool) *bool { return &b }

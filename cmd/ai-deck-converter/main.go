@@ -12,8 +12,8 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/gperanich/ai-deck-converter/convert"
-	"github.com/gperanich/ai-deck-converter/revert"
+	"github.com/Kong/ai-deck-converter/convert"
+	"github.com/Kong/ai-deck-converter/revert"
 )
 
 func main() {

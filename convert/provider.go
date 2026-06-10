@@ -1,8 +1,8 @@
 package convert
 
 import (
-	"github.com/gperanich/ai-deck-converter/internal/aigw"
-	"github.com/gperanich/ai-deck-converter/internal/aimap"
+	"github.com/Kong/ai-deck-converter/internal/aigw"
+	"github.com/Kong/ai-deck-converter/internal/aimap"
 )
 
 // resolveAuth folds a provider's auth configuration into an ai-proxy-advanced
