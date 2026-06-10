@@ -29,9 +29,15 @@ type Options struct {
 	Strict bool `yaml:"strict"`
 	// LabelTagPrefix is prepended to label-derived tags, e.g. "aigw/".
 	LabelTagPrefix string `yaml:"label_tag_prefix"`
+	// OutputMode controls the emitted Kong config flavor.
+	// Supported values are "deck" (default) and "db-less".
+	OutputMode string `yaml:"output_mode"`
 }
 
 func (o Options) withDefaults() Options {
+	if o.OutputMode == "" {
+		o.OutputMode = "deck"
+	}
 	return o
 }
 
@@ -42,12 +48,20 @@ func Convert(src []byte, opts Options) ([]byte, []string, error) {
 	if err != nil {
 		return nil, nil, fmt.Errorf("parsing source document: %w", err)
 	}
-	out, warnings, err := ConvertDocument(doc, opts)
-	if err != nil {
-		return nil, warnings, err
+	c := newConverter(doc, opts.withDefaults())
+	if err := c.run(); err != nil {
+		return nil, c.warnings, err
 	}
-	data, err := marshalYAML(out)
-	return data, warnings, err
+	switch c.opts.OutputMode {
+	case "deck":
+		data, err := marshalYAML(c.out)
+		return data, c.warnings, err
+	case "db-less":
+		data, err := marshalYAML(c.projectDBLess())
+		return data, c.warnings, err
+	default:
+		return nil, c.warnings, fmt.Errorf("invalid output_mode %q (want deck or db-less)", c.opts.OutputMode)
+	}
 }
 
 // marshalYAML encodes v as YAML using a fixed two-space indent.

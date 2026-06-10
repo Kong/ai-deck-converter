@@ -1,0 +1,9 @@
+# Apple cruft
+.DS_Store
+
+# for this repo only
+ai-deck-converter
+
+# editor files
+.vscode/
+.idea/

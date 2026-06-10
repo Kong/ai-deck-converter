@@ -28,7 +28,7 @@ func run() error {
 		outPath   = flag.String("o", "", "output file path (default: stdout)")
 		strict    = flag.Bool("strict", false, "treat unresolved references and unconvertible entities as errors instead of warnings")
 		tagPrefix = flag.String("label-tag-prefix", "", "prefix for label-derived tags (prepended when converting, stripped when reverting), e.g. aigw/")
-		direction = flag.String("direction", "auto", "conversion direction: auto, to-deck (AI Gateway -> decK), or from-deck (decK -> AI Gateway)")
+		direction = flag.String("direction", "auto", "conversion direction: auto, to-deck (AI Gateway -> decK), to-dbless (AI Gateway -> db-less), or from-deck (decK -> AI Gateway)")
 	)
 	flag.Parse()
 
@@ -52,6 +52,13 @@ func run() error {
 		out, warnings, err = convert.Convert(in, convert.Options{
 			Strict:         *strict,
 			LabelTagPrefix: *tagPrefix,
+			OutputMode:     "deck",
+		})
+	case "to-dbless":
+		out, warnings, err = convert.Convert(in, convert.Options{
+			Strict:         *strict,
+			LabelTagPrefix: *tagPrefix,
+			OutputMode:     "db-less",
 		})
 	case "from-deck":
 		out, warnings, err = revert.Revert(in, revert.Options{
@@ -59,7 +66,7 @@ func run() error {
 			LabelTagPrefix: *tagPrefix,
 		})
 	default:
-		return fmt.Errorf("invalid -direction %q (want auto, to-deck, or from-deck)", dir)
+		return fmt.Errorf("invalid -direction %q (want auto, to-deck, to-dbless, or from-deck)", dir)
 	}
 	if err != nil {
 		return err
