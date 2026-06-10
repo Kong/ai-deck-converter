@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/Kong/ai-deck-converter/convert"
+	"gopkg.in/yaml.v3"
 )
 
 // TestRoundTrip verifies that reverting the forward converter's output and
@@ -26,6 +27,11 @@ func TestRoundTrip(t *testing.T) {
 		}
 		dir := dir
 		t.Run(filepath.Base(dir), func(t *testing.T) {
+			opts := loadForwardOptions(t, dir)
+			if opts.OutputMode == "db-less" {
+				t.Skip("db-less forward cases are not revertible decK fixtures")
+			}
+
 			deck1, err := os.ReadFile(filepath.Join(dir, "expected.yaml"))
 			if err != nil {
 				t.Fatalf("read forward golden: %v", err)
@@ -52,4 +58,20 @@ func TestRoundTrip(t *testing.T) {
 			}
 		})
 	}
+}
+
+func loadForwardOptions(t *testing.T, dir string) convert.Options {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(dir, "options.yaml"))
+	if os.IsNotExist(err) {
+		return convert.Options{}
+	}
+	if err != nil {
+		t.Fatalf("read options: %v", err)
+	}
+	var opts convert.Options
+	if err := yaml.Unmarshal(data, &opts); err != nil {
+		t.Fatalf("parse options: %v", err)
+	}
+	return opts
 }

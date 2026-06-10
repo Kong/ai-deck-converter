@@ -4,7 +4,9 @@ import (
 	"strings"
 	"testing"
 
+	publicaigw "github.com/Kong/ai-deck-converter/aigw"
 	"github.com/Kong/ai-deck-converter/internal/aigw"
+	"gopkg.in/yaml.v3"
 )
 
 func TestConvertWarnsUnknownProvider(t *testing.T) {
@@ -30,6 +32,45 @@ models:
 	}
 	if !containsSubstr(warnings, "unknown provider") {
 		t.Errorf("expected unknown-provider warning, got %v", warnings)
+	}
+}
+
+func TestConvertDocumentToDBLessYAML(t *testing.T) {
+	src := []byte(`
+models:
+  - type: model
+    name: m1
+    capabilities: [chat]
+    formats: [{type: openai}]
+    target_models:
+      - name: gpt-4o
+        provider: p1
+        config: {type: openai}
+    config:
+      route: {paths: [/v1]}
+      model: {alias: m1}
+providers:
+  - name: p1
+    type: openai
+`)
+
+	doc, err := publicaigw.Parse(src)
+	if err != nil {
+		t.Fatalf("parse source: %v", err)
+	}
+
+	got, _, err := ConvertDocumentToDBLessYAML(doc, Options{})
+	if err != nil {
+		t.Fatalf("convert typed db-less: %v", err)
+	}
+
+	want, _, err := Convert(src, Options{OutputMode: "db-less"})
+	if err != nil {
+		t.Fatalf("convert yaml db-less: %v", err)
+	}
+
+	if string(got) != string(want) {
+		t.Fatalf("typed db-less output mismatch\nwant:\n%s\ngot:\n%s", want, got)
 	}
 }
 
@@ -135,4 +176,158 @@ func containsSubstr(warnings []string, sub string) bool {
 		}
 	}
 	return false
+}
+
+func TestConvertDBLessFlattensConsumerCredentialsAndGroups(t *testing.T) {
+	src := []byte(`
+consumer_groups:
+  - name: devs
+consumers:
+  - name: alice
+    type: api-key
+    consumer_groups: [devs]
+    credentials:
+      - name: alice-key
+        api_key: sk-test
+`)
+
+	out, _, err := Convert(src, Options{OutputMode: "db-less"})
+	if err != nil {
+		t.Fatalf("convert db-less: %v", err)
+	}
+
+	var got map[string]any
+	if err := yaml.Unmarshal(out, &got); err != nil {
+		t.Fatalf("unmarshal output: %v", err)
+	}
+
+	if got["_format_version"] != "3.0" {
+		t.Fatalf("unexpected format version: %v", got["_format_version"])
+	}
+	if _, ok := got["keyauth_credentials"]; !ok {
+		t.Fatalf("expected keyauth_credentials in db-less output: %s", out)
+	}
+	if _, ok := got["consumer_group_consumers"]; !ok {
+		t.Fatalf("expected consumer_group_consumers in db-less output: %s", out)
+	}
+}
+
+func TestConvertDBLessKeepsExpandedRouteFields(t *testing.T) {
+	src := []byte(`
+models:
+  - type: model
+    name: m1
+    capabilities: [generate]
+    formats: [{type: openai}]
+    target_models:
+      - name: gpt-4o
+        provider: p1
+        config: {type: openai}
+    policies: []
+    acls: {allow: [], deny: []}
+    config:
+      route:
+        hosts: [ai.example.com]
+        methods: [GET, POST]
+        protocols: [http, https]
+        headers:
+          x-api-version: [v1]
+        snis: [ai.example.com]
+        sources:
+          - ip: 192.168.1.0/24
+            port: 8080
+        destinations:
+          - ip: 10.1.0.0/16
+            port: 443
+        strip_path: true
+        preserve_host: false
+        https_redirect_status_code: 426
+        regex_priority: 1
+        path_handling: v0
+        request_buffering: true
+        response_buffering: true
+      model: {}
+providers:
+  - name: p1
+    type: openai
+`)
+
+	out, _, err := Convert(src, Options{OutputMode: "db-less"})
+	if err != nil {
+		t.Fatalf("convert db-less: %v", err)
+	}
+
+	var got struct {
+		Routes []struct {
+			Hosts     []string            `yaml:"hosts"`
+			Methods   []string            `yaml:"methods"`
+			Protocols []string            `yaml:"protocols"`
+			Headers   map[string][]string `yaml:"headers"`
+			SNIs      []string            `yaml:"snis"`
+			Sources   []struct {
+				IP   string `yaml:"ip"`
+				Port int    `yaml:"port"`
+			} `yaml:"sources"`
+			Destinations []struct {
+				IP   string `yaml:"ip"`
+				Port int    `yaml:"port"`
+			} `yaml:"destinations"`
+			StripPath               *bool  `yaml:"strip_path"`
+			PreserveHost            *bool  `yaml:"preserve_host"`
+			HTTPSRedirectStatusCode *int   `yaml:"https_redirect_status_code"`
+			RegexPriority           *int   `yaml:"regex_priority"`
+			PathHandling            string `yaml:"path_handling"`
+			RequestBuffering        *bool  `yaml:"request_buffering"`
+			ResponseBuffering       *bool  `yaml:"response_buffering"`
+		} `yaml:"routes"`
+	}
+	if err := yaml.Unmarshal(out, &got); err != nil {
+		t.Fatalf("unmarshal output: %v", err)
+	}
+	if len(got.Routes) != 1 {
+		t.Fatalf("expected 1 route, got %d: %s", len(got.Routes), out)
+	}
+	route := got.Routes[0]
+	if len(route.Hosts) != 1 || route.Hosts[0] != "ai.example.com" {
+		t.Fatalf("unexpected hosts: %#v", route.Hosts)
+	}
+	if len(route.Methods) != 2 || route.Methods[0] != "GET" || route.Methods[1] != "POST" {
+		t.Fatalf("unexpected methods: %#v", route.Methods)
+	}
+	if len(route.Protocols) != 2 || route.Protocols[0] != "http" || route.Protocols[1] != "https" {
+		t.Fatalf("unexpected protocols: %#v", route.Protocols)
+	}
+	if got := route.Headers["x-api-version"]; len(got) != 1 || got[0] != "v1" {
+		t.Fatalf("unexpected headers: %#v", route.Headers)
+	}
+	if len(route.SNIs) != 1 || route.SNIs[0] != "ai.example.com" {
+		t.Fatalf("unexpected snis: %#v", route.SNIs)
+	}
+	if len(route.Sources) != 1 || route.Sources[0].IP != "192.168.1.0/24" || route.Sources[0].Port != 8080 {
+		t.Fatalf("unexpected sources: %#v", route.Sources)
+	}
+	if len(route.Destinations) != 1 || route.Destinations[0].IP != "10.1.0.0/16" || route.Destinations[0].Port != 443 {
+		t.Fatalf("unexpected destinations: %#v", route.Destinations)
+	}
+	if route.StripPath == nil || !*route.StripPath {
+		t.Fatalf("unexpected strip_path: %#v", route.StripPath)
+	}
+	if route.PreserveHost == nil || *route.PreserveHost {
+		t.Fatalf("unexpected preserve_host: %#v", route.PreserveHost)
+	}
+	if route.HTTPSRedirectStatusCode == nil || *route.HTTPSRedirectStatusCode != 426 {
+		t.Fatalf("unexpected https_redirect_status_code: %#v", route.HTTPSRedirectStatusCode)
+	}
+	if route.RegexPriority == nil || *route.RegexPriority != 1 {
+		t.Fatalf("unexpected regex_priority: %#v", route.RegexPriority)
+	}
+	if route.PathHandling != "v0" {
+		t.Fatalf("unexpected path_handling: %q", route.PathHandling)
+	}
+	if route.RequestBuffering == nil || !*route.RequestBuffering {
+		t.Fatalf("unexpected request_buffering: %#v", route.RequestBuffering)
+	}
+	if route.ResponseBuffering == nil || !*route.ResponseBuffering {
+		t.Fatalf("unexpected response_buffering: %#v", route.ResponseBuffering)
+	}
 }

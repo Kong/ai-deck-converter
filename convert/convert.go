@@ -9,6 +9,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	publicaigw "github.com/Kong/ai-deck-converter/aigw"
 	"github.com/Kong/ai-deck-converter/internal/aigw"
 	"github.com/Kong/ai-deck-converter/internal/kong"
 )
@@ -29,25 +30,26 @@ type Options struct {
 	Strict bool `yaml:"strict"`
 	// LabelTagPrefix is prepended to label-derived tags, e.g. "aigw/".
 	LabelTagPrefix string `yaml:"label_tag_prefix"`
+	// OutputMode controls the emitted Kong config flavor.
+	// Supported values are "deck" (default) and "db-less".
+	OutputMode string `yaml:"output_mode"`
 }
 
 func (o Options) withDefaults() Options {
+	if o.OutputMode == "" {
+		o.OutputMode = "deck"
+	}
 	return o
 }
 
 // Convert parses an AI Gateway document from YAML and returns Kong decK YAML
 // along with any non-fatal warnings.
 func Convert(src []byte, opts Options) ([]byte, []string, error) {
-	doc, err := aigw.Parse(src)
+	doc, err := publicaigw.Parse(src)
 	if err != nil {
 		return nil, nil, fmt.Errorf("parsing source document: %w", err)
 	}
-	out, warnings, err := ConvertDocument(doc, opts)
-	if err != nil {
-		return nil, warnings, err
-	}
-	data, err := marshalYAML(out)
-	return data, warnings, err
+	return convertParsedDocument(doc, opts)
 }
 
 // marshalYAML encodes v as YAML using a fixed two-space indent.
@@ -74,6 +76,41 @@ func ConvertDocument(doc *aigw.Document, opts Options) (*kong.Document, []string
 		return nil, c.warnings, err
 	}
 	return c.out, c.warnings, nil
+}
+
+// ConvertDocumentToDBLessYAML translates a parsed AI Gateway document into the
+// flattened db-less YAML payload understood by Kong data planes.
+func ConvertDocumentToDBLessYAML(doc *publicaigw.Document, opts Options) ([]byte, []string, error) {
+	typed, warnings, err := convertDocumentToDBLess(doc, opts)
+	if err != nil {
+		return nil, warnings, err
+	}
+	data, err := marshalYAML(typed)
+	return data, warnings, err
+}
+
+func convertParsedDocument(doc *publicaigw.Document, opts Options) ([]byte, []string, error) {
+	switch opts = opts.withDefaults(); opts.OutputMode {
+	case "deck":
+		out, warnings, err := ConvertDocument(doc, opts)
+		if err != nil {
+			return nil, warnings, err
+		}
+		data, err := marshalYAML(out)
+		return data, warnings, err
+	case "db-less":
+		return ConvertDocumentToDBLessYAML(doc, opts)
+	default:
+		return nil, nil, fmt.Errorf("invalid output_mode %q (want deck or db-less)", opts.OutputMode)
+	}
+}
+
+func convertDocumentToDBLess(doc *publicaigw.Document, opts Options) (any, []string, error) {
+	c := newConverter(doc, opts.withDefaults())
+	if err := c.run(); err != nil {
+		return nil, c.warnings, err
+	}
+	return c.projectDBLess(), c.warnings, nil
 }
 
 // Converter holds conversion state: source registries, the output document, and

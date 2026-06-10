@@ -1,0 +1,91 @@
+models:
+  - type: model
+    display_name: My Model With CH Balancer
+    name: my-balancer-ch-model
+    enabled: true
+    capabilities:
+      - generate
+      - embeddings
+    formats:
+      - type: openai
+    acls:
+      allow:
+        - consumer-alice
+        - group-admins
+      deny:
+        - consumer-bob
+        - group-blocked
+    config:
+      route:
+        destinations:
+          - ip: 10.1.0.0/16
+            port: 443
+          - ip: 10.2.0.0/16
+            port: 8443
+        headers:
+          x-api-version:
+            - v1
+            - v2
+        hosts:
+          - ai.example.com
+          - ai-internal.example.com
+        https_redirect_status_code: 426
+        methods:
+          - GET
+          - POST
+        path_handling: v0
+        paths:
+          - /v1/chat/completions
+          - /v1/embeddings
+        preserve_host: false
+        protocols:
+          - http
+          - https
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+        snis:
+          - ai.example.com
+          - ai-internal.example.com
+        sources:
+          - ip: 192.168.1.0/24
+            port: 8080
+          - ip: 192.168.2.0/24
+            port: 8081
+        strip_path: true
+        tags:
+          - team-ai
+          - env-production
+      logging:
+        payloads: false
+        statistics: true
+      response_streaming: allow
+      max_request_body_size: 8388608
+      model:
+        alias: my-model-alias
+        name_header: true
+      balancer:
+        algorithm: consistent-hashing
+        connect_timeout: 60000
+        fail_timeout: 10000
+        failover_criteria:
+          - error
+          - timeout
+          - http_429
+          - http_500
+        max_fails: 0
+        read_timeout: 60000
+        retries: 5
+        slots: 10000
+        write_timeout: 60000
+        hash_on_header: X-Kong-LLM-Request-ID
+    target_models:
+      - name: gpt-4o
+        provider: my-openai-provider
+        config:
+          type: openai
+    policies: []
+    labels:
+      env: production
+    managed_by:
+      owner: terraform
