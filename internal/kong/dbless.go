@@ -42,7 +42,7 @@ type DBLessService struct {
 type DBLessRoute struct {
 	ID                      string              `yaml:"id"`
 	Name                    string              `yaml:"name"`
-	Service                 string              `yaml:"service,omitempty"`
+	Service                 map[string]string   `yaml:"service,omitempty"`
 	Paths                   []string            `yaml:"paths,omitempty"`
 	Hosts                   []string            `yaml:"hosts,omitempty"`
 	Methods                 []string            `yaml:"methods,omitempty"`
@@ -67,16 +67,16 @@ type DBLessCIDRPort struct {
 }
 
 type DBLessPlugin struct {
-	ID            string         `yaml:"id"`
-	Name          string         `yaml:"name"`
-	Enabled       *bool          `yaml:"enabled,omitempty"`
-	Config        map[string]any `yaml:"config,omitempty"`
-	Service       string         `yaml:"service,omitempty"`
-	Route         string         `yaml:"route,omitempty"`
-	Consumer      string         `yaml:"consumer,omitempty"`
-	ConsumerGroup string         `yaml:"consumer_group,omitempty"`
-	Model         string         `yaml:"model,omitempty"`
-	Tags          []string       `yaml:"tags,omitempty"`
+	ID            string            `yaml:"id"`
+	Name          string            `yaml:"name"`
+	Enabled       *bool             `yaml:"enabled,omitempty"`
+	Config        map[string]any    `yaml:"config,omitempty"`
+	Service       map[string]string `yaml:"service,omitempty"`
+	Route         map[string]string `yaml:"route,omitempty"`
+	Consumer      map[string]string `yaml:"consumer,omitempty"`
+	ConsumerGroup map[string]string `yaml:"consumer_group,omitempty"`
+	Model         string            `yaml:"model,omitempty"`
+	Tags          []string          `yaml:"tags,omitempty"`
 }
 
 type DBLessConsumer struct {
