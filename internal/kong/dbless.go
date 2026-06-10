@@ -75,7 +75,7 @@ type DBLessPlugin struct {
 	Route         map[string]string `yaml:"route,omitempty"`
 	Consumer      map[string]string `yaml:"consumer,omitempty"`
 	ConsumerGroup map[string]string `yaml:"consumer_group,omitempty"`
-	Model         string            `yaml:"model,omitempty"`
+	Model         map[string]string `yaml:"model,omitempty"`
 	Tags          []string          `yaml:"tags,omitempty"`
 }
 

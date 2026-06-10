@@ -182,7 +182,7 @@ func toDBLessPlugin(plugin kong.Plugin, id string, scope scopeRef) kong.DBLessPl
 		Route:         toDBLessFK(scope.route),
 		Consumer:      toDBLessFK(scope.consumer),
 		ConsumerGroup: toDBLessFK(scope.consumerGroup),
-		Model:         firstNonEmpty(scope.model, ""),
+		Model:         toDBLessFK(scope.model),
 		Tags:          plugin.Tags,
 	}
 }
