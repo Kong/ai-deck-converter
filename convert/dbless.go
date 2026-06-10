@@ -178,10 +178,10 @@ func toDBLessPlugin(plugin kong.Plugin, id string, scope scopeRef) kong.DBLessPl
 		Name:          plugin.Name,
 		Enabled:       plugin.Enabled,
 		Config:        plugin.Config,
-		Service:       firstNonEmpty(scope.service, ""),
-		Route:         firstNonEmpty(scope.route, ""),
-		Consumer:      firstNonEmpty(scope.consumer, ""),
-		ConsumerGroup: firstNonEmpty(scope.consumerGroup, ""),
+		Service:       toDBLessFK(scope.service),
+		Route:         toDBLessFK(scope.route),
+		Consumer:      toDBLessFK(scope.consumer),
+		ConsumerGroup: toDBLessFK(scope.consumerGroup),
 		Model:         firstNonEmpty(scope.model, ""),
 		Tags:          plugin.Tags,
 	}
@@ -226,7 +226,7 @@ func toDBLessRoute(route kong.Route, id, serviceID string) kong.DBLessRoute {
 	r := kong.DBLessRoute{
 		ID:                      id,
 		Name:                    route.Name,
-		Service:                 serviceID,
+		Service:                 toDBLessFK(serviceID),
 		Paths:                   route.Paths,
 		Hosts:                   route.Hosts,
 		Methods:                 route.Methods,
@@ -248,6 +248,15 @@ func toDBLessRoute(route kong.Route, id, serviceID string) kong.DBLessRoute {
 		r.Protocols = []string{"http", "https"}
 	}
 	return r
+}
+
+func toDBLessFK(id string) map[string]string {
+	if id == "" {
+		return nil
+	}
+	return map[string]string{
+		"id": id,
+	}
 }
 
 func toDBLessCIDRPorts(in []kong.CIDRPort) []kong.DBLessCIDRPort {
