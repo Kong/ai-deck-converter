@@ -48,16 +48,30 @@ type Service struct {
 
 // Route is a Kong Gateway Route. Plugins may be nested.
 type Route struct {
-	Name         string              `yaml:"name"`
-	Paths        []string            `yaml:"paths,omitempty"`
-	Hosts        []string            `yaml:"hosts,omitempty"`
-	Methods      []string            `yaml:"methods,omitempty"`
-	Protocols    []string            `yaml:"protocols,omitempty"`
-	Headers      map[string][]string `yaml:"headers,omitempty"`
-	StripPath    *bool               `yaml:"strip_path,omitempty"`
-	PreserveHost *bool               `yaml:"preserve_host,omitempty"`
-	Plugins      []Plugin            `yaml:"plugins,omitempty"`
-	Tags         []string            `yaml:"tags,omitempty"`
+	Name                    string              `yaml:"name"`
+	Paths                   []string            `yaml:"paths,omitempty"`
+	Hosts                   []string            `yaml:"hosts,omitempty"`
+	Methods                 []string            `yaml:"methods,omitempty"`
+	Protocols               []string            `yaml:"protocols,omitempty"`
+	Headers                 map[string][]string `yaml:"headers,omitempty"`
+	SNIs                    []string            `yaml:"snis,omitempty"`
+	Sources                 []CIDRPort          `yaml:"sources,omitempty"`
+	Destinations            []CIDRPort          `yaml:"destinations,omitempty"`
+	StripPath               *bool               `yaml:"strip_path,omitempty"`
+	PreserveHost            *bool               `yaml:"preserve_host,omitempty"`
+	HTTPSRedirectStatusCode *int                `yaml:"https_redirect_status_code,omitempty"`
+	RegexPriority           *int                `yaml:"regex_priority,omitempty"`
+	PathHandling            string              `yaml:"path_handling,omitempty"`
+	RequestBuffering        *bool               `yaml:"request_buffering,omitempty"`
+	ResponseBuffering       *bool               `yaml:"response_buffering,omitempty"`
+	Plugins                 []Plugin            `yaml:"plugins,omitempty"`
+	Tags                    []string            `yaml:"tags,omitempty"`
+}
+
+// CIDRPort mirrors Kong route source/destination entries.
+type CIDRPort struct {
+	IP   string `yaml:"ip,omitempty"`
+	Port *int   `yaml:"port,omitempty"`
 }
 
 // Plugin is a Kong Gateway Plugin. When emitted at the top level, the foreign-key

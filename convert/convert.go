@@ -121,16 +121,60 @@ func buildRoute(rc aigw.RouteConfig, entityName string) kong.Route {
 		name = entityName + "-route"
 	}
 	return kong.Route{
-		Name:         name,
-		Paths:        rc.Paths,
-		Hosts:        rc.Hosts,
-		Methods:      rc.Methods,
-		Protocols:    rc.Protocols,
-		Headers:      rc.Headers,
-		StripPath:    rc.StripPath,
-		PreserveHost: rc.PreserveHost,
-		Tags:         rc.Tags,
+		Name:                    name,
+		Paths:                   rc.Paths,
+		Hosts:                   rc.Hosts,
+		Methods:                 rc.Methods,
+		Protocols:               rc.Protocols,
+		Headers:                 rc.Headers,
+		SNIs:                    cloneStrings(rc.SNIs),
+		Sources:                 toKongCIDRPorts(rc.Sources),
+		Destinations:            toKongCIDRPorts(rc.Destinations),
+		StripPath:               rc.StripPath,
+		PreserveHost:            rc.PreserveHost,
+		HTTPSRedirectStatusCode: rc.HTTPSRedirectStatusCode,
+		RegexPriority:           rc.RegexPriority,
+		PathHandling:            rc.PathHandling,
+		RequestBuffering:        rc.RequestBuffering,
+		ResponseBuffering:       rc.ResponseBuffering,
+		Tags:                    rc.Tags,
 	}
+}
+
+func buildModelRoute(rc aigw.RouteConfig, routeName, path string, defaultMethods []string) kong.Route {
+	route := buildRoute(rc, routeName)
+	route.Name = routeName
+	route.Paths = []string{path}
+	if len(route.Methods) == 0 {
+		route.Methods = defaultMethods
+	}
+	if route.StripPath == nil {
+		route.StripPath = boolPtr(false)
+	}
+	return route
+}
+
+func toKongCIDRPorts(in []aigw.CIDRPort) []kong.CIDRPort {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make([]kong.CIDRPort, 0, len(in))
+	for _, item := range in {
+		out = append(out, kong.CIDRPort{
+			IP:   item.IP,
+			Port: item.Port,
+		})
+	}
+	return out
+}
+
+func cloneStrings(in []string) []string {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make([]string, len(in))
+	copy(out, in)
+	return out
 }
 
 func (c *Converter) run() error {
