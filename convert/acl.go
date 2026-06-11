@@ -1,13 +1,9 @@
 package convert
 
-import (
-	"github.com/Kong/ai-deck-converter/internal/aigw"
-	"github.com/Kong/ai-deck-converter/internal/kong"
-)
+import "github.com/Kong/ai-deck-converter/internal/aigw"
 
 // aclBlock builds an {allow, deny} config map from an AI Gateway ACL. Returns
-// nil when both lists are empty. Reused by the Kong acl plugin (for Models,
-// Agents) and by the ai-mcp-proxy plugin's internal ACL fields.
+// nil when both lists are empty. Reused by AI-native plugin ACL fields.
 func aclBlock(acls aigw.ACLs) map[string]any {
 	if acls.IsEmpty() {
 		return nil
@@ -31,9 +27,4 @@ func defaultACLBlock(acls aigw.ACLs) []map[string]any {
 		return nil
 	}
 	return []map[string]any{block}
-}
-
-// aclPlugin builds a Kong acl plugin from an AI Gateway ACL allow/deny list.
-func aclPlugin(acls aigw.ACLs) kong.Plugin {
-	return kong.Plugin{Name: "acl", Config: aclBlock(acls)}
 }

@@ -48,6 +48,9 @@ plugins:
       name: openai-chat
   - name: ai-proxy-advanced
     config:
+      acls:
+        allow:
+          - premium
       balancer:
         algorithm: lowest-latency
       genai_category: text/generation
@@ -81,12 +84,6 @@ plugins:
     config:
       allow_patterns:
         - ^safe
-    model:
-      name: prod-chat
-  - name: acl
-    config:
-      allow:
-        - premium
     model:
       name: prod-chat
 vaults:

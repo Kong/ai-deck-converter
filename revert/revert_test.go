@@ -162,6 +162,48 @@ services:
 	}
 }
 
+func TestRevertModelACLsFromAIProxyAdvanced(t *testing.T) {
+	in := []byte(`
+_format_version: "3.0"
+services:
+  - name: gw
+    url: http://gw.invalid
+    routes:
+      - name: openai-chat
+        paths: [/ai/chat/completions]
+        plugins:
+          - name: ai-proxy-advanced
+            config:
+              acls:
+                allow: [consumer-alice, group-admins]
+                deny: [consumer-bob, group-blocked]
+              llm_format: openai
+              targets:
+                - route_type: llm/v1/chat
+                  model: {provider: openai, name: gpt-4o, model_alias: '@openai/m1'}
+ai-models:
+  - name: m1
+    alias: '@openai/m1'
+`)
+
+	doc, warnings, err := revertYAML(t, in, Options{})
+	if err != nil {
+		t.Fatalf("revert: %v", err)
+	}
+	if len(warnings) != 0 {
+		t.Fatalf("unexpected warnings: %v", warnings)
+	}
+	if len(doc.Models) != 1 {
+		t.Fatalf("expected 1 model, got %d: %+v", len(doc.Models), doc.Models)
+	}
+	if got := doc.Models[0].ACLs.Allow; len(got) != 2 || got[0] != "consumer-alice" || got[1] != "group-admins" {
+		t.Fatalf("unexpected allow ACLs: %#v", got)
+	}
+	if got := doc.Models[0].ACLs.Deny; len(got) != 2 || got[0] != "consumer-bob" || got[1] != "group-blocked" {
+		t.Fatalf("unexpected deny ACLs: %#v", got)
+	}
+}
+
 func TestMismatchedAliasStillWarns(t *testing.T) {
 	// When ai-models entries exist but a target alias matches none of them,
 	// that is a genuine inconsistency and keeps its warning.

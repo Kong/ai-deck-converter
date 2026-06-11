@@ -17,8 +17,8 @@ func (c *Converter) convertGlobalPolicies() {
 }
 
 // scopedPlugins builds the plugins to nest under a referencing entity: one per
-// non-global policy reference, plus an acl plugin when ACLs are present.
-func (c *Converter) scopedPlugins(refs []string, acls aigw.ACLs) ([]kong.Plugin, error) {
+// non-global policy reference.
+func (c *Converter) scopedPlugins(refs []string, _ aigw.ACLs) ([]kong.Plugin, error) {
 	var plugins []kong.Plugin
 	seen := map[string]bool{}
 	for _, ref := range refs {
@@ -37,9 +37,6 @@ func (c *Converter) scopedPlugins(refs []string, acls aigw.ACLs) ([]kong.Plugin,
 			continue // emitted once at the top level
 		}
 		plugins = append(plugins, policyPlugin(p, nil))
-	}
-	if !acls.IsEmpty() {
-		plugins = append(plugins, aclPlugin(acls))
 	}
 	return plugins, nil
 }

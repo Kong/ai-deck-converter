@@ -1,6 +1,8 @@
 package convert
 
 import (
+	"fmt"
+
 	"github.com/Kong/ai-deck-converter/internal/aigw"
 	"github.com/Kong/ai-deck-converter/internal/aimap"
 	"github.com/Kong/ai-deck-converter/internal/kong"
@@ -14,6 +16,7 @@ type routeGroup struct {
 	takesBodyModel    bool
 	llmFormat         string
 	genaiCategory     string
+	acls              map[string]any
 	balancer          map[string]any
 	responseStreaming string
 	modelNameHeader   *bool
@@ -28,6 +31,7 @@ type routeGroup struct {
 // ai-proxy-advanced plugins per route plus an ai-models entry per source model.
 func (c *Converter) convertModels() error {
 	groups := map[string]*routeGroup{}
+	usedRouteNames := map[string]bool{}
 	var order []string
 	var guardPlugins []kong.Plugin
 
@@ -63,14 +67,21 @@ func (c *Converter) convertModels() error {
 					}
 					continue
 				}
-				key := sec + "|" + spec.RouteLabel
+				aclSig := aclSignature(m.ACLs)
+				key := sec + "|" + spec.RouteLabel + "|" + aclSig
 				g := groups[key]
 				if g == nil {
+					routeName := sec + "-" + spec.RouteLabel
+					if usedRouteNames[routeName] {
+						routeName = fmt.Sprintf("%s-%s", routeName, m.Name)
+					}
+					usedRouteNames[routeName] = true
 					g = &routeGroup{
-						route:             buildModelRoute(m.Config.Route, sec+"-"+spec.RouteLabel, aimap.RoutePath(base, spec), spec.Methods),
+						route:             buildModelRoute(m.Config.Route, routeName, aimap.RoutePath(base, spec), spec.Methods),
 						takesBodyModel:    spec.TakesBodyModel,
 						llmFormat:         llmFormat(m),
 						genaiCategory:     spec.GenaiCategory,
+						acls:              aclBlock(m.ACLs),
 						balancer:          balancerConfig(m.Config.Balancer),
 						responseStreaming: m.Config.ResponseStreaming,
 						modelNameHeader:   m.Config.Model.NameHeader,
@@ -148,6 +159,9 @@ func (g *routeGroup) proxyConfig() map[string]any {
 		"llm_format":     g.llmFormat,
 		"genai_category": g.genaiCategory,
 		"targets":        g.targets,
+	}
+	if g.acls != nil {
+		cfg["acls"] = g.acls
 	}
 	if g.responseStreaming != "" {
 		cfg["response_streaming"] = g.responseStreaming
@@ -234,6 +248,13 @@ func bodySizeOrDefault(m *aigw.Model) int {
 		return *m.Config.MaxRequestBodySize
 	}
 	return aimap.DefaultMaxBodySize
+}
+
+func aclSignature(acls aigw.ACLs) string {
+	if acls.IsEmpty() {
+		return ""
+	}
+	return fmt.Sprintf("allow=%q|deny=%q", acls.Allow, acls.Deny)
 }
 
 func boolPtr(b bool) *bool { return &b }

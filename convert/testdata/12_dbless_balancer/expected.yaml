@@ -104,6 +104,13 @@ plugins:
   - id: f3adc007-171c-5519-8763-3a0eef79bde3
     name: ai-proxy-advanced
     config:
+      acls:
+        allow:
+          - consumer-alice
+          - group-admins
+        deny:
+          - consumer-bob
+          - group-blocked
       balancer:
         algorithm: consistent-hashing
         connect_timeout: 60000
@@ -143,6 +150,13 @@ plugins:
   - id: 75ff22ed-6245-594b-895f-6a9fa36f4581
     name: ai-proxy-advanced
     config:
+      acls:
+        allow:
+          - consumer-alice
+          - group-admins
+        deny:
+          - consumer-bob
+          - group-blocked
       balancer:
         algorithm: consistent-hashing
         connect_timeout: 60000
@@ -171,17 +185,6 @@ plugins:
           route_type: llm/v1/embeddings
     route:
       id: 0da1097c-6edc-5c9c-a032-cd042d0db5e4
-  - id: 2501ef6b-218c-5327-ad93-4df6a2133531
-    name: acl
-    config:
-      allow:
-        - consumer-alice
-        - group-admins
-      deny:
-        - consumer-bob
-        - group-blocked
-    model:
-      id: aab20033-7c80-5942-aadc-52357371dbeb
 ai_models:
   - id: aab20033-7c80-5942-aadc-52357371dbeb
     name: my-balancer-ch-model

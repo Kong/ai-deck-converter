@@ -1,6 +1,7 @@
 package convert
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -210,6 +211,87 @@ consumers:
 	if _, ok := got["consumer_group_consumers"]; !ok {
 		t.Fatalf("expected consumer_group_consumers in db-less output: %s", out)
 	}
+}
+
+func TestConvertACLsLowerToAIProxyAdvanced(t *testing.T) {
+	src := []byte(`
+models:
+  - type: model
+    name: m1
+    capabilities: [chat]
+    formats: [{type: openai}]
+    target_models:
+      - name: gpt-4o
+        provider: p1
+        config: {type: openai}
+    acls:
+      allow: [consumer-alice, group-admins]
+      deny: [consumer-bob, group-blocked]
+    config:
+      route: {paths: [/v1]}
+      model: {alias: m1}
+providers:
+  - name: p1
+    type: openai
+`)
+
+	type pluginDoc struct {
+		Plugins []struct {
+			Name   string `yaml:"name"`
+			Config struct {
+				ACLs struct {
+					Allow []string `yaml:"allow"`
+					Deny  []string `yaml:"deny"`
+				} `yaml:"acls"`
+			} `yaml:"config"`
+		} `yaml:"plugins"`
+	}
+
+	assertACLs := func(t *testing.T, out []byte) {
+		t.Helper()
+
+		var got pluginDoc
+		if err := yaml.Unmarshal(out, &got); err != nil {
+			t.Fatalf("unmarshal output: %v", err)
+		}
+
+		var foundProxy bool
+		for _, plugin := range got.Plugins {
+			if plugin.Name == "acl" {
+				t.Fatalf("unexpected standalone acl plugin in output: %s", out)
+			}
+			if plugin.Name != "ai-proxy-advanced" {
+				continue
+			}
+			foundProxy = true
+			if !slices.Equal(plugin.Config.ACLs.Allow, []string{"consumer-alice", "group-admins"}) {
+				t.Fatalf("unexpected allow ACLs: %#v", plugin.Config.ACLs.Allow)
+			}
+			if !slices.Equal(plugin.Config.ACLs.Deny, []string{"consumer-bob", "group-blocked"}) {
+				t.Fatalf("unexpected deny ACLs: %#v", plugin.Config.ACLs.Deny)
+			}
+		}
+
+		if !foundProxy {
+			t.Fatalf("expected ai-proxy-advanced plugin in output: %s", out)
+		}
+	}
+
+	t.Run("deck", func(t *testing.T) {
+		out, _, err := Convert(src, Options{})
+		if err != nil {
+			t.Fatalf("convert deck: %v", err)
+		}
+		assertACLs(t, out)
+	})
+
+	t.Run("dbless", func(t *testing.T) {
+		out, _, err := Convert(src, Options{OutputMode: "db-less"})
+		if err != nil {
+			t.Fatalf("convert db-less: %v", err)
+		}
+		assertACLs(t, out)
+	})
 }
 
 func TestConvertDBLessKeepsExpandedRouteFields(t *testing.T) {

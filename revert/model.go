@@ -46,6 +46,9 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 	// Route-scoped guard plugins (other than the AI plugins) apply to every
 	// model on the route.
 	routeRefs, routeACLs := r.policyRefs(plugins)
+	if proxyACLs := aclsFromBlock(getMap(cfg, "acls")); !proxyACLs.IsEmpty() {
+		routeACLs = proxyACLs
+	}
 
 	targets := getSlice(cfg, "targets")
 	if len(targets) == 0 {
