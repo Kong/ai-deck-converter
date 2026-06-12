@@ -186,6 +186,8 @@ func (c *Converter) buildTarget(tm *aigw.TargetModel, provider *aigw.Provider, p
 	}
 	if tm.SemanticDesc != "" {
 		target["description"] = tm.SemanticDesc
+	} else {
+		target["description"] = tm.Name // Use name as default description.
 	}
 	return target
 }

@@ -47,6 +47,7 @@ plugins:
         - auth:
             header_name: Authorization
             header_value: '{vault://env/openai-key}'
+          description: gpt-4o
           model:
             model_alias: '@openai/guarded-gpt'
             name: gpt-4o

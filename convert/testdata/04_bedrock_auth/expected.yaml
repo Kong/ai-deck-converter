@@ -21,6 +21,7 @@ plugins:
         - auth:
             aws_access_key_id: '{vault://env/aws-key-id}'
             aws_secret_access_key: '{vault://env/aws-secret}'
+          description: anthropic.claude-3-5-sonnet
           model:
             model_alias: '@bedrock/claude-3-5-sonnet'
             name: anthropic.claude-3-5-sonnet

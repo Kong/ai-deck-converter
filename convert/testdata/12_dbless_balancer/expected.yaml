@@ -125,7 +125,8 @@ plugins:
       model_name_header: true
       response_streaming: allow
       targets:
-        - model:
+        - description: gpt-4o
+          model:
             model_alias: my-model-alias
             name: gpt-4o
             provider: openai
@@ -164,7 +165,8 @@ plugins:
       model_name_header: true
       response_streaming: allow
       targets:
-        - model:
+        - description: gpt-4o
+          model:
             model_alias: my-model-alias
             name: gpt-4o
             provider: openai
