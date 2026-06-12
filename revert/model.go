@@ -88,10 +88,17 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 			g.caps = append(g.caps, capability)
 		}
 
+		name := getStr(modelMap, "name")
+		// A description equal to the model name is the forward converter's
+		// default; drop it so round trips stay clean.
+		semanticDesc := getStr(target, "description")
+		if semanticDesc == name {
+			semanticDesc = ""
+		}
 		tm := aigw.TargetModel{
-			Name:         getStr(modelMap, "name"),
+			Name:         name,
 			Weight:       getInt(target, "weight"),
-			SemanticDesc: getStr(target, "description"),
+			SemanticDesc: semanticDesc,
 			Provider:     aigw.ProviderRef{},
 			Config:       aigw.TargetModelConfig{Type: providerType},
 		}

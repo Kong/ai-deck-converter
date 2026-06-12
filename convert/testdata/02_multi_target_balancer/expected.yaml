@@ -28,6 +28,7 @@ plugins:
         - auth:
             header_name: Authorization
             header_value: '{vault://env/openai-key}'
+          description: gpt-4o
           model:
             model_alias: '@openai/chat-lb'
             name: gpt-4o
@@ -40,6 +41,7 @@ plugins:
             param_location: query
             param_name: api-key
             param_value: '{vault://env/azure-key}'
+          description: gpt-4o-azure
           model:
             model_alias: '@openai/chat-lb'
             name: gpt-4o-azure

@@ -56,6 +56,7 @@ plugins:
         - auth:
             header_name: Authorization
             header_value: '{vault://env/openai-key}'
+          description: gpt-4o
           model:
             model_alias: '@prod/prod-chat'
             name: gpt-4o
@@ -67,6 +68,7 @@ plugins:
         - auth:
             header_name: x-api-key
             header_value: '{vault://env/anthropic-key}'
+          description: claude-3-5
           model:
             model_alias: '@prod/prod-chat'
             name: claude-3-5
