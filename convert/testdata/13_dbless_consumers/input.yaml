@@ -1,0 +1,40 @@
+models:
+  - type: model
+    name: my-model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    target_models:
+      - name: gpt-4o
+        provider: openai-main
+        config: {type: openai}
+    config:
+      route: {paths: [/v1]}
+      model: {alias: my-alias}
+providers:
+  - type: openai
+    name: openai-main
+    config:
+      auth:
+        type: header
+        headers: [{name: Authorization, value: "Bearer sk-test"}]
+consumers:
+  - name: alice
+    type: api-key
+    labels:
+      tier: gold
+    credentials:
+      - name: alice-key
+        type: api-key
+        api_key: sk-alice-secret
+        ttl: 3600
+        labels:
+          env: prod
+          scope: read-only
+  - name: bob
+    type: api-key
+    credentials:
+      - name: bob-key
+        type: api-key
+        api_key: sk-bob-secret
+consumer_groups:
+  - name: premium-users

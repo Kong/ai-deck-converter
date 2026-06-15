@@ -46,9 +46,10 @@ func (c *Converter) convertConsumers() error {
 				continue
 			}
 			kc.KeyAuthCredentials = append(kc.KeyAuthCredentials, kong.KeyAuthCredential{
-				ID:  cred.ID,
-				Key: cred.APIKey,
-				TTL: cred.TTL,
+				ID:   cred.ID,
+				Key:  cred.APIKey,
+				TTL:  cred.TTL,
+				Tags: c.labelsToTags(cred.Labels),
 			})
 		}
 		c.out.Consumers = append(c.out.Consumers, kc)

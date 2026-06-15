@@ -22,6 +22,7 @@ type Credential struct {
 	Type        string `yaml:"type,omitempty"` // api-key
 	TTL         *int   `yaml:"ttl,omitempty"`
 	APIKey      string `yaml:"api_key,omitempty"`
+	Labels      Labels `yaml:"labels,omitempty"`
 }
 
 // ConsumerGroup is an AI Gateway consumer group.

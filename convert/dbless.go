@@ -94,6 +94,8 @@ func (c *Converter) projectDBLess() *kong.DBLessDocument {
 				ID:       firstNonEmpty(cred.ID, stableUUID(fmt.Sprintf("keyauth:%s:%s:%d", consumer.Username, cred.Key, credIdx))),
 				Key:      cred.Key,
 				Consumer: consumerID,
+				TTL:      cred.TTL,
+				Tags:     cred.Tags,
 			})
 		}
 		for pluginIdx, plugin := range consumer.Plugins {
