@@ -113,7 +113,9 @@ type DBLessAIModel struct {
 }
 
 type DBLessKeyAuthCredential struct {
-	ID       string `yaml:"id"`
-	Key      string `yaml:"key,omitempty"`
-	Consumer string `yaml:"consumer"`
+	ID       string   `yaml:"id"`
+	Key      string   `yaml:"key,omitempty"`
+	Consumer string   `yaml:"consumer"`
+	TTL      *int     `yaml:"ttl,omitempty"`
+	Tags     []string `yaml:"tags,omitempty"`
 }

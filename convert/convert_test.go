@@ -417,3 +417,68 @@ providers:
 		t.Fatalf("unexpected response_buffering: %#v", route.ResponseBuffering)
 	}
 }
+
+func TestConvertDBLessCredentialTTLAndTags(t *testing.T) {
+	ttl := 7200
+	src := []byte(`
+consumers:
+  - name: alice
+    type: api-key
+    credentials:
+      - name: alice-key
+        type: api-key
+        api_key: sk-alice
+        ttl: 7200
+        labels:
+          env: prod
+          scope: read-only
+  - name: bob
+    type: api-key
+    credentials:
+      - name: bob-key
+        type: api-key
+        api_key: sk-bob
+`)
+
+	out, _, err := Convert(src, Options{OutputMode: "db-less"})
+	if err != nil {
+		t.Fatalf("convert db-less: %v", err)
+	}
+
+	var got struct {
+		Credentials []struct {
+			Key      string   `yaml:"key"`
+			Consumer string   `yaml:"consumer"`
+			TTL      *int     `yaml:"ttl"`
+			Tags     []string `yaml:"tags"`
+		} `yaml:"keyauth_credentials"`
+	}
+	if err := yaml.Unmarshal(out, &got); err != nil {
+		t.Fatalf("unmarshal output: %v", err)
+	}
+	if len(got.Credentials) != 2 {
+		t.Fatalf("expected 2 keyauth_credentials, got %d: %s", len(got.Credentials), out)
+	}
+
+	alice := got.Credentials[0]
+	if alice.Key != "sk-alice" {
+		t.Fatalf("unexpected key: %q", alice.Key)
+	}
+	if alice.TTL == nil || *alice.TTL != ttl {
+		t.Fatalf("expected TTL %d, got %v", ttl, alice.TTL)
+	}
+	if len(alice.Tags) != 2 || alice.Tags[0] != "env:prod" || alice.Tags[1] != "scope:read-only" {
+		t.Fatalf("unexpected tags: %#v", alice.Tags)
+	}
+
+	bob := got.Credentials[1]
+	if bob.Key != "sk-bob" {
+		t.Fatalf("unexpected key: %q", bob.Key)
+	}
+	if bob.TTL != nil {
+		t.Fatalf("expected no TTL for bob, got %v", bob.TTL)
+	}
+	if len(bob.Tags) != 0 {
+		t.Fatalf("expected no tags for bob, got %#v", bob.Tags)
+	}
+}
