@@ -13,6 +13,7 @@ func (c *Converter) convertConsumerGroups() error {
 			return err
 		}
 		c.out.ConsumerGroups = append(c.out.ConsumerGroups, kong.ConsumerGroup{
+			ID:      g.ID,
 			Name:    g.Name,
 			Plugins: plugins,
 			Tags:    c.labelsToTags(g.Labels),
@@ -29,6 +30,7 @@ func (c *Converter) convertConsumers() error {
 			return err
 		}
 		kc := kong.Consumer{
+			ID:       cons.ID,
 			Username: cons.Name,
 			CustomID: cons.CustomID,
 			Groups:   cons.ConsumerGroups,
@@ -44,6 +46,7 @@ func (c *Converter) convertConsumers() error {
 				continue
 			}
 			kc.KeyAuthCredentials = append(kc.KeyAuthCredentials, kong.KeyAuthCredential{
+				ID:  cred.ID,
 				Key: cred.APIKey,
 				TTL: cred.TTL,
 			})

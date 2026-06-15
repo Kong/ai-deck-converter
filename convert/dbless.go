@@ -44,16 +44,16 @@ func (c *Converter) projectDBLess() *kong.DBLessDocument {
 		}
 	}
 	for _, model := range c.out.AIModels {
-		ids.model[model.Name] = stableUUID("ai_model:" + model.Name)
+		ids.model[model.Name] = firstNonEmpty(model.ID, stableUUID("ai_model:"+model.Name))
 	}
 	for _, vault := range c.out.Vaults {
-		ids.vault[vault.Prefix] = stableUUID("vault:" + vault.Prefix)
+		ids.vault[vault.Prefix] = firstNonEmpty(vault.ID, stableUUID("vault:"+vault.Prefix))
 	}
 	for _, group := range c.out.ConsumerGroups {
-		ids.group[group.Name] = stableUUID("consumer_group:" + group.Name)
+		ids.group[group.Name] = firstNonEmpty(group.ID, stableUUID("consumer_group:"+group.Name))
 	}
 	for _, consumer := range c.out.Consumers {
-		ids.consumer[consumer.Username] = stableUUID("consumer:" + consumer.Username)
+		ids.consumer[consumer.Username] = firstNonEmpty(consumer.ID, stableUUID("consumer:"+consumer.Username))
 	}
 
 	memberSeen := map[string]bool{}
@@ -91,7 +91,7 @@ func (c *Converter) projectDBLess() *kong.DBLessDocument {
 		})
 		for credIdx, cred := range consumer.KeyAuthCredentials {
 			out.KeyAuthCredentials = append(out.KeyAuthCredentials, kong.DBLessKeyAuthCredential{
-				ID:       stableUUID(fmt.Sprintf("keyauth:%s:%s:%d", consumer.Username, cred.Key, credIdx)),
+				ID:       firstNonEmpty(cred.ID, stableUUID(fmt.Sprintf("keyauth:%s:%s:%d", consumer.Username, cred.Key, credIdx))),
 				Key:      cred.Key,
 				Consumer: consumerID,
 			})

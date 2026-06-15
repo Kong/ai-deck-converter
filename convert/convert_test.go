@@ -212,6 +212,92 @@ consumers:
 	}
 }
 
+func TestConvertDBLessPreservesInputIDsWhenProvided(t *testing.T) {
+	src := []byte(`
+consumer_groups:
+  - id: cg-source-id
+    name: devs
+consumers:
+  - id: consumer-source-id
+    name: alice
+    type: api-key
+    consumer_groups: [devs]
+    credentials:
+      - id: cred-source-id
+        name: alice-key
+        api_key: sk-test
+models:
+  - id: model-source-id
+    type: model
+    name: m1
+    capabilities: [generate]
+    formats: [{type: openai}]
+    target_models:
+      - name: gpt-4o
+        provider: p1
+        config: {type: openai}
+    config:
+      route: {paths: [/v1]}
+      model: {alias: m1}
+vaults:
+  - id: vault-source-id
+    type: env
+    name: env
+providers:
+  - name: p1
+    type: openai
+`)
+
+	out, _, err := Convert(src, Options{OutputMode: "db-less"})
+	if err != nil {
+		t.Fatalf("convert db-less: %v", err)
+	}
+
+	var got map[string]any
+	if err := yaml.Unmarshal(out, &got); err != nil {
+		t.Fatalf("unmarshal output: %v", err)
+	}
+
+	consumerGroups := got["consumer_groups"].([]any)
+	consumerGroup := consumerGroups[0].(map[string]any)
+	if consumerGroup["id"] != "cg-source-id" {
+		t.Fatalf("expected consumer group id to be preserved, got %v", consumerGroup["id"])
+	}
+
+	consumers := got["consumers"].([]any)
+	consumer := consumers[0].(map[string]any)
+	if consumer["id"] != "consumer-source-id" {
+		t.Fatalf("expected consumer id to be preserved, got %v", consumer["id"])
+	}
+
+	credentials := got["keyauth_credentials"].([]any)
+	credential := credentials[0].(map[string]any)
+	if credential["id"] != "cred-source-id" {
+		t.Fatalf("expected credential id to be preserved, got %v", credential["id"])
+	}
+
+	members := got["consumer_group_consumers"].([]any)
+	member := members[0].(map[string]any)
+	if member["consumer_group"] != "cg-source-id" {
+		t.Fatalf("expected consumer group membership to use preserved group id, got %v", member["consumer_group"])
+	}
+	if member["consumer"] != "consumer-source-id" {
+		t.Fatalf("expected consumer group membership to use preserved consumer id, got %v", member["consumer"])
+	}
+
+	models := got["ai_models"].([]any)
+	model := models[0].(map[string]any)
+	if model["id"] != "model-source-id" {
+		t.Fatalf("expected ai model id to be preserved, got %v", model["id"])
+	}
+
+	vaults := got["vaults"].([]any)
+	vault := vaults[0].(map[string]any)
+	if vault["id"] != "vault-source-id" {
+		t.Fatalf("expected vault id to be preserved, got %v", vault["id"])
+	}
+}
+
 func TestConvertDBLessKeepsExpandedRouteFields(t *testing.T) {
 	src := []byte(`
 models:

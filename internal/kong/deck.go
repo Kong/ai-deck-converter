@@ -91,6 +91,7 @@ type Plugin struct {
 
 // Consumer is a Kong Gateway Consumer. Credentials and scoped plugins may be nested.
 type Consumer struct {
+	ID                 string              `yaml:"id,omitempty"`
 	Username           string              `yaml:"username,omitempty"`
 	CustomID           string              `yaml:"custom_id,omitempty"`
 	Groups             []string            `yaml:"groups,omitempty"`
@@ -101,6 +102,7 @@ type Consumer struct {
 
 // KeyAuthCredential is a key-auth credential nested under a Consumer.
 type KeyAuthCredential struct {
+	ID   string   `yaml:"id,omitempty"`
 	Key  string   `yaml:"key,omitempty"`
 	TTL  *int     `yaml:"ttl,omitempty"`
 	Tags []string `yaml:"tags,omitempty"`
@@ -108,6 +110,7 @@ type KeyAuthCredential struct {
 
 // ConsumerGroup is a Kong Gateway Consumer Group. Scoped plugins may be nested.
 type ConsumerGroup struct {
+	ID      string   `yaml:"id,omitempty"`
 	Name    string   `yaml:"name"`
 	Plugins []Plugin `yaml:"plugins,omitempty"`
 	Tags    []string `yaml:"tags,omitempty"`
@@ -116,6 +119,7 @@ type ConsumerGroup struct {
 // Vault is a Kong Gateway Vault. Name is the backend type (env, aws, gcp, ...);
 // Prefix is the reference prefix used in {vault://<prefix>/...} lookups.
 type Vault struct {
+	ID          string         `yaml:"id,omitempty"`
 	Prefix      string         `yaml:"prefix"`
 	Name        string         `yaml:"name"`
 	Description string         `yaml:"description,omitempty"`
@@ -126,6 +130,7 @@ type Vault struct {
 // AIModel is the Kong Gateway ai-model entity: a named model with an optional
 // request-body alias. Plugins scope to it via a Plugin.Model foreign key.
 type AIModel struct {
+	ID    string `yaml:"id,omitempty"`
 	Name  string `yaml:"name"`
 	Alias string `yaml:"alias,omitempty"`
 }

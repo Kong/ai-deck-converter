@@ -95,6 +95,7 @@ func (c *Converter) convertModels() error {
 
 		// ai-models entry (one per source model).
 		c.out.AIModels = append(c.out.AIModels, kong.AIModel{
+			ID:    m.ID,
 			Name:  m.Name,
 			Alias: m.Config.Model.Alias,
 		})
