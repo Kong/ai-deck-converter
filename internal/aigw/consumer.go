@@ -3,6 +3,7 @@ package aigw
 // Consumer is an AI Gateway consumer. Credentials are nested here in the input
 // envelope (matching the REST sub-resource /consumers/{id}/credentials).
 type Consumer struct {
+	ID             string       `yaml:"id,omitempty"`
 	DisplayName    string       `yaml:"display_name,omitempty"`
 	Name           string       `yaml:"name,omitempty"`
 	Type           string       `yaml:"type,omitempty"` // api-key | oauth
@@ -15,6 +16,7 @@ type Consumer struct {
 
 // Credential is an AI Gateway consumer credential.
 type Credential struct {
+	ID          string `yaml:"id,omitempty"`
 	DisplayName string `yaml:"display_name,omitempty"`
 	Name        string `yaml:"name,omitempty"`
 	Type        string `yaml:"type,omitempty"` // api-key
@@ -24,6 +26,7 @@ type Credential struct {
 
 // ConsumerGroup is an AI Gateway consumer group.
 type ConsumerGroup struct {
+	ID          string   `yaml:"id,omitempty"`
 	DisplayName string   `yaml:"display_name,omitempty"`
 	Name        string   `yaml:"name,omitempty"`
 	Policies    []string `yaml:"policies,omitempty"`

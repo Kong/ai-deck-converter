@@ -6,6 +6,7 @@ import "gopkg.in/yaml.v3"
 // (synchronous generative APIs) or "api" (files/batches); both share the same
 // shape and differ only in their allowed capabilities, so one struct covers both.
 type Model struct {
+	ID           string        `yaml:"id,omitempty"`
 	Type         string        `yaml:"type,omitempty"`
 	DisplayName  string        `yaml:"display_name,omitempty"`
 	Name         string        `yaml:"name,omitempty"`
