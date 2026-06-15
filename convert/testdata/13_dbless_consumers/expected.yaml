@@ -1,0 +1,75 @@
+_format_version: "3.0"
+_transform: false
+services:
+  - id: 947a4e23-b483-5a65-8165-da9aed24565b
+    name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    host: ai-gateway.upstream.local
+    port: 80
+    protocol: http
+routes:
+  - id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+    name: openai-chat
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /v1/chat/completions
+    methods:
+      - POST
+    protocols:
+      - http
+      - https
+    strip_path: false
+consumers:
+  - id: 145c8c6a-fb31-552f-980e-efdb9fd40602
+    username: alice
+    tags:
+      - tier:gold
+  - id: 9604cd6c-366b-5768-b694-6a848586f80a
+    username: bob
+consumer_groups:
+  - id: ccdc7a46-6d73-5cfd-96db-0dc5b6ccf7d6
+    name: premium-users
+plugins:
+  - id: 17fa8192-4b9f-5b5a-8379-20ad8bc836a7
+    name: ai-model-selector
+    config:
+      body_path: model
+      max_request_body_size: 8388608
+      source: body
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+  - id: f3adc007-171c-5519-8763-3a0eef79bde3
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: Bearer sk-test
+          description: gpt-4o
+          model:
+            model_alias: my-alias
+            name: gpt-4o
+            provider: openai
+          route_type: llm/v1/chat
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+ai_models:
+  - id: 164a019e-95ff-5ec6-8ec4-4bd2315e999c
+    name: my-model
+    alias: my-alias
+keyauth_credentials:
+  - id: befaceb2-f53c-5b16-8bfa-4625884a2851
+    key: sk-alice-secret
+    consumer: 145c8c6a-fb31-552f-980e-efdb9fd40602
+    ttl: 3600
+    tags:
+      - env:prod
+      - scope:read-only
+  - id: 44466ae7-2cc6-5690-9a16-b762616686f4
+    key: sk-bob-secret
+    consumer: 9604cd6c-366b-5768-b694-6a848586f80a
