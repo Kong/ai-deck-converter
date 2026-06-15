@@ -15,6 +15,8 @@ type routeGroup struct {
 	llmFormat         string
 	genaiCategory     string
 	balancer          map[string]any
+	vectordb          any
+	embeddings        any
 	responseStreaming string
 	modelNameHeader   *bool
 	maxBodySize       *int
@@ -72,6 +74,8 @@ func (c *Converter) convertModels() error {
 						llmFormat:         llmFormat(m),
 						genaiCategory:     spec.GenaiCategory,
 						balancer:          balancerConfig(m.Config.Balancer),
+						vectordb:          balancerExtra(m.Config.Balancer, "vectordb"),
+						embeddings:        balancerExtra(m.Config.Balancer, "embeddings"),
 						responseStreaming: m.Config.ResponseStreaming,
 						modelNameHeader:   m.Config.Model.NameHeader,
 						maxBodySize:       m.Config.MaxRequestBodySize,
@@ -149,6 +153,12 @@ func (g *routeGroup) proxyConfig() map[string]any {
 		"genai_category": g.genaiCategory,
 		"targets":        g.targets,
 	}
+	if g.vectordb != nil {
+		cfg["vectordb"] = g.vectordb
+	}
+	if g.embeddings != nil {
+		cfg["embeddings"] = g.embeddings
+	}
 	if g.responseStreaming != "" {
 		cfg["response_streaming"] = g.responseStreaming
 	}
@@ -201,12 +211,19 @@ func (c *Converter) expandCapabilities(m *aigw.Model) []string {
 	return out
 }
 
+// balancerHoisted are balancer-block fields that the plugin schema
+// expects as siblings of `balancer`, not nested inside it.
+var balancerHoisted = map[string]bool{"vectordb": true, "embeddings": true}
+
 func balancerConfig(b *aigw.Balancer) map[string]any {
 	if b == nil {
 		return map[string]any{"algorithm": "round-robin"}
 	}
 	cfg := map[string]any{}
 	for k, v := range b.Fields {
+		if balancerHoisted[k] {
+			continue
+		}
 		cfg[k] = v
 	}
 	algorithm := b.Algorithm
@@ -215,6 +232,15 @@ func balancerConfig(b *aigw.Balancer) map[string]any {
 	}
 	cfg["algorithm"] = algorithm
 	return cfg
+}
+
+// balancerExtra pulls a hoisted field (vectordb/embeddings) out of the balancer
+// block so it can be emitted at the top level of the plugin config.
+func balancerExtra(b *aigw.Balancer, key string) any {
+	if b == nil {
+		return nil
+	}
+	return b.Fields[key]
 }
 
 func basePath(m *aigw.Model) string {

@@ -1,0 +1,48 @@
+models:
+  # The balancer block carries vectordb and embeddings fields. These are
+  # ai-proxy-advanced top-level config keys (siblings of `balancer`), so they
+  # must be hoisted out of the balancer block on conversion.
+  - type: model
+    display_name: Semantic LB
+    name: semantic-lb
+    capabilities: [generate]
+    formats:
+      - type: openai
+    target_models:
+      - name: gpt-4o
+        provider: openai-main
+        config:
+          type: openai
+    policies: []
+    acls: {allow: [], deny: []}
+    config:
+      route:
+        paths: [/ai]
+      balancer:
+        algorithm: semantic
+        slots: 10000
+        vectordb:
+          strategy: redis
+          distance_metric: cosine
+          threshold: 0.7
+          dimensions: 1024
+          redis:
+            host: redis.local
+            port: 6379
+        embeddings:
+          auth:
+            header_name: Authorization
+            header_value: "{vault://env/openai-key}"
+          model:
+            name: text-embedding-3-small
+            provider: openai
+providers:
+  - type: openai
+    display_name: OpenAI Main
+    name: openai-main
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://env/openai-key}"

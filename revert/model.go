@@ -162,7 +162,7 @@ func (r *Reverter) modelGroupFor(acc *modelAcc, rt *kong.Route, alias, llmFormat
 	g.model.Config.Model.NameHeader = getBool(cfg, "model_name_header")
 	g.model.Config.ResponseStreaming = getStr(cfg, "response_streaming")
 	g.model.Config.MaxRequestBodySize = getInt(cfg, "max_request_body_size")
-	g.model.Config.Balancer = balancerFromConfig(getMap(cfg, "balancer"))
+	g.model.Config.Balancer = balancerFromConfig(getMap(cfg, "balancer"), cfg["vectordb"], cfg["embeddings"])
 	if base != "" && base != aimap.DefaultBasePath {
 		g.model.Config.Route.Paths = []string{base}
 	}
@@ -285,17 +285,25 @@ func isAPIOnly(caps []string) bool {
 }
 
 // balancerFromConfig reverses convert.balancerConfig, dropping the implicit
-// {algorithm: round-robin} default the forward converter emits.
-func balancerFromConfig(cfg map[string]any) *aigw.Balancer {
-	if len(cfg) == 0 {
-		return nil
-	}
+// {algorithm: round-robin} default the forward converter emits. The top-level
+// vectordb/embeddings config keys (siblings of `balancer` in ai-proxy-advanced)
+// are folded back into the balancer block, mirroring convert's hoisting.
+func balancerFromConfig(cfg map[string]any, vectordb, embeddings any) *aigw.Balancer {
 	algo := getStr(cfg, "algorithm")
 	fields := map[string]any{}
 	for k, v := range cfg {
 		if k != "algorithm" {
 			fields[k] = v
 		}
+	}
+	if vectordb != nil {
+		fields["vectordb"] = vectordb
+	}
+	if embeddings != nil {
+		fields["embeddings"] = embeddings
+	}
+	if len(cfg) == 0 && len(fields) == 0 {
+		return nil
 	}
 	if algo == "round-robin" && len(fields) == 0 {
 		return nil
