@@ -37,8 +37,7 @@ models:
       - type: huggingface
     target_models:
       - name: meta-llama/Llama-3.3-70B-Instruct
-        provider:
-          name: huggingface-prod
+        provider: huggingface-prod
         config:
           type: huggingface
           upstream_url: "https://kong-hf-tgi.huggingface.cloud"

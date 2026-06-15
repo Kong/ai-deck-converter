@@ -10,7 +10,6 @@ type (
 	ModelSelector     = internal.ModelSelector
 	Balancer          = internal.Balancer
 	TargetModel       = internal.TargetModel
-	ProviderRef       = internal.ProviderRef
 	TargetModelConfig = internal.TargetModelConfig
 	Provider          = internal.Provider
 	ProviderConfig    = internal.ProviderConfig

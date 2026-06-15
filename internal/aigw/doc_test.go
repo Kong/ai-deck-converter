@@ -68,7 +68,7 @@ func TestParseEnvelope(t *testing.T) {
 	require.Equal(t, "model", m.Type, "model type")
 	require.Len(t, m.TargetModels, 1, "want 1 target")
 	tm := m.TargetModels[0]
-	require.Equal(t, "openai-main", tm.Provider.Name, "target provider")
+	require.Equal(t, "openai-main", tm.Provider, "target provider")
 	require.Equal(t, "openai", tm.Config.Type, "target config type")
 	require.NotContains(t, tm.Config.Options, "type", "type should be stripped from options")
 	require.Equal(t, 0.7, tm.Config.Options["temperature"], "temperature")

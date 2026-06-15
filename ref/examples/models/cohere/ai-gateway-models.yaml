@@ -34,8 +34,7 @@ models:
       - type: cohere
     target_models:
       - name: rerank-v3.5
-        provider:
-          name: cohere-prod
+        provider: cohere-prod
         config:
           type: cohere
     policies: []

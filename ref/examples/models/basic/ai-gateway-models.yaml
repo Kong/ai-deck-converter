@@ -97,8 +97,7 @@ models:
       - type: openai
     target_models:
       - name: gpt-5.2
-        provider:
-          name: openai-prod
+        provider: openai-prod
     policies:
       - ai-prompt-guard-default
       - ip-restriction-default
@@ -123,8 +122,7 @@ models:
       - type: anthropic
     target_models:
       - name: claude-opus-4-6
-        provider:
-          name: anthropic-prod
+        provider: anthropic-prod
         config:
           type: anthropic
     policies:

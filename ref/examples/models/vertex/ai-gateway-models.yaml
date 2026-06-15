@@ -33,8 +33,7 @@ models:
       - type: gemini
     target_models:
       - name: gemini-2.5-pro
-        provider:
-          name: vertex-prod
+        provider: vertex-prod
         config:
           # Vertex shares Gemini's target_model schema (no distinct vertex
           # target schema exists at the data-model layer).
@@ -68,8 +67,7 @@ models:
       - type: gemini
     target_models:
       - name: text-embedding-005
-        provider:
-          name: vertex-prod
+        provider: vertex-prod
         config:
           type: gemini
           location_id: us-central1
@@ -99,8 +97,7 @@ models:
       - type: gemini
     target_models:
       - name: imagen-3.0-generate-001
-        provider:
-          name: vertex-prod
+        provider: vertex-prod
         config:
           type: gemini
           location_id: us-central1
@@ -130,8 +127,7 @@ models:
       - type: gemini
     target_models:
       - name: veo-2.0-generate-001
-        provider:
-          name: vertex-prod
+        provider: vertex-prod
         config:
           type: gemini
           location_id: us-central1
@@ -161,8 +157,7 @@ models:
       - type: gemini
     target_models:
       - name: ranking-api
-        provider:
-          name: vertex-prod
+        provider: vertex-prod
         config:
           type: gemini
           location_id: us-central1
@@ -190,8 +185,7 @@ models:
       - type: gemini
     target_models:
       - name: batch-api
-        provider:
-          name: vertex-prod
+        provider: vertex-prod
         config:
           type: gemini
           location_id: us-central1

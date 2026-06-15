@@ -36,8 +36,7 @@ models:
       - type: openai
     target_models:
       - name: gpt-5-4
-        provider:
-          name: azure-prod
+        provider: azure-prod
         config:
           type: azure
           deployment_id: gpt-5-4
@@ -70,8 +69,7 @@ models:
       - type: openai
     target_models:
       - name: gpt-realtime
-        provider:
-          name: azure-prod
+        provider: azure-prod
         config:
           type: azure
           deployment_id: gpt-realtime
@@ -102,8 +100,7 @@ models:
       - type: openai
     target_models:
       - name: text-embedding-3-large
-        provider:
-          name: azure-prod
+        provider: azure-prod
         config:
           type: azure
           deployment_id: text-embedding-3-large
@@ -135,8 +132,7 @@ models:
       - type: openai
     target_models:
       - name: gpt-image-1
-        provider:
-          name: azure-prod
+        provider: azure-prod
         config:
           type: azure
           deployment_id: gpt-image-1
@@ -167,8 +163,7 @@ models:
       - type: openai
     target_models:
       - name: gpt-4o-mini-tts
-        provider:
-          name: azure-prod
+        provider: azure-prod
         config:
           type: azure
           deployment_id: gpt-4o-mini-tts
@@ -200,8 +195,7 @@ models:
       - type: openai
     target_models:
       - name: whisper-1
-        provider:
-          name: azure-prod
+        provider: azure-prod
         config:
           type: azure
           deployment_id: whisper-1
@@ -232,8 +226,7 @@ models:
       - type: openai
     target_models:
       - name: sora-2
-        provider:
-          name: azure-prod
+        provider: azure-prod
         config:
           type: azure
           deployment_id: sora-2
@@ -265,8 +258,7 @@ models:
       - type: openai
     target_models:
       - name: batch-api
-        provider:
-          name: azure-prod
+        provider: azure-prod
         config:
           type: azure
           api_version: "2024-10-01-preview"
@@ -297,8 +289,7 @@ models:
       - type: openai
     target_models:
       - name: files-api
-        provider:
-          name: azure-prod
+        provider: azure-prod
         config:
           type: azure
           api_version: "2024-10-01-preview"

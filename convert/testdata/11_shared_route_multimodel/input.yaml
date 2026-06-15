@@ -19,7 +19,7 @@ models:
       model: {alias: "@openai/gpt-5.2"}
     target_models:
       - name: gpt-5.2
-        provider: {name: openai-prod}
+        provider: openai-prod
         config: {type: openai}
     policies: []
     acls: {allow: [], deny: []}
@@ -33,7 +33,7 @@ models:
       model: {alias: "@openai/gpt-5.2-mini"}
     target_models:
       - name: gpt-5.2-mini
-        provider: {name: openai-prod}
+        provider: openai-prod
         config: {type: openai}
     policies: []
     acls: {allow: [], deny: []}

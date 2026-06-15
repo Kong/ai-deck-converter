@@ -2,41 +2,16 @@ package aigw
 
 import "gopkg.in/yaml.v3"
 
-// TargetModel is one backend model a Model routes to. It references a Provider
-// by name; Config carries the provider type plus model options.
+// TargetModel is one backend model a Model routes to. Provider references a
+// Provider by name (a bare string, per the Admin API); Config carries the
+// provider type plus model options.
 type TargetModel struct {
 	Name              string            `yaml:"name,omitempty"`
 	Weight            *int              `yaml:"weight,omitempty"`
 	SemanticDesc      string            `yaml:"semantic_description,omitempty"`
 	AllowAuthOverride *bool             `yaml:"allow_auth_override,omitempty"`
-	Provider          ProviderRef       `yaml:"provider,omitempty"`
+	Provider          string            `yaml:"provider,omitempty"`
 	Config            TargetModelConfig `yaml:"config,omitempty"`
-}
-
-// ProviderRef references a Provider by name. It accepts either a bare string
-// (`provider: openai-prod`) or an object (`provider: {name: openai-prod}`).
-type ProviderRef struct {
-	Name string
-}
-
-// UnmarshalYAML decodes a ProviderRef from a scalar string or a {name: ...} map.
-func (r *ProviderRef) UnmarshalYAML(node *yaml.Node) error {
-	if node.Kind == yaml.ScalarNode {
-		return node.Decode(&r.Name)
-	}
-	var obj struct {
-		Name string `yaml:"name,omitempty"`
-	}
-	if err := node.Decode(&obj); err != nil {
-		return err
-	}
-	r.Name = obj.Name
-	return nil
-}
-
-// MarshalYAML emits the reference as a bare string (the compact input form).
-func (r ProviderRef) MarshalYAML() (any, error) {
-	return r.Name, nil
 }
 
 // TargetModelConfig is discriminated by provider `type`. The remaining fields are

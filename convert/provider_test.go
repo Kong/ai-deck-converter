@@ -118,7 +118,7 @@ models:
     formats: [{type: anthropic}]
     target_models:
       - name: claude
-        provider: {name: anthropic-main}
+        provider: anthropic-main
         config: {type: anthropic}
     policies: []
     acls: {allow: [], deny: []}

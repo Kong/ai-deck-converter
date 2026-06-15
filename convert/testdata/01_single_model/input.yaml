@@ -14,8 +14,7 @@ models:
       response_streaming: allow
     target_models:
       - name: gpt-5.2
-        provider:
-          name: openai-prod
+        provider: openai-prod
         config:
           type: openai
           temperature: 1.0

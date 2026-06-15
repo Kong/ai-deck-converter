@@ -48,7 +48,7 @@ func (c *Converter) convertModels() error {
 
 		for j := range m.TargetModels {
 			tm := &m.TargetModels[j]
-			provider := c.providers[tm.Provider.Name]
+			provider := c.providers[tm.Provider]
 			providerType := tm.Config.Type
 			if providerType == "" && provider != nil {
 				providerType = provider.Type
@@ -59,7 +59,7 @@ func (c *Converter) convertModels() error {
 				}
 			}
 			if provider == nil {
-				if err := c.warn("model %q target %q references unknown provider %q; auth/options may be incomplete", m.Name, tm.Name, tm.Provider.Name); err != nil {
+				if err := c.warn("model %q target %q references unknown provider %q; auth/options may be incomplete", m.Name, tm.Name, tm.Provider); err != nil {
 					return err
 				}
 			}
