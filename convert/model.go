@@ -68,6 +68,10 @@ func (c *Converter) convertModels() error {
 				key := sec + "|" + spec.RouteLabel
 				g := groups[key]
 				if g == nil {
+					embeddings, err := c.resolveEmbeddings(balancerExtra(m.Config.Balancer, "embeddings"))
+					if err != nil {
+						return err
+					}
 					g = &routeGroup{
 						route:             buildModelRoute(m.Config.Route, sec+"-"+spec.RouteLabel, aimap.RoutePath(base, spec), spec.Methods),
 						takesBodyModel:    spec.TakesBodyModel,
@@ -75,7 +79,7 @@ func (c *Converter) convertModels() error {
 						genaiCategory:     spec.GenaiCategory,
 						balancer:          balancerConfig(m.Config.Balancer),
 						vectordb:          balancerExtra(m.Config.Balancer, "vectordb"),
-						embeddings:        balancerExtra(m.Config.Balancer, "embeddings"),
+						embeddings:        embeddings,
 						responseStreaming: m.Config.ResponseStreaming,
 						modelNameHeader:   m.Config.Model.NameHeader,
 						maxBodySize:       m.Config.MaxRequestBodySize,

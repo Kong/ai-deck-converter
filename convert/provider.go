@@ -75,6 +75,46 @@ func resolveAuth(p *aigw.Provider, allowOverride *bool) map[string]any {
 	return auth
 }
 
+// resolveEmbeddings folds a referenced provider's auth into the embeddings
+// block. When `embeddings.provider` names a top-level provider entity, its auth
+// is resolved via resolveAuth and merged into `embeddings.auth` (any explicitly
+// configured auth keys win), then the provider reference is dropped — the
+// ai-proxy-advanced embeddings schema has no top-level provider field.
+func (c *Converter) resolveEmbeddings(raw any) (any, error) {
+	emb, ok := raw.(map[string]any)
+	if !ok {
+		return raw, nil
+	}
+	provName, ok := emb["provider"].(string)
+	if !ok || provName == "" {
+		return emb, nil
+	}
+	delete(emb, "provider")
+
+	provider := c.providers[provName]
+	if provider == nil {
+		if err := c.warn("model embeddings reference unknown provider %q; auth may be incomplete", provName); err != nil {
+			return nil, err
+		}
+		return emb, nil
+	}
+	resolved := resolveAuth(provider, nil)
+	if resolved == nil {
+		return emb, nil
+	}
+	existing, _ := emb["auth"].(map[string]any)
+	if existing == nil {
+		emb["auth"] = resolved
+		return emb, nil
+	}
+	for k, v := range resolved {
+		if _, set := existing[k]; !set {
+			existing[k] = v
+		}
+	}
+	return emb, nil
+}
+
 // mapOptions translates a target model's option map into an ai-proxy-advanced
 // model.options map. It renames/nests provider-specific keys per provider type
 // and folds in provider-level fields (azure instance, gemini project id, bedrock

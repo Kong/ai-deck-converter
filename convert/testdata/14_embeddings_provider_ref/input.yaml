@@ -1,0 +1,47 @@
+models:
+  # The embeddings block references a top-level provider by name. Its auth is
+  # resolved (reusing the target-model auth resolution) and folded into
+  # embeddings.auth; the provider reference is dropped on conversion.
+  - type: model
+    display_name: Semantic LB
+    name: semantic-lb
+    capabilities: [generate]
+    formats:
+      - type: openai
+    target_models:
+      - name: gpt-4o
+        provider: openai-main
+        config:
+          type: openai
+    policies: []
+    acls: {allow: [], deny: []}
+    config:
+      route:
+        paths: [/ai]
+      balancer:
+        algorithm: semantic
+        slots: 10000
+        embeddings:
+          provider: embed-main
+          model:
+            name: text-embedding-3-small
+            provider: openai
+providers:
+  - type: openai
+    display_name: OpenAI Main
+    name: openai-main
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://env/openai-key}"
+  - type: openai
+    display_name: Embeddings
+    name: embed-main
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://env/embed-key}"
