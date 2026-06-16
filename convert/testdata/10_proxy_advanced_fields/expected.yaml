@@ -69,4 +69,6 @@ plugins:
       name: openai-embeddings
 ai-models:
   - name: full-model
+    alias: full-model
   - name: bare-model
+    alias: bare-model

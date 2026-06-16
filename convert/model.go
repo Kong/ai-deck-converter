@@ -102,11 +102,15 @@ func (c *Converter) convertModels() error {
 		}
 
 		// ai-models entry (one per source model).
-		c.out.AIModels = append(c.out.AIModels, kong.AIModel{
+		aiModel := kong.AIModel{
 			ID:    m.ID,
 			Name:  m.Name,
 			Alias: m.Config.Model.Alias,
-		})
+		}
+		if aiModel.Alias == "" {
+			aiModel.Alias = m.Name
+		}
+		c.out.AIModels = append(c.out.AIModels, aiModel)
 
 		// Model policy and ACL plugins scope to the ai-models entity.
 		plugins, err := c.scopedPlugins(m.Policies, m.ACLs)

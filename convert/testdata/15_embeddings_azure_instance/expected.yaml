@@ -47,3 +47,4 @@ plugins:
       name: openai-chat
 ai-models:
   - name: semantic-lb
+    alias: semantic-lb
