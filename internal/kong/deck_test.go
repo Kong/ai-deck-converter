@@ -1,9 +1,9 @@
 package kong
 
 import (
-	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 )
 
@@ -26,9 +26,7 @@ func TestMarshalShape(t *testing.T) {
 	}}
 
 	out, err := yaml.Marshal(doc)
-	if err != nil {
-		t.Fatalf("marshal: %v", err)
-	}
+	require.NoError(t, err, "marshal")
 	got := string(out)
 
 	for _, want := range []string{
@@ -41,13 +39,9 @@ func TestMarshalShape(t *testing.T) {
 		"name: ai-proxy-advanced",
 		"llm_format: openai",
 	} {
-		if !strings.Contains(got, want) {
-			t.Errorf("output missing %q\n---\n%s", want, got)
-		}
+		require.Contains(t, got, want, "output missing %q", want)
 	}
 
 	// Empty top-level sections must be omitted.
-	if strings.Contains(got, "consumers:") {
-		t.Errorf("expected empty consumers to be omitted\n---\n%s", got)
-	}
+	require.NotContains(t, got, "consumers:", "expected empty consumers to be omitted")
 }

@@ -1,6 +1,10 @@
 package main
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/require"
+)
 
 func TestDetectDirection(t *testing.T) {
 	cases := []struct {
@@ -12,15 +16,9 @@ func TestDetectDirection(t *testing.T) {
 	}
 	for _, tc := range cases {
 		got, err := detectDirection([]byte(tc.in))
-		if err != nil {
-			t.Errorf("%s: %v", tc.name, err)
-			continue
-		}
-		if got != tc.want {
-			t.Errorf("%s: detectDirection = %q, want %q", tc.name, got, tc.want)
-		}
+		require.NoError(t, err, tc.name)
+		require.Equal(t, tc.want, got, tc.name)
 	}
-	if _, err := detectDirection([]byte(":\tnot yaml")); err == nil {
-		t.Error("invalid yaml: want error")
-	}
+	_, err := detectDirection([]byte(":\tnot yaml"))
+	require.Error(t, err, "invalid yaml: want error")
 }

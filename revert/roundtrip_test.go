@@ -5,8 +5,10 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/Kong/ai-deck-converter/convert"
+	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
+
+	"github.com/Kong/ai-deck-converter/convert"
 )
 
 // TestRoundTrip verifies that reverting the forward converter's output and
@@ -17,9 +19,7 @@ import (
 // warnings.
 func TestRoundTrip(t *testing.T) {
 	dirs, err := filepath.Glob(filepath.Join("..", "convert", "testdata", "*"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	for _, dir := range dirs {
 		info, err := os.Stat(dir)
 		if err != nil || !info.IsDir() {
@@ -33,29 +33,18 @@ func TestRoundTrip(t *testing.T) {
 			}
 
 			deck1, err := os.ReadFile(filepath.Join(dir, "expected.yaml"))
-			if err != nil {
-				t.Fatalf("read forward golden: %v", err)
-			}
+			require.NoError(t, err, "read forward golden")
 
 			aigwYAML, warnings, err := Revert(deck1, Options{})
-			if err != nil {
-				t.Fatalf("revert: %v", err)
-			}
-			for _, w := range warnings {
-				t.Errorf("unexpected revert warning: %s", w)
-			}
+			require.NoError(t, err, "revert")
+			require.Empty(t, warnings, "unexpected revert warnings")
 
 			deck2, warnings, err := convert.Convert(aigwYAML, convert.Options{})
-			if err != nil {
-				t.Fatalf("re-convert: %v", err)
-			}
-			for _, w := range warnings {
-				t.Errorf("unexpected convert warning: %s", w)
-			}
+			require.NoError(t, err, "re-convert")
+			require.Empty(t, warnings, "unexpected convert warnings")
 
-			if string(deck1) != string(deck2) {
-				t.Errorf("round trip mismatch for %s\n--- original ---\n%s\n--- round-tripped ---\n%s\n--- intermediate aigw ---\n%s", dir, deck1, deck2, aigwYAML)
-			}
+			require.Equalf(t, string(deck1), string(deck2),
+				"round trip mismatch for %s\n--- intermediate aigw ---\n%s", dir, aigwYAML)
 		})
 	}
 }
@@ -66,12 +55,8 @@ func loadForwardOptions(t *testing.T, dir string) convert.Options {
 	if os.IsNotExist(err) {
 		return convert.Options{}
 	}
-	if err != nil {
-		t.Fatalf("read options: %v", err)
-	}
+	require.NoError(t, err, "read options")
 	var opts convert.Options
-	if err := yaml.Unmarshal(data, &opts); err != nil {
-		t.Fatalf("parse options: %v", err)
-	}
+	require.NoError(t, yaml.Unmarshal(data, &opts), "parse options")
 	return opts
 }

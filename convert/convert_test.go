@@ -4,9 +4,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
+
 	publicaigw "github.com/Kong/ai-deck-converter/aigw"
 	"github.com/Kong/ai-deck-converter/internal/aigw"
-	"gopkg.in/yaml.v3"
 )
 
 func TestConvertWarnsUnknownProvider(t *testing.T) {
@@ -27,12 +29,9 @@ models:
       model: {}
 `)
 	_, warnings, err := Convert(src, Options{})
-	if err != nil {
-		t.Fatalf("convert: %v", err)
-	}
-	if !containsSubstr(warnings, "unknown provider") {
-		t.Errorf("expected unknown-provider warning, got %v", warnings)
-	}
+	require.NoError(t, err, "convert")
+	require.Contains(t, strings.Join(warnings, "\n"), "unknown provider",
+		"expected unknown-provider warning")
 }
 
 func TestConvertDocumentToDBLessYAML(t *testing.T) {
@@ -55,23 +54,15 @@ providers:
 `)
 
 	doc, err := publicaigw.Parse(src)
-	if err != nil {
-		t.Fatalf("parse source: %v", err)
-	}
+	require.NoError(t, err, "parse source")
 
 	got, _, err := ConvertDocumentToDBLessYAML(doc, Options{})
-	if err != nil {
-		t.Fatalf("convert typed db-less: %v", err)
-	}
+	require.NoError(t, err, "convert typed db-less")
 
 	want, _, err := Convert(src, Options{OutputMode: "db-less"})
-	if err != nil {
-		t.Fatalf("convert yaml db-less: %v", err)
-	}
+	require.NoError(t, err, "convert yaml db-less")
 
-	if string(got) != string(want) {
-		t.Fatalf("typed db-less output mismatch\nwant:\n%s\ngot:\n%s", want, got)
-	}
+	require.Equal(t, string(want), string(got), "typed db-less output mismatch")
 }
 
 func TestConvertStrictFailsUnknownProvider(t *testing.T) {
@@ -91,9 +82,8 @@ models:
       route: {paths: [/chat]}
       model: {}
 `)
-	if _, _, err := Convert(src, Options{Strict: true}); err == nil {
-		t.Error("expected strict mode to fail on unknown provider")
-	}
+	_, _, err := Convert(src, Options{Strict: true})
+	require.Error(t, err, "expected strict mode to fail on unknown provider")
 }
 
 func TestConvertWarnsUnknownPolicy(t *testing.T) {
@@ -104,12 +94,9 @@ consumers:
     policies: [missing-policy]
 `)
 	_, warnings, err := Convert(src, Options{})
-	if err != nil {
-		t.Fatalf("convert: %v", err)
-	}
-	if !containsSubstr(warnings, "unknown policy") {
-		t.Errorf("expected unknown-policy warning, got %v", warnings)
-	}
+	require.NoError(t, err, "convert")
+	require.Contains(t, strings.Join(warnings, "\n"), "unknown policy",
+		"expected unknown-policy warning")
 }
 
 func TestConvertWarnsMCPToolMissingDescription(t *testing.T) {
@@ -123,12 +110,9 @@ mcp_servers:
       - name: noDescTool
 `)
 	_, warnings, err := Convert(src, Options{})
-	if err != nil {
-		t.Fatalf("convert: %v", err)
-	}
-	if !containsSubstr(warnings, "no description") {
-		t.Errorf("expected missing-description warning, got %v", warnings)
-	}
+	require.NoError(t, err, "convert")
+	require.Contains(t, strings.Join(warnings, "\n"), "no description",
+		"expected missing-description warning")
 }
 
 func TestConvertStrictFailsMCPToolMissingDescription(t *testing.T) {
@@ -141,9 +125,8 @@ mcp_servers:
     tools:
       - name: noDescTool
 `)
-	if _, _, err := Convert(src, Options{Strict: true}); err == nil {
-		t.Error("expected strict mode to fail on MCP tool missing description")
-	}
+	_, _, err := Convert(src, Options{Strict: true})
+	require.Error(t, err, "expected strict mode to fail on MCP tool missing description")
 }
 
 func TestA2APluginDropsLogAudits(t *testing.T) {
@@ -158,24 +141,9 @@ func TestA2APluginDropsLogAudits(t *testing.T) {
 		},
 	}
 	logging, ok := a2aPlugin(a).Config["logging"].(map[string]any)
-	if !ok {
-		t.Fatalf("expected logging block, got %v", a2aPlugin(a).Config["logging"])
-	}
-	if _, present := logging["log_audits"]; present {
-		t.Errorf("ai-a2a-proxy must not emit log_audits, got %v", logging)
-	}
-	if logging["log_statistics"] != true {
-		t.Errorf("expected log_statistics true, got %v", logging["log_statistics"])
-	}
-}
-
-func containsSubstr(warnings []string, sub string) bool {
-	for _, w := range warnings {
-		if strings.Contains(w, sub) {
-			return true
-		}
-	}
-	return false
+	require.True(t, ok, "expected logging block, got %v", a2aPlugin(a).Config["logging"])
+	require.NotContains(t, logging, "log_audits", "ai-a2a-proxy must not emit log_audits, got %v", logging)
+	require.Equal(t, true, logging["log_statistics"], "expected log_statistics true")
 }
 
 func TestConvertDBLessFlattensConsumerCredentialsAndGroups(t *testing.T) {
@@ -192,24 +160,14 @@ consumers:
 `)
 
 	out, _, err := Convert(src, Options{OutputMode: "db-less"})
-	if err != nil {
-		t.Fatalf("convert db-less: %v", err)
-	}
+	require.NoError(t, err, "convert db-less")
 
 	var got map[string]any
-	if err := yaml.Unmarshal(out, &got); err != nil {
-		t.Fatalf("unmarshal output: %v", err)
-	}
+	require.NoError(t, yaml.Unmarshal(out, &got), "unmarshal output")
 
-	if got["_format_version"] != "3.0" {
-		t.Fatalf("unexpected format version: %v", got["_format_version"])
-	}
-	if _, ok := got["keyauth_credentials"]; !ok {
-		t.Fatalf("expected keyauth_credentials in db-less output: %s", out)
-	}
-	if _, ok := got["consumer_group_consumers"]; !ok {
-		t.Fatalf("expected consumer_group_consumers in db-less output: %s", out)
-	}
+	require.Equal(t, "3.0", got["_format_version"], "unexpected format version")
+	require.Contains(t, got, "keyauth_credentials", "expected keyauth_credentials in db-less output: %s", out)
+	require.Contains(t, got, "consumer_group_consumers", "expected consumer_group_consumers in db-less output: %s", out)
 }
 
 func TestConvertDBLessPreservesInputIDsWhenProvided(t *testing.T) {
@@ -339,9 +297,7 @@ providers:
 `)
 
 	out, _, err := Convert(src, Options{OutputMode: "db-less"})
-	if err != nil {
-		t.Fatalf("convert db-less: %v", err)
-	}
+	require.NoError(t, err, "convert db-less")
 
 	var got struct {
 		Routes []struct {
@@ -367,55 +323,33 @@ providers:
 			ResponseBuffering       *bool  `yaml:"response_buffering"`
 		} `yaml:"routes"`
 	}
-	if err := yaml.Unmarshal(out, &got); err != nil {
-		t.Fatalf("unmarshal output: %v", err)
-	}
-	if len(got.Routes) != 1 {
-		t.Fatalf("expected 1 route, got %d: %s", len(got.Routes), out)
-	}
+	require.NoError(t, yaml.Unmarshal(out, &got), "unmarshal output")
+	require.Len(t, got.Routes, 1, "expected 1 route: %s", out)
 	route := got.Routes[0]
-	if len(route.Hosts) != 1 || route.Hosts[0] != "ai.example.com" {
-		t.Fatalf("unexpected hosts: %#v", route.Hosts)
-	}
-	if len(route.Methods) != 2 || route.Methods[0] != "GET" || route.Methods[1] != "POST" {
-		t.Fatalf("unexpected methods: %#v", route.Methods)
-	}
-	if len(route.Protocols) != 2 || route.Protocols[0] != "http" || route.Protocols[1] != "https" {
-		t.Fatalf("unexpected protocols: %#v", route.Protocols)
-	}
-	if got := route.Headers["x-api-version"]; len(got) != 1 || got[0] != "v1" {
-		t.Fatalf("unexpected headers: %#v", route.Headers)
-	}
-	if len(route.SNIs) != 1 || route.SNIs[0] != "ai.example.com" {
-		t.Fatalf("unexpected snis: %#v", route.SNIs)
-	}
-	if len(route.Sources) != 1 || route.Sources[0].IP != "192.168.1.0/24" || route.Sources[0].Port != 8080 {
-		t.Fatalf("unexpected sources: %#v", route.Sources)
-	}
-	if len(route.Destinations) != 1 || route.Destinations[0].IP != "10.1.0.0/16" || route.Destinations[0].Port != 443 {
-		t.Fatalf("unexpected destinations: %#v", route.Destinations)
-	}
-	if route.StripPath == nil || !*route.StripPath {
-		t.Fatalf("unexpected strip_path: %#v", route.StripPath)
-	}
-	if route.PreserveHost == nil || *route.PreserveHost {
-		t.Fatalf("unexpected preserve_host: %#v", route.PreserveHost)
-	}
-	if route.HTTPSRedirectStatusCode == nil || *route.HTTPSRedirectStatusCode != 426 {
-		t.Fatalf("unexpected https_redirect_status_code: %#v", route.HTTPSRedirectStatusCode)
-	}
-	if route.RegexPriority == nil || *route.RegexPriority != 1 {
-		t.Fatalf("unexpected regex_priority: %#v", route.RegexPriority)
-	}
-	if route.PathHandling != "v0" {
-		t.Fatalf("unexpected path_handling: %q", route.PathHandling)
-	}
-	if route.RequestBuffering == nil || !*route.RequestBuffering {
-		t.Fatalf("unexpected request_buffering: %#v", route.RequestBuffering)
-	}
-	if route.ResponseBuffering == nil || !*route.ResponseBuffering {
-		t.Fatalf("unexpected response_buffering: %#v", route.ResponseBuffering)
-	}
+	require.Equal(t, []string{"ai.example.com"}, route.Hosts, "unexpected hosts")
+	require.Equal(t, []string{"GET", "POST"}, route.Methods, "unexpected methods")
+	require.Equal(t, []string{"http", "https"}, route.Protocols, "unexpected protocols")
+	require.Equal(t, []string{"v1"}, route.Headers["x-api-version"], "unexpected headers")
+	require.Equal(t, []string{"ai.example.com"}, route.SNIs, "unexpected snis")
+	require.Len(t, route.Sources, 1, "unexpected sources")
+	require.Equal(t, "192.168.1.0/24", route.Sources[0].IP, "unexpected source ip")
+	require.Equal(t, 8080, route.Sources[0].Port, "unexpected source port")
+	require.Len(t, route.Destinations, 1, "unexpected destinations")
+	require.Equal(t, "10.1.0.0/16", route.Destinations[0].IP, "unexpected destination ip")
+	require.Equal(t, 443, route.Destinations[0].Port, "unexpected destination port")
+	require.NotNil(t, route.StripPath, "unexpected strip_path")
+	require.True(t, *route.StripPath, "unexpected strip_path")
+	require.NotNil(t, route.PreserveHost, "unexpected preserve_host")
+	require.False(t, *route.PreserveHost, "unexpected preserve_host")
+	require.NotNil(t, route.HTTPSRedirectStatusCode, "unexpected https_redirect_status_code")
+	require.Equal(t, 426, *route.HTTPSRedirectStatusCode, "unexpected https_redirect_status_code")
+	require.NotNil(t, route.RegexPriority, "unexpected regex_priority")
+	require.Equal(t, 1, *route.RegexPriority, "unexpected regex_priority")
+	require.Equal(t, "v0", route.PathHandling, "unexpected path_handling")
+	require.NotNil(t, route.RequestBuffering, "unexpected request_buffering")
+	require.True(t, *route.RequestBuffering, "unexpected request_buffering")
+	require.NotNil(t, route.ResponseBuffering, "unexpected response_buffering")
+	require.True(t, *route.ResponseBuffering, "unexpected response_buffering")
 }
 
 func TestConvertDBLessCredentialTTLAndTags(t *testing.T) {

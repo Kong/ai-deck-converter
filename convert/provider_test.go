@@ -1,9 +1,10 @@
 package convert
 
 import (
+	"strings"
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/require"
 
 	"github.com/Kong/ai-deck-converter/internal/aigw"
 )
@@ -21,9 +22,7 @@ func TestResolveAuthHeader(t *testing.T) {
 		"header_value":   "Bearer k",
 		"allow_override": true,
 	}
-	if diff := cmp.Diff(want, got); diff != "" {
-		t.Errorf("resolveAuth header mismatch (-want +got):\n%s", diff)
-	}
+	require.Equal(t, want, got, "resolveAuth header mismatch")
 }
 
 func TestResolveAuthParam(t *testing.T) {
@@ -37,9 +36,7 @@ func TestResolveAuthParam(t *testing.T) {
 		"param_value":    "abc",
 		"param_location": "query",
 	}
-	if diff := cmp.Diff(want, got); diff != "" {
-		t.Errorf("resolveAuth param mismatch (-want +got):\n%s", diff)
-	}
+	require.Equal(t, want, got, "resolveAuth param mismatch")
 }
 
 func TestResolveAuthCloud(t *testing.T) {
@@ -55,15 +52,11 @@ func TestResolveAuthCloud(t *testing.T) {
 		"azure_tenant_id":            "tid",
 		"azure_use_managed_identity": true,
 	}
-	if diff := cmp.Diff(want, got); diff != "" {
-		t.Errorf("resolveAuth azure mismatch (-want +got):\n%s", diff)
-	}
+	require.Equal(t, want, got, "resolveAuth azure mismatch")
 }
 
 func TestResolveAuthNilProvider(t *testing.T) {
-	if got := resolveAuth(nil, nil); got != nil {
-		t.Errorf("expected nil auth for nil provider, got %v", got)
-	}
+	require.Nil(t, resolveAuth(nil, nil), "expected nil auth for nil provider")
 }
 
 func TestMapOptionsAzureRenames(t *testing.T) {
@@ -79,9 +72,7 @@ func TestMapOptionsAzureRenames(t *testing.T) {
 		"azure_api_version":   "2024-02-01",
 		"azure_instance":      "kong-az",
 	}
-	if diff := cmp.Diff(want, got); diff != "" {
-		t.Errorf("mapOptions mismatch (-want +got):\n%s", diff)
-	}
+	require.Equal(t, want, got, "mapOptions mismatch")
 }
 
 func TestMapOptionsGeminiNesting(t *testing.T) {
@@ -97,9 +88,7 @@ func TestMapOptionsGeminiNesting(t *testing.T) {
 			"location_id": "us-central1",
 		},
 	}
-	if diff := cmp.Diff(want, got); diff != "" {
-		t.Errorf("mapOptions gemini mismatch (-want +got):\n%s", diff)
-	}
+	require.Equal(t, want, got, "mapOptions gemini mismatch")
 }
 
 func TestMapOptionsBedrockNesting(t *testing.T) {
@@ -117,9 +106,7 @@ func TestMapOptionsBedrockNesting(t *testing.T) {
 			"aws_assume_role_arn": "arn:role",
 		},
 	}
-	if diff := cmp.Diff(want, got); diff != "" {
-		t.Errorf("mapOptions bedrock mismatch (-want +got):\n%s", diff)
-	}
+	require.Equal(t, want, got, "mapOptions bedrock mismatch")
 }
 
 func TestConvertWarnsUnsupportedCapability(t *testing.T) {
@@ -144,10 +131,7 @@ providers:
     config: {auth: {type: basic, headers: [{name: x-api-key, value: k}]}}
 `)
 	_, warnings, err := Convert(src, Options{})
-	if err != nil {
-		t.Fatalf("convert: %v", err)
-	}
-	if !containsSubstr(warnings, "no endpoint for capability") {
-		t.Errorf("expected unsupported-capability warning, got %v", warnings)
-	}
+	require.NoError(t, err, "convert")
+	require.Contains(t, strings.Join(warnings, "\n"), "no endpoint for capability",
+		"expected unsupported-capability warning")
 }
