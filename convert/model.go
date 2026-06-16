@@ -38,6 +38,14 @@ func (c *Converter) convertModels() error {
 		base := basePath(m)
 		caps := c.expandCapabilities(m)
 
+		// The model alias defaults to the model name when unset, and is applied
+		// identically to each target's model_alias and the ai-models entry so the
+		// two stay in sync (the reverter matches targets to ai-models by alias).
+		alias := m.Config.Model.Alias
+		if alias == "" {
+			alias = m.Name
+		}
+
 		for j := range m.TargetModels {
 			tm := &m.TargetModels[j]
 			provider := c.providers[tm.Provider.Name]
@@ -89,7 +97,7 @@ func (c *Converter) convertModels() error {
 					groups[key] = g
 					order = append(order, key)
 				}
-				target := c.buildTarget(tm, provider, providerType, m.Config.Model.Alias, spec.RouteType)
+				target := c.buildTarget(tm, provider, providerType, alias, spec.RouteType)
 				dedup := tm.Name + "|" + spec.RouteType
 				if !g.seen[dedup] {
 					g.seen[dedup] = true
@@ -105,7 +113,7 @@ func (c *Converter) convertModels() error {
 		c.out.AIModels = append(c.out.AIModels, kong.AIModel{
 			ID:    m.ID,
 			Name:  m.Name,
-			Alias: m.Config.Model.Alias,
+			Alias: alias,
 		})
 
 		// Model policy and ACL plugins scope to the ai-models entity.

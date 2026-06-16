@@ -37,6 +37,7 @@ plugins:
             header_value: '{vault://env/openai-key}'
           description: gpt-4o
           model:
+            model_alias: semantic-lb
             name: gpt-4o
             provider: openai
           route_type: llm/v1/chat
@@ -44,3 +45,4 @@ plugins:
       name: openai-chat
 ai-models:
   - name: semantic-lb
+    alias: semantic-lb
