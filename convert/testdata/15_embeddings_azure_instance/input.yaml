@@ -1,0 +1,50 @@
+models:
+  # The embeddings block references an azure provider by name. Its auth is
+  # resolved into embeddings.auth, and the provider's azure `instance` is folded
+  # into embeddings.model.options.azure.instance (the embeddings schema nests
+  # azure options under model.options.azure, unlike the flat azure_* keys used
+  # for ai-proxy-advanced targets).
+  - type: model
+    display_name: Semantic LB
+    name: semantic-lb
+    capabilities: [generate]
+    formats:
+      - type: openai
+    target_models:
+      - name: gpt-4o
+        provider: openai-main
+        config:
+          type: openai
+    policies: []
+    acls: {allow: [], deny: []}
+    config:
+      route:
+        paths: [/ai]
+      balancer:
+        algorithm: semantic
+        slots: 10000
+        embeddings:
+          provider: embed-azure
+          model:
+            name: text-embedding-ada-002
+            provider: azure
+providers:
+  - type: openai
+    display_name: OpenAI Main
+    name: openai-main
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://env/openai-key}"
+  - type: azure
+    display_name: Embeddings Azure
+    name: embed-azure
+    config:
+      instance: my-azure-instance
+      auth:
+        type: azure
+        headers:
+          - name: api-key
+            value: "{vault://env/azure-embed-key}"
