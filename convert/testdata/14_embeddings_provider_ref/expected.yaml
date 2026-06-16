@@ -1,0 +1,46 @@
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: openai-chat
+        paths:
+          - /ai/chat/completions
+        methods:
+          - POST
+        strip_path: false
+plugins:
+  - name: ai-model-selector
+    config:
+      body_path: model
+      max_request_body_size: 8388608
+      source: body
+    route:
+      name: openai-chat
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: semantic
+        slots: 10000
+      embeddings:
+        auth:
+          header_name: Authorization
+          header_value: '{vault://env/embed-key}'
+        model:
+          name: text-embedding-3-small
+          provider: openai
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://env/openai-key}'
+          description: gpt-4o
+          model:
+            name: gpt-4o
+            provider: openai
+          route_type: llm/v1/chat
+    route:
+      name: openai-chat
+ai-models:
+  - name: semantic-lb
