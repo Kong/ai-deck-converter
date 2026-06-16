@@ -98,6 +98,9 @@ func (c *Converter) resolveEmbeddings(raw any) (any, error) {
 		}
 		return emb, nil
 	}
+
+	mapEmbeddingsOptions(emb, provider)
+
 	resolved := resolveAuth(provider, nil)
 	if resolved == nil {
 		return emb, nil
@@ -113,6 +116,45 @@ func (c *Converter) resolveEmbeddings(raw any) (any, error) {
 		}
 	}
 	return emb, nil
+}
+
+// mapEmbeddingsOptions folds a referenced provider's non-auth, provider-specific
+// fields into the embeddings model's options block. The embeddings schema nests
+// these under model.options.<provider> with bare keys (e.g.
+// model.options.azure.instance) — distinct from mapOptions, which emits flat
+// azure_* keys for ai-proxy-advanced targets. Currently only the azure instance
+// is mapped; extend the switch as more provider fields are surfaced.
+func mapEmbeddingsOptions(emb map[string]any, provider *aigw.Provider) {
+	model, ok := emb["model"].(map[string]any)
+	if !ok {
+		return
+	}
+	providerType, _ := model["provider"].(string)
+	if providerType == "" {
+		providerType = provider.Type
+	}
+	switch providerType {
+	case "azure":
+		if provider.Config.Instance != "" {
+			embeddingsNested(model, "azure")["instance"] = provider.Config.Instance
+		}
+	}
+}
+
+// embeddingsNested returns model.options.<prov>, creating the options map and the
+// provider sub-map if absent.
+func embeddingsNested(model map[string]any, prov string) map[string]any {
+	options, ok := model["options"].(map[string]any)
+	if !ok {
+		options = map[string]any{}
+		model["options"] = options
+	}
+	sub, ok := options[prov].(map[string]any)
+	if !ok {
+		sub = map[string]any{}
+		options[prov] = sub
+	}
+	return sub
 }
 
 // mapOptions translates a target model's option map into an ai-proxy-advanced
