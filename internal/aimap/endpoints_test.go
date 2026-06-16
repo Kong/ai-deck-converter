@@ -1,6 +1,10 @@
 package aimap
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/require"
+)
 
 func TestSectionDerivation(t *testing.T) {
 	cases := []struct {
@@ -16,9 +20,8 @@ func TestSectionDerivation(t *testing.T) {
 		{"", "openai", "openai"},       // default format
 	}
 	for _, tc := range cases {
-		if got := SectionFor(tc.format, tc.providerType); got != tc.want {
-			t.Errorf("SectionFor(%q,%q) = %q, want %q", tc.format, tc.providerType, got, tc.want)
-		}
+		got := SectionFor(tc.format, tc.providerType)
+		require.Equalf(t, tc.want, got, "SectionFor(%q,%q)", tc.format, tc.providerType)
 	}
 }
 
@@ -26,20 +29,15 @@ func TestEndpointLookupAndNormalization(t *testing.T) {
 	// chat -> generate -> openai chat completions.
 	for _, capability := range NormalizeCapability("chat") {
 		spec, ok := LookupEndpoint("openai", capability)
-		if !ok || spec.RouteType != "llm/v1/chat" || spec.PathSuffix != "/chat/completions" {
-			t.Errorf("openai chat lookup = %+v ok=%v", spec, ok)
-		}
+		require.True(t, ok, "openai chat lookup ok")
+		require.Equal(t, "llm/v1/chat", spec.RouteType, "openai chat route type")
+		require.Equal(t, "/chat/completions", spec.PathSuffix, "openai chat path suffix")
 	}
 	// bare audio fans out to three endpoints.
-	if got := NormalizeCapability("audio"); len(got) != 3 {
-		t.Errorf("NormalizeCapability(audio) = %v, want 3 entries", got)
-	}
+	require.Len(t, NormalizeCapability("audio"), 3, "NormalizeCapability(audio)")
 	// batch alias.
-	if got := NormalizeCapability("batch"); len(got) != 1 || got[0] != "batches" {
-		t.Errorf("NormalizeCapability(batch) = %v", got)
-	}
+	require.Equal(t, []string{"batches"}, NormalizeCapability("batch"), "NormalizeCapability(batch)")
 	// unsupported (section,capability) returns not-ok.
-	if _, ok := LookupEndpoint("anthropic", "image"); ok {
-		t.Error("expected anthropic image to be unsupported")
-	}
+	_, ok := LookupEndpoint("anthropic", "image")
+	require.False(t, ok, "expected anthropic image to be unsupported")
 }

@@ -1,6 +1,10 @@
 package aigw
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/require"
+)
 
 const sampleDoc = `
 models:
@@ -57,42 +61,22 @@ vaults:
 
 func TestParseEnvelope(t *testing.T) {
 	doc, err := Parse([]byte(sampleDoc))
-	if err != nil {
-		t.Fatalf("parse: %v", err)
-	}
-	if len(doc.Models) != 1 {
-		t.Fatalf("want 1 model, got %d", len(doc.Models))
-	}
+	require.NoError(t, err, "parse")
+	require.Len(t, doc.Models, 1, "want 1 model")
 	m := doc.Models[0]
-	if m.Name != "my-gpt" || m.Type != "model" {
-		t.Errorf("model name/type = %q/%q", m.Name, m.Type)
-	}
-	if len(m.TargetModels) != 1 {
-		t.Fatalf("want 1 target, got %d", len(m.TargetModels))
-	}
+	require.Equal(t, "my-gpt", m.Name, "model name")
+	require.Equal(t, "model", m.Type, "model type")
+	require.Len(t, m.TargetModels, 1, "want 1 target")
 	tm := m.TargetModels[0]
-	if tm.Provider.Name != "openai-main" {
-		t.Errorf("target provider = %q", tm.Provider.Name)
-	}
-	if tm.Config.Type != "openai" {
-		t.Errorf("target config type = %q", tm.Config.Type)
-	}
-	if _, ok := tm.Config.Options["type"]; ok {
-		t.Error("type should be stripped from options")
-	}
-	if tm.Config.Options["temperature"] != 0.7 {
-		t.Errorf("temperature = %v", tm.Config.Options["temperature"])
-	}
-	if m.Config.Route.Name != "gpt-route" {
-		t.Errorf("route name = %q", m.Config.Route.Name)
-	}
-	if len(doc.Providers) != 1 || doc.Providers[0].Config.Auth.Headers[0].Name != "Authorization" {
-		t.Errorf("provider auth not parsed: %+v", doc.Providers)
-	}
-	if len(doc.Consumers) != 1 || len(doc.Consumers[0].Credentials) != 1 {
-		t.Errorf("consumer/credential not parsed: %+v", doc.Consumers)
-	}
-	if len(doc.Vaults) != 1 || doc.Vaults[0].Type != "env" {
-		t.Errorf("vault not parsed: %+v", doc.Vaults)
-	}
+	require.Equal(t, "openai-main", tm.Provider.Name, "target provider")
+	require.Equal(t, "openai", tm.Config.Type, "target config type")
+	require.NotContains(t, tm.Config.Options, "type", "type should be stripped from options")
+	require.Equal(t, 0.7, tm.Config.Options["temperature"], "temperature")
+	require.Equal(t, "gpt-route", m.Config.Route.Name, "route name")
+	require.Len(t, doc.Providers, 1, "provider not parsed")
+	require.Equal(t, "Authorization", doc.Providers[0].Config.Auth.Headers[0].Name, "provider auth not parsed")
+	require.Len(t, doc.Consumers, 1, "consumer not parsed")
+	require.Len(t, doc.Consumers[0].Credentials, 1, "credential not parsed")
+	require.Len(t, doc.Vaults, 1, "vault not parsed")
+	require.Equal(t, "env", doc.Vaults[0].Type, "vault type")
 }

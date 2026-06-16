@@ -1,8 +1,9 @@
 package aimap
 
 import (
-	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestLabelsTagsRoundTrip(t *testing.T) {
@@ -11,21 +12,13 @@ func TestLabelsTagsRoundTrip(t *testing.T) {
 	for _, prefix := range []string{"", "aigw/"} {
 		tags := LabelsToTags(labels, prefix)
 		got, rest := TagsToLabels(tags, prefix)
-		if !reflect.DeepEqual(got, labels) {
-			t.Errorf("prefix %q: round trip = %v, want %v", prefix, got, labels)
-		}
-		if len(rest) != 0 {
-			t.Errorf("prefix %q: unexpected unconverted tags %v", prefix, rest)
-		}
+		require.Equal(t, labels, got, "prefix %q: round trip", prefix)
+		require.Empty(t, rest, "prefix %q: unexpected unconverted tags", prefix)
 	}
 }
 
 func TestTagsToLabelsSkipsForeignTags(t *testing.T) {
 	labels, rest := TagsToLabels([]string{"aigw/env:prod", "no-separator", "other/x:y"}, "aigw/")
-	if !reflect.DeepEqual(labels, map[string]string{"env": "prod"}) {
-		t.Errorf("labels = %v", labels)
-	}
-	if !reflect.DeepEqual(rest, []string{"no-separator", "other/x:y"}) {
-		t.Errorf("rest = %v", rest)
-	}
+	require.Equal(t, map[string]string{"env": "prod"}, labels)
+	require.Equal(t, []string{"no-separator", "other/x:y"}, rest)
 }

@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/Kong/ai-deck-converter/internal/aigw"
 	"github.com/Kong/ai-deck-converter/internal/aimap"
 )
@@ -19,9 +21,8 @@ func TestDetectProviderType(t *testing.T) {
 		{"gemini", "", "gemini"},
 	}
 	for _, tc := range cases {
-		if got := detectProviderType(tc.enum, tc.path); got != tc.want {
-			t.Errorf("detectProviderType(%q, %q) = %q, want %q", tc.enum, tc.path, got, tc.want)
-		}
+		got := detectProviderType(tc.enum, tc.path)
+		require.Equalf(t, tc.want, got, "detectProviderType(%q, %q)", tc.enum, tc.path)
 	}
 }
 
@@ -39,13 +40,10 @@ func TestBasePathRecovery(t *testing.T) {
 	}
 	for _, tc := range cases {
 		spec, ok := aimap.LookupEndpoint(tc.section, tc.capability)
-		if !ok {
-			t.Fatalf("missing endpoint spec for %s/%s", tc.section, tc.capability)
-		}
+		require.Truef(t, ok, "missing endpoint spec for %s/%s", tc.section, tc.capability)
 		base, ok := basePathFor(tc.path, spec)
-		if ok != tc.wantOK || base != tc.wantBase {
-			t.Errorf("basePathFor(%q, %s/%s) = (%q, %v), want (%q, %v)", tc.path, tc.section, tc.capability, base, ok, tc.wantBase, tc.wantOK)
-		}
+		require.Equalf(t, tc.wantOK, ok, "basePathFor(%q, %s/%s) ok", tc.path, tc.section, tc.capability)
+		require.Equalf(t, tc.wantBase, base, "basePathFor(%q, %s/%s) base", tc.path, tc.section, tc.capability)
 	}
 }
 
@@ -53,21 +51,18 @@ func TestResolveEndpointDisambiguation(t *testing.T) {
 	// bedrock invoke serves four capabilities with the same route label and
 	// path; the target's route_type + genai_category pick the right one.
 	m, ok := resolveEndpoint("bedrock", "image/v1/images/generations", "image/generation", "bedrock-invoke", "~/ai/model/(?<model_name>[^/]+)/invoke(?:-with-response-stream)?")
-	if !ok || m.capability != "image" {
-		t.Errorf("bedrock invoke image = (%+v, %v), want capability image", m, ok)
-	}
+	require.True(t, ok, "bedrock invoke image ok")
+	require.Equal(t, "image", m.capability, "bedrock invoke image capability")
 	// anthropic generate vs batches share route_type llm/v1/chat; the route
 	// name (or path) disambiguates.
 	m, ok = resolveEndpoint("anthropic", "llm/v1/chat", "text/generation", "anthropic-batches", "/ai/v1/messages/batches")
-	if !ok || m.capability != "batches" {
-		t.Errorf("anthropic batches = (%+v, %v), want capability batches", m, ok)
-	}
+	require.True(t, ok, "anthropic batches ok")
+	require.Equal(t, "batches", m.capability, "anthropic batches capability")
 	// A route_type the section's table doesn't use still resolves via the
 	// route name / path shape.
 	m, ok = resolveEndpoint("anthropic", "llm/v1/batches", "", "anthropic-batches", "/ai/v1/messages/batches")
-	if !ok || m.capability != "batches" {
-		t.Errorf("anthropic generic batches = (%+v, %v), want capability batches", m, ok)
-	}
+	require.True(t, ok, "anthropic generic batches ok")
+	require.Equal(t, "batches", m.capability, "anthropic generic batches capability")
 }
 
 func TestDeriveModelName(t *testing.T) {
@@ -78,9 +73,8 @@ func TestDeriveModelName(t *testing.T) {
 		"with/slash.alias": "with-slash-alias",
 	}
 	for alias, want := range cases {
-		if got := deriveModelName(alias); got != want {
-			t.Errorf("deriveModelName(%q) = %q, want %q", alias, got, want)
-		}
+		got := deriveModelName(alias)
+		require.Equalf(t, want, got, "deriveModelName(%q)", alias)
 	}
 }
 
@@ -109,15 +103,10 @@ services:
                   model: {provider: openai, name: gpt-3.5, model_alias: '@a/three'}
 `)
 	doc, warnings, err := revertYAML(t, in, Options{})
-	if err != nil {
-		t.Fatalf("revert: %v (warnings: %v)", err, warnings)
-	}
-	if len(doc.Providers) != 2 {
-		t.Fatalf("got %d providers, want 2 (identical auth must dedupe): %+v", len(doc.Providers), doc.Providers)
-	}
-	if doc.Providers[0].Name != "openai-env" || doc.Providers[1].Name != "openai-other" {
-		t.Errorf("provider names = %q, %q; want openai-env, openai-other", doc.Providers[0].Name, doc.Providers[1].Name)
-	}
+	require.NoErrorf(t, err, "revert (warnings: %v)", warnings)
+	require.Lenf(t, doc.Providers, 2, "identical auth must dedupe: %+v", doc.Providers)
+	require.Equal(t, "openai-env", doc.Providers[0].Name, "first provider name")
+	require.Equal(t, "openai-other", doc.Providers[1].Name, "second provider name")
 }
 
 func TestLegacyConfigWithoutAIModels(t *testing.T) {
@@ -151,15 +140,11 @@ services:
                   model: {provider: openai, name: text-embedding-3-large}
 `)
 	doc, warnings, err := revertYAML(t, in, Options{Strict: true})
-	if err != nil {
-		t.Fatalf("strict revert: %v (warnings: %v)", err, warnings)
-	}
-	if len(warnings) != 0 {
-		t.Errorf("warnings = %v; want none for a legacy config with no ai-models", warnings)
-	}
-	if len(doc.Models) != 2 || doc.Models[0].Name != "gpt-4o" || doc.Models[1].Name != "openai-embeddings" {
-		t.Errorf("models = %+v; want gpt-4o (derived from alias) and openai-embeddings (route name)", doc.Models)
-	}
+	require.NoErrorf(t, err, "strict revert (warnings: %v)", warnings)
+	require.Empty(t, warnings, "want no warnings for a legacy config with no ai-models")
+	require.Lenf(t, doc.Models, 2, "models = %+v", doc.Models)
+	require.Equal(t, "gpt-4o", doc.Models[0].Name, "first model name (derived from alias)")
+	require.Equal(t, "openai-embeddings", doc.Models[1].Name, "second model name (route name)")
 }
 
 func TestMismatchedAliasStillWarns(t *testing.T) {
@@ -185,18 +170,9 @@ ai-models:
     alias: '@openai/other'
 `)
 	_, warnings, err := revertYAML(t, in, Options{})
-	if err != nil {
-		t.Fatalf("revert: %v", err)
-	}
-	found := false
-	for _, w := range warnings {
-		if strings.Contains(w, "no ai-models entry for alias") {
-			found = true
-		}
-	}
-	if !found {
-		t.Errorf("warnings = %v; want a no-ai-models-entry-for-alias warning", warnings)
-	}
+	require.NoError(t, err, "revert")
+	require.Contains(t, strings.Join(warnings, "\n"), "no ai-models entry for alias",
+		"want a no-ai-models-entry-for-alias warning")
 }
 
 func TestStrictModeMakesDropsFatal(t *testing.T) {
@@ -206,12 +182,13 @@ services:
   - name: orphan
     url: http://nowhere.invalid
 `)
-	if _, warnings, err := revertYAML(t, in, Options{}); err != nil || len(warnings) != 1 {
-		t.Errorf("non-strict: err=%v warnings=%v; want nil error and 1 warning", err, warnings)
-	}
-	if _, _, err := revertYAML(t, in, Options{Strict: true}); err == nil || !strings.Contains(err.Error(), "no routes") {
-		t.Errorf("strict: err=%v; want a no-routes error", err)
-	}
+	_, warnings, err := revertYAML(t, in, Options{})
+	require.NoError(t, err, "non-strict")
+	require.Len(t, warnings, 1, "non-strict: want 1 warning")
+
+	_, _, err = revertYAML(t, in, Options{Strict: true})
+	require.Error(t, err, "strict: want a no-routes error")
+	require.Contains(t, err.Error(), "no routes", "strict: want a no-routes error")
 }
 
 func TestUnresolvableCapabilityDefaultsToGenerate(t *testing.T) {
@@ -232,21 +209,11 @@ services:
                   model: {provider: mistral, name: mistral-large, model_alias: '@m/large'}
 `)
 	doc, warnings, err := revertYAML(t, in, Options{})
-	if err != nil {
-		t.Fatalf("revert: %v", err)
-	}
-	if len(doc.Models) != 1 || len(doc.Models[0].Capabilities) != 1 || doc.Models[0].Capabilities[0] != "generate" {
-		t.Fatalf("models = %+v; want one model with capability generate", doc.Models)
-	}
-	found := false
-	for _, w := range warnings {
-		if strings.Contains(w, "defaulting to generate") {
-			found = true
-		}
-	}
-	if !found {
-		t.Errorf("warnings = %v; want a defaulting-to-generate warning", warnings)
-	}
+	require.NoError(t, err, "revert")
+	require.Lenf(t, doc.Models, 1, "models = %+v; want one model", doc.Models)
+	require.Equalf(t, []string{"generate"}, doc.Models[0].Capabilities, "models = %+v; want capability generate", doc.Models)
+	require.Contains(t, strings.Join(warnings, "\n"), "defaulting to generate",
+		"want a defaulting-to-generate warning")
 }
 
 // revertYAML is a test helper that runs Revert and re-parses the output into
@@ -258,8 +225,6 @@ func revertYAML(t *testing.T, in []byte, opts Options) (*aigw.Document, []string
 		return nil, warnings, err
 	}
 	doc, err := aigw.Parse(out)
-	if err != nil {
-		t.Fatalf("re-parse output: %v\n%s", err, out)
-	}
+	require.NoErrorf(t, err, "re-parse output:\n%s", out)
 	return doc, warnings, nil
 }

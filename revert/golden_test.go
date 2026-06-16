@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 )
 
@@ -18,9 +19,7 @@ var update = flag.Bool("update", false, "regenerate golden expected.yaml files")
 // regenerate the expected files after reviewing changes.
 func TestGolden(t *testing.T) {
 	dirs, err := filepath.Glob("testdata/*")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	for _, dir := range dirs {
 		info, err := os.Stat(dir)
 		if err != nil || !info.IsDir() {
@@ -29,29 +28,19 @@ func TestGolden(t *testing.T) {
 		dir := dir
 		t.Run(filepath.Base(dir), func(t *testing.T) {
 			in, err := os.ReadFile(filepath.Join(dir, "input.yaml"))
-			if err != nil {
-				t.Fatalf("read input: %v", err)
-			}
+			require.NoError(t, err, "read input")
 			opts := loadOptions(t, dir)
 			got, _, err := Revert(in, opts)
-			if err != nil {
-				t.Fatalf("revert: %v", err)
-			}
+			require.NoError(t, err, "revert")
 
 			expectedPath := filepath.Join(dir, "expected.yaml")
 			if *update {
-				if err := os.WriteFile(expectedPath, got, 0o644); err != nil {
-					t.Fatalf("write golden: %v", err)
-				}
+				require.NoError(t, os.WriteFile(expectedPath, got, 0o644), "write golden")
 				return
 			}
 			want, err := os.ReadFile(expectedPath)
-			if err != nil {
-				t.Fatalf("read golden (run -update to create): %v", err)
-			}
-			if string(got) != string(want) {
-				t.Errorf("output mismatch for %s\n--- got ---\n%s\n--- want ---\n%s", dir, got, want)
-			}
+			require.NoError(t, err, "read golden (run -update to create)")
+			require.Equal(t, string(want), string(got), "output mismatch for %s", dir)
 		})
 	}
 }
@@ -62,12 +51,8 @@ func loadOptions(t *testing.T, dir string) Options {
 	if os.IsNotExist(err) {
 		return Options{}
 	}
-	if err != nil {
-		t.Fatalf("read options: %v", err)
-	}
+	require.NoError(t, err, "read options")
 	var opts Options
-	if err := yaml.Unmarshal(data, &opts); err != nil {
-		t.Fatalf("parse options: %v", err)
-	}
+	require.NoError(t, yaml.Unmarshal(data, &opts), "parse options")
 	return opts
 }
