@@ -37,8 +37,7 @@ models:
       - type: bedrock
     target_models:
       - name: anthropic.claude-3-7-sonnet-20250219-v1:0
-        provider:
-          name: bedrock-prod
+        provider: bedrock-prod
         config:
           type: bedrock
           max_tokens: 4096
@@ -69,8 +68,7 @@ models:
       - type: bedrock
     target_models:
       - name: amazon.titan-embed-text-v2:0
-        provider:
-          name: bedrock-prod
+        provider: bedrock-prod
         config:
           type: bedrock
           embeddings_normalize: true
@@ -100,8 +98,7 @@ models:
       - type: bedrock
     target_models:
       - name: amazon.nova-canvas-v1:0
-        provider:
-          name: bedrock-prod
+        provider: bedrock-prod
         config:
           type: bedrock
     policies: []
@@ -130,8 +127,7 @@ models:
       - type: bedrock
     target_models:
       - name: amazon.nova-sonic-v1:0
-        provider:
-          name: bedrock-prod
+        provider: bedrock-prod
         config:
           type: bedrock
     policies: []
@@ -160,8 +156,7 @@ models:
       - type: bedrock
     target_models:
       - name: amazon.nova-reel-v1:1
-        provider:
-          name: bedrock-prod
+        provider: bedrock-prod
         config:
           type: bedrock
           video_output_s3_uri: "s3://kong-bedrock-outputs/nova-reel/"
@@ -191,8 +186,7 @@ models:
       - type: bedrock
     target_models:
       - name: cohere.rerank-v3-5:0
-        provider:
-          name: bedrock-prod
+        provider: bedrock-prod
         config:
           type: bedrock
     policies: []
@@ -221,8 +215,7 @@ models:
       - type: bedrock
     target_models:
       - name: batch-api
-        provider:
-          name: bedrock-prod
+        provider: bedrock-prod
         config:
           type: bedrock
           batch_bucket_prefix: "s3://kong-bedrock-batches/jobs/"

@@ -99,13 +99,12 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 			Name:         name,
 			Weight:       getInt(target, "weight"),
 			SemanticDesc: semanticDesc,
-			Provider:     aigw.ProviderRef{},
 			Config:       aigw.TargetModelConfig{Type: providerType},
 		}
 		d := defoldTarget(target, providerType)
 		tm.AllowAuthOverride = d.allowOverride
 		tm.Config.Options = d.options
-		tm.Provider.Name = r.providerFor(providerType, &d)
+		tm.Provider = r.providerFor(providerType, &d)
 
 		if !g.targetsSeen[tm.Name] {
 			g.targetsSeen[tm.Name] = true

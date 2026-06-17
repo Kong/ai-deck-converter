@@ -15,8 +15,7 @@ models:
       max_request_body_size: 2097152
     target_models:
       - name: gpt-4o
-        provider:
-          name: openai-prod
+        provider: openai-prod
         config:
           type: openai
     policies: []
@@ -34,8 +33,7 @@ models:
       model: {}
     target_models:
       - name: text-embedding-3-small
-        provider:
-          name: openai-prod
+        provider: openai-prod
         config:
           type: openai
     policies: []

@@ -20,7 +20,7 @@ models:
       model: {alias: "@bedrock/titan-embed-text-v2"}
     target_models:
       - name: amazon.titan-embed-text-v2:0
-        provider: {name: bedrock-prod}
+        provider: bedrock-prod
         config: {type: bedrock, aws_region: us-east-1, embeddings_normalize: true}
     policies: []
     acls: {allow: [], deny: []}
@@ -34,7 +34,7 @@ models:
       model: {alias: "@bedrock/nova-canvas"}
     target_models:
       - name: amazon.nova-canvas-v1:0
-        provider: {name: bedrock-prod}
+        provider: bedrock-prod
         config: {type: bedrock, aws_region: us-east-1}
     policies: []
     acls: {allow: [], deny: []}
@@ -48,7 +48,7 @@ models:
       model: {alias: "@bedrock/nova-sonic"}
     target_models:
       - name: amazon.nova-sonic-v1:0
-        provider: {name: bedrock-prod}
+        provider: bedrock-prod
         config: {type: bedrock, aws_region: us-east-1}
     policies: []
     acls: {allow: [], deny: []}
@@ -62,7 +62,7 @@ models:
       model: {alias: "@bedrock/nova-reel"}
     target_models:
       - name: amazon.nova-reel-v1:1
-        provider: {name: bedrock-prod}
+        provider: bedrock-prod
         config: {type: bedrock, aws_region: us-east-1, video_output_s3_uri: "s3://kong/nova-reel/"}
     policies: []
     acls: {allow: [], deny: []}

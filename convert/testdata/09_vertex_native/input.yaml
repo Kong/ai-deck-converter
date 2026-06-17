@@ -21,7 +21,7 @@ models:
         alias: "@vertex/gemini-2.5-pro"
     target_models:
       - name: gemini-2.5-pro
-        provider: {name: vertex-prod}
+        provider: vertex-prod
         config:
           type: gemini
           location_id: us-central1
@@ -42,7 +42,7 @@ models:
         alias: "@vertex/text-embedding-005"
     target_models:
       - name: text-embedding-005
-        provider: {name: vertex-prod}
+        provider: vertex-prod
         config:
           type: gemini
           location_id: us-central1

@@ -33,8 +33,7 @@ models:
       - type: gemini
     target_models:
       - name: gemini-2.5-pro
-        provider:
-          name: gemini-prod
+        provider: gemini-prod
         config:
           type: gemini
           max_tokens: 4096
@@ -65,8 +64,7 @@ models:
       - type: gemini
     target_models:
       - name: text-embedding-004
-        provider:
-          name: gemini-prod
+        provider: gemini-prod
         config:
           type: gemini
     policies: []
@@ -95,8 +93,7 @@ models:
       - type: gemini
     target_models:
       - name: batch-api
-        provider:
-          name: gemini-prod
+        provider: gemini-prod
         config:
           type: gemini
     policies: []
@@ -125,8 +122,7 @@ models:
       - type: gemini
     target_models:
       - name: files-api
-        provider:
-          name: gemini-prod
+        provider: gemini-prod
         config:
           type: gemini
     policies: []

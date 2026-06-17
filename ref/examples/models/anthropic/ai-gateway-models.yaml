@@ -36,8 +36,7 @@ models:
       - type: anthropic
     target_models:
       - name: claude-opus-4-5
-        provider:
-          name: anthropic-prod
+        provider: anthropic-prod
         config:
           type: anthropic
           version: "2023-06-01"
@@ -69,8 +68,7 @@ models:
       - type: anthropic
     target_models:
       - name: batch-api
-        provider:
-          name: anthropic-prod
+        provider: anthropic-prod
         config:
           type: anthropic
           version: "2023-06-01"
