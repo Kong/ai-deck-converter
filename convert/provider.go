@@ -138,6 +138,10 @@ func mapEmbeddingsOptions(emb map[string]any, provider *aigw.Provider) {
 		if provider.Config.Instance != "" {
 			embeddingsNested(model, "azure")["instance"] = provider.Config.Instance
 		}
+	case "gemini", "vertex":
+		if provider.Config.ProjectID != "" {
+			embeddingsNested(model, "gemini")["project_id"] = provider.Config.ProjectID
+		}
 	}
 }
 
