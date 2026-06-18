@@ -5,6 +5,8 @@
 // directions on one table guarantees they cannot drift.
 package aimap
 
+import "strings"
+
 // EndpointSpec describes the Kong route that serves a given (section, capability).
 // Routes are grouped by (section, RouteLabel); specs sharing a label collapse to
 // one route whose ai-proxy-advanced plugin carries one target per capability/model.
@@ -139,6 +141,10 @@ func LookupEndpoint(sec, capability string) (EndpointSpec, bool) {
 
 // RoutePath builds the full route path for a spec under the given base path.
 func RoutePath(base string, spec EndpointSpec) string {
+	// A trailing slash on the base (e.g. a root base path of "/") would collide
+	// with the leading slash of the suffix and produce an empty path segment
+	// like "//chat/completions", which Kong rejects.
+	base = strings.TrimRight(base, "/")
 	if spec.IsRegex {
 		return "~" + base + "/" + spec.PathSuffix
 	}
