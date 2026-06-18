@@ -41,3 +41,22 @@ func TestEndpointLookupAndNormalization(t *testing.T) {
 	_, ok := LookupEndpoint("anthropic", "image")
 	require.False(t, ok, "expected anthropic image to be unsupported")
 }
+
+func TestRoutePath(t *testing.T) {
+	chat, _ := LookupEndpoint("openai", "generate")
+	bedrock, _ := LookupEndpoint("bedrock", "generate")
+	cases := []struct {
+		name, base, want string
+		spec             EndpointSpec
+	}{
+		{"plain base", "/ai", "/ai/chat/completions", chat},
+		{"root base does not double slash", "/", "/chat/completions", chat},
+		{"empty base", "", "/chat/completions", chat},
+		{"trailing slash trimmed", "/ai/", "/ai/chat/completions", chat},
+		{"regex plain base", "/ai", "~/ai/model/(?<model_name>[^/]+)/converse(?:-stream)?", bedrock},
+		{"regex root base", "/", "~/model/(?<model_name>[^/]+)/converse(?:-stream)?", bedrock},
+	}
+	for _, tc := range cases {
+		require.Equalf(t, tc.want, RoutePath(tc.base, tc.spec), "RoutePath(%q) [%s]", tc.base, tc.name)
+	}
+}
