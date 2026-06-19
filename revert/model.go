@@ -83,6 +83,12 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 		if err != nil {
 			return err
 		}
+		// Logging is carried per target by ai-proxy-advanced but is a single
+		// model-level block in the AI Gateway model; lift it back from the first
+		// target that has it (all of a model's targets share the same block).
+		if g.model.Config.Logging == nil {
+			g.model.Config.Logging = loggingFromBlock(getMap(target, "logging"))
+		}
 		if !g.capsSeen[capability] {
 			g.capsSeen[capability] = true
 			g.caps = append(g.caps, capability)

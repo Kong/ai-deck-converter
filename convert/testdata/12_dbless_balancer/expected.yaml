@@ -126,6 +126,9 @@ plugins:
       response_streaming: allow
       targets:
         - description: gpt-4o
+          logging:
+            log_payloads: false
+            log_statistics: true
           model:
             model_alias: my-model-alias
             name: gpt-4o
@@ -166,6 +169,9 @@ plugins:
       response_streaming: allow
       targets:
         - description: gpt-4o
+          logging:
+            log_payloads: false
+            log_statistics: true
           model:
             model_alias: my-model-alias
             name: gpt-4o
