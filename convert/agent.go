@@ -35,12 +35,19 @@ func (c *Converter) convertAgents() error {
 				return err
 			}
 		}
-		c.out.Services = append(c.out.Services, kong.Service{
+		svc := kong.Service{
 			Name:   a.Name,
 			URL:    a.Config.URL,
 			Routes: []kong.Route{route},
 			Tags:   c.labelsToTags(a.Labels),
-		})
+		}
+		// A disabled agent maps to a disabled Gateway Service so the DP stops
+		// proxying it. enabled defaults to true, so only emit the flag when the
+		// agent is explicitly disabled to keep the output minimal.
+		if a.Enabled != nil && !*a.Enabled {
+			svc.Enabled = a.Enabled
+		}
+		c.out.Services = append(c.out.Services, svc)
 	}
 	return nil
 }
