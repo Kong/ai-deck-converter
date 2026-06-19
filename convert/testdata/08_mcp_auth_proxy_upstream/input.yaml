@@ -1,0 +1,57 @@
+mcp_servers:
+  # conversion-listener carrying OAuth ACL config (acl_attribute_type +
+  # access_token_claim_field + default_tool_acls) under config.auth.
+  - type: conversion-listener
+    display_name: Secure Flights MCP
+    name: secure-flights-mcp
+    enabled: true
+    config:
+      route:
+        paths:
+          - /mcp/secure-flights
+      auth:
+        acl_attribute_type: oauth_access_token
+        access_token_claim_field: .user.email
+        default_tool_acls:
+          allow:
+            - premium
+    tools:
+      - name: searchFlights
+        description: Search available flights
+        method: GET
+        path: /flights
+        scheme: https
+        host: flights.internal
+  # passthrough-listener carrying a proxy block (-> proxy_config).
+  - type: passthrough-listener
+    name: vendor-proxy-mcp
+    upstream_url: https://vendor.example.com/mcp
+    config:
+      route:
+        paths:
+          - /mcp/vendor-proxy
+      proxy:
+        https_proxy_host: proxy.internal
+        https_proxy_port: 8080
+    tools:
+      - name: vendorTool
+        description: A vendor tool
+  # upstream-server carrying tools_cache_ttl_seconds (required by the plugin in
+  # this mode) and per-tool input/output schema.
+  - type: upstream-server
+    name: upstream-mcp
+    upstream_url: https://upstream.example.com/mcp
+    config:
+      route:
+        paths:
+          - /mcp/upstream
+      tools_cache_ttl_seconds: 300
+      server:
+        preserve_upstream_tool_names: true
+    tools:
+      - name: upstreamTool
+        description: An upstream tool
+        input_schema:
+          type: object
+        output_schema:
+          type: object
