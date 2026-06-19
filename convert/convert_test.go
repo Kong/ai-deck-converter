@@ -146,6 +146,43 @@ func TestA2APluginDropsLogAudits(t *testing.T) {
 	require.Equal(t, true, logging["log_statistics"], "expected log_statistics true")
 }
 
+func TestConvertDisabledAgentDisablesService(t *testing.T) {
+	src := []byte(`
+agents:
+  - type: a2a
+    name: off-agent
+    enabled: false
+    config:
+      url: https://a.internal/a2a
+      route: {paths: [/agents/off]}
+  - type: http
+    name: on-agent
+    enabled: true
+    config:
+      url: https://b.internal/api
+      route: {paths: [/agents/on]}
+`)
+	out, _, err := Convert(src, Options{OutputMode: "db-less"})
+	require.NoError(t, err, "convert db-less")
+
+	var got struct {
+		Services []struct {
+			Name    string `yaml:"name"`
+			Enabled *bool  `yaml:"enabled"`
+		} `yaml:"services"`
+	}
+	require.NoError(t, yaml.Unmarshal(out, &got), "unmarshal output")
+
+	byName := map[string]*bool{}
+	for _, s := range got.Services {
+		byName[s.Name] = s.Enabled
+	}
+	require.Contains(t, byName, "off-agent")
+	require.NotNil(t, byName["off-agent"], "disabled agent must emit enabled")
+	require.False(t, *byName["off-agent"], "disabled agent service must be enabled=false")
+	require.Nil(t, byName["on-agent"], "enabled agent should not emit the flag")
+}
+
 func TestConvertDBLessFlattensConsumerCredentialsAndGroups(t *testing.T) {
 	src := []byte(`
 consumer_groups:
