@@ -37,6 +37,7 @@ func (c *Converter) convertModels() error {
 		m := &c.src.Models[i]
 		base := basePath(m)
 		caps := c.expandCapabilities(m)
+		logging := modelLoggingBlock(m.Config.Logging)
 
 		// The model alias defaults to the model name when unset, and is applied
 		// identically to each target's model_alias and the ai-models entry so the
@@ -97,7 +98,7 @@ func (c *Converter) convertModels() error {
 					groups[key] = g
 					order = append(order, key)
 				}
-				target := c.buildTarget(tm, provider, providerType, alias, spec.RouteType)
+				target := c.buildTarget(tm, provider, providerType, alias, spec.RouteType, logging)
 				dedup := tm.Name + "|" + spec.RouteType
 				if !g.seen[dedup] {
 					g.seen[dedup] = true
@@ -184,8 +185,27 @@ func (g *routeGroup) proxyConfig() map[string]any {
 	return cfg
 }
 
-// buildTarget builds one ai-proxy-advanced target from a target model.
-func (c *Converter) buildTarget(tm *aigw.TargetModel, provider *aigw.Provider, providerType, alias, routeType string) map[string]any {
+// modelLoggingBlock maps a model's AI Gateway logging into the per-target logging
+// record accepted by the ai-proxy-advanced target schema, which only allows
+// log_statistics and log_payloads. Any extra keys loggingBlock may produce
+// (max_payload_size, log_audits) are dropped to avoid emitting unknown fields.
+func modelLoggingBlock(l *aigw.Logging) map[string]any {
+	block := loggingBlock(l)
+	if block == nil {
+		return nil
+	}
+	delete(block, "max_payload_size")
+	delete(block, "log_audits")
+	if len(block) == 0 {
+		return nil
+	}
+	return block
+}
+
+// buildTarget builds one ai-proxy-advanced target from a target model. The
+// model-level logging block (if any) is applied to every target, since
+// ai-proxy-advanced carries logging per target rather than per plugin.
+func (c *Converter) buildTarget(tm *aigw.TargetModel, provider *aigw.Provider, providerType, alias, routeType string, logging map[string]any) map[string]any {
 	model := map[string]any{
 		"provider": aimap.PluginProvider(providerType),
 		"name":     tm.Name,
@@ -211,6 +231,9 @@ func (c *Converter) buildTarget(tm *aigw.TargetModel, provider *aigw.Provider, p
 		target["description"] = tm.SemanticDesc
 	} else {
 		target["description"] = tm.Name // Use name as default description.
+	}
+	if logging != nil {
+		target["logging"] = logging
 	}
 	return target
 }
