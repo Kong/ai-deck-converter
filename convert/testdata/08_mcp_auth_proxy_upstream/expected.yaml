@@ -1,0 +1,60 @@
+_format_version: "3.0"
+services:
+  - name: secure-flights-mcp
+    host: localhost
+    routes:
+      - name: secure-flights-mcp-route
+        paths:
+          - /mcp/secure-flights
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              access_token_claim_field: .user.email
+              acl_attribute_type: oauth_access_token
+              default_acl:
+                - allow:
+                    - premium
+              mode: conversion-listener
+              tools:
+                - description: Search available flights
+                  host: flights.internal
+                  method: GET
+                  name: searchFlights
+                  path: /flights
+                  scheme: https
+  - name: vendor-proxy-mcp
+    url: https://vendor.example.com/mcp
+    routes:
+      - name: vendor-proxy-mcp-route
+        paths:
+          - /mcp/vendor-proxy
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              mode: passthrough-listener
+              proxy_config:
+                https_proxy_host: proxy.internal
+                https_proxy_port: 8080
+              tools:
+                - description: A vendor tool
+                  name: vendorTool
+  - name: upstream-mcp
+    url: https://upstream.example.com/mcp
+    routes:
+      - name: upstream-mcp-route
+        paths:
+          - /mcp/upstream
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              mode: upstream-server
+              server:
+                preserve_upstream_tool_names: true
+              tools:
+                - description: An upstream tool
+                  input_schema:
+                    type: object
+                  name: upstreamTool
+                  output_schema:
+                    type: object
+              tools_cache_ttl_seconds: 300

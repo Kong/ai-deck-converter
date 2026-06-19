@@ -6,8 +6,9 @@ import (
 )
 
 // revertMCPServer lifts a service route carrying ai-mcp-proxy back into an AI
-// Gateway MCP Server: config.mode becomes the type, the plugin's embedded
-// tools/default_acl come back out as Tools/DefaultToolACLs, and any other
+// Gateway MCP Server: config.mode becomes the type, the plugin's embedded tools
+// come back out as Tools, the ACL config (acl_attribute_type /
+// access_token_claim_field / default_acl) becomes config.auth, and any other
 // route- or service-level plugins become policies.
 func (r *Reverter) revertMCPServer(svc *kong.Service, rt *kong.Route, plugins, svcPlugins []kong.Plugin) error {
 	cfg := findPlugin(plugins, "ai-mcp-proxy").Config
@@ -34,15 +35,29 @@ func (r *Reverter) revertMCPServer(svc *kong.Service, rt *kong.Route, plugins, s
 	m.Config.MaxRequestBodySize = getInt(cfg, "max_request_body_size")
 	m.Config.Logging = loggingFromBlock(getMap(cfg, "logging"))
 	m.Config.Server = getMap(cfg, "server")
+	m.Config.Proxy = getMap(cfg, "proxy_config")
+	m.Config.ToolsCacheTTLSeconds = getInt(cfg, "tools_cache_ttl_seconds")
 
+	// Auth: the ACL attribute config and default_acl live in the plugin config;
+	// lift them back into the structured config.auth block.
+	attrType := getStr(cfg, "acl_attribute_type")
+	claimField := getStr(cfg, "access_token_claim_field")
+	var defaultToolACLs aigw.ACLs
 	if dacl := getSlice(cfg, "default_acl"); len(dacl) > 0 {
 		if block, ok := dacl[0].(map[string]any); ok {
-			m.DefaultToolACLs = aclsFromBlock(block)
+			defaultToolACLs = aclsFromBlock(block)
 		}
 		if len(dacl) > 1 {
 			if err := r.warn("MCP server %q: only the first default_acl entry is convertible; %d dropped", svc.Name, len(dacl)-1); err != nil {
 				return err
 			}
+		}
+	}
+	if attrType != "" || claimField != "" || !defaultToolACLs.IsEmpty() {
+		m.Config.Auth = &aigw.MCPAuth{
+			ACLAttributeType:      attrType,
+			AccessTokenClaimField: claimField,
+			DefaultToolACLs:       defaultToolACLs,
 		}
 	}
 
@@ -65,17 +80,19 @@ func (r *Reverter) revertMCPServer(svc *kong.Service, rt *kong.Route, plugins, s
 // mcpTool reverses one ai-mcp-proxy config.tools[] entry.
 func mcpTool(tool map[string]any) aigw.MCPTool {
 	t := aigw.MCPTool{
-		Name:        getStr(tool, "name"),
-		Description: getStr(tool, "description"),
-		Method:      getStr(tool, "method"),
-		Path:        getStr(tool, "path"),
-		Scheme:      getStr(tool, "scheme"),
-		Host:        getStr(tool, "host"),
-		Headers:     getMap(tool, "headers"),
-		Query:       getMap(tool, "query"),
-		RequestBody: getMap(tool, "request_body"),
-		Responses:   getMap(tool, "responses"),
-		Annotations: getMap(tool, "annotations"),
+		Name:         getStr(tool, "name"),
+		Description:  getStr(tool, "description"),
+		Method:       getStr(tool, "method"),
+		Path:         getStr(tool, "path"),
+		Scheme:       getStr(tool, "scheme"),
+		Host:         getStr(tool, "host"),
+		Headers:      getMap(tool, "headers"),
+		Query:        getMap(tool, "query"),
+		RequestBody:  getMap(tool, "request_body"),
+		Responses:    getMap(tool, "responses"),
+		Annotations:  getMap(tool, "annotations"),
+		InputSchema:  getMap(tool, "input_schema"),
+		OutputSchema: getMap(tool, "output_schema"),
 	}
 	for _, raw := range getSlice(tool, "parameters") {
 		if p, ok := raw.(map[string]any); ok {

@@ -1,8 +1,8 @@
 package aigw
 
 // MCPServer is an AI Gateway MCP Server. The discriminator `type` is the mode
-// (conversion-only | conversion-listener | listener | passthrough-listener),
-// which maps to the ai-mcp-proxy plugin's config.mode.
+// (conversion-only | conversion-listener | listener | passthrough-listener |
+// upstream-server), which maps to the ai-mcp-proxy plugin's config.mode.
 type MCPServer struct {
 	Type            string          `yaml:"type,omitempty"`
 	DisplayName     string          `yaml:"display_name,omitempty"`
@@ -21,12 +21,32 @@ type MCPServer struct {
 	UpstreamURL string `yaml:"upstream_url,omitempty"`
 }
 
-// MCPServerConfig holds routing, logging, and server configuration.
+// MCPServerConfig holds routing, logging, auth, proxy, and server configuration.
 type MCPServerConfig struct {
 	Route              RouteConfig    `yaml:"route,omitempty"`
 	Logging            *Logging       `yaml:"logging,omitempty"`
 	MaxRequestBodySize *int           `yaml:"max_request_body_size,omitempty"`
 	Server             map[string]any `yaml:"server,omitempty"`
+	// Auth carries the server-level ACL configuration. It maps to the
+	// ai-mcp-proxy plugin's acl_attribute_type / access_token_claim_field /
+	// default_acl fields.
+	Auth *MCPAuth `yaml:"auth,omitempty"`
+	// Proxy maps directly to the ai-mcp-proxy plugin's proxy_config (only
+	// honored by the plugin in passthrough-listener mode).
+	Proxy map[string]any `yaml:"proxy,omitempty"`
+	// ToolsCacheTTLSeconds maps to the ai-mcp-proxy plugin's
+	// tools_cache_ttl_seconds (required by the plugin in upstream-server mode).
+	ToolsCacheTTLSeconds *int `yaml:"tools_cache_ttl_seconds,omitempty"`
+}
+
+// MCPAuth is the server-level ACL configuration of an MCP Server. It maps to the
+// ai-mcp-proxy plugin's acl_attribute_type, access_token_claim_field, and
+// default_acl fields.
+type MCPAuth struct {
+	ACLAttributeType      string `yaml:"acl_attribute_type,omitempty"`
+	AccessTokenClaimField string `yaml:"access_token_claim_field,omitempty"`
+	ACLs                  ACLs   `yaml:"acls,omitempty"`
+	DefaultToolACLs       ACLs   `yaml:"default_tool_acls,omitempty"`
 }
 
 // MCPTool is a single MCP tool definition. Fields mirror the ai-mcp-proxy
@@ -45,4 +65,9 @@ type MCPTool struct {
 	Parameters  []map[string]any `yaml:"parameters,omitempty"`
 	Annotations map[string]any   `yaml:"annotations,omitempty"`
 	ACLs        *ACLs            `yaml:"acls,omitempty"`
+	// InputSchema / OutputSchema are only honored by the plugin in
+	// upstream-server mode; they override the upstream server's schema for the
+	// tool of the same name.
+	InputSchema  map[string]any `yaml:"input_schema,omitempty"`
+	OutputSchema map[string]any `yaml:"output_schema,omitempty"`
 }

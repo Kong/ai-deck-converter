@@ -12,6 +12,10 @@ mcp_servers:
       server:
         forward_client_headers: true
         timeout: 10000
+      auth:
+        default_tool_acls:
+          allow:
+            - premium
     tools:
       - name: searchFlights
         description: Search available flights
@@ -26,9 +30,6 @@ mcp_servers:
         acls:
           allow:
             - agents
-    default_tool_acls:
-      allow:
-        - premium
   - type: passthrough-listener
     name: vendor-mcp
     config:
