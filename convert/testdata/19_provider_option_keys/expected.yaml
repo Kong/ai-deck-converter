@@ -1,0 +1,117 @@
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: openai-chat
+        paths:
+          - /ai/chat/completions
+        methods:
+          - POST
+        strip_path: false
+plugins:
+  - name: ai-model-selector
+    config:
+      body_path: model
+      max_request_body_size: 8388608
+      source: body
+    route:
+      name: openai-chat
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://env/llama2-key}'
+          description: llama-3
+          model:
+            model_alias: '@openai/provider-options-mix'
+            name: llama-3
+            options:
+              llama2_format: ollama
+              temperature: 0.7
+            provider: llama2
+          route_type: llm/v1/chat
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://env/mistral-key}'
+          description: mistral-large
+          model:
+            model_alias: '@openai/provider-options-mix'
+            name: mistral-large
+            options:
+              mistral_format: openai
+            provider: mistral
+          route_type: llm/v1/chat
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://env/dashscope-key}'
+          description: qwen-max
+          model:
+            model_alias: '@openai/provider-options-mix'
+            name: qwen-max
+            options:
+              dashscope:
+                international: true
+            provider: dashscope
+          route_type: llm/v1/chat
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://env/kimi-key}'
+          description: kimi-k2
+          model:
+            model_alias: '@openai/provider-options-mix'
+            name: kimi-k2
+            options:
+              kimi:
+                international: false
+            provider: kimi
+          route_type: llm/v1/chat
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://env/cohere-key}'
+          description: command-r
+          model:
+            model_alias: '@openai/provider-options-mix'
+            name: command-r
+            options:
+              cohere:
+                api_version: "2022-12-06"
+                embedding_input_type: search_document
+                wait_for_model: true
+            provider: cohere
+          route_type: llm/v1/chat
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://env/hf-key}'
+          description: hf-zephyr
+          model:
+            model_alias: '@openai/provider-options-mix'
+            name: hf-zephyr
+            options:
+              huggingface:
+                use_cache: true
+                wait_for_model: false
+            provider: huggingface
+          route_type: llm/v1/chat
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://env/databricks-key}'
+          description: dbrx-instruct
+          model:
+            model_alias: '@openai/provider-options-mix'
+            name: dbrx-instruct
+            options:
+              databricks:
+                workspace_instance_id: dbc-a1b2c3d4
+            provider: databricks
+          route_type: llm/v1/chat
+    route:
+      name: openai-chat
+ai-models:
+  - name: provider-options-mix
+    alias: '@openai/provider-options-mix'
