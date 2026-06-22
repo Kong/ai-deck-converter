@@ -187,6 +187,21 @@ func mapOptions(opts map[string]any, providerType string, provider *aigw.Provide
 			addNested("gemini", k, v)
 		case providerType == "bedrock" && aimap.BedrockOptionKeys[k]:
 			addNested("bedrock", k, v)
+		case providerType == "llama2" && k == "format":
+			out["llama2_format"] = v
+		case providerType == "mistral" && k == "format":
+			out["mistral_format"] = v
+		case providerType == "dashscope" && k == "international":
+			addNested("dashscope", k, v)
+		case providerType == "kimi" && k == "international":
+			addNested("kimi", k, v)
+		case providerType == "cohere" &&
+			(k == "embedding_input_type" || k == "wait_for_model" || k == "api_version"):
+			addNested("cohere", k, v)
+		case providerType == "huggingface" && (k == "use_cache" || k == "wait_for_model"):
+			addNested("huggingface", k, v)
+		case providerType == "databricks" && k == "workspace_instance_id":
+			addNested("databricks", k, v)
 		default:
 			out[k] = v
 		}

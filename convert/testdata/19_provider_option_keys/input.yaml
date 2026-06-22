@@ -1,0 +1,122 @@
+# One openai-format generate route whose ai-proxy-advanced plugin carries one
+# target per provider type, each exercising the provider-specific option keys
+# that mapOptions renames/nests (llama2/mistral -> flat *_format; dashscope/
+# kimi/cohere/huggingface/databricks -> nested under model.options.<provider>).
+models:
+  - type: model
+    display_name: Provider Options Mix
+    name: provider-options-mix
+    capabilities: [generate]
+    formats:
+      - type: openai
+    target_models:
+      - name: llama-3
+        provider: llama2-prov
+        config:
+          type: llama2
+          format: ollama
+          temperature: 0.7
+      - name: mistral-large
+        provider: mistral-prov
+        config:
+          type: mistral
+          format: openai
+      - name: qwen-max
+        provider: dashscope-prov
+        config:
+          type: dashscope
+          international: true
+      - name: kimi-k2
+        provider: kimi-prov
+        config:
+          type: kimi
+          international: false
+      - name: command-r
+        provider: cohere-prov
+        config:
+          type: cohere
+          embedding_input_type: search_document
+          wait_for_model: true
+          api_version: "2022-12-06"
+      - name: hf-zephyr
+        provider: huggingface-prov
+        config:
+          type: huggingface
+          use_cache: true
+          wait_for_model: false
+      - name: dbrx-instruct
+        provider: databricks-prov
+        config:
+          type: databricks
+          workspace_instance_id: dbc-a1b2c3d4
+    policies: []
+    acls: {allow: [], deny: []}
+    config:
+      route:
+        paths: [/ai]
+      model:
+        alias: "@openai/provider-options-mix"
+providers:
+  - type: llama2
+    display_name: Llama2 Prov
+    name: llama2-prov
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://env/llama2-key}"
+  - type: mistral
+    display_name: Mistral Prov
+    name: mistral-prov
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://env/mistral-key}"
+  - type: dashscope
+    display_name: DashScope Prov
+    name: dashscope-prov
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://env/dashscope-key}"
+  - type: kimi
+    display_name: Kimi Prov
+    name: kimi-prov
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://env/kimi-key}"
+  - type: cohere
+    display_name: Cohere Prov
+    name: cohere-prov
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://env/cohere-key}"
+  - type: huggingface
+    display_name: HuggingFace Prov
+    name: huggingface-prov
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://env/hf-key}"
+  - type: databricks
+    display_name: Databricks Prov
+    name: databricks-prov
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://env/databricks-key}"
