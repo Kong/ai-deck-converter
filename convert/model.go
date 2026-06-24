@@ -39,12 +39,12 @@ func (c *Converter) convertModels() error {
 		caps := c.expandCapabilities(m)
 		logging := modelLoggingBlock(m.Config.Logging)
 
-		// The model alias defaults to the model name when unset, and is applied
-		// identically to each target's model_alias and the ai-models entry so the
-		// two stay in sync (the reverter matches targets to ai-models by alias).
-		alias := m.Config.Model.Alias
-		if alias == "" {
-			alias = m.Name
+		// ai-proxy-advanced only carries model_alias when the source model set an
+		// explicit alias. ai-models keeps its historical default-to-name behavior.
+		targetAlias := m.Config.Model.Alias
+		aiModelAlias := targetAlias
+		if aiModelAlias == "" {
+			aiModelAlias = m.Name
 		}
 
 		for j := range m.TargetModels {
@@ -98,7 +98,7 @@ func (c *Converter) convertModels() error {
 					groups[key] = g
 					order = append(order, key)
 				}
-				target := c.buildTarget(tm, provider, providerType, alias, spec.RouteType, logging)
+				target := c.buildTarget(tm, provider, providerType, targetAlias, spec.RouteType, logging)
 				dedup := tm.Name + "|" + spec.RouteType
 				if !g.seen[dedup] {
 					g.seen[dedup] = true
@@ -114,7 +114,7 @@ func (c *Converter) convertModels() error {
 		c.out.AIModels = append(c.out.AIModels, kong.AIModel{
 			ID:    m.ID,
 			Name:  m.Name,
-			Alias: alias,
+			Alias: aiModelAlias,
 		})
 
 		// Model policy and ACL plugins scope to the ai-models entity.

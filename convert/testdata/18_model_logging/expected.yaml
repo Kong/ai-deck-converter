@@ -32,7 +32,6 @@ plugins:
             log_payloads: false
             log_statistics: true
           model:
-            model_alias: gpt-5-2
             name: gpt-5.2
             provider: openai
           route_type: llm/v1/chat

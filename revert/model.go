@@ -233,9 +233,10 @@ func (r *Reverter) finalizeModels(acc *modelAcc) error {
 }
 
 // nameAliaslessGroups assigns names to model groups whose targets carry no
-// model_alias. When the alias-less ai-models entries line up one-to-one with
-// the alias-less groups (the shape the forward converter produces), they are
-// matched by position; otherwise the route name stands in.
+// model_alias. When the alias-less groups line up one-to-one with ai-models
+// entries that provide only naming help (either no alias, or the converter's
+// historical alias==name default), they are matched by position; otherwise the
+// route name stands in.
 func (r *Reverter) nameAliaslessGroups(acc *modelAcc) error {
 	var unnamed []*modelGroup
 	for _, key := range acc.order {
@@ -249,7 +250,7 @@ func (r *Reverter) nameAliaslessGroups(acc *modelAcc) error {
 
 	var free []string
 	for _, m := range r.src.AIModels {
-		if m.Alias == "" {
+		if m.Alias == "" || m.Alias == m.Name {
 			free = append(free, m.Name)
 		}
 	}
