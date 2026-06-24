@@ -147,6 +147,34 @@ services:
 	require.Equal(t, "openai-embeddings", doc.Models[1].Name, "second model name (route name)")
 }
 
+func TestAliaslessTargetsCanUseAIModelsNameOnly(t *testing.T) {
+	in := []byte(`
+_format_version: "3.0"
+services:
+  - name: gw
+    url: http://gw.invalid
+    routes:
+      - name: openai-chat
+        paths: [/ai/chat/completions]
+        plugins:
+          - name: ai-proxy-advanced
+            config:
+              llm_format: openai
+              targets:
+                - route_type: llm/v1/chat
+                  model: {provider: openai, name: gpt-4o}
+ai-models:
+  - name: m1
+    alias: m1
+`)
+	doc, warnings, err := revertYAML(t, in, Options{Strict: true})
+	require.NoErrorf(t, err, "strict revert (warnings: %v)", warnings)
+	require.Empty(t, warnings, "want no warnings for the forward-produced aliasless target shape")
+	require.Len(t, doc.Models, 1, "models = %+v", doc.Models)
+	require.Equal(t, "m1", doc.Models[0].Name, "model name should come from ai-models")
+	require.Empty(t, doc.Models[0].Config.Model.Alias, "synthetic ai-models alias should not be restored into model.alias")
+}
+
 func TestMismatchedAliasStillWarns(t *testing.T) {
 	// When ai-models entries exist but a target alias matches none of them,
 	// that is a genuine inconsistency and keeps its warning.
