@@ -14,7 +14,6 @@ models:
     policies: [pii-sanitizer, audit-logging]
     acls:
       allow: [premium-users]
-      deny: [banned]
     config:
       route: {paths: [/ai]}
       model: {alias: "@openai/guarded-gpt"}

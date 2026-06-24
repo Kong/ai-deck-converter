@@ -185,9 +185,6 @@ plugins:
       allow:
         - consumer-alice
         - group-admins
-      deny:
-        - consumer-bob
-        - group-blocked
     model:
       id: aab20033-7c80-5942-aadc-52357371dbeb
 ai_models:

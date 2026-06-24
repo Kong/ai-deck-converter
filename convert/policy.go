@@ -1,6 +1,8 @@
 package convert
 
 import (
+	"fmt"
+
 	"github.com/Kong/ai-deck-converter/internal/aigw"
 	"github.com/Kong/ai-deck-converter/internal/kong"
 )
@@ -39,6 +41,12 @@ func (c *Converter) scopedPlugins(refs []string, acls aigw.ACLs) ([]kong.Plugin,
 		plugins = append(plugins, policyPlugin(p, nil))
 	}
 	if !acls.IsEmpty() {
+		// A Kong acl plugin enforces only_one_of {config.allow, config.deny}; an
+		// AI Gateway acl that sets both is not representable as one valid plugin,
+		// so reject it rather than emit config the gateway will refuse to load.
+		if len(acls.Allow) > 0 && len(acls.Deny) > 0 {
+			return nil, fmt.Errorf("acl policy sets both allow (%v) and deny (%v), but a Kong acl plugin permits exactly one; set only allow or only deny", acls.Allow, acls.Deny)
+		}
 		plugins = append(plugins, aclPlugin(acls))
 	}
 	return plugins, nil

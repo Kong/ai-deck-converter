@@ -70,8 +70,6 @@ plugins:
     config:
       allow:
         - premium-users
-      deny:
-        - banned
     model:
       name: guarded-gpt
 vaults:
