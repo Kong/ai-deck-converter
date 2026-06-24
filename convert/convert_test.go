@@ -34,6 +34,40 @@ models:
 		"expected unknown-provider warning")
 }
 
+// A Kong acl plugin permits exactly one of config.allow / config.deny
+// (only_one_of in its schema). An AI Gateway acl that sets both is not
+// representable as a single valid acl plugin, so the converter must reject it
+// rather than emit structurally invalid config (it does no schema validation).
+func TestConvertRejectsACLWithAllowAndDeny(t *testing.T) {
+	src := []byte(`
+models:
+  - type: model
+    name: guarded
+    capabilities: [generate]
+    formats: [{type: openai}]
+    target_models:
+      - name: gpt-4o
+        provider: p1
+        config: {type: openai}
+    acls:
+      allow: [premium]
+      deny: [banned]
+    config:
+      route: {paths: [/ai]}
+      model: {alias: m1}
+providers:
+  - name: p1
+    type: openai
+`)
+	// Invalid in every output mode, so it is rejected regardless of -strict.
+	for _, mode := range []string{"", "db-less"} {
+		_, _, err := Convert(src, Options{OutputMode: mode})
+		require.Error(t, err, "acl with both allow and deny must be rejected (mode %q)", mode)
+		require.Contains(t, err.Error(), "allow")
+		require.Contains(t, err.Error(), "deny")
+	}
+}
+
 func TestConvertDocumentToDBLessYAML(t *testing.T) {
 	src := []byte(`
 models:

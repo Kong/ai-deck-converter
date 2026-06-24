@@ -12,9 +12,6 @@ models:
       allow:
         - consumer-alice
         - group-admins
-      deny:
-        - consumer-bob
-        - group-blocked
     config:
       route:
         destinations:
