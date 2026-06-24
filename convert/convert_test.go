@@ -510,7 +510,6 @@ providers:
 }
 
 func TestConvertDBLessCredentialTTLAndTags(t *testing.T) {
-	ttl := 7200
 	src := []byte(`
 consumers:
   - name: alice
@@ -531,7 +530,16 @@ consumers:
         api_key: sk-bob
 `)
 
-	out, _, err := Convert(src, Options{OutputMode: "db-less"})
+	// Deck output (db-backed) honors a relative credential ttl, so it is kept.
+	deck, _, err := Convert(src, Options{})
+	if err != nil {
+		t.Fatalf("convert deck: %v", err)
+	}
+	if !strings.Contains(string(deck), "ttl: 7200") {
+		t.Fatalf("expected deck output to keep credential ttl 7200:\n%s", deck)
+	}
+
+	out, warnings, err := Convert(src, Options{OutputMode: "db-less"})
 	if err != nil {
 		t.Fatalf("convert db-less: %v", err)
 	}
@@ -555,8 +563,13 @@ consumers:
 	if alice.Key != "sk-alice" {
 		t.Fatalf("unexpected key: %q", alice.Key)
 	}
-	if alice.TTL == nil || *alice.TTL != ttl {
-		t.Fatalf("expected TTL %d, got %v", ttl, alice.TTL)
+	// db-less cannot honor a relative ttl (it reads ttl as an absolute epoch and
+	// drops the credential), so the converter drops the ttl and warns. Tags stay.
+	if alice.TTL != nil {
+		t.Fatalf("expected ttl to be dropped for db-less, got %d", *alice.TTL)
+	}
+	if !strings.Contains(strings.Join(warnings, "\n"), "dropping ttl") {
+		t.Fatalf("expected a ttl-dropped warning, got %#v", warnings)
 	}
 	if len(alice.Tags) != 2 || alice.Tags[0] != "env:prod" || alice.Tags[1] != "scope:read-only" {
 		t.Fatalf("unexpected tags: %#v", alice.Tags)

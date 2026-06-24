@@ -45,10 +45,21 @@ func (c *Converter) convertConsumers() error {
 				}
 				continue
 			}
+			ttl := cred.TTL
+			// db-less reads a credential ttl as an absolute epoch (not a relative
+			// duration) and silently drops the credential, so a relative ttl is not
+			// representable in db-less output. Drop it (and warn) for db-less; deck
+			// output keeps it, where db-backed honors a relative ttl.
+			if ttl != nil && c.opts.OutputMode == "db-less" {
+				if err := c.warn("consumer %q credential %q sets ttl=%d, which a db-less data plane cannot honor (it reads ttl as an absolute timestamp and would drop the credential); dropping ttl", cons.Name, cred.Name, *ttl); err != nil {
+					return err
+				}
+				ttl = nil
+			}
 			kc.KeyAuthCredentials = append(kc.KeyAuthCredentials, kong.KeyAuthCredential{
 				ID:   cred.ID,
 				Key:  cred.APIKey,
-				TTL:  cred.TTL,
+				TTL:  ttl,
 				Tags: c.labelsToTags(cred.Labels),
 			})
 		}

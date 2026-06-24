@@ -66,7 +66,6 @@ keyauth_credentials:
   - id: befaceb2-f53c-5b16-8bfa-4625884a2851
     key: sk-alice-secret
     consumer: 145c8c6a-fb31-552f-980e-efdb9fd40602
-    ttl: 3600
     tags:
       - env:prod
       - scope:read-only
