@@ -13,7 +13,7 @@ models:
       model:
         name_header: false
       max_request_body_size: 2097152
-    target_models:
+    targets:
       - name: gpt-4o
         provider: openai-prod
         config:
@@ -31,7 +31,7 @@ models:
       route:
         paths: [/ai]
       model: {}
-    target_models:
+    targets:
       - name: text-embedding-3-small
         provider: openai-prod
         config:

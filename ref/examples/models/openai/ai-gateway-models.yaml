@@ -34,7 +34,7 @@ models:
       - agentic
     formats:
       - type: openai
-    target_models:
+    targets:
       - name: gpt-5-4
         provider: azure-prod
         config:
@@ -67,7 +67,7 @@ models:
       - realtime
     formats:
       - type: openai
-    target_models:
+    targets:
       - name: gpt-realtime
         provider: azure-prod
         config:
@@ -98,7 +98,7 @@ models:
       - embeddings
     formats:
       - type: openai
-    target_models:
+    targets:
       - name: text-embedding-3-large
         provider: azure-prod
         config:
@@ -130,7 +130,7 @@ models:
       - image
     formats:
       - type: openai
-    target_models:
+    targets:
       - name: gpt-image-1
         provider: azure-prod
         config:
@@ -161,7 +161,7 @@ models:
       - audio
     formats:
       - type: openai
-    target_models:
+    targets:
       - name: gpt-4o-mini-tts
         provider: azure-prod
         config:
@@ -193,7 +193,7 @@ models:
       - audio
     formats:
       - type: openai
-    target_models:
+    targets:
       - name: whisper-1
         provider: azure-prod
         config:
@@ -224,7 +224,7 @@ models:
       - video
     formats:
       - type: openai
-    target_models:
+    targets:
       - name: sora-2
         provider: azure-prod
         config:
@@ -256,7 +256,7 @@ models:
       - batches
     formats:
       - type: openai
-    target_models:
+    targets:
       - name: batch-api
         provider: azure-prod
         config:
@@ -287,7 +287,7 @@ models:
       - files
     formats:
       - type: openai
-    target_models:
+    targets:
       - name: files-api
         provider: azure-prod
         config:

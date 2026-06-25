@@ -14,7 +14,7 @@ models:
     capabilities: [generate]
     formats:
       - type: openai
-    target_models:
+    targets:
       - name: gpt-4o
         weight: 100
         provider: openai-main

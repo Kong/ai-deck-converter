@@ -76,7 +76,7 @@ models:
         slots: 10000
         write_timeout: 60000
         hash_on_header: X-Kong-LLM-Request-ID
-    target_models:
+    targets:
       - name: gpt-4o
         provider: my-openai-provider
         config:

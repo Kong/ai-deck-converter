@@ -35,7 +35,7 @@ models:
       - agentic
     formats:
       - type: bedrock
-    target_models:
+    targets:
       - name: anthropic.claude-3-7-sonnet-20250219-v1:0
         provider: bedrock-prod
         config:
@@ -66,7 +66,7 @@ models:
       - embeddings
     formats:
       - type: bedrock
-    target_models:
+    targets:
       - name: amazon.titan-embed-text-v2:0
         provider: bedrock-prod
         config:
@@ -96,7 +96,7 @@ models:
       - image
     formats:
       - type: bedrock
-    target_models:
+    targets:
       - name: amazon.nova-canvas-v1:0
         provider: bedrock-prod
         config:
@@ -125,7 +125,7 @@ models:
       - audio
     formats:
       - type: bedrock
-    target_models:
+    targets:
       - name: amazon.nova-sonic-v1:0
         provider: bedrock-prod
         config:
@@ -154,7 +154,7 @@ models:
       - video
     formats:
       - type: bedrock
-    target_models:
+    targets:
       - name: amazon.nova-reel-v1:1
         provider: bedrock-prod
         config:
@@ -184,7 +184,7 @@ models:
       - rerank
     formats:
       - type: bedrock
-    target_models:
+    targets:
       - name: cohere.rerank-v3-5:0
         provider: bedrock-prod
         config:
@@ -213,7 +213,7 @@ models:
       - batches
     formats:
       - type: bedrock
-    target_models:
+    targets:
       - name: batch-api
         provider: bedrock-prod
         config:

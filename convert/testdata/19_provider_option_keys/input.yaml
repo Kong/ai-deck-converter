@@ -9,7 +9,7 @@ models:
     capabilities: [generate]
     formats:
       - type: openai
-    target_models:
+    targets:
       - name: llama-3
         provider: llama2-prov
         config:

@@ -7,7 +7,7 @@ models:
     labels:
       env: prod
       team: ai-platform
-    target_models:
+    targets:
       - name: gpt-4o
         provider: openai-main
         config: {type: openai}

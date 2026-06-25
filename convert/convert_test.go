@@ -18,7 +18,7 @@ models:
     name: m1
     capabilities: [generate]
     formats: [{type: openai}]
-    target_models:
+    targets:
       - name: gpt-4o
         provider: missing-provider
         config: {type: openai}
@@ -45,7 +45,7 @@ models:
     name: guarded
     capabilities: [generate]
     formats: [{type: openai}]
-    target_models:
+    targets:
       - name: gpt-4o
         provider: p1
         config: {type: openai}
@@ -75,7 +75,7 @@ models:
     name: m1
     capabilities: [chat]
     formats: [{type: openai}]
-    target_models:
+    targets:
       - name: gpt-4o
         provider: p1
         config: {type: openai}
@@ -106,7 +106,7 @@ models:
     name: m1
     capabilities: [generate]
     formats: [{type: openai}]
-    target_models:
+    targets:
       - name: gpt-4o
         provider: p1
         config: {type: openai}
@@ -166,7 +166,7 @@ models:
     name: m1
     capabilities: [generate]
     formats: [{type: openai}]
-    target_models:
+    targets:
       - name: gpt-4o
         provider: p1
         config: {type: openai}
@@ -226,7 +226,7 @@ models:
     name: m1
     capabilities: [generate]
     formats: [{type: openai}]
-    target_models:
+    targets:
       - name: gpt-4o
         provider: missing-provider
         config: {type: openai}
@@ -381,7 +381,7 @@ models:
     name: m1
     capabilities: [generate]
     formats: [{type: openai}]
-    target_models:
+    targets:
       - name: gpt-4o
         provider: p1
         config: {type: openai}
@@ -454,7 +454,7 @@ models:
     name: m1
     capabilities: [generate]
     formats: [{type: openai}]
-    target_models:
+    targets:
       - name: gpt-4o
         provider: p1
         config: {type: openai}

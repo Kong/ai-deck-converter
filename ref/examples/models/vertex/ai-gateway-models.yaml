@@ -31,7 +31,7 @@ models:
       - generate
     formats:
       - type: gemini
-    target_models:
+    targets:
       - name: gemini-2.5-pro
         provider: vertex-prod
         config:
@@ -65,7 +65,7 @@ models:
       - embeddings
     formats:
       - type: gemini
-    target_models:
+    targets:
       - name: text-embedding-005
         provider: vertex-prod
         config:
@@ -95,7 +95,7 @@ models:
       - image
     formats:
       - type: gemini
-    target_models:
+    targets:
       - name: imagen-3.0-generate-001
         provider: vertex-prod
         config:
@@ -125,7 +125,7 @@ models:
       - video
     formats:
       - type: gemini
-    target_models:
+    targets:
       - name: veo-2.0-generate-001
         provider: vertex-prod
         config:
@@ -155,7 +155,7 @@ models:
       - rerank
     formats:
       - type: gemini
-    target_models:
+    targets:
       - name: ranking-api
         provider: vertex-prod
         config:
@@ -183,7 +183,7 @@ models:
       - batches
     formats:
       - type: gemini
-    target_models:
+    targets:
       - name: batch-api
         provider: vertex-prod
         config:

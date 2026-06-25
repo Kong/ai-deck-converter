@@ -5,7 +5,7 @@ models:
       - embeddings
     formats:
       - type: bedrock
-    target_models:
+    targets:
       - name: amazon.titan-embed-text-v2:0
         provider: bedrock-ai
         config:
@@ -21,7 +21,7 @@ models:
       - image
     formats:
       - type: bedrock
-    target_models:
+    targets:
       - name: amazon.nova-canvas-v1:0
         provider: bedrock-ai
         config:
@@ -36,7 +36,7 @@ models:
       - audio/speech
     formats:
       - type: bedrock
-    target_models:
+    targets:
       - name: amazon.nova-sonic-v1:0
         provider: bedrock-ai
         config:
@@ -51,7 +51,7 @@ models:
       - video
     formats:
       - type: bedrock
-    target_models:
+    targets:
       - name: amazon.nova-reel-v1:1
         provider: bedrock-ai
         config:

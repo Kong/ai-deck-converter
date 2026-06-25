@@ -13,7 +13,7 @@ type Model struct {
 	Enabled      *bool         `yaml:"enabled,omitempty"`
 	Capabilities []string      `yaml:"capabilities,omitempty"`
 	Formats      []Format      `yaml:"formats,omitempty"`
-	TargetModels []TargetModel `yaml:"target_models,omitempty"`
+	TargetModels []TargetModel `yaml:"targets,omitempty"`
 	Policies     []string      `yaml:"policies,omitempty"`
 	ACLs         ACLs          `yaml:"acls,omitempty"`
 	Config       ModelConfig   `yaml:"config,omitempty"`
