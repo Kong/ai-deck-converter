@@ -5,7 +5,7 @@ models:
       - generate
     formats:
       - type: gemini
-    target_models:
+    targets:
       - name: gemini-2.5-pro
         provider: gemini-ai
         config:
@@ -22,7 +22,7 @@ models:
       - embeddings
     formats:
       - type: gemini
-    target_models:
+    targets:
       - name: text-embedding-005
         provider: gemini-ai
         config:

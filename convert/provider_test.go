@@ -116,7 +116,7 @@ models:
     name: m1
     capabilities: [image]
     formats: [{type: anthropic}]
-    target_models:
+    targets:
       - name: claude
         provider: anthropic-main
         config: {type: anthropic}

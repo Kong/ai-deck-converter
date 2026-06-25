@@ -19,7 +19,7 @@ models:
         paths: [/ai]
       model:
         alias: "@vertex/gemini-2.5-pro"
-    target_models:
+    targets:
       - name: gemini-2.5-pro
         provider: vertex-prod
         config:
@@ -40,7 +40,7 @@ models:
         paths: [/ai]
       model:
         alias: "@vertex/text-embedding-005"
-    target_models:
+    targets:
       - name: text-embedding-005
         provider: vertex-prod
         config:

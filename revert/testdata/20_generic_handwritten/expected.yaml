@@ -5,7 +5,7 @@ models:
       - generate
     formats:
       - type: openai
-    target_models:
+    targets:
       - name: gpt-4o
         provider: openai-secrets
         config:

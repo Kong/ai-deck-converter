@@ -5,7 +5,7 @@ models:
     capabilities: [generate]
     formats:
       - type: bedrock
-    target_models:
+    targets:
       - name: anthropic.claude-3-5-sonnet
         provider: bedrock-prod
         config:

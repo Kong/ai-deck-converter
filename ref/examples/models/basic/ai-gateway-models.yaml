@@ -37,13 +37,13 @@ policies:
       policies:
       - match:
         - type: model
-          values: 
+          values:
           - "@openai/gpt-5.2"
         limits:
         - token_count_strategy: cost
           limit: 100
           window_size: 86400
-  
+
   - display_name: Anthropic Rate Limits
     name: anthropic-rate-limits
     type: ai-rate-limiting-advanced
@@ -53,7 +53,7 @@ policies:
       policies:
       - match:
         - type: model
-          values: 
+          values:
           - "@anthropic/claude-opus-4-6"
         limits:
         - token_count_strategy: cost
@@ -95,7 +95,7 @@ models:
       - chat
     formats:
       - type: openai
-    target_models:
+    targets:
       - name: gpt-5.2
         provider: openai-prod
     policies:
@@ -103,7 +103,7 @@ models:
       - ip-restriction-default
       - key-auth-default
       - openai-rate-limits
-    
+
 
   - display_name: Claude Opus 4.6
     name: claude-opus-4-6
@@ -120,7 +120,7 @@ models:
       - chat
     formats:
       - type: anthropic
-    target_models:
+    targets:
       - name: claude-opus-4-6
         provider: anthropic-prod
         config:

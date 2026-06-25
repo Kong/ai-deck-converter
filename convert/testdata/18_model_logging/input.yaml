@@ -14,7 +14,7 @@ models:
       logging:
         statistics: true
         payloads: false
-    target_models:
+    targets:
       - name: gpt-5.2
         provider: openai-prod
         config:

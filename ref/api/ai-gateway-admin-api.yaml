@@ -1639,7 +1639,7 @@ components:
             $ref: '#/components/schemas/AIGatewayModelFormat'
           maxItems: 1
           minItems: 1
-        target_models:
+        targets:
           description: One or more backend models that this model entry routes to.
           type: array
           items:
@@ -1675,7 +1675,7 @@ components:
         - formats
         - acls
         - config
-        - target_models
+        - targets
         - policies
         - type
         - capabilities
@@ -1715,7 +1715,7 @@ components:
             $ref: '#/components/schemas/AIGatewayModelFormat'
           maxItems: 1
           minItems: 1
-        target_models:
+        targets:
           description: One or more backend models that this model entry routes to.
           type: array
           items:
@@ -1745,7 +1745,7 @@ components:
         - formats
         - acls
         - config
-        - target_models
+        - targets
         - policies
         - type
         - capabilities
@@ -2759,7 +2759,7 @@ components:
         password:
           description: >
             Password to use for Redis connections. If undefined, no AUTH
-            commands are sent to Redis. 
+            commands are sent to Redis.
 
             This field is
             [referenceable](https://developer.konghq.com/gateway/entities/vault/#how-do-i-reference-secrets-stored-in-a-vault).
@@ -2849,7 +2849,7 @@ components:
               description: >
                 Sentinel username to authenticate with a Redis Sentinel
                 instance. If undefined, ACL authentication won't be performed.
-                This requires Redis v6.2.0+. 
+                This requires Redis v6.2.0+.
 
                 This field is
                 [referenceable](https://developer.konghq.com/gateway/entities/vault/#how-do-i-reference-secrets-stored-in-a-vault).
@@ -2970,7 +2970,7 @@ components:
           default: 5000
         user:
           description: >
-            the user of the pgvector database 
+            the user of the pgvector database
 
             This field is
             [referenceable](https://developer.konghq.com/gateway/entities/vault/#how-do-i-reference-secrets-stored-in-a-vault).
@@ -3018,7 +3018,7 @@ components:
         semantic_description:
           description: >
             The semantic description of the target, required if using semantic
-            load balancing. 
+            load balancing.
 
             Specially, setting this to 'CATCHALL' will indicate such target to
             be used when no other targets match the semantic threshold.
@@ -3499,7 +3499,7 @@ components:
           type: string
         endpoint_id:
           description: |
-            The endpoint ID for the Gemini model. 
+            The endpoint ID for the Gemini model.
             This must be set when running on Gemini on Vertex Model Garden.
           type: string
       required:
@@ -3909,10 +3909,10 @@ components:
             base64_decode:
               description: >
                 Decode all secrets in this vault as base64. Useful for binary
-                data. 
+                data.
 
                 If some of the secrets in the vault are not base64-encoded, an
-                error will occur when using them. 
+                error will occur when using them.
 
                 We recommend creating a separate vault for base64 secrets.
               type: boolean
@@ -3957,16 +3957,16 @@ components:
             base64_decode:
               description: >
                 Decode all secrets in this vault as base64. Useful for binary
-                data. 
+                data.
 
                 If some of the secrets in the vault are not base64-encoded, an
-                error will occur when using them. 
+                error will occur when using them.
 
                 We recommend creating a separate vault for base64 secrets.
               type: boolean
             neg_ttl:
               description: >
-                Time-to-live (in seconds) for caching failed secret lookups. 
+                Time-to-live (in seconds) for caching failed secret lookups.
 
                 A value of 0 disables negative caching. Kong will retry fetching
                 the secret after neg_ttl expires.
@@ -3975,13 +3975,13 @@ components:
             resurrect_ttl:
               description: >
                 Time (in seconds) that secrets remain in use after expiration
-                (config.ttl ends). 
+                (config.ttl ends).
 
                 Useful if the vault is unreachable or the secret is deleted but
-                not yet replaced. 
+                not yet replaced.
 
                 Kong continues to retry for resurrect_ttl seconds before giving
-                up. 
+                up.
 
                 The default is ~3 years to support uninterrupted service during
                 outages.
@@ -3990,7 +3990,7 @@ components:
             ttl:
               description: >
                 Time-to-live (in seconds) for a cached secret. A value of 0
-                disables rotation. 
+                disables rotation.
 
                 For non-zero values, use a minimum of 60 seconds.
               type: integer
@@ -4002,10 +4002,10 @@ components:
               type: string
             endpoint_url:
               description: >
-                The endpoint URL of the AWS Secrets Manager service. 
+                The endpoint URL of the AWS Secrets Manager service.
 
                 If not specified, the default is
-                https://secretsmanager.{region}.amazonaws.com. 
+                https://secretsmanager.{region}.amazonaws.com.
 
                 You can override this by specifying a complete URL including the
                 http/https scheme.
@@ -4020,10 +4020,10 @@ components:
               default: KongVault
             sts_endpoint_url:
               description: >
-                A custom STS endpoint URL used for IAM role assumption. 
+                A custom STS endpoint URL used for IAM role assumption.
 
                 Overrides the default https://sts.amazonaws.com or regional
-                variant https://sts.<region>.amazonaws.com. 
+                variant https://sts.<region>.amazonaws.com.
 
                 Include the full http/https scheme. Only specify this if using a
                 private VPC endpoint for STS.
@@ -4065,16 +4065,16 @@ components:
             base64_decode:
               description: >
                 Decode all secrets in this vault as base64. Useful for binary
-                data. 
+                data.
 
                 If some of the secrets in the vault are not base64-encoded, an
-                error will occur when using them. 
+                error will occur when using them.
 
                 We recommend creating a separate vault for base64 secrets.
               type: boolean
             neg_ttl:
               description: >
-                Time-to-live (in seconds) for caching failed secret lookups. 
+                Time-to-live (in seconds) for caching failed secret lookups.
 
                 A value of 0 disables negative caching. Kong will retry fetching
                 the secret after neg_ttl expires.
@@ -4083,13 +4083,13 @@ components:
             resurrect_ttl:
               description: >
                 Time (in seconds) that secrets remain in use after expiration
-                (config.ttl ends). 
+                (config.ttl ends).
 
                 Useful if the vault is unreachable or the secret is deleted but
-                not yet replaced. 
+                not yet replaced.
 
                 Kong continues to retry for resurrect_ttl seconds before giving
-                up. 
+                up.
 
                 The default is ~3 years to support uninterrupted service during
                 outages.
@@ -4098,14 +4098,14 @@ components:
             ttl:
               description: >
                 Time-to-live (in seconds) for a cached secret. A value of 0
-                disables rotation. 
+                disables rotation.
 
                 For non-zero values, use a minimum of 60 seconds.
               type: integer
               default: 0
             project_id:
               description: >
-                The project ID from your Google API Console. 
+                The project ID from your Google API Console.
 
                 You can find it by visiting your Google API Console and
                 selecting “Manage all projects” in the projects list.
@@ -4147,16 +4147,16 @@ components:
             base64_decode:
               description: >
                 Decode all secrets in this vault as base64. Useful for binary
-                data. 
+                data.
 
                 If some of the secrets in the vault are not base64-encoded, an
-                error will occur when using them. 
+                error will occur when using them.
 
                 We recommend creating a separate vault for base64 secrets.
               type: boolean
             neg_ttl:
               description: >
-                Time-to-live (in seconds) for caching failed secret lookups. 
+                Time-to-live (in seconds) for caching failed secret lookups.
 
                 A value of 0 disables negative caching. Kong will retry fetching
                 the secret after neg_ttl expires.
@@ -4165,13 +4165,13 @@ components:
             resurrect_ttl:
               description: >
                 Time (in seconds) that secrets remain in use after expiration
-                (config.ttl ends). 
+                (config.ttl ends).
 
                 Useful if the vault is unreachable or the secret is deleted but
-                not yet replaced. 
+                not yet replaced.
 
                 Kong continues to retry for resurrect_ttl seconds before giving
-                up. 
+                up.
 
                 The default is ~3 years to support uninterrupted service during
                 outages.
@@ -4180,7 +4180,7 @@ components:
             ttl:
               description: >
                 Time-to-live (in seconds) for a cached secret. A value of 0
-                disables rotation. 
+                disables rotation.
 
                 For non-zero values, use a minimum of 60 seconds.
               type: integer
@@ -4192,7 +4192,7 @@ components:
               default: AZURE
             vault_uri:
               description: >
-                The URI from which the vault is reachable. 
+                The URI from which the vault is reachable.
 
                 This value can be found in your Azure Key Vault Dashboard under
                 the Vault URI entry.
@@ -4204,7 +4204,7 @@ components:
               type: string
             client_id:
               description: >
-                The client ID for your registered application. 
+                The client ID for your registered application.
 
                 You can find this in the Azure Dashboard under App
                 Registrations.
@@ -4212,7 +4212,7 @@ components:
             tenant_id:
               description: >
                 The DirectoryId and TenantId are the same: both refer to the
-                GUID representing your Azure Active Directory tenant. 
+                GUID representing your Azure Active Directory tenant.
 
                 Microsoft documentation and products may use either term
                 depending on context.
@@ -4261,16 +4261,16 @@ components:
             base64_decode:
               description: >
                 Decode all secrets in this vault as base64. Useful for binary
-                data. 
+                data.
 
                 If some of the secrets in the vault are not base64-encoded, an
-                error will occur when using them. 
+                error will occur when using them.
 
                 We recommend creating a separate vault for base64 secrets.
               type: boolean
             neg_ttl:
               description: >
-                Time-to-live (in seconds) for caching failed secret lookups. 
+                Time-to-live (in seconds) for caching failed secret lookups.
 
                 A value of 0 disables negative caching. Kong will retry fetching
                 the secret after neg_ttl expires.
@@ -4279,13 +4279,13 @@ components:
             resurrect_ttl:
               description: >
                 Time (in seconds) that secrets remain in use after expiration
-                (config.ttl ends). 
+                (config.ttl ends).
 
                 Useful if the vault is unreachable or the secret is deleted but
-                not yet replaced. 
+                not yet replaced.
 
                 Kong continues to retry for resurrect_ttl seconds before giving
-                up. 
+                up.
 
                 The default is ~3 years to support uninterrupted service during
                 outages.
@@ -4294,7 +4294,7 @@ components:
             ttl:
               description: >
                 Time-to-live (in seconds) for a cached secret. A value of 0
-                disables rotation. 
+                disables rotation.
 
                 For non-zero values, use a minimum of 60 seconds.
               type: integer
@@ -4389,16 +4389,16 @@ components:
       properties:
         base64_decode:
           description: >
-            Decode all secrets in this vault as base64. Useful for binary data. 
+            Decode all secrets in this vault as base64. Useful for binary data.
 
             If some of the secrets in the vault are not base64-encoded, an error
-            will occur when using them. 
+            will occur when using them.
 
             We recommend creating a separate vault for base64 secrets.
           type: boolean
         neg_ttl:
           description: >
-            Time-to-live (in seconds) for caching failed secret lookups. 
+            Time-to-live (in seconds) for caching failed secret lookups.
 
             A value of 0 disables negative caching. Kong will retry fetching the
             secret after neg_ttl expires.
@@ -4407,12 +4407,12 @@ components:
         resurrect_ttl:
           description: >
             Time (in seconds) that secrets remain in use after expiration
-            (config.ttl ends). 
+            (config.ttl ends).
 
             Useful if the vault is unreachable or the secret is deleted but not
-            yet replaced. 
+            yet replaced.
 
-            Kong continues to retry for resurrect_ttl seconds before giving up. 
+            Kong continues to retry for resurrect_ttl seconds before giving up.
 
             The default is ~3 years to support uninterrupted service during
             outages.
@@ -4421,7 +4421,7 @@ components:
         ttl:
           description: >
             Time-to-live (in seconds) for a cached secret. A value of 0 disables
-            rotation. 
+            rotation.
 
             For non-zero values, use a minimum of 60 seconds.
           type: integer
@@ -4478,16 +4478,16 @@ components:
       properties:
         base64_decode:
           description: >
-            Decode all secrets in this vault as base64. Useful for binary data. 
+            Decode all secrets in this vault as base64. Useful for binary data.
 
             If some of the secrets in the vault are not base64-encoded, an error
-            will occur when using them. 
+            will occur when using them.
 
             We recommend creating a separate vault for base64 secrets.
           type: boolean
         neg_ttl:
           description: >
-            Time-to-live (in seconds) for caching failed secret lookups. 
+            Time-to-live (in seconds) for caching failed secret lookups.
 
             A value of 0 disables negative caching. Kong will retry fetching the
             secret after neg_ttl expires.
@@ -4496,12 +4496,12 @@ components:
         resurrect_ttl:
           description: >
             Time (in seconds) that secrets remain in use after expiration
-            (config.ttl ends). 
+            (config.ttl ends).
 
             Useful if the vault is unreachable or the secret is deleted but not
-            yet replaced. 
+            yet replaced.
 
-            Kong continues to retry for resurrect_ttl seconds before giving up. 
+            Kong continues to retry for resurrect_ttl seconds before giving up.
 
             The default is ~3 years to support uninterrupted service during
             outages.
@@ -4510,7 +4510,7 @@ components:
         ttl:
           description: >
             Time-to-live (in seconds) for a cached secret. A value of 0 disables
-            rotation. 
+            rotation.
 
             For non-zero values, use a minimum of 60 seconds.
           type: integer
@@ -4582,16 +4582,16 @@ components:
       properties:
         base64_decode:
           description: >
-            Decode all secrets in this vault as base64. Useful for binary data. 
+            Decode all secrets in this vault as base64. Useful for binary data.
 
             If some of the secrets in the vault are not base64-encoded, an error
-            will occur when using them. 
+            will occur when using them.
 
             We recommend creating a separate vault for base64 secrets.
           type: boolean
         neg_ttl:
           description: >
-            Time-to-live (in seconds) for caching failed secret lookups. 
+            Time-to-live (in seconds) for caching failed secret lookups.
 
             A value of 0 disables negative caching. Kong will retry fetching the
             secret after neg_ttl expires.
@@ -4600,12 +4600,12 @@ components:
         resurrect_ttl:
           description: >
             Time (in seconds) that secrets remain in use after expiration
-            (config.ttl ends). 
+            (config.ttl ends).
 
             Useful if the vault is unreachable or the secret is deleted but not
-            yet replaced. 
+            yet replaced.
 
-            Kong continues to retry for resurrect_ttl seconds before giving up. 
+            Kong continues to retry for resurrect_ttl seconds before giving up.
 
             The default is ~3 years to support uninterrupted service during
             outages.
@@ -4614,7 +4614,7 @@ components:
         ttl:
           description: >
             Time-to-live (in seconds) for a cached secret. A value of 0 disables
-            rotation. 
+            rotation.
 
             For non-zero values, use a minimum of 60 seconds.
           type: integer
@@ -4658,10 +4658,10 @@ components:
             - jwt
         role:
           description: >
-            The configured role name in HashiCorp Vault for JWT auth. 
+            The configured role name in HashiCorp Vault for JWT auth.
 
             When creating the role in HashiCorp Vault, make sure that the
-            `role_type` is `jwt` 
+            `role_type` is `jwt`
 
             and the `token_policies` have permissions to read the secrets.
           type: string
@@ -4693,16 +4693,16 @@ components:
       properties:
         base64_decode:
           description: >
-            Decode all secrets in this vault as base64. Useful for binary data. 
+            Decode all secrets in this vault as base64. Useful for binary data.
 
             If some of the secrets in the vault are not base64-encoded, an error
-            will occur when using them. 
+            will occur when using them.
 
             We recommend creating a separate vault for base64 secrets.
           type: boolean
         neg_ttl:
           description: >
-            Time-to-live (in seconds) for caching failed secret lookups. 
+            Time-to-live (in seconds) for caching failed secret lookups.
 
             A value of 0 disables negative caching. Kong will retry fetching the
             secret after neg_ttl expires.
@@ -4711,12 +4711,12 @@ components:
         resurrect_ttl:
           description: >
             Time (in seconds) that secrets remain in use after expiration
-            (config.ttl ends). 
+            (config.ttl ends).
 
             Useful if the vault is unreachable or the secret is deleted but not
-            yet replaced. 
+            yet replaced.
 
-            Kong continues to retry for resurrect_ttl seconds before giving up. 
+            Kong continues to retry for resurrect_ttl seconds before giving up.
 
             The default is ~3 years to support uninterrupted service during
             outages.
@@ -4725,7 +4725,7 @@ components:
         ttl:
           description: >
             Time-to-live (in seconds) for a cached secret. A value of 0 disables
-            rotation. 
+            rotation.
 
             For non-zero values, use a minimum of 60 seconds.
           type: integer
@@ -4775,9 +4775,9 @@ components:
           default: approle
         response_wrapping:
           description: >
-            Whether the secret ID is a response-wrapping token. 
+            Whether the secret ID is a response-wrapping token.
 
-            When true, Kong unwraps the token to get the actual secret ID. 
+            When true, Kong unwraps the token to get the actual secret ID.
 
             Note: tokens can only be unwrapped once; distribute them
             individually to Kong nodes.
@@ -4806,16 +4806,16 @@ components:
       properties:
         base64_decode:
           description: >
-            Decode all secrets in this vault as base64. Useful for binary data. 
+            Decode all secrets in this vault as base64. Useful for binary data.
 
             If some of the secrets in the vault are not base64-encoded, an error
-            will occur when using them. 
+            will occur when using them.
 
             We recommend creating a separate vault for base64 secrets.
           type: boolean
         neg_ttl:
           description: >
-            Time-to-live (in seconds) for caching failed secret lookups. 
+            Time-to-live (in seconds) for caching failed secret lookups.
 
             A value of 0 disables negative caching. Kong will retry fetching the
             secret after neg_ttl expires.
@@ -4824,12 +4824,12 @@ components:
         resurrect_ttl:
           description: >
             Time (in seconds) that secrets remain in use after expiration
-            (config.ttl ends). 
+            (config.ttl ends).
 
             Useful if the vault is unreachable or the secret is deleted but not
-            yet replaced. 
+            yet replaced.
 
-            Kong continues to retry for resurrect_ttl seconds before giving up. 
+            Kong continues to retry for resurrect_ttl seconds before giving up.
 
             The default is ~3 years to support uninterrupted service during
             outages.
@@ -4838,7 +4838,7 @@ components:
         ttl:
           description: >
             Time-to-live (in seconds) for a cached secret. A value of 0 disables
-            rotation. 
+            rotation.
 
             For non-zero values, use a minimum of 60 seconds.
           type: integer
@@ -4905,16 +4905,16 @@ components:
       properties:
         base64_decode:
           description: >
-            Decode all secrets in this vault as base64. Useful for binary data. 
+            Decode all secrets in this vault as base64. Useful for binary data.
 
             If some of the secrets in the vault are not base64-encoded, an error
-            will occur when using them. 
+            will occur when using them.
 
             We recommend creating a separate vault for base64 secrets.
           type: boolean
         neg_ttl:
           description: >
-            Time-to-live (in seconds) for caching failed secret lookups. 
+            Time-to-live (in seconds) for caching failed secret lookups.
 
             A value of 0 disables negative caching. Kong will retry fetching the
             secret after neg_ttl expires.
@@ -4923,12 +4923,12 @@ components:
         resurrect_ttl:
           description: >
             Time (in seconds) that secrets remain in use after expiration
-            (config.ttl ends). 
+            (config.ttl ends).
 
             Useful if the vault is unreachable or the secret is deleted but not
-            yet replaced. 
+            yet replaced.
 
-            Kong continues to retry for resurrect_ttl seconds before giving up. 
+            Kong continues to retry for resurrect_ttl seconds before giving up.
 
             The default is ~3 years to support uninterrupted service during
             outages.
@@ -4937,7 +4937,7 @@ components:
         ttl:
           description: >
             Time-to-live (in seconds) for a cached secret. A value of 0 disables
-            rotation. 
+            rotation.
 
             For non-zero values, use a minimum of 60 seconds.
           type: integer
@@ -5003,16 +5003,16 @@ components:
       properties:
         base64_decode:
           description: >
-            Decode all secrets in this vault as base64. Useful for binary data. 
+            Decode all secrets in this vault as base64. Useful for binary data.
 
             If some of the secrets in the vault are not base64-encoded, an error
-            will occur when using them. 
+            will occur when using them.
 
             We recommend creating a separate vault for base64 secrets.
           type: boolean
         neg_ttl:
           description: >
-            Time-to-live (in seconds) for caching failed secret lookups. 
+            Time-to-live (in seconds) for caching failed secret lookups.
 
             A value of 0 disables negative caching. Kong will retry fetching the
             secret after neg_ttl expires.
@@ -5021,12 +5021,12 @@ components:
         resurrect_ttl:
           description: >
             Time (in seconds) that secrets remain in use after expiration
-            (config.ttl ends). 
+            (config.ttl ends).
 
             Useful if the vault is unreachable or the secret is deleted but not
-            yet replaced. 
+            yet replaced.
 
-            Kong continues to retry for resurrect_ttl seconds before giving up. 
+            Kong continues to retry for resurrect_ttl seconds before giving up.
 
             The default is ~3 years to support uninterrupted service during
             outages.
@@ -5035,7 +5035,7 @@ components:
         ttl:
           description: >
             Time-to-live (in seconds) for a cached secret. A value of 0 disables
-            rotation. 
+            rotation.
 
             For non-zero values, use a minimum of 60 seconds.
           type: integer
@@ -5095,16 +5095,16 @@ components:
       properties:
         base64_decode:
           description: >
-            Decode all secrets in this vault as base64. Useful for binary data. 
+            Decode all secrets in this vault as base64. Useful for binary data.
 
             If some of the secrets in the vault are not base64-encoded, an error
-            will occur when using them. 
+            will occur when using them.
 
             We recommend creating a separate vault for base64 secrets.
           type: boolean
         neg_ttl:
           description: >
-            Time-to-live (in seconds) for caching failed secret lookups. 
+            Time-to-live (in seconds) for caching failed secret lookups.
 
             A value of 0 disables negative caching. Kong will retry fetching the
             secret after neg_ttl expires.
@@ -5113,12 +5113,12 @@ components:
         resurrect_ttl:
           description: >
             Time (in seconds) that secrets remain in use after expiration
-            (config.ttl ends). 
+            (config.ttl ends).
 
             Useful if the vault is unreachable or the secret is deleted but not
-            yet replaced. 
+            yet replaced.
 
-            Kong continues to retry for resurrect_ttl seconds before giving up. 
+            Kong continues to retry for resurrect_ttl seconds before giving up.
 
             The default is ~3 years to support uninterrupted service during
             outages.
@@ -5127,7 +5127,7 @@ components:
         ttl:
           description: >
             Time-to-live (in seconds) for a cached secret. A value of 0 disables
-            rotation. 
+            rotation.
 
             For non-zero values, use a minimum of 60 seconds.
           type: integer
@@ -5187,16 +5187,16 @@ components:
       properties:
         base64_decode:
           description: >
-            Decode all secrets in this vault as base64. Useful for binary data. 
+            Decode all secrets in this vault as base64. Useful for binary data.
 
             If some of the secrets in the vault are not base64-encoded, an error
-            will occur when using them. 
+            will occur when using them.
 
             We recommend creating a separate vault for base64 secrets.
           type: boolean
         neg_ttl:
           description: >
-            Time-to-live (in seconds) for caching failed secret lookups. 
+            Time-to-live (in seconds) for caching failed secret lookups.
 
             A value of 0 disables negative caching. Kong will retry fetching the
             secret after neg_ttl expires.
@@ -5205,12 +5205,12 @@ components:
         resurrect_ttl:
           description: >
             Time (in seconds) that secrets remain in use after expiration
-            (config.ttl ends). 
+            (config.ttl ends).
 
             Useful if the vault is unreachable or the secret is deleted but not
-            yet replaced. 
+            yet replaced.
 
-            Kong continues to retry for resurrect_ttl seconds before giving up. 
+            Kong continues to retry for resurrect_ttl seconds before giving up.
 
             The default is ~3 years to support uninterrupted service during
             outages.
@@ -5219,7 +5219,7 @@ components:
         ttl:
           description: >
             Time-to-live (in seconds) for a cached secret. A value of 0 disables
-            rotation. 
+            rotation.
 
             For non-zero values, use a minimum of 60 seconds.
           type: integer
@@ -5283,16 +5283,16 @@ components:
       properties:
         base64_decode:
           description: >
-            Decode all secrets in this vault as base64. Useful for binary data. 
+            Decode all secrets in this vault as base64. Useful for binary data.
 
             If some of the secrets in the vault are not base64-encoded, an error
-            will occur when using them. 
+            will occur when using them.
 
             We recommend creating a separate vault for base64 secrets.
           type: boolean
         neg_ttl:
           description: >
-            Time-to-live (in seconds) for caching failed secret lookups. 
+            Time-to-live (in seconds) for caching failed secret lookups.
 
             A value of 0 disables negative caching. Kong will retry fetching the
             secret after neg_ttl expires.
@@ -5301,12 +5301,12 @@ components:
         resurrect_ttl:
           description: >
             Time (in seconds) that secrets remain in use after expiration
-            (config.ttl ends). 
+            (config.ttl ends).
 
             Useful if the vault is unreachable or the secret is deleted but not
-            yet replaced. 
+            yet replaced.
 
-            Kong continues to retry for resurrect_ttl seconds before giving up. 
+            Kong continues to retry for resurrect_ttl seconds before giving up.
 
             The default is ~3 years to support uninterrupted service during
             outages.
@@ -5315,7 +5315,7 @@ components:
         ttl:
           description: >
             Time-to-live (in seconds) for a cached secret. A value of 0 disables
-            rotation. 
+            rotation.
 
             For non-zero values, use a minimum of 60 seconds.
           type: integer
@@ -5370,14 +5370,14 @@ components:
         access_key_id:
           description: >
             The AWS access key ID for IAM auth. If not provided, the default
-            credentials provider chain is used. 
+            credentials provider chain is used.
 
             If set, `secret_access_key` must also be set.
           type: string
         secret_access_key:
           description: >
             The AWS secret access key for IAM auth. If not provided, the default
-            credentials provider chain is used. 
+            credentials provider chain is used.
 
             If set, `access_key_id` must also be set.
           type: string
@@ -5385,10 +5385,10 @@ components:
         sts_endpoint_url:
           description: >
             The AWS STS endpoint URL used by Kong Gateway when signing the
-            GetCallerIdentity request for AWS IAM authentication. 
+            GetCallerIdentity request for AWS IAM authentication.
 
             If not provided, defaults to the standard STS endpoint for the
-            specified region. 
+            specified region.
 
             This setting only affects the STS endpoint that Kong Gateway itself
             contacts -
@@ -5503,7 +5503,7 @@ components:
         type:
           description: >
             The type of the Policy. This is equivalent to the Kong 3 plugin
-            name. 
+            name.
 
             Some examples are: 'ai-sanitizer', 'ai-prompt-guard', and
             'openid-connect'.
@@ -5564,7 +5564,7 @@ components:
         type:
           description: >
             The type of the Policy. This is equivalent to the Kong 3 plugin
-            name. 
+            name.
 
             Some examples are: 'ai-sanitizer', 'ai-prompt-guard', and
             'openid-connect'.
@@ -5625,7 +5625,7 @@ components:
         type:
           description: >
             The type of the Policy. This is equivalent to the Kong 3 plugin
-            name. 
+            name.
 
             Some examples are: 'ai-sanitizer', 'ai-prompt-guard', and
             'openid-connect'.
@@ -6551,7 +6551,7 @@ components:
             - aws
         access_key_id:
           description: >
-            AWS Access Key ID to be used for authentication. 
+            AWS Access Key ID to be used for authentication.
 
             This field is
             [referenceable](https://developer.konghq.com/gateway/entities/vault/#how-do-i-reference-secrets-stored-in-a-vault).
@@ -6568,7 +6568,7 @@ components:
           x-referenceable: true
         cache_name:
           description: >
-            The name of the AWS Elasticache cluster. 
+            The name of the AWS Elasticache cluster.
 
             This field is
             [referenceable](https://developer.konghq.com/gateway/entities/vault/#how-do-i-reference-secrets-stored-in-a-vault).
@@ -6597,7 +6597,7 @@ components:
           x-referenceable: true
         secret_access_key:
           description: >
-            AWS Secret Access Key. 
+            AWS Secret Access Key.
 
             This field is
             [referenceable](https://developer.konghq.com/gateway/entities/vault/#how-do-i-reference-secrets-stored-in-a-vault).
@@ -6778,7 +6778,7 @@ components:
         password:
           description: >
             Password to use for Redis connections. If undefined, no AUTH
-            commands are sent to Redis. 
+            commands are sent to Redis.
 
             This field is
             [referenceable](https://developer.konghq.com/gateway/entities/vault/#how-do-i-reference-secrets-stored-in-a-vault).
@@ -6868,7 +6868,7 @@ components:
               description: >
                 Sentinel username to authenticate with a Redis Sentinel
                 instance. If undefined, ACL authentication won't be performed.
-                This requires Redis v6.2.0+. 
+                This requires Redis v6.2.0+.
 
                 This field is
                 [referenceable](https://developer.konghq.com/gateway/entities/vault/#how-do-i-reference-secrets-stored-in-a-vault).
@@ -7216,7 +7216,7 @@ components:
         acls:
           description: >
             Access control rules for allowing or denying consumer groups access
-            to this tool. 
+            to this tool.
 
             When configured, these will override the default access control
             rules defined on the MCP Server.
@@ -8063,7 +8063,7 @@ components:
         access_key_id:
           description: >
             The access key id for authenticating with static IAM User
-            credentials. 
+            credentials.
 
             This field is
             [referenceable](https://developer.konghq.com/gateway/entities/vault/#how-do-i-reference-secrets-stored-in-a-vault).
@@ -8487,7 +8487,7 @@ components:
         filtering a list of objects.
 
 
-        Public labels are intended to store **PUBLIC** metadata. 
+        Public labels are intended to store **PUBLIC** metadata.
 
 
         Keys must be of length 1-63 characters, and cannot start with "kong",

@@ -34,7 +34,7 @@ models:
       - generate
     formats:
       - type: anthropic
-    target_models:
+    targets:
       - name: claude-opus-4-5
         provider: anthropic-prod
         config:
@@ -66,7 +66,7 @@ models:
       - batches
     formats:
       - type: anthropic
-    target_models:
+    targets:
       - name: batch-api
         provider: anthropic-prod
         config:
