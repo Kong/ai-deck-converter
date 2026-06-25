@@ -94,9 +94,6 @@ func (c *Converter) mcpPlugin(m *aigw.MCPServer) (kong.Plugin, error) {
 }
 
 func (c *Converter) mcpTools(serverName string, tools []aigw.MCPTool) ([]map[string]any, error) {
-	if len(tools) == 0 {
-		return nil, nil
-	}
 	out := make([]map[string]any, 0, len(tools))
 	for i := range tools {
 		t := &tools[i]
