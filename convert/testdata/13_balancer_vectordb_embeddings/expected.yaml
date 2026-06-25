@@ -50,6 +50,8 @@ plugins:
         threshold: 0.7
     route:
       name: openai-chat
+    model:
+      name: semantic-lb
 ai-models:
   - name: semantic-lb
     alias: semantic-lb

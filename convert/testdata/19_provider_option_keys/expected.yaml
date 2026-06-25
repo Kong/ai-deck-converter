@@ -112,6 +112,8 @@ plugins:
           route_type: llm/v1/chat
     route:
       name: openai-chat
+    model:
+      name: provider-options-mix
 ai-models:
   - name: provider-options-mix
     alias: '@openai/provider-options-mix'

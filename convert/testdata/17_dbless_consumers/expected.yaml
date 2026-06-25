@@ -58,6 +58,8 @@ plugins:
           route_type: llm/v1/chat
     route:
       id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+    model:
+      id: 164a019e-95ff-5ec6-8ec4-4bd2315e999c
 ai_models:
   - id: 164a019e-95ff-5ec6-8ec4-4bd2315e999c
     name: my-model

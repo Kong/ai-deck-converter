@@ -1,0 +1,63 @@
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: openai-batches
+        paths:
+          - /ai/batches
+        methods:
+          - GET
+          - POST
+        strip_path: false
+      - name: openai-files
+        paths:
+          - /ai/files
+        methods:
+          - GET
+          - POST
+          - DELETE
+        strip_path: false
+plugins:
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      response_streaming: deny
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://env/openai-key}'
+          description: batch-api
+          model:
+            name: batch-api
+            provider: openai
+          route_type: llm/v1/batches
+    route:
+      name: openai-batches
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      max_request_body_size: 536870912
+      response_streaming: deny
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://env/openai-key}'
+          description: files-api
+          model:
+            name: files-api
+            provider: openai
+          route_type: llm/v1/files
+    route:
+      name: openai-files
+ai-models:
+  - name: openai-batch-api
+    alias: openai-batch-api
+  - name: openai-files-api
+    alias: openai-files-api

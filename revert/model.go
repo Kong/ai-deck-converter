@@ -26,113 +26,163 @@ type modelAcc struct {
 	order  []string
 }
 
-// accumulateModelRoute folds one ai-proxy-advanced route into the model
-// accumulator: each target resolves to a (capability, provider) and lands in
-// the group keyed by its model_alias. Mirrors (in reverse) the routeGroup
-// collapse in convert.convertModels.
+// accumulateModelRoute folds a route's ai-proxy-advanced plugins into the model
+// accumulator. A route may carry several such plugins (one per type "model"
+// entity, each scoped to the route and its ai-model); each plugin's targets land
+// in the group keyed by the plugin's model FK (or, FK-less, by model_alias or
+// route). Mirrors (in reverse) the per-model proxy split in convert.convertModels.
 func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins []kong.Plugin) error {
-	proxy := findPlugin(plugins, "ai-proxy-advanced")
-	cfg := proxy.Config
-	llmFormat := getStr(cfg, "llm_format")
-	if llmFormat == "" {
-		llmFormat = aimap.DefaultLLMFormat
-	}
-	genai := getStr(cfg, "genai_category")
 	var path string
 	if len(rt.Paths) > 0 {
 		path = rt.Paths[0]
 	}
 
-	// Route-scoped guard plugins (other than the AI plugins) apply to every
-	// model on the route.
-	routeRefs, routeACLs := r.policyRefs(plugins)
-
-	targets := getSlice(cfg, "targets")
-	if len(targets) == 0 {
-		return r.warn("route %q: ai-proxy-advanced has no targets; nothing to convert", rt.Name)
-	}
-
-	for _, raw := range targets {
-		target, ok := raw.(map[string]any)
-		if !ok {
+	// Partition guard plugins: those carrying a model FK belong to that specific
+	// model; FK-less guards apply route-wide (every model on the route).
+	var routeGuards []kong.Plugin
+	modelGuards := map[string][]kong.Plugin{}
+	for _, p := range plugins {
+		if aiPluginNames[p.Name] {
 			continue
 		}
-		modelMap := getMap(target, "model")
-		alias := getStr(modelMap, "model_alias")
-		routeType := getStr(target, "route_type")
-		providerType := detectProviderType(getStr(modelMap, "provider"), path)
-		section := aimap.SectionFor(llmFormat, providerType)
-
-		var capability, base string
-		if match, ok := resolveEndpoint(section, routeType, genai, rt.Name, path); ok {
-			capability = match.capability
-			base, _ = basePathFor(path, match.spec)
-		} else if routeType == "llm/v1/chat" {
-			capability = "generate"
-			if err := r.warn("route %q: cannot resolve capability for route_type %q in section %q; defaulting to generate", rt.Name, routeType, section); err != nil {
-				return err
-			}
+		if p.Model != nil {
+			modelGuards[p.Model.Name] = append(modelGuards[p.Model.Name], p)
 		} else {
-			if err := r.warn("route %q: cannot resolve capability for route_type %q in section %q; skipping target", rt.Name, routeType, section); err != nil {
+			routeGuards = append(routeGuards, p)
+		}
+	}
+	routeRefs, routeACLs := r.policyRefs(routeGuards)
+
+	for _, proxy := range findPlugins(plugins, "ai-proxy-advanced") {
+		cfg := proxy.Config
+		llmFormat := getStr(cfg, "llm_format")
+		if llmFormat == "" {
+			llmFormat = aimap.DefaultLLMFormat
+		}
+		genai := getStr(cfg, "genai_category")
+		fkName := ""
+		if proxy.Model != nil {
+			fkName = proxy.Model.Name
+		}
+
+		// Guard refs for this plugin's model: route-wide guards plus any scoped to
+		// this model FK.
+		refs, acls := routeRefs, routeACLs
+		if fkName != "" {
+			if mRefs, mACLs := r.policyRefs(modelGuards[fkName]); len(mRefs) > 0 || !mACLs.IsEmpty() {
+				refs = append(append([]string{}, routeRefs...), mRefs...)
+				if !mACLs.IsEmpty() {
+					acls = mACLs
+				}
+			}
+		}
+
+		targets := getSlice(cfg, "targets")
+		if len(targets) == 0 {
+			if err := r.warn("route %q: ai-proxy-advanced has no targets; nothing to convert", rt.Name); err != nil {
 				return err
 			}
 			continue
 		}
 
-		g, err := r.modelGroupFor(acc, rt, alias, llmFormat, base, cfg, routeRefs, routeACLs)
-		if err != nil {
-			return err
-		}
-		// Logging is carried per target by ai-proxy-advanced but is a single
-		// model-level block in the AI Gateway model; lift it back from the first
-		// target that has it (all of a model's targets share the same block).
-		if g.model.Config.Logging == nil {
-			g.model.Config.Logging = loggingFromBlock(getMap(target, "logging"))
-		}
-		if !g.capsSeen[capability] {
-			g.capsSeen[capability] = true
-			g.caps = append(g.caps, capability)
-		}
+		for _, raw := range targets {
+			target, ok := raw.(map[string]any)
+			if !ok {
+				continue
+			}
+			modelMap := getMap(target, "model")
+			alias := getStr(modelMap, "model_alias")
+			routeType := getStr(target, "route_type")
+			providerType := detectProviderType(getStr(modelMap, "provider"), path)
+			section := aimap.SectionFor(llmFormat, providerType)
 
-		name := getStr(modelMap, "name")
-		// A description equal to the model name is the forward converter's
-		// default; drop it so round trips stay clean.
-		semanticDesc := getStr(target, "description")
-		if semanticDesc == name {
-			semanticDesc = ""
-		}
-		tm := aigw.TargetModel{
-			Name:         name,
-			Weight:       getInt(target, "weight"),
-			SemanticDesc: semanticDesc,
-			Config:       aigw.TargetModelConfig{Type: providerType},
-		}
-		d := defoldTarget(target, providerType)
-		tm.AllowAuthOverride = d.allowOverride
-		tm.Config.Options = d.options
-		tm.Provider = r.providerFor(providerType, &d)
+			var capability, base string
+			if match, ok := resolveEndpoint(section, routeType, genai, rt.Name, path); ok {
+				capability = match.capability
+				base, _ = basePathFor(path, match.spec)
+			} else if routeType == "llm/v1/chat" {
+				capability = "generate"
+				if err := r.warn("route %q: cannot resolve capability for route_type %q in section %q; defaulting to generate", rt.Name, routeType, section); err != nil {
+					return err
+				}
+			} else {
+				if err := r.warn("route %q: cannot resolve capability for route_type %q in section %q; skipping target", rt.Name, routeType, section); err != nil {
+					return err
+				}
+				continue
+			}
 
-		if !g.targetsSeen[tm.Name] {
-			g.targetsSeen[tm.Name] = true
-			g.model.TargetModels = append(g.model.TargetModels, tm)
+			g, err := r.modelGroupFor(acc, rt, fkName, alias, llmFormat, base, cfg, refs, acls)
+			if err != nil {
+				return err
+			}
+			// Logging is carried per target by ai-proxy-advanced but is a single
+			// model-level block in the AI Gateway model; lift it back from the
+			// first target that has it (all of a model's targets share the block).
+			if g.model.Config.Logging == nil {
+				g.model.Config.Logging = loggingFromBlock(getMap(target, "logging"))
+			}
+			if !g.capsSeen[capability] {
+				g.capsSeen[capability] = true
+				g.caps = append(g.caps, capability)
+			}
+
+			name := getStr(modelMap, "name")
+			// A description equal to the model name is the forward converter's
+			// default; drop it so round trips stay clean.
+			semanticDesc := getStr(target, "description")
+			if semanticDesc == name {
+				semanticDesc = ""
+			}
+			tm := aigw.TargetModel{
+				Name:         name,
+				Weight:       getInt(target, "weight"),
+				SemanticDesc: semanticDesc,
+				Config:       aigw.TargetModelConfig{Type: providerType},
+			}
+			d := defoldTarget(target, providerType)
+			tm.AllowAuthOverride = d.allowOverride
+			tm.Config.Options = d.options
+			tm.Provider = r.providerFor(providerType, &d)
+
+			if !g.targetsSeen[tm.Name] {
+				g.targetsSeen[tm.Name] = true
+				g.model.TargetModels = append(g.model.TargetModels, tm)
+			}
 		}
 	}
 	return nil
 }
 
-// modelGroupFor finds or creates the model group for an alias (or, alias-less,
-// for the route), seeding model-level config from the route's plugin config.
-func (r *Reverter) modelGroupFor(acc *modelAcc, rt *kong.Route, alias, llmFormat, base string, cfg map[string]any, routeRefs []string, routeACLs aigw.ACLs) (*modelGroup, error) {
-	key := "alias:" + alias
-	if alias == "" {
+// modelGroupFor finds or creates the model group for a plugin's model FK (or,
+// FK-less, for an alias or the route), seeding model-level config from the
+// plugin config. A non-empty fkName names the group directly (the type "model"
+// case where ai-proxy-advanced carries an ai-model FK).
+func (r *Reverter) modelGroupFor(acc *modelAcc, rt *kong.Route, fkName, alias, llmFormat, base string, cfg map[string]any, refs []string, acls aigw.ACLs) (*modelGroup, error) {
+	var key string
+	switch {
+	case fkName != "":
+		key = "model:" + fkName
+	case alias != "":
+		key = "alias:" + alias
+	default:
 		key = "route:" + rt.Name
 	}
 	if g, ok := acc.groups[key]; ok {
 		return g, nil
 	}
 
-	name := ""
-	if alias != "" {
+	var name string
+	aliasless := false
+	switch {
+	case fkName != "":
+		name = fkName
+		if alias != "" {
+			if _, ok := r.aiModelByAlias[alias]; ok {
+				r.aiModelUsed[alias] = true
+			}
+		}
+	case alias != "":
 		if n, ok := r.aiModelByAlias[alias]; ok {
 			name = n
 			r.aiModelUsed[alias] = true
@@ -144,23 +194,24 @@ func (r *Reverter) modelGroupFor(acc *modelAcc, rt *kong.Route, alias, llmFormat
 				}
 			}
 		}
-	} else {
+	default:
 		// Provisional; finalizeModels matches alias-less groups to alias-less
 		// ai-models entries by position when the counts line up.
 		name = rt.Name
+		aliasless = true
 	}
 
 	g := &modelGroup{
 		capsSeen:    map[string]bool{},
 		targetsSeen: map[string]bool{},
-		aliasless:   alias == "",
+		aliasless:   aliasless,
 		routeName:   rt.Name,
 		model: aigw.Model{
 			Type:     "model",
 			Name:     name,
 			Formats:  []aigw.Format{{Type: llmFormat}},
-			Policies: routeRefs,
-			ACLs:     routeACLs,
+			Policies: refs,
+			ACLs:     acls,
 		},
 	}
 	g.model.Config.Model.Alias = alias

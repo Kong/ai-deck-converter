@@ -35,6 +35,8 @@ plugins:
           route_type: llm/v1/chat
     route:
       name: bedrock-converse
+    model:
+      name: claude-bedrock
 ai-models:
   - name: claude-bedrock
     alias: '@bedrock/claude-3-5-sonnet'
