@@ -6,7 +6,7 @@ models:
     capabilities: [batches]
     formats:
       - type: openai
-    target_models:
+    targets:
       - name: batch-api
         provider: openai-prod
         config:
@@ -25,7 +25,7 @@ models:
     capabilities: [files]
     formats:
       - type: openai
-    target_models:
+    targets:
       - name: files-api
         provider: openai-prod
         config:

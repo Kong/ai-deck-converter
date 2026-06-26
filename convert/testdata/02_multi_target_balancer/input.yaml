@@ -35,7 +35,7 @@ models:
     capabilities: [generate]
     formats:
       - type: openai
-    target_models:
+    targets:
       - name: gpt-5.4
         weight: 70
         provider: openai-main
