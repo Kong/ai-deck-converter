@@ -7,11 +7,23 @@ import (
 )
 
 // routeGroup accumulates everything that maps to a single Kong route, keyed by
-// (section, routeLabel). Multiple models/targets that resolve to the same
-// endpoint contribute one ai-proxy-advanced target each.
+// (section, routeLabel). The route and its ai-model-selector are shared by every
+// model that resolves to the endpoint; each owning model contributes its own
+// ai-proxy-advanced plugin (a proxyGroup).
 type routeGroup struct {
-	route             kong.Route
-	takesBodyModel    bool
+	route          kong.Route
+	takesBodyModel bool
+	bodySize       int
+	proxies        []*proxyGroup
+	proxyByOwner   map[string]*proxyGroup
+}
+
+// proxyGroup accumulates one ai-proxy-advanced plugin: the targets owned by a
+// single source model on a route (type "model", scoped to route+ai-model), or
+// every target on a route (type "api", scoped route-only and merged).
+type proxyGroup struct {
+	routeName         string
+	modelName         string // ai-model FK; empty scopes the plugin route-only
 	llmFormat         string
 	genaiCategory     string
 	balancer          map[string]any
@@ -20,14 +32,16 @@ type routeGroup struct {
 	responseStreaming string
 	modelNameHeader   *bool
 	maxBodySize       *int
-	bodySize          int
 	targets           []map[string]any
 	seen              map[string]bool
 }
 
 // convertModels groups all (model, target, capability) tuples into routes under
-// a single shared ai-gateway Service, emitting ai-model-selector and
-// ai-proxy-advanced plugins per route plus an ai-models entry per source model.
+// a single shared ai-gateway Service, emitting a route-scoped ai-model-selector
+// and one ai-proxy-advanced per owning model (type "model") or per route (type
+// "api"), plus an ai-models entry per source model. type "model" plugins are
+// scoped to both the route and the ai-model entity; type "api" plugins are
+// scoped route-only.
 func (c *Converter) convertModels() error {
 	groups := map[string]*routeGroup{}
 	var order []string
@@ -46,6 +60,18 @@ func (c *Converter) convertModels() error {
 		if aiModelAlias == "" {
 			aiModelAlias = m.Name
 		}
+
+		// ownerKey groups targets into ai-proxy-advanced plugins: per source model
+		// for type "model" (each carries its own ai-model FK), shared for type
+		// "api" (route-only, all targets merged into one plugin).
+		modelScoped := isModelType(m)
+		ownerKey := ""
+		if modelScoped {
+			ownerKey = m.Name
+		}
+
+		var routeNames []string
+		routeSeen := map[string]bool{}
 
 		for j := range m.TargetModels {
 			tm := &m.TargetModels[j]
@@ -77,13 +103,33 @@ func (c *Converter) convertModels() error {
 				key := sec + "|" + spec.RouteLabel
 				g := groups[key]
 				if g == nil {
+					g = &routeGroup{
+						route:          buildModelRoute(m.Config.Route, sec+"-"+spec.RouteLabel, aimap.RoutePath(base, spec), spec.Methods),
+						takesBodyModel: spec.TakesBodyModel,
+						bodySize:       aimap.DefaultMaxBodySize,
+						proxyByOwner:   map[string]*proxyGroup{},
+					}
+					groups[key] = g
+					order = append(order, key)
+				}
+				if !routeSeen[g.route.Name] {
+					routeSeen[g.route.Name] = true
+					routeNames = append(routeNames, g.route.Name)
+				}
+
+				pg := g.proxyByOwner[ownerKey]
+				if pg == nil {
 					embeddings, err := c.resolveEmbeddings(balancerExtra(m.Config.Balancer, "embeddings"))
 					if err != nil {
 						return err
 					}
-					g = &routeGroup{
-						route:             buildModelRoute(m.Config.Route, sec+"-"+spec.RouteLabel, aimap.RoutePath(base, spec), spec.Methods),
-						takesBodyModel:    spec.TakesBodyModel,
+					modelName := ""
+					if modelScoped {
+						modelName = m.Name
+					}
+					pg = &proxyGroup{
+						routeName:         g.route.Name,
+						modelName:         modelName,
 						llmFormat:         llmFormat(m),
 						genaiCategory:     spec.GenaiCategory,
 						balancer:          balancerConfig(m.Config.Balancer),
@@ -92,17 +138,16 @@ func (c *Converter) convertModels() error {
 						responseStreaming: m.Config.ResponseStreaming,
 						modelNameHeader:   m.Config.Model.NameHeader,
 						maxBodySize:       m.Config.MaxRequestBodySize,
-						bodySize:          aimap.DefaultMaxBodySize,
 						seen:              map[string]bool{},
 					}
-					groups[key] = g
-					order = append(order, key)
+					g.proxyByOwner[ownerKey] = pg
+					g.proxies = append(g.proxies, pg)
 				}
 				target := c.buildTarget(tm, provider, providerType, targetAlias, spec.RouteType, logging)
 				dedup := tm.Name + "|" + spec.RouteType
-				if !g.seen[dedup] {
-					g.seen[dedup] = true
-					g.targets = append(g.targets, target)
+				if !pg.seen[dedup] {
+					pg.seen[dedup] = true
+					pg.targets = append(pg.targets, target)
 				}
 				if bs := bodySizeOrDefault(m); bs > g.bodySize {
 					g.bodySize = bs
@@ -117,14 +162,21 @@ func (c *Converter) convertModels() error {
 			Alias: aiModelAlias,
 		})
 
-		// Model policy and ACL plugins scope to the ai-models entity.
+		// Model policy and ACL plugins scope to each route the model produces, plus
+		// the ai-model entity for type "model".
 		plugins, err := c.scopedPlugins(m.Policies, m.ACLs)
 		if err != nil {
 			return err
 		}
-		for k := range plugins {
-			plugins[k].Model = kong.NewRef(m.Name)
-			guardPlugins = append(guardPlugins, plugins[k])
+		for _, routeName := range routeNames {
+			for k := range plugins {
+				p := plugins[k]
+				p.Route = kong.NewRef(routeName)
+				if modelScoped {
+					p.Model = kong.NewRef(m.Name)
+				}
+				guardPlugins = append(guardPlugins, p)
+			}
 		}
 	}
 
@@ -148,19 +200,25 @@ func (c *Converter) convertModels() error {
 				},
 			})
 		}
-		c.out.Plugins = append(c.out.Plugins, kong.Plugin{
-			Name:   "ai-proxy-advanced",
-			Route:  kong.NewRef(g.route.Name),
-			Config: g.proxyConfig(),
-		})
+		for _, pg := range g.proxies {
+			plugin := kong.Plugin{
+				Name:   "ai-proxy-advanced",
+				Route:  kong.NewRef(pg.routeName),
+				Config: pg.proxyConfig(),
+			}
+			if pg.modelName != "" {
+				plugin.Model = kong.NewRef(pg.modelName)
+			}
+			c.out.Plugins = append(c.out.Plugins, plugin)
+		}
 	}
 	c.out.Services = append(c.out.Services, service)
 	c.out.Plugins = append(c.out.Plugins, guardPlugins...)
 	return nil
 }
 
-// proxyConfig assembles the ai-proxy-advanced plugin config for a route group.
-func (g *routeGroup) proxyConfig() map[string]any {
+// proxyConfig assembles the ai-proxy-advanced plugin config for a proxy group.
+func (g *proxyGroup) proxyConfig() map[string]any {
 	cfg := map[string]any{
 		"balancer":       g.balancer,
 		"llm_format":     g.llmFormat,
@@ -285,6 +343,11 @@ func basePath(m *aigw.Model) string {
 	}
 	return aimap.DefaultBasePath
 }
+
+// isModelType reports whether a model is a synchronous "model" entity (as
+// opposed to an "api" entity for files/batches). An empty type defaults to
+// "model", the discriminator default and the common synchronous case.
+func isModelType(m *aigw.Model) bool { return m.Type != "api" }
 
 func llmFormat(m *aigw.Model) string {
 	if len(m.Formats) > 0 && m.Formats[0].Type != "" {

@@ -80,16 +80,22 @@ plugins:
           weight: 20
     route:
       name: openai-chat
+    model:
+      name: prod-chat
   - name: ai-prompt-guard
     config:
       allow_patterns:
         - ^safe
+    route:
+      name: openai-chat
     model:
       name: prod-chat
   - name: acl
     config:
       allow:
         - premium
+    route:
+      name: openai-chat
     model:
       name: prod-chat
 vaults:

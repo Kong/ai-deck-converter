@@ -55,21 +55,29 @@ plugins:
           route_type: llm/v1/chat
     route:
       name: openai-chat
+    model:
+      name: guarded-gpt
   - name: ai-prompt-guard
     config:
       allow_patterns:
         - ^safe
+    route:
+      name: openai-chat
     model:
       name: guarded-gpt
   - name: http-log
     config:
       http_endpoint: https://logs.internal/ingest
+    route:
+      name: openai-chat
     model:
       name: guarded-gpt
   - name: acl
     config:
       allow:
         - premium-users
+    route:
+      name: openai-chat
     model:
       name: guarded-gpt
 vaults:

@@ -26,10 +26,13 @@ func (r *Reverter) buildIndexes() {
 	}
 	for _, p := range r.src.Plugins {
 		switch {
+		case p.Route != nil:
+			// A plugin may carry both route and model FKs (ai-proxy-advanced and
+			// guard plugins for a type "model" entity); index it by route so the
+			// per-route reversal sees it, and read the model FK off the plugin.
+			r.idx.route[p.Route.Name] = append(r.idx.route[p.Route.Name], p)
 		case p.Model != nil:
 			r.idx.model[p.Model.Name] = append(r.idx.model[p.Model.Name], p)
-		case p.Route != nil:
-			r.idx.route[p.Route.Name] = append(r.idx.route[p.Route.Name], p)
 		case p.Service != nil:
 			r.idx.service[p.Service.Name] = append(r.idx.service[p.Service.Name], p)
 		case p.Consumer != nil:
@@ -77,4 +80,16 @@ func findPlugin(plugins []kong.Plugin, name string) *kong.Plugin {
 		}
 	}
 	return nil
+}
+
+// findPlugins returns every plugin with the given name, in order. A route may
+// carry several ai-proxy-advanced plugins, one per type "model" entity.
+func findPlugins(plugins []kong.Plugin, name string) []*kong.Plugin {
+	var out []*kong.Plugin
+	for i := range plugins {
+		if plugins[i].Name == name {
+			out = append(out, &plugins[i])
+		}
+	}
+	return out
 }

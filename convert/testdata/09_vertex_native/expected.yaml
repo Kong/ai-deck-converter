@@ -49,6 +49,8 @@ plugins:
           route_type: llm/v1/chat
     route:
       name: gemini-generate
+    model:
+      name: vertex-gemini-2-5-pro
   - name: ai-model-selector
     config:
       body_path: model
@@ -78,6 +80,8 @@ plugins:
           route_type: llm/v1/embeddings
     route:
       name: gemini-embeddings
+    model:
+      name: vertex-text-embedding-005
 ai-models:
   - name: vertex-gemini-2-5-pro
     alias: '@vertex/gemini-2.5-pro'

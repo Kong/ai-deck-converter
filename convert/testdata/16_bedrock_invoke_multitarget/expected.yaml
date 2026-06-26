@@ -31,6 +31,17 @@ plugins:
                 embeddings_normalize: true
             provider: bedrock
           route_type: llm/v1/embeddings
+    route:
+      name: bedrock-invoke
+    model:
+      name: titan-embed-text-v2
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: image/generation
+      llm_format: bedrock
+      targets:
         - auth:
             aws_access_key_id: '{vault://ai/aws-access-key-id}'
             aws_secret_access_key: '{vault://ai/aws-secret-access-key}'
@@ -43,6 +54,17 @@ plugins:
                 aws_region: us-east-1
             provider: bedrock
           route_type: image/v1/images/generations
+    route:
+      name: bedrock-invoke
+    model:
+      name: nova-canvas-image
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: audio/speech
+      llm_format: bedrock
+      targets:
         - auth:
             aws_access_key_id: '{vault://ai/aws-access-key-id}'
             aws_secret_access_key: '{vault://ai/aws-secret-access-key}'
@@ -55,6 +77,17 @@ plugins:
                 aws_region: us-east-1
             provider: bedrock
           route_type: audio/v1/audio/speech
+    route:
+      name: bedrock-invoke
+    model:
+      name: nova-sonic-audio
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: video/generation
+      llm_format: bedrock
+      targets:
         - auth:
             aws_access_key_id: '{vault://ai/aws-access-key-id}'
             aws_secret_access_key: '{vault://ai/aws-secret-access-key}'
@@ -70,6 +103,8 @@ plugins:
           route_type: video/v1/videos/generations
     route:
       name: bedrock-invoke
+    model:
+      name: nova-reel-video
 ai-models:
   - name: titan-embed-text-v2
     alias: '@bedrock/titan-embed-text-v2'

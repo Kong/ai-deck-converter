@@ -1,0 +1,50 @@
+models:
+  - display_name: OpenAI Batch API
+    name: openai-batch-api
+    type: api
+    enabled: true
+    capabilities: [batches]
+    formats:
+      - type: openai
+    targets:
+      - name: batch-api
+        provider: openai-prod
+        config:
+          type: openai
+    policies: []
+    acls: {allow: [], deny: []}
+    config:
+      route:
+        paths: [/ai]
+      model: {}
+      response_streaming: deny
+  - display_name: OpenAI Files API
+    name: openai-files-api
+    type: api
+    enabled: true
+    capabilities: [files]
+    formats:
+      - type: openai
+    targets:
+      - name: files-api
+        provider: openai-prod
+        config:
+          type: openai
+    policies: []
+    acls: {allow: [], deny: []}
+    config:
+      route:
+        paths: [/ai]
+      model: {}
+      response_streaming: deny
+      max_request_body_size: 536870912
+providers:
+  - type: openai
+    display_name: OpenAI Prod
+    name: openai-prod
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://env/openai-key}"
