@@ -44,6 +44,12 @@ func (c *Converter) convertMCPServers() error {
 				}
 			}
 		}
+		// Honor enabled: false, consistent with agents (convert/agent.go) and policies (convert/policy.go).
+		// Without this, an MCP server an operator disabled still lowers to an active service + route +
+		// ai-mcp-proxy plugin and keeps serving on every data plane.
+		if m.Enabled != nil && !*m.Enabled {
+			service.Enabled = m.Enabled
+		}
 		c.out.Services = append(c.out.Services, service)
 	}
 	return nil

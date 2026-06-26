@@ -277,6 +277,44 @@ agents:
 	require.Nil(t, byName["on-agent"], "enabled agent should not emit the flag")
 }
 
+func TestConvertDisabledMCPServerDisablesService(t *testing.T) {
+	src := []byte(`
+mcp_servers:
+  - type: conversion-listener
+    name: off-mcp
+    enabled: false
+    config:
+      route: {paths: [/mcp/off]}
+    tools:
+      - {name: t, description: a tool, method: GET, path: /t, scheme: https, host: x.internal}
+  - type: passthrough-listener
+    name: on-mcp
+    enabled: true
+    upstream_url: https://b.internal/mcp
+    config:
+      route: {paths: [/mcp/on]}
+`)
+	out, _, err := Convert(src, Options{OutputMode: "db-less"})
+	require.NoError(t, err, "convert db-less")
+
+	var got struct {
+		Services []struct {
+			Name    string `yaml:"name"`
+			Enabled *bool  `yaml:"enabled"`
+		} `yaml:"services"`
+	}
+	require.NoError(t, yaml.Unmarshal(out, &got), "unmarshal output")
+
+	byName := map[string]*bool{}
+	for _, s := range got.Services {
+		byName[s.Name] = s.Enabled
+	}
+	require.Contains(t, byName, "off-mcp")
+	require.NotNil(t, byName["off-mcp"], "disabled MCP server must emit enabled")
+	require.False(t, *byName["off-mcp"], "disabled MCP server service must be enabled=false")
+	require.Nil(t, byName["on-mcp"], "enabled MCP server should not emit the flag")
+}
+
 func TestConvertDBLessFlattensConsumerCredentialsAndGroups(t *testing.T) {
 	src := []byte(`
 consumer_groups:
