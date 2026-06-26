@@ -19,6 +19,7 @@ services:
           - name: ai-mcp-proxy
             config:
               mode: passthrough-listener
+              tools: []
   - name: orchestrator
     url: https://orchestrator.internal/a2a
     routes:

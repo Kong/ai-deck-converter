@@ -44,3 +44,4 @@ services:
           - name: ai-mcp-proxy
             config:
               mode: passthrough-listener
+              tools: []
