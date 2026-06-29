@@ -33,6 +33,7 @@ plugins:
             header_value: '{vault://env/openai-key}'
           description: batch-api
           model:
+            model_alias: openai-batch-api
             name: batch-api
             provider: openai
           route_type: llm/v1/batches
@@ -53,6 +54,7 @@ plugins:
             header_value: '{vault://env/openai-key}'
           description: files-api
           model:
+            model_alias: openai-files-api
             name: files-api
             provider: openai
           route_type: llm/v1/files

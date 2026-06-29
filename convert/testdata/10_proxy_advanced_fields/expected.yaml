@@ -38,6 +38,7 @@ plugins:
             header_value: '{vault://ai/openai-token}'
           description: gpt-4o
           model:
+            model_alias: full-model
             name: gpt-4o
             provider: openai
           route_type: llm/v1/chat
@@ -64,6 +65,7 @@ plugins:
             header_value: '{vault://ai/openai-token}'
           description: text-embedding-3-small
           model:
+            model_alias: bare-model
             name: text-embedding-3-small
             provider: openai
           route_type: llm/v1/embeddings

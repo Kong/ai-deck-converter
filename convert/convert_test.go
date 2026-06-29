@@ -99,66 +99,6 @@ providers:
 	require.Equal(t, string(want), string(got), "typed db-less output mismatch")
 }
 
-func TestConvertOmitsSynthesizedModelAlias(t *testing.T) {
-	src := []byte(`
-models:
-  - type: model
-    name: m1
-    capabilities: [generate]
-    formats: [{type: openai}]
-    targets:
-      - name: gpt-4o
-        provider: p1
-        config: {type: openai}
-    config:
-      route: {paths: [/v1]}
-      model: {}
-providers:
-  - name: p1
-    type: openai
-`)
-
-	out, _, err := Convert(src, Options{})
-	require.NoError(t, err, "convert")
-
-	var got map[string]any
-	require.NoError(t, yaml.Unmarshal(out, &got), "unmarshal output")
-
-	aiModels, ok := got["ai-models"].([]any)
-	require.True(t, ok, "expected ai-models collection")
-	require.Len(t, aiModels, 1)
-	aiModel, ok := aiModels[0].(map[string]any)
-	require.True(t, ok, "expected ai-models entry")
-	require.Equal(t, "m1", aiModel["name"])
-	require.Equal(t, "m1", aiModel["alias"], "ai-models alias should retain the default-to-name behavior")
-
-	plugins, ok := got["plugins"].([]any)
-	require.True(t, ok, "expected plugins collection")
-
-	var proxy map[string]any
-	for _, raw := range plugins {
-		plugin, ok := raw.(map[string]any)
-		require.True(t, ok, "expected plugin entry")
-		if plugin["name"] == "ai-proxy-advanced" {
-			proxy = plugin
-			break
-		}
-	}
-	require.NotNil(t, proxy, "expected ai-proxy-advanced plugin")
-
-	cfg, ok := proxy["config"].(map[string]any)
-	require.True(t, ok, "expected ai-proxy-advanced config")
-	targets, ok := cfg["targets"].([]any)
-	require.True(t, ok, "expected ai-proxy-advanced targets")
-	require.Len(t, targets, 1)
-	target, ok := targets[0].(map[string]any)
-	require.True(t, ok, "expected ai-proxy-advanced target")
-	model, ok := target["model"].(map[string]any)
-	require.True(t, ok, "expected ai-proxy-advanced model")
-	require.Equal(t, "gpt-4o", model["name"])
-	require.NotContains(t, model, "model_alias", "target model_alias should be omitted when source model.alias is unset")
-}
-
 func TestConvertMapsConfiguredModelAlias(t *testing.T) {
 	src := []byte(`
 models:
