@@ -127,6 +127,12 @@ func (c *Converter) convertModels() error {
 					if modelScoped {
 						modelName = m.Name
 					}
+
+					modelNameHeader := boolPtr(false)
+					if supportsModelNameHeader(spec) {
+						modelNameHeader = m.Config.Model.NameHeader
+					}
+
 					pg = &proxyGroup{
 						routeName:         g.route.Name,
 						modelName:         modelName,
@@ -136,7 +142,7 @@ func (c *Converter) convertModels() error {
 						vectordb:          balancerExtra(m.Config.Balancer, "vectordb"),
 						embeddings:        embeddings,
 						responseStreaming: m.Config.ResponseStreaming,
-						modelNameHeader:   m.Config.Model.NameHeader,
+						modelNameHeader:   modelNameHeader,
 						maxBodySize:       m.Config.MaxRequestBodySize,
 						seen:              map[string]bool{},
 					}
@@ -342,6 +348,14 @@ func basePath(m *aigw.Model) string {
 		return m.Config.Route.Paths[0]
 	}
 	return aimap.DefaultBasePath
+}
+
+// The assistants, batches, and files endpoints do not route by model,
+// as a result, they do not support the model name header.
+func supportsModelNameHeader(spec aimap.EndpointSpec) bool {
+	return spec.RouteType != "llm/v1/assistants" &&
+		spec.RouteType != "llm/v1/batches" &&
+		spec.RouteType != "llm/v1/files"
 }
 
 // isModelType reports whether a model is a synchronous "model" entity (as

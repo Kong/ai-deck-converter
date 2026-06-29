@@ -25,6 +25,7 @@ plugins:
         algorithm: round-robin
       genai_category: text/generation
       llm_format: openai
+      model_name_header: false
       response_streaming: deny
       targets:
         - auth:
@@ -44,6 +45,7 @@ plugins:
       genai_category: text/generation
       llm_format: openai
       max_request_body_size: 536870912
+      model_name_header: false
       response_streaming: deny
       targets:
         - auth:
