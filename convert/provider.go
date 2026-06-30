@@ -208,6 +208,9 @@ func mapOptions(opts map[string]any, providerType string, provider *aigw.Provide
 	}
 
 	if provider != nil {
+		if providerType == "anthropic" && out["anthropic_version"] == nil {
+			out["anthropic_version"] = "2023-06-01"
+		}
 		if providerType == "azure" && provider.Config.Instance != "" {
 			out["azure_instance"] = provider.Config.Instance
 		}
