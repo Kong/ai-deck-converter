@@ -53,12 +53,12 @@ func (c *Converter) convertModels() error {
 		caps := c.expandCapabilities(m)
 		logging := modelLoggingBlock(m.Config.Logging)
 
-		// ai-proxy-advanced only carries model_alias when the source model set an
-		// explicit alias. ai-models keeps its historical default-to-name behavior.
-		targetAlias := m.Config.Model.Alias
-		aiModelAlias := targetAlias
-		if aiModelAlias == "" {
-			aiModelAlias = m.Name
+		// The model alias defaults to the model name when unset, and is applied
+		// identically to each target's model_alias and the ai-models entry so the
+		// two stay in sync (the reverter matches targets to ai-models by alias).
+		alias := m.Config.Model.Alias
+		if alias == "" {
+			alias = m.Name
 		}
 
 		// ownerKey groups targets into ai-proxy-advanced plugins: per source model
@@ -149,7 +149,7 @@ func (c *Converter) convertModels() error {
 					g.proxyByOwner[ownerKey] = pg
 					g.proxies = append(g.proxies, pg)
 				}
-				target := c.buildTarget(tm, provider, providerType, targetAlias, spec.RouteType, logging)
+				target := c.buildTarget(tm, provider, providerType, alias, spec.RouteType, logging)
 				dedup := tm.Name + "|" + spec.RouteType
 				if !pg.seen[dedup] {
 					pg.seen[dedup] = true
@@ -165,7 +165,7 @@ func (c *Converter) convertModels() error {
 		c.out.AIModels = append(c.out.AIModels, kong.AIModel{
 			ID:    m.ID,
 			Name:  m.Name,
-			Alias: aiModelAlias,
+			Alias: alias,
 		})
 
 		// Model policy and ACL plugins scope to each route the model produces, plus
