@@ -68,6 +68,39 @@ providers:
 	}
 }
 
+// Kong's acl plugin only ever sees an identified consumer/credential if some
+// authentication plugin ran first (e.g. key-auth); the converter never emits
+// one on its own. Without it, the acl plugin's unauthenticated fallback
+// rejects every request outright regardless of credential validity, so a
+// model with acls but no authentication plugin is a silent dead end unless
+// flagged.
+func TestConvertWarnsModelACLWithoutAuthPlugin(t *testing.T) {
+	src := []byte(`
+models:
+  - type: model
+    name: guarded
+    capabilities: [generate]
+    formats: [{type: openai}]
+    targets:
+      - name: gpt-4o
+        provider: p1
+        config: {type: openai}
+    acls:
+      allow: [premium-users]
+    config:
+      route: {paths: [/ai]}
+      model: {alias: m1}
+providers:
+  - name: p1
+    type: openai
+`)
+	_, warnings, err := Convert(src, Options{})
+	require.NoError(t, err, "convert")
+	joined := strings.Join(warnings, "\n")
+	require.Contains(t, joined, "guarded", "expected a warning naming the model")
+	require.Contains(t, joined, "authentication", "expected the warning to explain the missing authentication plugin")
+}
+
 func TestConvertDocumentToDBLessYAML(t *testing.T) {
 	src := []byte(`
 models:

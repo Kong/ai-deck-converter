@@ -168,6 +168,17 @@ func (c *Converter) convertModels() error {
 			Alias: alias,
 		})
 
+		// An acl plugin only ever sees an identified consumer/credential if some
+		// authentication plugin ran first (e.g. key-auth); the converter never
+		// emits one on its own. Without it, the acl plugin's unauthenticated
+		// fallback rejects every request outright, regardless of credential
+		// validity -- so an acl with no accompanying auth is a silent dead end.
+		if !m.ACLs.IsEmpty() {
+			if err := c.warn("model %q has acls configured but no authentication plugin (e.g. key-auth) is emitted to establish an identified consumer; every request to this model's route will be rejected regardless of credentials until an authentication plugin is added separately", m.Name); err != nil {
+				return err
+			}
+		}
+
 		// Model policy and ACL plugins scope to each route the model produces, plus
 		// the ai-model entity for type "model".
 		plugins, err := c.scopedPlugins(m.Policies, m.ACLs)
