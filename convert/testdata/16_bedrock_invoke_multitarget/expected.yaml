@@ -33,8 +33,6 @@ plugins:
           route_type: llm/v1/embeddings
     route:
       name: bedrock-invoke
-    model:
-      name: titan-embed-text-v2
   - name: ai-proxy-advanced
     config:
       balancer:
@@ -56,8 +54,6 @@ plugins:
           route_type: image/v1/images/generations
     route:
       name: bedrock-invoke
-    model:
-      name: nova-canvas-image
   - name: ai-proxy-advanced
     config:
       balancer:
@@ -79,8 +75,6 @@ plugins:
           route_type: llm/v1/chat
     route:
       name: bedrock-invoke
-    model:
-      name: nova-sonic-audio
   - name: ai-proxy-advanced
     config:
       balancer:
@@ -103,8 +97,6 @@ plugins:
           route_type: video/v1/videos/generations
     route:
       name: bedrock-invoke
-    model:
-      name: nova-reel-video
 ai-models:
   - name: titan-embed-text-v2
     alias: '@bedrock/titan-embed-text-v2'

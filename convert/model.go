@@ -72,6 +72,7 @@ func (c *Converter) convertModels() error {
 
 		var routeNames []string
 		routeSeen := map[string]bool{}
+		routeTakesBodyModel := map[string]bool{}
 
 		for j := range m.TargetModels {
 			tm := &m.TargetModels[j]
@@ -115,6 +116,7 @@ func (c *Converter) convertModels() error {
 				if !routeSeen[g.route.Name] {
 					routeSeen[g.route.Name] = true
 					routeNames = append(routeNames, g.route.Name)
+					routeTakesBodyModel[g.route.Name] = g.takesBodyModel
 				}
 
 				pg := g.proxyByOwner[ownerKey]
@@ -124,7 +126,7 @@ func (c *Converter) convertModels() error {
 						return err
 					}
 					modelName := ""
-					if modelScoped {
+					if modelScoped && g.takesBodyModel {
 						modelName = m.Name
 					}
 
@@ -178,7 +180,7 @@ func (c *Converter) convertModels() error {
 			for k := range plugins {
 				p := plugins[k]
 				p.Route = kong.NewRef(routeName)
-				if modelScoped {
+				if modelScoped && routeTakesBodyModel[routeName] {
 					p.Model = kong.NewRef(m.Name)
 				}
 				guardPlugins = append(guardPlugins, p)

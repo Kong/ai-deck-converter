@@ -44,8 +44,6 @@ plugins:
           route_type: llm/v1/embeddings
     route:
       name: bedrock-invoke
-    model:
-      name: titan-embed-text-v2
 ai-models:
   - name: titan-embed-text-v2
     alias: '@bedrock/titan-embed-text-v2'

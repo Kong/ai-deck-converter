@@ -159,6 +159,62 @@ providers:
 	require.Equal(t, "@openai/custom-m1", model["model_alias"], "target model_alias should match source model.alias")
 }
 
+// TestConvertOmitsPluginModelFKOnNativeRoutes guards against regressing to a
+// plugin-level `model:` FK on ai-proxy-advanced for native (path-model)
+// routes. Kong only ever sets ngx.ctx.ai_model from ai-model-selector (used
+// for OpenAI-format body-model routing); a model-scoped plugin on a route
+// with no ai-model-selector can never activate, since Kong's plugin iterator
+// requires ctx.ai_model to match the plugin's model FK. A native-format
+// route (model selected from the URL path, e.g. bedrock/vertex/gemini) never
+// gets an ai-model-selector, so it must never get a plugin-level model FK
+// either — see convert/testdata/04_bedrock_auth and
+// convert/testdata/16_bedrock_invoke_multitarget for the full fixtures this
+// was found against.
+func TestConvertOmitsPluginModelFKOnNativeRoutes(t *testing.T) {
+	src := []byte(`
+models:
+  - type: model
+    name: claude-bedrock
+    capabilities: [generate]
+    formats: [{type: bedrock}]
+    targets:
+      - name: anthropic.claude-3-5-sonnet
+        provider: bedrock-prod
+        config: {type: bedrock, aws_region: us-east-1}
+    config:
+      route: {paths: [/ai]}
+      model: {alias: "@bedrock/claude-3-5-sonnet"}
+providers:
+  - name: bedrock-prod
+    type: bedrock
+`)
+
+	out, _, err := Convert(src, Options{})
+	require.NoError(t, err, "convert")
+
+	var got map[string]any
+	require.NoError(t, yaml.Unmarshal(out, &got), "unmarshal output")
+
+	plugins, ok := got["plugins"].([]any)
+	require.True(t, ok, "expected plugins collection")
+
+	var selector, proxy map[string]any
+	for _, raw := range plugins {
+		plugin, ok := raw.(map[string]any)
+		require.True(t, ok, "expected plugin entry")
+		switch plugin["name"] {
+		case "ai-model-selector":
+			selector = plugin
+		case "ai-proxy-advanced":
+			proxy = plugin
+		}
+	}
+	require.Nil(t, selector, "native (path-model) routes must not get an ai-model-selector")
+	require.NotNil(t, proxy, "expected ai-proxy-advanced plugin")
+	require.Nil(t, proxy["model"], "ai-proxy-advanced must not carry a plugin-level model FK on a native route: "+
+		"nothing ever sets ngx.ctx.ai_model without ai-model-selector, so a model-scoped plugin here can never activate")
+}
+
 func TestConvertStrictFailsUnknownProvider(t *testing.T) {
 	src := []byte(`
 models:
