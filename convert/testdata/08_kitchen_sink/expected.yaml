@@ -77,7 +77,19 @@ plugins:
               anthropic_version: "2023-06-01"
             provider: anthropic
           route_type: llm/v1/chat
-          weight: 20
+          weight: 10
+        - auth:
+            header_name: x-api-key
+            header_value: '{vault://env/anthropic-key}'
+          description: claude-3-4
+          model:
+            model_alias: '@prod/prod-chat'
+            name: claude-3-4
+            options:
+              anthropic_version: "2023-06-01"
+            provider: anthropic
+          route_type: llm/v1/chat
+          weight: 10
     route:
       name: openai-chat
     model:
