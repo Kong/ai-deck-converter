@@ -1,6 +1,8 @@
 package convert
 
 import (
+	"fmt"
+
 	"github.com/Kong/ai-deck-converter/internal/aigw"
 	"github.com/Kong/ai-deck-converter/internal/kong"
 )
@@ -23,7 +25,7 @@ func (c *Converter) convertMCPServers() error {
 
 		// Non-ACL policy plugins still apply at the route; ACLs are folded into
 		// the ai-mcp-proxy plugin above.
-		guard, err := c.scopedPlugins(m.Policies, aigw.ACLs{})
+		guard, err := c.scopedPlugins(fmt.Sprintf("mcp_server %q", m.Name), m.Policies, aigw.ACLs{})
 		if err != nil {
 			return err
 		}

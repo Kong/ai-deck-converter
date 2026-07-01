@@ -20,7 +20,9 @@ func (c *Converter) convertGlobalPolicies() {
 
 // scopedPlugins builds the plugins to nest under a referencing entity: one per
 // non-global policy reference, plus an acl plugin when ACLs are present.
-func (c *Converter) scopedPlugins(refs []string, acls aigw.ACLs) ([]kong.Plugin, error) {
+// owner describes the referencing entity (e.g. `consumer_group "premium-users"`)
+// for warning messages.
+func (c *Converter) scopedPlugins(owner string, refs []string, acls aigw.ACLs) ([]kong.Plugin, error) {
 	var plugins []kong.Plugin
 	seen := map[string]bool{}
 	for _, ref := range refs {
@@ -36,7 +38,13 @@ func (c *Converter) scopedPlugins(refs []string, acls aigw.ACLs) ([]kong.Plugin,
 			continue
 		}
 		if p.Global != nil && *p.Global {
-			continue // emitted once at the top level
+			// Already emitted once at the top level (convertGlobalPolicies): a
+			// global policy applies to all traffic regardless of any scoped
+			// reference, so this attachment is a silent no-op unless flagged.
+			if err := c.warn("%s references policy %q, but it is global:true and already applies to all traffic; this scoped attachment has no effect", owner, ref); err != nil {
+				return nil, err
+			}
+			continue
 		}
 		plugins = append(plugins, policyPlugin(p, nil))
 	}

@@ -1,6 +1,8 @@
 package convert
 
 import (
+	"fmt"
+
 	"github.com/Kong/ai-deck-converter/internal/aigw"
 	"github.com/Kong/ai-deck-converter/internal/kong"
 )
@@ -13,7 +15,7 @@ func (c *Converter) convertAgents() error {
 		a := &c.src.Agents[i]
 		route := buildRoute(a.Config.Route, a.Name)
 
-		guard, err := c.scopedPlugins(a.Policies, a.ACLs)
+		guard, err := c.scopedPlugins(fmt.Sprintf("agent %q", a.Name), a.Policies, a.ACLs)
 		if err != nil {
 			return err
 		}

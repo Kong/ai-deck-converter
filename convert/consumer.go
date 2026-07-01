@@ -1,6 +1,8 @@
 package convert
 
 import (
+	"fmt"
+
 	"github.com/Kong/ai-deck-converter/internal/aigw"
 	"github.com/Kong/ai-deck-converter/internal/kong"
 )
@@ -8,7 +10,7 @@ import (
 func (c *Converter) convertConsumerGroups() error {
 	for i := range c.src.ConsumerGroups {
 		g := &c.src.ConsumerGroups[i]
-		plugins, err := c.scopedPlugins(g.Policies, aigw.ACLs{})
+		plugins, err := c.scopedPlugins(fmt.Sprintf("consumer_group %q", g.Name), g.Policies, aigw.ACLs{})
 		if err != nil {
 			return err
 		}
@@ -25,7 +27,7 @@ func (c *Converter) convertConsumerGroups() error {
 func (c *Converter) convertConsumers() error {
 	for i := range c.src.Consumers {
 		cons := &c.src.Consumers[i]
-		plugins, err := c.scopedPlugins(cons.Policies, aigw.ACLs{})
+		plugins, err := c.scopedPlugins(fmt.Sprintf("consumer %q", cons.Name), cons.Policies, aigw.ACLs{})
 		if err != nil {
 			return err
 		}
