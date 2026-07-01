@@ -111,8 +111,10 @@ func defoldOptions(options map[string]any, providerType string, d *defoldedTarge
 					d.auth.RoleSessionName, _ = bv.(string)
 				case bk == "aws_sts_endpoint_url":
 					d.auth.STSEndpointURL, _ = bv.(string)
+				case bk == "aws_region":
+					out["region"] = bv
 				case aimap.BedrockOptionKeys[bk]:
-					// Target-level option (aws_region, batch_role_arn, ...).
+					// Target-level option (batch_role_arn, ...).
 					out[bk] = bv
 				default:
 					out[bk] = bv

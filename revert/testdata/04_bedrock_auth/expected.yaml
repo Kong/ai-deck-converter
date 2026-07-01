@@ -9,8 +9,8 @@ models:
       - name: anthropic.claude-3-5-sonnet
         provider: bedrock-env
         config:
-          aws_region: us-east-1
           max_tokens: 1024
+          region: us-east-1
           type: bedrock
     config:
       model:
