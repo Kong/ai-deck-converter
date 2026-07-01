@@ -34,6 +34,14 @@ func defaultACLBlock(acls aigw.ACLs) []map[string]any {
 }
 
 // aclPlugin builds a Kong acl plugin from an AI Gateway ACL allow/deny list.
+//
+// include_consumer_groups is always set: AI Gateway's only group-membership
+// construct is consumer_groups (the converter never creates the legacy
+// per-consumer kong.db.acls rows the acl plugin checks by default), so
+// allow/deny entries that name a consumer_groups group would otherwise never
+// match anything and the plugin could never allow a request.
 func aclPlugin(acls aigw.ACLs) kong.Plugin {
-	return kong.Plugin{Name: "acl", Config: aclBlock(acls)}
+	config := aclBlock(acls)
+	config["include_consumer_groups"] = true
+	return kong.Plugin{Name: "acl", Config: config}
 }

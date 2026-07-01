@@ -68,6 +68,61 @@ providers:
 	}
 }
 
+// The Kong acl plugin checks a legacy per-consumer kong.db.acls entity by
+// default, not Enterprise consumer_groups membership, unless
+// config.include_consumer_groups is set. AI Gateway's only group-membership
+// construct is consumer_groups (the converter never creates legacy acls
+// rows), so an emitted acl plugin must always set include_consumer_groups —
+// otherwise its allow/deny list can never match anything and the plugin can
+// never allow a request.
+func TestConvertACLIncludesConsumerGroups(t *testing.T) {
+	src := []byte(`
+models:
+  - type: model
+    name: guarded
+    capabilities: [generate]
+    formats: [{type: openai}]
+    targets:
+      - name: gpt-4o
+        provider: p1
+        config: {type: openai}
+    acls:
+      allow: [premium-users]
+    config:
+      route: {paths: [/ai]}
+      model: {alias: m1}
+providers:
+  - name: p1
+    type: openai
+`)
+	out, _, err := Convert(src, Options{})
+	require.NoError(t, err, "convert")
+
+	var doc struct {
+		Plugins []struct {
+			Name   string         `yaml:"name"`
+			Config map[string]any `yaml:"config"`
+		} `yaml:"plugins"`
+	}
+	require.NoError(t, yaml.Unmarshal(out, &doc), "parse output")
+
+	var acl *struct {
+		Name   string
+		Config map[string]any
+	}
+	for i := range doc.Plugins {
+		if doc.Plugins[i].Name == "acl" {
+			acl = &struct {
+				Name   string
+				Config map[string]any
+			}{doc.Plugins[i].Name, doc.Plugins[i].Config}
+		}
+	}
+	require.NotNil(t, acl, "expected an acl plugin in the output")
+	require.Equal(t, true, acl.Config["include_consumer_groups"],
+		"acl plugin must set include_consumer_groups so consumer_groups-based allow/deny actually works")
+}
+
 func TestConvertDocumentToDBLessYAML(t *testing.T) {
 	src := []byte(`
 models:

@@ -189,6 +189,7 @@ plugins:
       allow:
         - consumer-alice
         - group-admins
+      include_consumer_groups: true
     route:
       id: 8ae36805-da7a-55b9-b056-72bde6bb937d
     model:
@@ -199,6 +200,7 @@ plugins:
       allow:
         - consumer-alice
         - group-admins
+      include_consumer_groups: true
     route:
       id: 0da1097c-6edc-5c9c-a032-cd042d0db5e4
     model:
