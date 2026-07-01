@@ -78,8 +78,8 @@ Below is a mapping of supported Capabilities to LLM Formats.
 |---|---|---|---|
 | generate | `/chat/completions`, `/completions` | `llm/v1/chat`, `llm/v1/completions` | `text/generation` |
 | agentic | `/assistants`, `/responses` | `llm/v1/assistants`, `llm/v1/responses` | `text/generation` |
-| realtime | `/realtime` | `llm/v1/realtime` | `text/generation` |
-| embeddings | `/embeddings` | `llm/v1/embeddings` | `text/generation` |
+| realtime | `/realtime` | `realtime/v1/realtime` | `realtime/generation` |
+| embeddings | `/embeddings` | `llm/v1/embeddings` | `text/embeddings` |
 | image | `/images/generations`, `/images/edits` | `image/v1/images/generations`, `image/v1/images/edits` | `image/generation` |
 | audio/speech | `/audio/speech` | `audio/v1/audio/speech` | `audio/speech` |
 | audio/transcription | `/audio/transcriptions` | `audio/v1/audio/transcriptions` | `audio/transcription` |
@@ -100,14 +100,14 @@ Below is a mapping of supported Capabilities to LLM Formats.
 | Capability | Supported Endpoint(s) | route_type | genai_category |
 |---|---|---|---|
 | generate | `/v1/messages` | `llm/v1/chat` | `text/generation` |
-| agentic | — | | |
+| agentic | — | - | - |
 | realtime | — | - | - |
 | embeddings | — | - | - |
 | image | — | - | - |
 | audio | — | - | - |
 | video | — | - | - |
 | rerank | — | - | - |
-| batch | `/v1/messages/batches` | `llm/v1/chat` | `text/generation` |
+| batch | `/v1/messages/batches` | `llm/v1/batches` | `text/generation` |
 | files | — | - | - |
 </details>
 
@@ -124,14 +124,14 @@ Below is a mapping of supported Capabilities to LLM Formats.
 | generate | `~/model/(?<model_name>[^/]+)/converse(?:-stream)?` | `llm/v1/chat` | `text/generation` |
 | generate | `~/model/(?<model_name>[^/]+)/invoke(?:-with-response-stream)?` | `llm/v1/chat` | `text/generation` |
 | agentic | `~/model/(?<model_name>[^/]+)/retrieveAndGenerate(?:Stream)?` | `llm/v1/chat` | `text/generation` |
-| realtime | — | `llm/v1/chat` | `text/generation` |
-| embeddings | `~/model/(?<model_name>[^/]+)/invoke` | `llm/v1/chat` | `text/generation` |
-| image | `~/model/(?<model_name>[^/]+)/invoke` | `llm/v1/chat` | `text/generation` |
+| realtime | — | - | - |
+| embeddings | `~/model/(?<model_name>[^/]+)/invoke` | `llm/v1/embeddings` | `text/embeddings` |
+| image | `~/model/(?<model_name>[^/]+)/invoke` | `image/v1/images/generations` | `image/generation` |
 | audio | `~/model/(?<model_name>[^/]+)/invoke` | `llm/v1/chat` | `text/generation` |
-| video | `~/model/(?<model_name>[^/]+)/invoke` | `llm/v1/chat` | `text/generation` |
+| video | `~/model/(?<model_name>[^/]+)/invoke` | `video/v1/videos/generations` | `video/generation` |
 | rerank | `~/model/(?<model_name>[^/]+)/rerank` | `llm/v1/chat` | `text/generation` |
-| batch | `~/model/(?<model_name>[^/]+)/async-invoke`, `/model-invocations` | `llm/v1/chat` | `text/generation` |
-| files | — | `llm/v1/chat` | `text/generation` |
+| batch | `~/model/(?<model_name>[^/]+)/async-invoke`, `/model-invocations` | `llm/v1/batches` | `text/generation` |
+| files | — | - | - |
 </details>
 
 <details>
@@ -147,12 +147,12 @@ Below is a mapping of supported Capabilities to LLM Formats.
 | generate | `~/v1beta/models/(?<model_name>[^:/]+):(?:generateContent\|streamGenerateContent)` | `llm/v1/chat` | `text/generation` |
 | agentic | — | - | - |
 | realtime | — | - | - |
-| embeddings | `~/v1beta/models/(?<model_name>[^:/]+):(?:embedContent\|batchEmbedContent)` | `llm/v1/chat` | `text/generation` |
+| embeddings | `~/v1beta/models/(?<model_name>[^:/]+):(?:embedContent\|batchEmbedContent)` | `llm/v1/embeddings` | `text/embeddings` |
 | image | — | - | - |
 | audio | — | - | - |
 | video | — | - | - |
 | rerank | — | - | - |
-| batch | `/v1beta/batches` | `llm/v1/chat` | `text/generation` |
+| batch | `/v1beta/batches` | `llm/v1/batches` | `text/generation` |
 | files | `~/(?:upload/)?v1beta/files` | `llm/v1/chat` | `text/generation` |
 </details>
 
@@ -172,12 +172,12 @@ Below is a mapping of supported Capabilities to LLM Formats.
 | generate | `~/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/google/models/(?<model_name>[^:/]+):(?:generateContent\|streamGenerateContent)`, `~/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/google/models/(?<model_name>[^:/]+):predictLongRunning` | `llm/v1/chat` | `text/generation` |
 | agentic | — | - | - |
 | realtime | — | - | - |
-| embeddings | `~/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/google/models/(?<model_name>[^:/]+):(?:embedContent\|batchEmbedContent)` | `llm/v1/chat` | `text/generation` |
-| image | `~/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/google/models/(?<model_name>[^:/]+):predictLongRunning` | | |
+| embeddings | `~/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/google/models/(?<model_name>[^:/]+):(?:embedContent\|batchEmbedContent)` | `llm/v1/embeddings` | `text/embeddings` |
+| image | `~/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/google/models/(?<model_name>[^:/]+):predictLongRunning` | `image/v1/images/generations` | `image/generation` |
 | audio | — | - | - |
-| video | `~/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/google/models/(?<model_name>[^:/]+):predictLongRunning` | `llm/v1/chat` | `text/generation` |
+| video | `~/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/google/models/(?<model_name>[^:/]+):predictLongRunning` | `video/v1/videos/generations` | `video/generation` |
 | rerank | `~/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/rankingConfigs/(?<ranking_config>[^:/]+):rank` | `llm/v1/chat` | `text/generation` |
-| batch | `~/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/batchPredictionJobs` | `llm/v1/chat` | `text/generation` |
+| batch | `~/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/batchPredictionJobs` | `llm/v1/batches` | `text/generation` |
 | files | — | - | - |
 </details>
 

@@ -53,16 +53,16 @@ func TestResolveEndpointDisambiguation(t *testing.T) {
 	m, ok := resolveEndpoint("bedrock", "image/v1/images/generations", "image/generation", "bedrock-invoke", "~/ai/model/(?<model_name>[^/]+)/invoke(?:-with-response-stream)?")
 	require.True(t, ok, "bedrock invoke image ok")
 	require.Equal(t, "image", m.capability, "bedrock invoke image capability")
-	// anthropic generate vs batches share route_type llm/v1/chat; the route
-	// name (or path) disambiguates.
-	m, ok = resolveEndpoint("anthropic", "llm/v1/chat", "text/generation", "anthropic-batches", "/ai/v1/messages/batches")
-	require.True(t, ok, "anthropic batches ok")
-	require.Equal(t, "batches", m.capability, "anthropic batches capability")
+	// bedrock generate/agentic/rerank/audio-speech all share route_type
+	// llm/v1/chat; the route name (RouteLabel) disambiguates.
+	m, ok = resolveEndpoint("bedrock", "llm/v1/chat", "text/generation", "bedrock-invoke", "~/ai/model/(?<model_name>[^/]+)/invoke(?:-with-response-stream)?")
+	require.True(t, ok, "bedrock invoke audio ok")
+	require.Equal(t, "audio/speech", m.capability, "bedrock invoke audio-speech capability")
 	// A route_type the section's table doesn't use still resolves via the
 	// route name / path shape.
-	m, ok = resolveEndpoint("anthropic", "llm/v1/batches", "", "anthropic-batches", "/ai/v1/messages/batches")
-	require.True(t, ok, "anthropic generic batches ok")
-	require.Equal(t, "batches", m.capability, "anthropic generic batches capability")
+	m, ok = resolveEndpoint("anthropic", "llm/v1/completions", "", "anthropic-messages", "/ai/v1/messages")
+	require.True(t, ok, "anthropic generic generate ok")
+	require.Equal(t, "generate", m.capability, "anthropic generic generate capability")
 }
 
 func TestDeriveModelName(t *testing.T) {

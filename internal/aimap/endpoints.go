@@ -77,14 +77,14 @@ var EndpointTable = map[string]map[string]EndpointSpec{
 	},
 	"anthropic": {
 		"generate": {"messages", "/v1/messages", false, mPost, "llm/v1/chat", catTextGen, true},
-		"batches":  {"batches", "/v1/messages/batches", false, mGetPost, "llm/v1/chat", catTextGen, false},
+		"batches":  {"batches", "/v1/messages/batches", false, mGetPost, "llm/v1/batches", catTextGen, false},
 	},
 	"bedrock": {
 		"generate":     {"converse", "model/(?<model_name>[^/]+)/converse(?:-stream)?", true, mGetPost, "llm/v1/chat", catTextGen, false},
-		"agentic":      {"retrieve", "model/(?<model_name>[^/]+)/retrieveAndGenerate(?:Stream)?", true, mGetPost, "llm/v1/responses", catTextGen, false},
+		"agentic":      {"retrieve", "model/(?<model_name>[^/]+)/retrieveAndGenerate(?:Stream)?", true, mGetPost, "llm/v1/chat", catTextGen, false},
 		"embeddings":   {"invoke", "model/(?<model_name>[^/]+)/invoke(?:-with-response-stream)?", true, mGetPost, "llm/v1/embeddings", catEmbeddings, false},
 		"image":        {"invoke", "model/(?<model_name>[^/]+)/invoke(?:-with-response-stream)?", true, mGetPost, "image/v1/images/generations", catImage, false},
-		"audio/speech": {"invoke", "model/(?<model_name>[^/]+)/invoke(?:-with-response-stream)?", true, mGetPost, "audio/v1/audio/speech", catSpeech, false},
+		"audio/speech": {"invoke", "model/(?<model_name>[^/]+)/invoke(?:-with-response-stream)?", true, mGetPost, "llm/v1/chat", catTextGen, false},
 		"video":        {"invoke", "model/(?<model_name>[^/]+)/invoke(?:-with-response-stream)?", true, mGetPost, "video/v1/videos/generations", catVideo, false},
 		"rerank":       {"rerank", "model/(?<model_name>[^/]+)/rerank", true, mGetPost, "llm/v1/chat", catTextGen, false},
 		"batches":      {"batches", "model/(?<model_name>[^/]+)/async-invoke", true, mGetPost, "llm/v1/batches", catTextGen, false},
@@ -93,7 +93,7 @@ var EndpointTable = map[string]map[string]EndpointSpec{
 		"generate":   {"generate", "v1beta/models/(?<model_name>[^:/]+):(?:generateContent|streamGenerateContent)", true, mGetPost, "llm/v1/chat", catTextGen, true},
 		"embeddings": {"embeddings", "v1beta/models/(?<model_name>[^:/]+):(?:embedContent|batchEmbedContent)", true, mGetPost, "llm/v1/embeddings", catEmbeddings, true},
 		"batches":    {"batches", "v1beta/batches", false, mGetPost, "llm/v1/batches", catTextGen, false},
-		"files":      {"files", "(?:upload/)?v1beta/files", true, mGetPost, "llm/v1/files", catTextGen, false},
+		"files":      {"files", "(?:upload/)?v1beta/files", true, mGetPost, "llm/v1/chat", catTextGen, false},
 	},
 	"vertex": {
 		"generate":   {"generate", "v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/google/models/(?<model_name>[^:/]+):(?:generateContent|streamGenerateContent)", true, mGetPost, "llm/v1/chat", catTextGen, true},
