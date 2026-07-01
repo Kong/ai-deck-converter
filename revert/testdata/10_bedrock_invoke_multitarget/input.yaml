@@ -51,7 +51,7 @@ plugins:
               bedrock:
                 aws_region: us-east-1
             provider: bedrock
-          route_type: audio/v1/audio/speech
+          route_type: llm/v1/chat
         - auth:
             aws_access_key_id: '{vault://ai/aws-access-key-id}'
             aws_secret_access_key: '{vault://ai/aws-secret-access-key}'

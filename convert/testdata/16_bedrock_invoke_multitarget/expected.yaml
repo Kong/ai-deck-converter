@@ -62,7 +62,7 @@ plugins:
     config:
       balancer:
         algorithm: round-robin
-      genai_category: audio/speech
+      genai_category: text/generation
       llm_format: bedrock
       targets:
         - auth:
@@ -76,7 +76,7 @@ plugins:
               bedrock:
                 aws_region: us-east-1
             provider: bedrock
-          route_type: audio/v1/audio/speech
+          route_type: llm/v1/chat
     route:
       name: bedrock-invoke
     model:
