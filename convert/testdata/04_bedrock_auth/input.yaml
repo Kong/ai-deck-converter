@@ -11,7 +11,7 @@ models:
         config:
           type: bedrock
           max_tokens: 1024
-          aws_region: us-east-1
+          region: us-east-1
     policies: []
     acls: {allow: [], deny: []}
     config:

@@ -186,7 +186,11 @@ func mapOptions(opts map[string]any, providerType string, provider *aigw.Provide
 		case (providerType == "gemini" || providerType == "vertex") && aimap.GeminiOptionKeys[k]:
 			addNested("gemini", k, v)
 		case providerType == "bedrock" && aimap.BedrockOptionKeys[k]:
-			addNested("bedrock", k, v)
+			if k == "region" {
+				addNested("bedrock", "aws_region", v)
+			} else {
+				addNested("bedrock", k, v)
+			}
 		case providerType == "llama2" && k == "format":
 			out["llama2_format"] = v
 		case providerType == "mistral" && k == "format":

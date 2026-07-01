@@ -168,6 +168,6 @@ var GeminiOptionKeys = map[string]bool{
 
 // BedrockOptionKeys are target-config keys that nest under model.options.bedrock.
 var BedrockOptionKeys = map[string]bool{
-	"aws_region": true, "embeddings_normalize": true, "video_output_s3_uri": true,
+	"region": true, "embeddings_normalize": true, "video_output_s3_uri": true,
 	"batch_bucket_prefix": true, "batch_role_arn": true, "performance_config_latency": true,
 }

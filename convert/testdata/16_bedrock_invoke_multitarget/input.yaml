@@ -21,7 +21,7 @@ models:
     targets:
       - name: amazon.titan-embed-text-v2:0
         provider: bedrock-prod
-        config: {type: bedrock, aws_region: us-east-1, embeddings_normalize: true}
+        config: {type: bedrock, region: us-east-1, embeddings_normalize: true}
     policies: []
     acls: {allow: [], deny: []}
   - display_name: Nova Canvas
@@ -35,7 +35,7 @@ models:
     targets:
       - name: amazon.nova-canvas-v1:0
         provider: bedrock-prod
-        config: {type: bedrock, aws_region: us-east-1}
+        config: {type: bedrock, region: us-east-1}
     policies: []
     acls: {allow: [], deny: []}
   - display_name: Nova Sonic
@@ -49,7 +49,7 @@ models:
     targets:
       - name: amazon.nova-sonic-v1:0
         provider: bedrock-prod
-        config: {type: bedrock, aws_region: us-east-1}
+        config: {type: bedrock, region: us-east-1}
     policies: []
     acls: {allow: [], deny: []}
   - display_name: Nova Reel
@@ -63,6 +63,6 @@ models:
     targets:
       - name: amazon.nova-reel-v1:1
         provider: bedrock-prod
-        config: {type: bedrock, aws_region: us-east-1, video_output_s3_uri: "s3://kong/nova-reel/"}
+        config: {type: bedrock, region: us-east-1, video_output_s3_uri: "s3://kong/nova-reel/"}
     policies: []
     acls: {allow: [], deny: []}
