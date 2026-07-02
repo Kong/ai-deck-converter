@@ -1,0 +1,37 @@
+# Four Bedrock models whose capabilities (embeddings/image/audio/video) all map
+# to the shared /invoke endpoint -> one bedrock-invoke route with four targets.
+providers:
+  - name: bedrock-prod
+    type: bedrock
+    display_name: Bedrock Prod
+    config:
+      auth:
+        type: aws
+        access_key_id: "{vault://ai/aws-access-key-id}"
+        secret_access_key: "{vault://ai/aws-secret-access-key}"
+models:
+  - display_name: Titan Embeddings
+    name: titan-embed-text-v2
+    type: model
+    capabilities: [embeddings]
+    formats: [{type: bedrock}]
+    config:
+      route: {paths: [/ai]}
+      model: {alias: "@bedrock/titan-embed-text-v2"}
+      balancer:
+        algorithm: semantic
+        slots: 10000
+        embeddings:
+          provider: bedrock-prod
+          model:
+            name: text-embedding-ada-002
+            provider: bedrock
+            options:
+              bedrock:
+                region: us-east-1
+    targets:
+      - name: amazon.titan-embed-text-v2:0
+        provider: bedrock-prod
+        config: {type: bedrock, region: us-east-1, embeddings_normalize: true}
+    policies: []
+    acls: {allow: [], deny: []}

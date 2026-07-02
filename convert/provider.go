@@ -142,6 +142,15 @@ func mapEmbeddingsOptions(emb map[string]any, provider *aigw.Provider) {
 		if provider.Config.ProjectID != "" {
 			embeddingsNested(model, "gemini")["project_id"] = provider.Config.ProjectID
 		}
+	case "bedrock":
+		if opts, ok := model["options"].(map[string]any); ok {
+			if b, ok := opts["bedrock"].(map[string]any); ok {
+				if v, ok := b["region"]; ok {
+					b["aws_region"] = v
+					delete(b, "region")
+				}
+			}
+		}
 	}
 }
 
