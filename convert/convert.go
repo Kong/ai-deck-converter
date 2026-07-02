@@ -157,6 +157,15 @@ func buildRoute(rc aigw.RouteConfig, entityName string) kong.Route {
 	if name == "" {
 		name = entityName + "-route"
 	}
+	// Kong's own schema defaults strip_path to true, which drops the route-matched
+	// path segment before forwarding. That's wrong for every route this converter
+	// emits (the request path is meaningful to the upstream), so default to false
+	// here rather than leaving it unset — matching what buildModelRoute already
+	// enforced for model routes, now applied uniformly to agents/MCP servers too.
+	stripPath := rc.StripPath
+	if stripPath == nil {
+		stripPath = boolPtr(false)
+	}
 	return kong.Route{
 		Name:                    name,
 		Paths:                   rc.Paths,
@@ -167,7 +176,7 @@ func buildRoute(rc aigw.RouteConfig, entityName string) kong.Route {
 		SNIs:                    cloneStrings(rc.SNIs),
 		Sources:                 toKongCIDRPorts(rc.Sources),
 		Destinations:            toKongCIDRPorts(rc.Destinations),
-		StripPath:               rc.StripPath,
+		StripPath:               stripPath,
 		PreserveHost:            rc.PreserveHost,
 		HTTPSRedirectStatusCode: rc.HTTPSRedirectStatusCode,
 		RegexPriority:           rc.RegexPriority,
@@ -184,9 +193,6 @@ func buildModelRoute(rc aigw.RouteConfig, routeName, path string, defaultMethods
 	route.Paths = []string{path}
 	if len(route.Methods) == 0 {
 		route.Methods = defaultMethods
-	}
-	if route.StripPath == nil {
-		route.StripPath = boolPtr(false)
 	}
 	return route
 }

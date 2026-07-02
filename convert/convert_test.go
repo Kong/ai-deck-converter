@@ -483,6 +483,37 @@ providers:
 	require.True(t, *route.ResponseBuffering, "unexpected response_buffering")
 }
 
+func TestConvertDBLessAgentRouteDefaultsStripPathFalse(t *testing.T) {
+	src := []byte(`
+agents:
+  - type: http
+    name: agent1
+    policies: []
+    config:
+      url: https://agent.internal/api
+      route:
+        paths: [/agents/agent1]
+`)
+
+	out, _, err := Convert(src, Options{OutputMode: "db-less"})
+	require.NoError(t, err, "convert db-less")
+
+	var got struct {
+		Routes []struct {
+			Paths     []string `yaml:"paths"`
+			StripPath *bool    `yaml:"strip_path"`
+		} `yaml:"routes"`
+	}
+	require.NoError(t, yaml.Unmarshal(out, &got), "unmarshal output")
+	require.Len(t, got.Routes, 1, "expected 1 route: %s", out)
+	route := got.Routes[0]
+	require.Equal(t, []string{"/agents/agent1"}, route.Paths, "unexpected paths")
+	// Without this default, Kong's own schema default (strip_path: true) strips the
+	// route-matched path segment before forwarding, breaking every agent route.
+	require.NotNil(t, route.StripPath, "expected strip_path to be set explicitly")
+	require.False(t, *route.StripPath, "agent routes must default strip_path to false, like model routes")
+}
+
 func TestConvertDBLessCredentialTTLAndTags(t *testing.T) {
 	ttl := 7200
 	src := []byte(`

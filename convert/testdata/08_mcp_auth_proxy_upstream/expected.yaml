@@ -6,6 +6,7 @@ services:
       - name: secure-flights-mcp-route
         paths:
           - /mcp/secure-flights
+        strip_path: false
         plugins:
           - name: ai-mcp-proxy
             config:
@@ -28,6 +29,7 @@ services:
       - name: vendor-proxy-mcp-route
         paths:
           - /mcp/vendor-proxy
+        strip_path: false
         plugins:
           - name: ai-mcp-proxy
             config:
@@ -44,6 +46,7 @@ services:
       - name: upstream-mcp-route
         paths:
           - /mcp/upstream
+        strip_path: false
         plugins:
           - name: ai-mcp-proxy
             config:

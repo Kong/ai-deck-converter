@@ -8,6 +8,7 @@ services:
           - /agents/booking
         methods:
           - POST
+        strip_path: false
         plugins:
           - name: ai-a2a-proxy
             config:
@@ -22,6 +23,7 @@ services:
       - name: weather-route
         paths:
           - /agents/weather
+        strip_path: false
         plugins:
           - name: key-auth
             config:

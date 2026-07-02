@@ -15,6 +15,7 @@ services:
       - name: tools-mcp-route
         paths:
           - /mcp/tools
+        strip_path: false
         plugins:
           - name: ai-mcp-proxy
             config:
@@ -26,6 +27,7 @@ services:
       - name: orch-route
         paths:
           - /agents/orch
+        strip_path: false
         plugins:
           - name: ai-a2a-proxy
             config:
