@@ -139,8 +139,15 @@ func mapEmbeddingsOptions(emb map[string]any, provider *aigw.Provider) {
 			embeddingsNested(model, "azure")["instance"] = provider.Config.Instance
 		}
 	case "gemini", "vertex":
-		if provider.Config.ProjectID != "" {
-			embeddingsNested(model, "gemini")["project_id"] = provider.Config.ProjectID
+		if opts, ok := model["options"].(map[string]any); ok {
+			if gemini, ok := opts["gemini"].(map[string]any); ok {
+				if env, ok := gemini["gcp_environment"].(map[string]any); ok {
+					for k, v := range env {
+						gemini[k] = v
+					}
+					delete(gemini, "gcp_environment")
+				}
+			}
 		}
 	case "bedrock":
 		if opts, ok := model["options"].(map[string]any); ok {
@@ -192,8 +199,16 @@ func mapOptions(opts map[string]any, providerType string, provider *aigw.Provide
 			out["azure_api_version"] = v
 		case providerType == "anthropic" && k == "version":
 			out["anthropic_version"] = v
-		case (providerType == "gemini" || providerType == "vertex") && aimap.GeminiOptionKeys[k]:
-			addNested("gemini", k, v)
+		case (providerType == "gemini" || providerType == "vertex") && k == "gcp_environment":
+			if env, ok := v.(map[string]any); ok {
+				for ek, ev := range env {
+					if aimap.GeminiOptionKeys[ek] {
+						addNested("gemini", ek, ev)
+					} else {
+						out[ek] = ev
+					}
+				}
+			}
 		case providerType == "bedrock" && aimap.BedrockOptionKeys[k]:
 			if k == "region" {
 				addNested("bedrock", "aws_region", v)
@@ -226,9 +241,6 @@ func mapOptions(opts map[string]any, providerType string, provider *aigw.Provide
 		}
 		if providerType == "azure" && provider.Config.Instance != "" {
 			out["azure_instance"] = provider.Config.Instance
-		}
-		if (providerType == "gemini" || providerType == "vertex") && provider.Config.ProjectID != "" {
-			addNested("gemini", "project_id", provider.Config.ProjectID)
 		}
 		if providerType == "bedrock" {
 			a := provider.Config.Auth
