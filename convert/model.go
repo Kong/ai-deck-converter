@@ -1,6 +1,8 @@
 package convert
 
 import (
+	"fmt"
+
 	"github.com/Kong/ai-deck-converter/internal/aigw"
 	"github.com/Kong/ai-deck-converter/internal/aimap"
 	"github.com/Kong/ai-deck-converter/internal/kong"
@@ -170,7 +172,7 @@ func (c *Converter) convertModels() error {
 
 		// Model policy and ACL plugins scope to each route the model produces, plus
 		// the ai-model entity for type "model".
-		plugins, err := c.scopedPlugins(m.Policies, m.ACLs)
+		plugins, err := c.scopedPlugins(fmt.Sprintf("model %q", m.Name), m.Policies, m.ACLs)
 		if err != nil {
 			return err
 		}

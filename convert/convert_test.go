@@ -68,6 +68,31 @@ providers:
 	}
 }
 
+// A policy marked global:true is emitted once at the top level and applies to
+// all traffic. If it is ALSO referenced by a scoped attachment (e.g. a
+// consumer_group's policies list), that attachment is a silent no-op --
+// scopedPlugins must warn about this rather than dropping the reference
+// silently, so the config author can tell their narrower-scope intent was not
+// honored.
+func TestConvertWarnsGlobalPolicyReferencedByScopedAttachment(t *testing.T) {
+	src := []byte(`
+policies:
+  - type: rate-limiting
+    name: org-wide-limit
+    global: true
+    config: {minute: 1000, policy: local}
+consumer_groups:
+  - name: premium-users
+    policies: [org-wide-limit]
+`)
+	_, warnings, err := Convert(src, Options{})
+	require.NoError(t, err, "convert")
+	joined := strings.Join(warnings, "\n")
+	require.Contains(t, joined, "org-wide-limit", "expected a warning naming the global policy")
+	require.Contains(t, joined, "premium-users", "expected a warning naming the referencing consumer_group")
+	require.Contains(t, joined, "global", "expected the warning to explain the policy is global")
+}
+
 func TestConvertDocumentToDBLessYAML(t *testing.T) {
 	src := []byte(`
 models:
