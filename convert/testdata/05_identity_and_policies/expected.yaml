@@ -76,6 +76,7 @@ plugins:
     config:
       allow:
         - premium-users
+      include_consumer_groups: true
     route:
       name: openai-chat
     model:
