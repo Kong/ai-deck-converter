@@ -1,0 +1,40 @@
+models:
+  - type: model
+    display_name: Semantic LB
+    name: semantic-lb
+    capabilities: [generate]
+    formats:
+      - type: openai
+    targets:
+      - name: gpt-4o
+        provider: openai-main
+        config:
+          type: openai
+    policies: []
+    acls: {allow: [], deny: []}
+    config:
+      route:
+        paths: [/ai]
+      balancer:
+        algorithm: semantic
+        slots: 10000
+        embeddings:
+          provider: gemini-prod
+          model:
+            name: text-embedding-004
+            options:
+              gemini:
+                gcp_environment:
+                  api_endpoint: us-central1-aiplatform.googleapis.com
+                  location_id: us-central1
+                  project_id: my-project-id
+              upstream_url: https://generativelanguage.googleapis.com
+            provider: gemini
+providers:
+  - name: gemini-prod
+    type: gemini
+    display_name: Google Gemini AI (Prod)
+    config:
+      auth:
+        type: gcp
+        service_account_json: "{vault://ai/gcp-service-account-json}"

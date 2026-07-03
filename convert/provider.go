@@ -138,6 +138,17 @@ func mapEmbeddingsOptions(emb map[string]any, provider *aigw.Provider) {
 		if provider.Config.Instance != "" {
 			embeddingsNested(model, "azure")["instance"] = provider.Config.Instance
 		}
+	case "gemini", "vertex":
+		if opts, ok := model["options"].(map[string]any); ok {
+			if gemini, ok := opts["gemini"].(map[string]any); ok {
+				if env, ok := gemini["gcp_environment"].(map[string]any); ok {
+					for k, v := range env {
+						gemini[k] = v
+					}
+					delete(gemini, "gcp_environment")
+				}
+			}
+		}
 	case "bedrock":
 		if opts, ok := model["options"].(map[string]any); ok {
 			if b, ok := opts["bedrock"].(map[string]any); ok {
