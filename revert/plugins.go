@@ -44,6 +44,7 @@ func (r *Reverter) buildIndexes() {
 		}
 	}
 	for _, m := range r.src.AIModels {
+		r.aiModelByName[m.Name] = m
 		if m.Alias != "" {
 			r.aiModelByAlias[m.Alias] = m.Name
 		}

@@ -94,6 +94,7 @@ type Reverter struct {
 	// ai-models entries indexed by alias and name, with usage tracking so
 	// orphans can be reported.
 	aiModelByAlias map[string]string
+	aiModelByName  map[string]kong.AIModel
 	aiModelUsed    map[string]bool
 
 	// synthesized providers, deduped by fingerprint.
@@ -115,6 +116,7 @@ func newReverter(doc *kong.Document, opts Options) *Reverter {
 		src:            doc,
 		out:            &aigw.Document{},
 		aiModelByAlias: map[string]string{},
+		aiModelByName:  map[string]kong.AIModel{},
 		aiModelUsed:    map[string]bool{},
 		providerByFP:   map[string]string{},
 		providerNames:  map[string]bool{},

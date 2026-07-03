@@ -547,3 +547,72 @@ consumers:
 		t.Fatalf("expected no tags for bob, got %#v", bob.Tags)
 	}
 }
+
+// A model's `labels` map, like every other entity's, must convert into the
+// low-level `tags` field on its ai-models entry via labelsToTags.
+func TestConvertDBLessModelLabelsToTags(t *testing.T) {
+	src := []byte(`
+models:
+  - type: model
+    name: prod-model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    labels:
+      env: prod
+    targets:
+      - name: gpt-4o
+        provider: p1
+        config: {type: openai}
+    config:
+      route: {paths: [/prod]}
+      model: {alias: prod-model}
+  - type: model
+    name: plain-model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    targets:
+      - name: gpt-4o
+        provider: p1
+        config: {type: openai}
+    config:
+      route: {paths: [/plain]}
+      model: {alias: plain-model}
+providers:
+  - name: p1
+    type: openai
+`)
+
+	out, _, err := Convert(src, Options{OutputMode: "db-less"})
+	if err != nil {
+		t.Fatalf("convert db-less: %v", err)
+	}
+
+	var got struct {
+		AIModels []struct {
+			Name string   `yaml:"name"`
+			Tags []string `yaml:"tags"`
+		} `yaml:"ai_models"`
+	}
+	if err := yaml.Unmarshal(out, &got); err != nil {
+		t.Fatalf("unmarshal output: %v", err)
+	}
+	if len(got.AIModels) != 2 {
+		t.Fatalf("expected 2 ai_models, got %d: %s", len(got.AIModels), out)
+	}
+
+	prod := got.AIModels[0]
+	if prod.Name != "prod-model" {
+		t.Fatalf("unexpected name: %q", prod.Name)
+	}
+	if len(prod.Tags) != 1 || prod.Tags[0] != "env:prod" {
+		t.Fatalf("unexpected tags: %#v", prod.Tags)
+	}
+
+	plain := got.AIModels[1]
+	if plain.Name != "plain-model" {
+		t.Fatalf("unexpected name: %q", plain.Name)
+	}
+	if len(plain.Tags) != 0 {
+		t.Fatalf("expected no tags for plain-model, got %#v", plain.Tags)
+	}
+}

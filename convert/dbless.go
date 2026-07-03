@@ -149,6 +149,7 @@ func (c *Converter) projectDBLess() *kong.DBLessDocument {
 			ID:    ids.model[model.Name],
 			Name:  model.Name,
 			Alias: model.Alias,
+			Tags:  model.Tags,
 		})
 	}
 

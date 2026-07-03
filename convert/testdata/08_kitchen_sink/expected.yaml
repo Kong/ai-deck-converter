@@ -118,3 +118,5 @@ vaults:
 ai-models:
   - name: prod-chat
     alias: '@prod/prod-chat'
+    tags:
+      - env:prod

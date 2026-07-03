@@ -89,3 +89,6 @@ vaults:
 ai-models:
   - name: guarded-gpt
     alias: '@openai/guarded-gpt'
+    tags:
+      - env:prod
+      - team:ai-platform

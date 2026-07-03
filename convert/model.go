@@ -166,6 +166,7 @@ func (c *Converter) convertModels() error {
 			ID:    m.ID,
 			Name:  m.Name,
 			Alias: alias,
+			Tags:  c.labelsToTags(m.Labels),
 		})
 
 		// Model policy and ACL plugins scope to each route the model produces, plus
