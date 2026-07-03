@@ -78,6 +78,7 @@ type CIDRPort struct {
 // reference fields name the entity it is scoped to (rendered as `{name: <x>}`).
 // When nested under an entity, those fields are left nil.
 type Plugin struct {
+	ID            string         `yaml:"id,omitempty"`
 	Name          string         `yaml:"name"`
 	Enabled       *bool          `yaml:"enabled,omitempty"`
 	Config        map[string]any `yaml:"config,omitempty"`

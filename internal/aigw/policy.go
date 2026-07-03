@@ -4,6 +4,7 @@ package aigw
 // config is passed through. A global policy becomes a global Kong plugin;
 // otherwise it is instantiated as a scoped plugin on each referencing entity.
 type Policy struct {
+	ID          string         `yaml:"id,omitempty"`
 	Type        string         `yaml:"type,omitempty"`
 	DisplayName string         `yaml:"display_name,omitempty"`
 	Name        string         `yaml:"name,omitempty"`
