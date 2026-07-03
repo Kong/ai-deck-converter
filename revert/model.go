@@ -241,6 +241,9 @@ func (r *Reverter) finalizeModels(acc *modelAcc) error {
 		if isAPIOnly(g.caps) {
 			g.model.Type = "api"
 		}
+		if entry, ok := r.aiModelByName[g.model.Name]; ok {
+			g.model.Labels = r.tagsToLabels(entry.Tags)
+		}
 
 		for _, p := range r.idx.model[g.model.Name] {
 			if p.Name == "acl" {
@@ -263,6 +266,7 @@ func (r *Reverter) finalizeModels(acc *modelAcc) error {
 		}
 		model := aigw.Model{Type: "model", Name: m.Name}
 		model.Config.Model.Alias = m.Alias
+		model.Labels = r.tagsToLabels(m.Tags)
 		built[m.Name] = true
 		r.out.Models = append(r.out.Models, model)
 	}

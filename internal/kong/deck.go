@@ -130,7 +130,8 @@ type Vault struct {
 // AIModel is the Kong Gateway ai-model entity: a named model with an optional
 // request-body alias. Plugins scope to it via a Plugin.Model foreign key.
 type AIModel struct {
-	ID    string `yaml:"id,omitempty"`
-	Name  string `yaml:"name"`
-	Alias string `yaml:"alias,omitempty"`
+	ID    string   `yaml:"id,omitempty"`
+	Name  string   `yaml:"name"`
+	Alias string   `yaml:"alias,omitempty"`
+	Tags  []string `yaml:"tags,omitempty"`
 }
