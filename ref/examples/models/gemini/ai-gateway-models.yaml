@@ -3,7 +3,6 @@ providers:
   type: gemini
   display_name: "Google Gemini (Prod)"
   config:
-    project_id: kong-gemini-project
     auth:
       type: gcp
       service_account_json: "{vault://ai/gcp-service-account-json}"
@@ -36,6 +35,8 @@ models:
         provider: gemini-prod
         config:
           type: gemini
+          gcp_environment:
+            project_id: kong-gemini-project
           max_tokens: 4096
           temperature: 1.0
     policies: []
@@ -67,6 +68,8 @@ models:
         provider: gemini-prod
         config:
           type: gemini
+          gcp_environment:
+            project_id: kong-gemini-project
     policies: []
 
   # -------------------------------------------------------------------------
@@ -96,6 +99,8 @@ models:
         provider: gemini-prod
         config:
           type: gemini
+          gcp_environment:
+            project_id: kong-gemini-project
     policies: []
 
   # -------------------------------------------------------------------------
@@ -125,4 +130,6 @@ models:
         provider: gemini-prod
         config:
           type: gemini
+          gcp_environment:
+            project_id: kong-gemini-project
     policies: []

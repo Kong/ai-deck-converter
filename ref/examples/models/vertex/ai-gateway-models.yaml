@@ -3,7 +3,6 @@ providers:
   type: vertex
   display_name: "Google Vertex AI (Prod)"
   config:
-    project_id: kong-vertex-project
     auth:
       type: gcp
       service_account_json: "{vault://ai/gcp-service-account-json}"
@@ -38,7 +37,9 @@ models:
           # Vertex shares Gemini's target_model schema (no distinct vertex
           # target schema exists at the data-model layer).
           type: gemini
-          location_id: us-central1
+          gcp_environment:
+            project_id: kong-vertex-project
+            location_id: us-central1
           max_tokens: 4096
           temperature: 1.0
     policies: []
@@ -70,7 +71,9 @@ models:
         provider: vertex-prod
         config:
           type: gemini
-          location_id: us-central1
+          gcp_environment:
+            project_id: kong-vertex-project
+            location_id: us-central1
     policies: []
 
   # -------------------------------------------------------------------------
@@ -100,7 +103,9 @@ models:
         provider: vertex-prod
         config:
           type: gemini
-          location_id: us-central1
+          gcp_environment:
+            project_id: kong-vertex-project
+            location_id: us-central1
     policies: []
 
   # -------------------------------------------------------------------------
@@ -130,7 +135,9 @@ models:
         provider: vertex-prod
         config:
           type: gemini
-          location_id: us-central1
+          gcp_environment:
+            project_id: kong-vertex-project
+            location_id: us-central1
     policies: []
 
   # -------------------------------------------------------------------------
@@ -160,7 +167,9 @@ models:
         provider: vertex-prod
         config:
           type: gemini
-          location_id: us-central1
+          gcp_environment:
+            project_id: kong-vertex-project
+            location_id: us-central1
     policies: []
 
   # -------------------------------------------------------------------------
@@ -188,5 +197,7 @@ models:
         provider: vertex-prod
         config:
           type: gemini
-          location_id: us-central1
+          gcp_environment:
+            project_id: kong-vertex-project
+            location_id: us-central1
     policies: []
