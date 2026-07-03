@@ -76,16 +76,21 @@ func TestMapOptionsAzureRenames(t *testing.T) {
 }
 
 func TestMapOptionsGeminiNesting(t *testing.T) {
-	p := &aigw.Provider{Type: "vertex", Config: aigw.ProviderConfig{ProjectID: "kong-proj"}}
+	p := &aigw.Provider{Type: "vertex", Config: aigw.ProviderConfig{}}
 	got := mapOptions(map[string]any{
-		"max_tokens":  4096,
-		"location_id": "us-central1",
+		"max_tokens": 4096,
+		"gcp_environment": map[string]any{
+			"project_id":   "kong-proj",
+			"location_id":  "us-central1",
+			"api_endpoint": "https://us-central1-aiplatform.googleapis.com",
+		},
 	}, "vertex", p)
 	want := map[string]any{
 		"max_tokens": 4096,
 		"gemini": map[string]any{
-			"project_id":  "kong-proj",
-			"location_id": "us-central1",
+			"project_id":   "kong-proj",
+			"location_id":  "us-central1",
+			"api_endpoint": "https://us-central1-aiplatform.googleapis.com",
 		},
 	}
 	require.Equal(t, want, got, "mapOptions gemini mismatch")

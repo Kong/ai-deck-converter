@@ -163,7 +163,7 @@ func PluginProvider(providerType string) string {
 // GeminiOptionKeys are target-config keys that nest under model.options.gemini
 // for the gemini and vertex provider types.
 var GeminiOptionKeys = map[string]bool{
-	"location_id": true, "api_endpoint": true, "endpoint_id": true,
+	"location_id": true, "api_endpoint": true, "endpoint_id": true, "project_id": true,
 }
 
 // BedrockOptionKeys are target-config keys that nest under model.options.bedrock.

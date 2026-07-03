@@ -9,7 +9,9 @@ models:
       - name: gemini-2.5-pro
         provider: gemini-ai
         config:
-          location_id: us-central1
+          gcp_environment:
+            location_id: us-central1
+            project_id: kong-vertex-project
           max_tokens: 4096
           temperature: 1
           type: gemini
@@ -26,7 +28,9 @@ models:
       - name: text-embedding-005
         provider: gemini-ai
         config:
-          location_id: us-central1
+          gcp_environment:
+            location_id: us-central1
+            project_id: kong-vertex-project
           type: gemini
     config:
       model:
@@ -38,4 +42,3 @@ providers:
       auth:
         type: gcp
         service_account_json: '{vault://ai/gcp-service-account-json}'
-      project_id: kong-vertex-project

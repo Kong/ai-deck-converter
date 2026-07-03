@@ -94,12 +94,12 @@ func defoldOptions(options map[string]any, providerType string, d *defoldedTarge
 			out["version"] = v
 		case (providerType == "gemini" || providerType == "vertex") && k == "gemini":
 			block, _ := v.(map[string]any)
-			for gk, gv := range block {
-				if gk == "project_id" {
-					d.projectID, _ = gv.(string)
-				} else {
-					out[gk] = gv
+			if len(block) > 0 {
+				env := make(map[string]any, len(block))
+				for gk, gv := range block {
+					env[gk] = gv
 				}
+				out["gcp_environment"] = env
 			}
 		case providerType == "bedrock" && k == "bedrock":
 			block, _ := v.(map[string]any)
