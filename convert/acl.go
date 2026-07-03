@@ -42,6 +42,9 @@ func defaultACLBlock(acls aigw.ACLs) []map[string]any {
 // match anything and the plugin could never allow a request.
 func aclPlugin(acls aigw.ACLs) kong.Plugin {
 	config := aclBlock(acls)
+	if config == nil {
+		config = map[string]any{}
+	}
 	config["include_consumer_groups"] = true
 	return kong.Plugin{Name: "acl", Config: config}
 }
