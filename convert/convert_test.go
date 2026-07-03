@@ -99,6 +99,46 @@ providers:
 	require.Equal(t, string(want), string(got), "typed db-less output mismatch")
 }
 
+func TestConvertDBLessPreservesProvidedPolicyIDAndGeneratesMissingOnes(t *testing.T) {
+	src := []byte(`
+policies:
+  - id: provided-policy-id
+    type: rate-limiting
+    name: org-wide-limit
+    global: true
+    config:
+      minute: 1000
+      policy: local
+  - type: key-auth
+    name: require-key
+    global: true
+`)
+
+	out, _, err := Convert(src, Options{OutputMode: "db-less"})
+	require.NoError(t, err, "convert db-less")
+
+	var got map[string]any
+	require.NoError(t, yaml.Unmarshal(out, &got), "unmarshal output")
+
+	plugins, ok := got["plugins"].([]any)
+	require.True(t, ok, "expected plugins collection")
+	require.Len(t, plugins, 2)
+
+	pluginsByName := make(map[string]map[string]any, len(plugins))
+	for _, raw := range plugins {
+		plugin, ok := raw.(map[string]any)
+		require.True(t, ok, "expected plugin entry")
+		pluginsByName[plugin["name"].(string)] = plugin
+	}
+
+	require.Equal(t, "provided-policy-id", pluginsByName["rate-limiting"]["id"])
+
+	keyAuthID, ok := pluginsByName["key-auth"]["id"].(string)
+	require.True(t, ok, "expected generated key-auth plugin id")
+	require.NotEmpty(t, keyAuthID)
+	require.NotEqual(t, "provided-policy-id", keyAuthID)
+}
+
 func TestConvertMapsConfiguredModelAlias(t *testing.T) {
 	src := []byte(`
 models:
