@@ -209,3 +209,5 @@ ai_models:
   - id: aab20033-7c80-5942-aadc-52357371dbeb
     name: my-balancer-ch-model
     alias: my-model-alias
+    tags:
+      - env:production

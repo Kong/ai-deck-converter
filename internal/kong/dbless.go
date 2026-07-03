@@ -107,9 +107,10 @@ type DBLessVault struct {
 }
 
 type DBLessAIModel struct {
-	ID    string `yaml:"id"`
-	Name  string `yaml:"name"`
-	Alias string `yaml:"alias,omitempty"`
+	ID    string   `yaml:"id"`
+	Name  string   `yaml:"name"`
+	Alias string   `yaml:"alias,omitempty"`
+	Tags  []string `yaml:"tags,omitempty"`
 }
 
 type DBLessKeyAuthCredential struct {

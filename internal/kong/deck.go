@@ -78,6 +78,7 @@ type CIDRPort struct {
 // reference fields name the entity it is scoped to (rendered as `{name: <x>}`).
 // When nested under an entity, those fields are left nil.
 type Plugin struct {
+	ID            string         `yaml:"id,omitempty"`
 	Name          string         `yaml:"name"`
 	Enabled       *bool          `yaml:"enabled,omitempty"`
 	Config        map[string]any `yaml:"config,omitempty"`
@@ -130,7 +131,8 @@ type Vault struct {
 // AIModel is the Kong Gateway ai-model entity: a named model with an optional
 // request-body alias. Plugins scope to it via a Plugin.Model foreign key.
 type AIModel struct {
-	ID    string `yaml:"id,omitempty"`
-	Name  string `yaml:"name"`
-	Alias string `yaml:"alias,omitempty"`
+	ID    string   `yaml:"id,omitempty"`
+	Name  string   `yaml:"name"`
+	Alias string   `yaml:"alias,omitempty"`
+	Tags  []string `yaml:"tags,omitempty"`
 }

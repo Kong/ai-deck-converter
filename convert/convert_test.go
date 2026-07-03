@@ -154,6 +154,46 @@ providers:
 	require.Equal(t, string(want), string(got), "typed db-less output mismatch")
 }
 
+func TestConvertDBLessPreservesProvidedPolicyIDAndGeneratesMissingOnes(t *testing.T) {
+	src := []byte(`
+policies:
+  - id: provided-policy-id
+    type: rate-limiting
+    name: org-wide-limit
+    global: true
+    config:
+      minute: 1000
+      policy: local
+  - type: key-auth
+    name: require-key
+    global: true
+`)
+
+	out, _, err := Convert(src, Options{OutputMode: "db-less"})
+	require.NoError(t, err, "convert db-less")
+
+	var got map[string]any
+	require.NoError(t, yaml.Unmarshal(out, &got), "unmarshal output")
+
+	plugins, ok := got["plugins"].([]any)
+	require.True(t, ok, "expected plugins collection")
+	require.Len(t, plugins, 2)
+
+	pluginsByName := make(map[string]map[string]any, len(plugins))
+	for _, raw := range plugins {
+		plugin, ok := raw.(map[string]any)
+		require.True(t, ok, "expected plugin entry")
+		pluginsByName[plugin["name"].(string)] = plugin
+	}
+
+	require.Equal(t, "provided-policy-id", pluginsByName["rate-limiting"]["id"])
+
+	keyAuthID, ok := pluginsByName["key-auth"]["id"].(string)
+	require.True(t, ok, "expected generated key-auth plugin id")
+	require.NotEmpty(t, keyAuthID)
+	require.NotEqual(t, "provided-policy-id", keyAuthID)
+}
+
 func TestConvertMapsConfiguredModelAlias(t *testing.T) {
 	src := []byte(`
 models:
@@ -330,6 +370,44 @@ agents:
 	require.NotNil(t, byName["off-agent"], "disabled agent must emit enabled")
 	require.False(t, *byName["off-agent"], "disabled agent service must be enabled=false")
 	require.Nil(t, byName["on-agent"], "enabled agent should not emit the flag")
+}
+
+func TestConvertDisabledMCPServerDisablesService(t *testing.T) {
+	src := []byte(`
+mcp_servers:
+  - type: conversion-listener
+    name: off-mcp
+    enabled: false
+    config:
+      route: {paths: [/mcp/off]}
+    tools:
+      - {name: t, description: a tool, method: GET, path: /t, scheme: https, host: x.internal}
+  - type: passthrough-listener
+    name: on-mcp
+    enabled: true
+    upstream_url: https://b.internal/mcp
+    config:
+      route: {paths: [/mcp/on]}
+`)
+	out, _, err := Convert(src, Options{OutputMode: "db-less"})
+	require.NoError(t, err, "convert db-less")
+
+	var got struct {
+		Services []struct {
+			Name    string `yaml:"name"`
+			Enabled *bool  `yaml:"enabled"`
+		} `yaml:"services"`
+	}
+	require.NoError(t, yaml.Unmarshal(out, &got), "unmarshal output")
+
+	byName := map[string]*bool{}
+	for _, s := range got.Services {
+		byName[s.Name] = s.Enabled
+	}
+	require.Contains(t, byName, "off-mcp")
+	require.NotNil(t, byName["off-mcp"], "disabled MCP server must emit enabled")
+	require.False(t, *byName["off-mcp"], "disabled MCP server service must be enabled=false")
+	require.Nil(t, byName["on-mcp"], "enabled MCP server should not emit the flag")
 }
 
 func TestConvertDBLessFlattensConsumerCredentialsAndGroups(t *testing.T) {
@@ -600,5 +678,74 @@ consumers:
 	}
 	if len(bob.Tags) != 0 {
 		t.Fatalf("expected no tags for bob, got %#v", bob.Tags)
+	}
+}
+
+// A model's `labels` map, like every other entity's, must convert into the
+// low-level `tags` field on its ai-models entry via labelsToTags.
+func TestConvertDBLessModelLabelsToTags(t *testing.T) {
+	src := []byte(`
+models:
+  - type: model
+    name: prod-model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    labels:
+      env: prod
+    targets:
+      - name: gpt-4o
+        provider: p1
+        config: {type: openai}
+    config:
+      route: {paths: [/prod]}
+      model: {alias: prod-model}
+  - type: model
+    name: plain-model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    targets:
+      - name: gpt-4o
+        provider: p1
+        config: {type: openai}
+    config:
+      route: {paths: [/plain]}
+      model: {alias: plain-model}
+providers:
+  - name: p1
+    type: openai
+`)
+
+	out, _, err := Convert(src, Options{OutputMode: "db-less"})
+	if err != nil {
+		t.Fatalf("convert db-less: %v", err)
+	}
+
+	var got struct {
+		AIModels []struct {
+			Name string   `yaml:"name"`
+			Tags []string `yaml:"tags"`
+		} `yaml:"ai_models"`
+	}
+	if err := yaml.Unmarshal(out, &got); err != nil {
+		t.Fatalf("unmarshal output: %v", err)
+	}
+	if len(got.AIModels) != 2 {
+		t.Fatalf("expected 2 ai_models, got %d: %s", len(got.AIModels), out)
+	}
+
+	prod := got.AIModels[0]
+	if prod.Name != "prod-model" {
+		t.Fatalf("unexpected name: %q", prod.Name)
+	}
+	if len(prod.Tags) != 1 || prod.Tags[0] != "env:prod" {
+		t.Fatalf("unexpected tags: %#v", prod.Tags)
+	}
+
+	plain := got.AIModels[1]
+	if plain.Name != "plain-model" {
+		t.Fatalf("unexpected name: %q", plain.Name)
+	}
+	if len(plain.Tags) != 0 {
+		t.Fatalf("expected no tags for plain-model, got %#v", plain.Tags)
 	}
 }

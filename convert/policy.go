@@ -53,7 +53,7 @@ func (c *Converter) scopedPlugins(refs []string, acls aigw.ACLs) ([]kong.Plugin,
 }
 
 func policyPlugin(p *aigw.Policy, tags []string) kong.Plugin {
-	plugin := kong.Plugin{Name: p.Type, Config: p.Config, Tags: tags}
+	plugin := kong.Plugin{ID: p.ID, Name: p.Type, Config: p.Config, Tags: tags}
 	if p.Enabled != nil && !*p.Enabled {
 		disabled := false
 		plugin.Enabled = &disabled

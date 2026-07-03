@@ -67,7 +67,7 @@ func (c *Converter) projectDBLess() *kong.DBLessDocument {
 			out.Routes = append(out.Routes, toDBLessRoute(route, routeID, svcID))
 
 			for pluginIdx, plugin := range route.Plugins {
-				id := stableUUID(fmt.Sprintf("plugin:route:%s:%s:%d", route.Name, plugin.Name, pluginIdx))
+				id := firstNonEmpty(plugin.ID, stableUUID(fmt.Sprintf("plugin:route:%s:%s:%d", route.Name, plugin.Name, pluginIdx)))
 				ids.plugin[id] = id
 				out.Plugins = append(out.Plugins, toDBLessPlugin(plugin, id, scopeRef{route: routeID}))
 			}
@@ -75,7 +75,7 @@ func (c *Converter) projectDBLess() *kong.DBLessDocument {
 		}
 
 		for pluginIdx, plugin := range svc.Plugins {
-			id := stableUUID(fmt.Sprintf("plugin:service:%s:%s:%d", svc.Name, plugin.Name, pluginIdx))
+			id := firstNonEmpty(plugin.ID, stableUUID(fmt.Sprintf("plugin:service:%s:%s:%d", svc.Name, plugin.Name, pluginIdx)))
 			ids.plugin[id] = id
 			out.Plugins = append(out.Plugins, toDBLessPlugin(plugin, id, scopeRef{service: svcID}))
 		}
@@ -99,7 +99,7 @@ func (c *Converter) projectDBLess() *kong.DBLessDocument {
 			})
 		}
 		for pluginIdx, plugin := range consumer.Plugins {
-			id := stableUUID(fmt.Sprintf("plugin:consumer:%s:%s:%d", consumer.Username, plugin.Name, pluginIdx))
+			id := firstNonEmpty(plugin.ID, stableUUID(fmt.Sprintf("plugin:consumer:%s:%s:%d", consumer.Username, plugin.Name, pluginIdx)))
 			out.Plugins = append(out.Plugins, toDBLessPlugin(plugin, id, scopeRef{consumer: consumerID}))
 		}
 		for _, groupName := range consumer.Groups {
@@ -128,7 +128,7 @@ func (c *Converter) projectDBLess() *kong.DBLessDocument {
 			Tags: group.Tags,
 		})
 		for pluginIdx, plugin := range group.Plugins {
-			id := stableUUID(fmt.Sprintf("plugin:consumer_group:%s:%s:%d", group.Name, plugin.Name, pluginIdx))
+			id := firstNonEmpty(plugin.ID, stableUUID(fmt.Sprintf("plugin:consumer_group:%s:%s:%d", group.Name, plugin.Name, pluginIdx)))
 			out.Plugins = append(out.Plugins, toDBLessPlugin(plugin, id, scopeRef{consumerGroup: groupID}))
 		}
 	}
@@ -149,11 +149,12 @@ func (c *Converter) projectDBLess() *kong.DBLessDocument {
 			ID:    ids.model[model.Name],
 			Name:  model.Name,
 			Alias: model.Alias,
+			Tags:  model.Tags,
 		})
 	}
 
 	for pluginIdx, plugin := range c.out.Plugins {
-		id := stableUUID(fmt.Sprintf("plugin:top:%s:%d", plugin.Name, pluginIdx))
+		id := firstNonEmpty(plugin.ID, stableUUID(fmt.Sprintf("plugin:top:%s:%d", plugin.Name, pluginIdx)))
 		out.Plugins = append(out.Plugins, toDBLessPlugin(plugin, id, scopeRef{
 			service:       lookupRef(plugin.Service, ids.service),
 			route:         lookupRouteRef(plugin.Route, ids.route),
