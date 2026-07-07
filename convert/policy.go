@@ -13,7 +13,7 @@ func (c *Converter) convertGlobalPolicies() {
 	for i := range c.src.Policies {
 		p := &c.src.Policies[i]
 		if p.Global != nil && *p.Global {
-			c.out.Plugins = append(c.out.Plugins, policyPlugin(p, c.labelsToTags(p.Labels)))
+			c.out.Plugins = append(c.out.Plugins, policyPlugin(p, c.labelsToTags(p.Labels), true))
 		}
 	}
 }
@@ -38,7 +38,7 @@ func (c *Converter) scopedPlugins(refs []string, acls aigw.ACLs) ([]kong.Plugin,
 		if p.Global != nil && *p.Global {
 			continue // emitted once at the top level
 		}
-		plugins = append(plugins, policyPlugin(p, nil))
+		plugins = append(plugins, policyPlugin(p, nil, false))
 	}
 	if !acls.IsEmpty() {
 		// A Kong acl plugin enforces only_one_of {config.allow, config.deny}; an
@@ -52,8 +52,11 @@ func (c *Converter) scopedPlugins(refs []string, acls aigw.ACLs) ([]kong.Plugin,
 	return plugins, nil
 }
 
-func policyPlugin(p *aigw.Policy, tags []string) kong.Plugin {
-	plugin := kong.Plugin{ID: p.ID, Name: p.Type, Config: p.Config, Tags: tags}
+func policyPlugin(p *aigw.Policy, tags []string, preserveID bool) kong.Plugin {
+	plugin := kong.Plugin{Name: p.Type, Config: p.Config, Tags: tags}
+	if preserveID {
+		plugin.ID = p.ID
+	}
 	if p.Enabled != nil && !*p.Enabled {
 		disabled := false
 		plugin.Enabled = &disabled

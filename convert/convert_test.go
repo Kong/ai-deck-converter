@@ -826,3 +826,89 @@ mcp_servers:
 		t.Fatalf("unexpected listener tag: %q", listenerTag)
 	}
 }
+
+func TestConvertScopedPoliciesDoNotReusePolicyID(t *testing.T) {
+	src := []byte(`
+policies:
+  - id: policy-123
+    name: sanitizer
+    type: ai-sanitizer
+    config:
+      host: localhost
+models:
+  - type: model
+    name: model-one
+    capabilities: [generate]
+    formats: [{type: openai}]
+    policies: [sanitizer]
+    targets:
+      - name: gpt-4o
+        provider: p1
+        config: {type: openai}
+    config:
+      route: {paths: [/model-one]}
+      model: {alias: model-one}
+  - type: api
+    name: api-one
+    capabilities: [files]
+    formats: [{type: openai}]
+    policies: [sanitizer]
+    targets:
+      - name: files-api
+        provider: p1
+        config: {type: openai}
+    config:
+      route: {paths: [/api-one]}
+      model: {name_header: false}
+providers:
+  - name: p1
+    type: openai
+`)
+
+	out, _, err := Convert(src, Options{OutputMode: "db-less"})
+	if err != nil {
+		t.Fatalf("convert db-less: %v", err)
+	}
+
+	var got struct {
+		Plugins []struct {
+			ID    string `yaml:"id"`
+			Name  string `yaml:"name"`
+			Route struct {
+				ID string `yaml:"id"`
+			} `yaml:"route"`
+			Model struct {
+				ID string `yaml:"id"`
+			} `yaml:"model"`
+		} `yaml:"plugins"`
+	}
+	if err := yaml.Unmarshal(out, &got); err != nil {
+		t.Fatalf("unmarshal output: %v", err)
+	}
+
+	var sanitizerCount int
+	seenIDs := map[string]bool{}
+	for _, plugin := range got.Plugins {
+		if plugin.Name != "ai-sanitizer" {
+			continue
+		}
+		sanitizerCount++
+		if plugin.ID == "" {
+			t.Fatalf("scoped ai-sanitizer plugin missing ID: %#v", plugin)
+		}
+		if plugin.ID == "policy-123" {
+			t.Fatalf("scoped ai-sanitizer plugin unexpectedly preserved source policy ID %q", plugin.ID)
+		}
+		if seenIDs[plugin.ID] {
+			t.Fatalf("scoped ai-sanitizer plugins unexpectedly reused generated ID %q", plugin.ID)
+		}
+		seenIDs[plugin.ID] = true
+		if plugin.Route.ID == "" {
+			t.Fatalf("scoped ai-sanitizer plugin missing route ref: %#v", plugin)
+		}
+	}
+
+	if sanitizerCount != 2 {
+		t.Fatalf("expected 2 scoped ai-sanitizer plugins, got %d: %s", sanitizerCount, out)
+	}
+}
