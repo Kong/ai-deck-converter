@@ -25,8 +25,10 @@ func TestCapabilitiesFor(t *testing.T) {
 		CapabilitiesFor("gemini", "gemini"))
 	// A format whose section is provider-independent.
 	require.Equal(t, []string{"rerank"}, CapabilitiesFor("cohere", "cohere"))
-	// An unknown format yields nil.
+	// An unknown format yields nil, as does a rendering section passed as a format (parity with
+	// Formats, which excludes "vertex").
 	require.Nil(t, CapabilitiesFor("nope", ""))
+	require.Nil(t, CapabilitiesFor("vertex", "vertex"))
 }
 
 func TestSectionDerivation(t *testing.T) {

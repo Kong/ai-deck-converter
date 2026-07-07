@@ -90,8 +90,12 @@ func Formats() []string {
 // served by the given provider type, resolved through the same section routing the converter uses
 // (SectionFor) — so the gemini format served by Vertex reports the Vertex-only image, video, and
 // rerank capabilities, while served by Gemini it does not. "generate" is listed first when
-// present, the rest sorted. An unknown format yields nil.
+// present, the rest sorted. An unknown format, or a rendering section passed as a format, yields
+// nil — keeping parity with Formats, which excludes those sections.
 func CapabilitiesFor(format, providerType string) []string {
+	if _, rendering := renderingSections[format]; rendering {
+		return nil
+	}
 	caps, ok := EndpointTable[SectionFor(format, providerType)]
 	if !ok {
 		return nil
