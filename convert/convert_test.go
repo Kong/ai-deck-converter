@@ -749,3 +749,80 @@ providers:
 		t.Fatalf("expected no tags for plain-model, got %#v", plain.Tags)
 	}
 }
+
+func TestConvertDBLessMCPLabelsBecomePluginTags(t *testing.T) {
+	src := []byte(`
+mcp_servers:
+  - type: conversion-only
+    name: team-a
+    labels:
+      aigw610: tools
+    config:
+      route: {paths: [/mcp/team-a]}
+      url: https://team-a.internal.example.com/mcp
+      tools:
+        - name: team-a-get-report
+          description: Get a report
+          method: GET
+          path: /report
+  - type: listener
+    name: aggregate
+    config:
+      route: {paths: [/mcp/aggregate]}
+      server:
+        tag: aigw610:tools
+`)
+
+	out, _, err := Convert(src, Options{OutputMode: "db-less"})
+	if err != nil {
+		t.Fatalf("convert db-less: %v", err)
+	}
+
+	var got struct {
+		Services []struct {
+			Name string   `yaml:"name"`
+			Tags []string `yaml:"tags"`
+		} `yaml:"services"`
+		Plugins []struct {
+			Name   string         `yaml:"name"`
+			Tags   []string       `yaml:"tags"`
+			Config map[string]any `yaml:"config"`
+		} `yaml:"plugins"`
+	}
+	if err := yaml.Unmarshal(out, &got); err != nil {
+		t.Fatalf("unmarshal output: %v", err)
+	}
+
+	var teamAServiceTags []string
+	for _, service := range got.Services {
+		if service.Name == "team-a" {
+			teamAServiceTags = service.Tags
+			break
+		}
+	}
+	if len(teamAServiceTags) != 1 || teamAServiceTags[0] != "aigw610:tools" {
+		t.Fatalf("unexpected team-a service tags: %#v", teamAServiceTags)
+	}
+
+	var conversionOnlyTags []string
+	var listenerTag string
+	for _, plugin := range got.Plugins {
+		if plugin.Name != "ai-mcp-proxy" {
+			continue
+		}
+		if plugin.Config["mode"] == "conversion-only" {
+			conversionOnlyTags = plugin.Tags
+		}
+		if plugin.Config["mode"] == "listener" {
+			server, _ := plugin.Config["server"].(map[string]any)
+			listenerTag, _ = server["tag"].(string)
+		}
+	}
+
+	if len(conversionOnlyTags) != 1 || conversionOnlyTags[0] != "aigw610:tools" {
+		t.Fatalf("unexpected conversion-only plugin tags: %#v", conversionOnlyTags)
+	}
+	if listenerTag != "aigw610:tools" {
+		t.Fatalf("unexpected listener tag: %q", listenerTag)
+	}
+}

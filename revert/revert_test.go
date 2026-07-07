@@ -175,6 +175,68 @@ ai-models:
 	require.Empty(t, doc.Models[0].Config.Model.Alias, "synthetic ai-models alias should not be restored into model.alias")
 }
 
+func TestMCPLabelsPreferPluginTagsWithServiceFallback(t *testing.T) {
+	in := []byte(`
+_format_version: "3.0"
+services:
+  - name: team-a
+    url: https://team-a.internal.example.com/mcp
+    tags: [legacy:service]
+    routes:
+      - name: team-a-route
+        paths: [/mcp/team-a]
+        plugins:
+          - name: ai-mcp-proxy
+            tags: [aigw610:tools]
+            config:
+              mode: conversion-only
+              tools:
+                - name: team-a-get-report
+                  description: Get a report
+                  method: GET
+                  path: /report
+  - name: aggregate
+    host: localhost
+    routes:
+      - name: aggregate-route
+        paths: [/mcp/aggregate]
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              mode: listener
+              server:
+                tag: aigw610:tools
+  - name: fallback
+    url: https://fallback.internal.example.com/mcp
+    tags: [fallback:service]
+    routes:
+      - name: fallback-route
+        paths: [/mcp/fallback]
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              mode: conversion-only
+              tools:
+                - name: fallback-tool
+                  description: Fallback tool
+                  method: GET
+                  path: /fallback
+`)
+
+	doc, warnings, err := revertYAML(t, in, Options{Strict: true})
+	require.NoErrorf(t, err, "strict revert (warnings: %v)", warnings)
+	require.Empty(t, warnings, "want no warnings")
+	require.Len(t, doc.MCPServers, 3, "mcp servers = %+v", doc.MCPServers)
+
+	byName := map[string]aigw.MCPServer{}
+	for _, server := range doc.MCPServers {
+		byName[server.Name] = server
+	}
+
+	require.Equal(t, aigw.Labels{"aigw610": "tools"}, byName["team-a"].Labels, "plugin tags should win")
+	require.Equal(t, aigw.Labels{"fallback": "service"}, byName["fallback"].Labels, "service tags should remain the fallback")
+}
+
 func TestMismatchedAliasStillWarns(t *testing.T) {
 	// When ai-models entries exist but a target alias matches none of them,
 	// that is a genuine inconsistency and keeps its warning.

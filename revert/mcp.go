@@ -11,12 +11,18 @@ import (
 // access_token_claim_field / default_acl) becomes config.auth, and any other
 // route- or service-level plugins become policies.
 func (r *Reverter) revertMCPServer(svc *kong.Service, rt *kong.Route, plugins, svcPlugins []kong.Plugin) error {
-	cfg := findPlugin(plugins, "ai-mcp-proxy").Config
+	mcpPlugin := findPlugin(plugins, "ai-mcp-proxy")
+	cfg := mcpPlugin.Config
+
+	labels := r.tagsToLabels(mcpPlugin.Tags)
+	if len(labels) == 0 {
+		labels = r.tagsToLabels(svc.Tags)
+	}
 
 	m := aigw.MCPServer{
 		Type:   getStr(cfg, "mode"),
 		Name:   svc.Name,
-		Labels: r.tagsToLabels(svc.Tags),
+		Labels: labels,
 	}
 	if m.Type == "" {
 		if err := r.warn("MCP server %q: ai-mcp-proxy has no mode; defaulting to listener", svc.Name); err != nil {
