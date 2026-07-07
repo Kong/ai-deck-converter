@@ -24,6 +24,7 @@ type (
 	Labels            = internal.Labels
 	Consumer          = internal.Consumer
 	ConsumerGroup     = internal.ConsumerGroup
+	Credential        = internal.Credential
 	MCPServer         = internal.MCPServer
 	Agent             = internal.Agent
 	Vault             = internal.Vault
