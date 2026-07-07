@@ -5,7 +5,10 @@
 // directions on one table guarantees they cannot drift.
 package aimap
 
-import "strings"
+import (
+	"sort"
+	"strings"
+)
 
 // EndpointSpec describes the Kong route that serves a given (section, capability).
 // Routes are grouped by (section, RouteLabel); specs sharing a label collapse to
@@ -57,6 +60,70 @@ func SectionFor(format, providerType string) string {
 		return "vertex"
 	}
 	return format
+}
+
+// renderingSections are EndpointTable sections that are provider-specific renderings of a client
+// format rather than formats in their own right: SectionFor routes some (format, providerType)
+// pairs to them (the gemini format served by Vertex -> "vertex"). Each maps to its base format.
+// They are excluded from Formats and folded into their base format's capabilities. Keep in step
+// with SectionFor's special cases.
+var renderingSections = map[string]string{
+	"vertex": "gemini",
+}
+
+// Formats returns the client-facing wire formats a model may declare (the valid Format.Type
+// values), sorted. Provider-rendering sections such as "vertex" are EndpointTable keys but not
+// formats, so they are excluded.
+func Formats() []string {
+	out := make([]string, 0, len(EndpointTable))
+	for section := range EndpointTable {
+		if _, rendering := renderingSections[section]; rendering {
+			continue
+		}
+		out = append(out, section)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// CapabilitiesFor returns the capabilities a model of the given client format may declare, unioned
+// across every section that format can resolve to — so gemini also reports the Vertex-only image,
+// video, and rerank capabilities. "generate" is listed first when present, the rest sorted. An
+// unknown format, or a rendering section passed as a format, yields nil.
+func CapabilitiesFor(format string) []string {
+	if _, rendering := renderingSections[format]; rendering {
+		return nil
+	}
+	caps, ok := EndpointTable[format]
+	if !ok {
+		return nil
+	}
+	set := make(map[string]bool, len(caps))
+	for c := range caps {
+		set[c] = true
+	}
+	for section, base := range renderingSections {
+		if base == format {
+			for c := range EndpointTable[section] {
+				set[c] = true
+			}
+		}
+	}
+	rest := make([]string, 0, len(set))
+	hasGenerate := false
+	for c := range set {
+		if c == "generate" {
+			hasGenerate = true
+			continue
+		}
+		rest = append(rest, c)
+	}
+	sort.Strings(rest)
+	out := make([]string, 0, len(set))
+	if hasGenerate {
+		out = append(out, "generate")
+	}
+	return append(out, rest...)
 }
 
 // EndpointTable maps section -> capability -> endpoint spec, derived from

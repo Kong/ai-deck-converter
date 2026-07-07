@@ -6,6 +6,26 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestFormats(t *testing.T) {
+	got := Formats()
+	// The valid Format.Type values, i.e. EndpointTable sections minus provider renderings.
+	want := []string{"anthropic", "bedrock", "cohere", "gemini", "huggingface", "openai"}
+	require.Equal(t, want, got)
+	require.NotContains(t, got, "vertex", "vertex is a rendering of gemini, not a client format")
+}
+
+func TestCapabilitiesFor(t *testing.T) {
+	// gemini folds in the Vertex-only image/video/rerank capabilities, generate first.
+	require.Equal(t,
+		[]string{"generate", "batches", "embeddings", "files", "image", "rerank", "video"},
+		CapabilitiesFor("gemini"))
+	// A format with no rendering section is unaffected.
+	require.Equal(t, []string{"rerank"}, CapabilitiesFor("cohere"))
+	// A rendering section is not a format, and an unknown format yields nil.
+	require.Nil(t, CapabilitiesFor("vertex"))
+	require.Nil(t, CapabilitiesFor("nope"))
+}
+
 func TestSectionDerivation(t *testing.T) {
 	cases := []struct {
 		format, providerType, want string
