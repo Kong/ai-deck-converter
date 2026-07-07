@@ -96,7 +96,11 @@ func (c *Converter) mcpPlugin(m *aigw.MCPServer) (kong.Plugin, error) {
 	if tools != nil {
 		cfg["tools"] = tools
 	}
-	return kong.Plugin{Name: "ai-mcp-proxy", Config: cfg}, nil
+	return kong.Plugin{
+		Name:   "ai-mcp-proxy",
+		Config: cfg,
+		Tags:   c.labelsToTags(m.Labels),
+	}, nil
 }
 
 func (c *Converter) mcpTools(serverName string, tools []aigw.MCPTool) ([]map[string]any, error) {
