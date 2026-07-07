@@ -13,8 +13,10 @@ func Formats() []string {
 	return aimap.Formats()
 }
 
-// CapabilitiesFor returns the capabilities a model of the given client format may declare, with
-// "generate" first when present and the rest sorted. An unknown format yields nil.
-func CapabilitiesFor(format string) []string {
-	return aimap.CapabilitiesFor(format)
+// CapabilitiesFor returns the capabilities a model of the given client format may declare when
+// served by the given provider type, with "generate" first when present and the rest sorted. The
+// provider type matters only for the gemini format, which Vertex serves with a wider capability
+// set than Gemini. An unknown format yields nil.
+func CapabilitiesFor(format, providerType string) []string {
+	return aimap.CapabilitiesFor(format, providerType)
 }

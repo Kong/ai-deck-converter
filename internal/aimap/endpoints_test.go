@@ -15,15 +15,18 @@ func TestFormats(t *testing.T) {
 }
 
 func TestCapabilitiesFor(t *testing.T) {
-	// gemini folds in the Vertex-only image/video/rerank capabilities, generate first.
+	// gemini served by Vertex folds in the Vertex-only image/video/rerank, generate first.
 	require.Equal(t,
-		[]string{"generate", "batches", "embeddings", "files", "image", "rerank", "video"},
-		CapabilitiesFor("gemini"))
-	// A format with no rendering section is unaffected.
-	require.Equal(t, []string{"rerank"}, CapabilitiesFor("cohere"))
-	// A rendering section is not a format, and an unknown format yields nil.
-	require.Nil(t, CapabilitiesFor("vertex"))
-	require.Nil(t, CapabilitiesFor("nope"))
+		[]string{"generate", "batches", "embeddings", "image", "rerank", "video"},
+		CapabilitiesFor("gemini", "vertex"))
+	// gemini served by Gemini has no image/video/rerank.
+	require.Equal(t,
+		[]string{"generate", "batches", "embeddings", "files"},
+		CapabilitiesFor("gemini", "gemini"))
+	// A format whose section is provider-independent.
+	require.Equal(t, []string{"rerank"}, CapabilitiesFor("cohere", "cohere"))
+	// An unknown format yields nil.
+	require.Nil(t, CapabilitiesFor("nope", ""))
 }
 
 func TestSectionDerivation(t *testing.T) {

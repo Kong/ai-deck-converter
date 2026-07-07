@@ -86,32 +86,19 @@ func Formats() []string {
 	return out
 }
 
-// CapabilitiesFor returns the capabilities a model of the given client format may declare, unioned
-// across every section that format can resolve to — so gemini also reports the Vertex-only image,
-// video, and rerank capabilities. "generate" is listed first when present, the rest sorted. An
-// unknown format, or a rendering section passed as a format, yields nil.
-func CapabilitiesFor(format string) []string {
-	if _, rendering := renderingSections[format]; rendering {
-		return nil
-	}
-	caps, ok := EndpointTable[format]
+// CapabilitiesFor returns the capabilities a model of the given client format may declare when
+// served by the given provider type, resolved through the same section routing the converter uses
+// (SectionFor) — so the gemini format served by Vertex reports the Vertex-only image, video, and
+// rerank capabilities, while served by Gemini it does not. "generate" is listed first when
+// present, the rest sorted. An unknown format yields nil.
+func CapabilitiesFor(format, providerType string) []string {
+	caps, ok := EndpointTable[SectionFor(format, providerType)]
 	if !ok {
 		return nil
 	}
-	set := make(map[string]bool, len(caps))
-	for c := range caps {
-		set[c] = true
-	}
-	for section, base := range renderingSections {
-		if base == format {
-			for c := range EndpointTable[section] {
-				set[c] = true
-			}
-		}
-	}
-	rest := make([]string, 0, len(set))
+	rest := make([]string, 0, len(caps))
 	hasGenerate := false
-	for c := range set {
+	for c := range caps {
 		if c == "generate" {
 			hasGenerate = true
 			continue
@@ -119,7 +106,7 @@ func CapabilitiesFor(format string) []string {
 		rest = append(rest, c)
 	}
 	sort.Strings(rest)
-	out := make([]string, 0, len(set))
+	out := make([]string, 0, len(caps))
 	if hasGenerate {
 		out = append(out, "generate")
 	}
