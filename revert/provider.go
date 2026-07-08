@@ -44,7 +44,8 @@ func defoldAuth(auth map[string]any) (aigw.ProviderAuth, *bool) {
 	if name, value := getStr(auth, "header_name"), getStr(auth, "header_value"); name != "" || value != "" {
 		a.Headers = []aigw.AuthHeader{{Name: name, Value: value}}
 	}
-	if name, value, loc := getStr(auth, "param_name"), getStr(auth, "param_value"), getStr(auth, "param_location"); name != "" || value != "" || loc != "" {
+	if name, value, loc := getStr(auth, "param_name"), getStr(auth, "param_value"),
+		getStr(auth, "param_location"); name != "" || value != "" || loc != "" {
 		a.Params = []aigw.AuthParam{{Name: name, Value: value, Location: loc}}
 	}
 	a.AccessKeyID = getStr(auth, "aws_access_key_id")

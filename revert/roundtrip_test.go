@@ -5,10 +5,9 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/Kong/ai-deck-converter/convert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
-
-	"github.com/Kong/ai-deck-converter/convert"
 )
 
 // TestRoundTrip verifies that reverting the forward converter's output and

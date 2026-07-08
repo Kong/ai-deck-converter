@@ -10,10 +10,9 @@ import (
 	"io"
 	"os"
 
-	"gopkg.in/yaml.v3"
-
 	"github.com/Kong/ai-deck-converter/convert"
 	"github.com/Kong/ai-deck-converter/revert"
+	"gopkg.in/yaml.v3"
 )
 
 func main() {
@@ -25,10 +24,14 @@ func main() {
 
 func run() error {
 	var (
-		outPath   = flag.String("o", "", "output file path (default: stdout)")
-		strict    = flag.Bool("strict", false, "treat unresolved references and unconvertible entities as errors instead of warnings")
-		tagPrefix = flag.String("label-tag-prefix", "", "prefix for label-derived tags (prepended when converting, stripped when reverting), e.g. aigw/")
-		direction = flag.String("direction", "auto", "conversion direction: auto, to-deck (AI Gateway -> decK), to-dbless (AI Gateway -> db-less), or from-deck (decK -> AI Gateway)")
+		outPath = flag.String("o", "", "output file path (default: stdout)")
+		strict  = flag.Bool("strict", false,
+			"treat unresolved references and unconvertible entities as errors instead of warnings")
+		tagPrefix = flag.String("label-tag-prefix", "",
+			"prefix for label-derived tags (prepended when converting, stripped when reverting), e.g. aigw/")
+		direction = flag.String("direction", "auto",
+			"conversion direction: auto, to-deck (AI Gateway -> decK), to-dbless (AI Gateway -> db-less), "+
+				"or from-deck (decK -> AI Gateway)")
 	)
 	flag.Parse()
 
@@ -79,7 +82,7 @@ func run() error {
 		_, err = os.Stdout.Write(out)
 		return err
 	}
-	return os.WriteFile(*outPath, out, 0o644)
+	return os.WriteFile(*outPath, out, 0o644) //nolint:gosec,mnd
 }
 
 // detectDirection inspects the input document: a decK config carries

@@ -54,7 +54,9 @@ func (r *Reverter) revertMCPServer(svc *kong.Service, rt *kong.Route, plugins, s
 			defaultToolACLs = aclsFromBlock(block)
 		}
 		if len(dacl) > 1 {
-			if err := r.warn("MCP server %q: only the first default_acl entry is convertible; %d dropped", svc.Name, len(dacl)-1); err != nil {
+			if err := r.warn(
+				"MCP server %q: only the first default_acl entry is convertible; %d dropped",
+				svc.Name, len(dacl)-1); err != nil {
 				return err
 			}
 		}

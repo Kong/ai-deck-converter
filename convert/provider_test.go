@@ -4,9 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/Kong/ai-deck-converter/internal/aigw"
+	"github.com/stretchr/testify/require"
 )
 
 func ptrBool(b bool) *bool { return &b }

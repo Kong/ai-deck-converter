@@ -29,7 +29,7 @@ func getInt(m map[string]any, key string) *int {
 		i := int(v)
 		return &i
 	case uint64:
-		i := int(v)
+		i := int(v) //nolint:gosec
 		return &i
 	case float64:
 		i := int(v)

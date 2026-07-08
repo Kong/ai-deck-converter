@@ -35,7 +35,7 @@ func TestGolden(t *testing.T) {
 
 			expectedPath := filepath.Join(dir, "expected.yaml")
 			if *update {
-				require.NoError(t, os.WriteFile(expectedPath, got, 0o644), "write golden")
+				require.NoError(t, os.WriteFile(expectedPath, got, 0o644), "write golden") //nolint:gosec
 				return
 			}
 			want, err := os.ReadFile(expectedPath)

@@ -103,11 +103,15 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 				base, _ = basePathFor(path, match.spec)
 			} else if routeType == "llm/v1/chat" {
 				capability = "generate"
-				if err := r.warn("route %q: cannot resolve capability for route_type %q in section %q; defaulting to generate", rt.Name, routeType, section); err != nil {
+				if err := r.warn(
+					"route %q: cannot resolve capability for route_type %q in section %q; defaulting to generate",
+					rt.Name, routeType, section); err != nil {
 					return err
 				}
 			} else {
-				if err := r.warn("route %q: cannot resolve capability for route_type %q in section %q; skipping target", rt.Name, routeType, section); err != nil {
+				if err := r.warn(
+					"route %q: cannot resolve capability for route_type %q in section %q; skipping target",
+					rt.Name, routeType, section); err != nil {
 					return err
 				}
 				continue
@@ -159,7 +163,10 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 // FK-less, for an alias or the route), seeding model-level config from the
 // plugin config. A non-empty fkName names the group directly (the type "model"
 // case where ai-proxy-advanced carries an ai-model FK).
-func (r *Reverter) modelGroupFor(acc *modelAcc, rt *kong.Route, fkName, alias, llmFormat, base string, cfg map[string]any, refs []string, acls aigw.ACLs, idpRefs []string) (*modelGroup, error) {
+func (r *Reverter) modelGroupFor(
+	acc *modelAcc, rt *kong.Route, fkName, alias, llmFormat, base string,
+	cfg map[string]any, refs []string, acls aigw.ACLs, idpRefs []string,
+) (*modelGroup, error) {
 	var key string
 	switch {
 	case fkName != "":
@@ -262,7 +269,9 @@ func (r *Reverter) finalizeModels(acc *modelAcc) error {
 		if built[m.Name] || (m.Alias != "" && r.aiModelUsed[m.Alias]) {
 			continue
 		}
-		if err := r.warn("ai-models entry %q is not referenced by any ai-proxy-advanced target; emitting a minimal model", m.Name); err != nil {
+		if err := r.warn(
+			"ai-models entry %q is not referenced by any ai-proxy-advanced target; emitting a minimal model",
+			m.Name); err != nil {
 			return err
 		}
 		model := aigw.Model{Type: "model", Name: m.Name}

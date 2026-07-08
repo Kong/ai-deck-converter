@@ -21,7 +21,7 @@ type Credential struct {
 	Name        string `yaml:"name,omitempty"`
 	Type        string `yaml:"type,omitempty"` // api-key
 	TTL         *int   `yaml:"ttl,omitempty"`
-	APIKey      string `yaml:"api_key,omitempty"`
+	APIKey      string `yaml:"api_key,omitempty"` //nolint:gosec
 	Labels      Labels `yaml:"labels,omitempty"`
 }
 

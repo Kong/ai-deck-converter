@@ -4,10 +4,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/Kong/ai-deck-converter/internal/aigw"
 	"github.com/Kong/ai-deck-converter/internal/aimap"
+	"github.com/stretchr/testify/require"
 )
 
 func TestDetectProviderType(t *testing.T) {
@@ -16,8 +15,16 @@ func TestDetectProviderType(t *testing.T) {
 	}{
 		{"openai", "/ai/chat/completions", "openai"},
 		{"bedrock", "~/ai/model/(?<model_name>[^/]+)/converse(?:-stream)?", "bedrock"},
-		{"gemini", "~/ai/v1beta/models/(?<model_name>[^:/]+):(?:generateContent|streamGenerateContent)", "gemini"},
-		{"gemini", "~/ai/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/google/models/(?<model_name>[^:/]+):(?:generateContent|streamGenerateContent)", "vertex"},
+		{
+			"gemini", "~/ai/v1beta/models/(?<model_name>[^:/]+):(?:generateContent|streamGenerateContent)",
+			"gemini",
+		},
+		{
+			"gemini",
+			"~/ai/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/google/models/" +
+				"(?<model_name>[^:/]+):(?:generateContent|streamGenerateContent)",
+			"vertex",
+		},
 		{"gemini", "", "gemini"},
 	}
 	for _, tc := range cases {
@@ -34,7 +41,12 @@ func TestBasePathRecovery(t *testing.T) {
 		{"openai", "generate", "/ai/chat/completions", "/ai", true},
 		{"openai", "generate", "/custom/base/chat/completions", "/custom/base", true},
 		{"bedrock", "generate", "~/ai/model/(?<model_name>[^/]+)/converse(?:-stream)?", "/ai", true},
-		{"vertex", "generate", "~/llm/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/google/models/(?<model_name>[^:/]+):(?:generateContent|streamGenerateContent)", "/llm", true},
+		{
+			"vertex", "generate",
+			"~/llm/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/google/models/" +
+				"(?<model_name>[^:/]+):(?:generateContent|streamGenerateContent)",
+			"/llm", true,
+		},
 		{"openai", "generate", "/ai/embeddings", "", false},
 		{"bedrock", "generate", "/ai/chat/completions", "", false}, // regex spec, literal path
 	}
@@ -50,12 +62,14 @@ func TestBasePathRecovery(t *testing.T) {
 func TestResolveEndpointDisambiguation(t *testing.T) {
 	// bedrock invoke serves four capabilities with the same route label and
 	// path; the target's route_type + genai_category pick the right one.
-	m, ok := resolveEndpoint("bedrock", "image/v1/images/generations", "image/generation", "bedrock-invoke", "~/ai/model/(?<model_name>[^/]+)/invoke(?:-with-response-stream)?")
+	m, ok := resolveEndpoint("bedrock", "image/v1/images/generations", "image/generation",
+		"bedrock-invoke", "~/ai/model/(?<model_name>[^/]+)/invoke(?:-with-response-stream)?")
 	require.True(t, ok, "bedrock invoke image ok")
 	require.Equal(t, "image", m.capability, "bedrock invoke image capability")
 	// bedrock generate/agentic/rerank/audio-speech all share route_type
 	// llm/v1/chat; the route name (RouteLabel) disambiguates.
-	m, ok = resolveEndpoint("bedrock", "llm/v1/chat", "text/generation", "bedrock-invoke", "~/ai/model/(?<model_name>[^/]+)/invoke(?:-with-response-stream)?")
+	m, ok = resolveEndpoint("bedrock", "llm/v1/chat", "text/generation",
+		"bedrock-invoke", "~/ai/model/(?<model_name>[^/]+)/invoke(?:-with-response-stream)?")
 	require.True(t, ok, "bedrock invoke audio ok")
 	require.Equal(t, "audio/speech", m.capability, "bedrock invoke audio-speech capability")
 	// A route_type the section's table doesn't use still resolves via the
@@ -301,7 +315,8 @@ services:
 	doc, warnings, err := revertYAML(t, in, Options{})
 	require.NoError(t, err, "revert")
 	require.Lenf(t, doc.Models, 1, "models = %+v; want one model", doc.Models)
-	require.Equalf(t, []string{"generate"}, doc.Models[0].Capabilities, "models = %+v; want capability generate", doc.Models)
+	require.Equalf(t, []string{"generate"}, doc.Models[0].Capabilities,
+		"models = %+v; want capability generate", doc.Models)
 	require.Contains(t, strings.Join(warnings, "\n"), "defaulting to generate",
 		"want a defaulting-to-generate warning")
 }

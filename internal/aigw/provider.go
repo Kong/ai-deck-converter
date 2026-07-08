@@ -57,7 +57,7 @@ type ProviderAuth struct {
 
 	// azure
 	ClientID           string `yaml:"client_id,omitempty"`
-	ClientSecret       string `yaml:"client_secret,omitempty"`
+	ClientSecret       string `yaml:"client_secret,omitempty"` //nolint:gosec
 	TenantID           string `yaml:"tenant_id,omitempty"`
 	UseManagedIdentity *bool  `yaml:"use_managed_identity,omitempty"`
 
