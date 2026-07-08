@@ -32,7 +32,7 @@ func (r *Reverter) revertAgent(svc *kong.Service, rt *kong.Route, name string, s
 
 	refs, acls := r.policyRefs(append(append([]kong.Plugin{}, plugins...), svcPlugins...))
 	a.Policies = refs
-	a.ACLs = acls
+	a.Access.ACLs = acls
 
 	r.out.Agents = append(r.out.Agents, a)
 	return nil

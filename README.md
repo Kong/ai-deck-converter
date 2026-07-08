@@ -105,7 +105,7 @@ See `convert/testdata/*/input.yaml` for worked examples.
 | Credential | `keyauth_credentials` nested under the consumer (`key` from `api_key`, `ttl`). |
 | Vault | `vaults` entry (`prefix` = name, `name` = backend type, config passed through). |
 | Model `policies`/`acls` | Top-level plugins scoped to the `ai-models` entity via a `model:` FK. |
-| Agent `acls` | Kong `acl` plugin on the agent's Route. |
+| Agent `access.acls` | Kong `acl` plugin on the agent's Route. |
 | `labels` | `tags` flattened to sorted `key:value` strings. |
 
 ### Capability → endpoint
