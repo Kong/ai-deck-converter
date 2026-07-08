@@ -4,7 +4,7 @@
 
 ## [v0.0.1]
 
-> Release date: 2026/07/??
+> Release date: TBD
 
 ### Features
 -

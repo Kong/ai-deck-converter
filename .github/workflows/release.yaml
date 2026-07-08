@@ -66,15 +66,15 @@ jobs:
           git push origin ${{ steps.new_version.outputs.version }}
 
       - name: Create release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.new_version.outputs.version }}
-          release_name: Release ${{ steps.new_version.outputs.version }}
+          name: Release ${{ steps.new_version.outputs.version }}
           body: |
             Release ${{ steps.new_version.outputs.version }}
 
             For details on changes, see the commit history between this release and the previous one.
           draft: false
           prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
