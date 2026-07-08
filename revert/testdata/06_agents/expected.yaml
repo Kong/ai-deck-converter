@@ -18,6 +18,10 @@ agents:
     name: weather-agent
     policies:
       - key-auth
+    access:
+      acls:
+        allow:
+          - forecast-users
     config:
       url: https://weather.internal/api
       route:
