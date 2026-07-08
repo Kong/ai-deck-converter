@@ -169,7 +169,7 @@ ai-models:
 `)
 	doc, warnings, err := revertYAML(t, in, Options{Strict: true})
 	require.NoErrorf(t, err, "strict revert (warnings: %v)", warnings)
-	require.Empty(t, warnings, "want no warnings for the forward-produced aliasless target shape")
+	require.Empty(t, warnings, "want no warnings for aliasless targets that rely on ai-models for naming only")
 	require.Len(t, doc.Models, 1, "models = %+v", doc.Models)
 	require.Equal(t, "m1", doc.Models[0].Name, "model name should come from ai-models")
 	require.Empty(t, doc.Models[0].Config.Model.Alias, "synthetic ai-models alias should not be restored into model.alias")
