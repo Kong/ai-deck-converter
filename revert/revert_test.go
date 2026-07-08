@@ -248,7 +248,8 @@ services:
 	}
 
 	require.Equal(t, aigw.Labels{"aigw610": "tools"}, byName["team-a"].Labels, "plugin tags should win")
-	require.Equal(t, aigw.Labels{"fallback": "service"}, byName["fallback"].Labels, "service tags should remain the fallback")
+	require.Equal(t, aigw.Labels{"fallback": "service"},
+		byName["fallback"].Labels, "service tags should remain the fallback")
 }
 
 func TestMismatchedAliasStillWarns(t *testing.T) {
