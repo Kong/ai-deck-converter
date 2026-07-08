@@ -41,3 +41,4 @@ plugins:
       name: gpt-5-2
 ai-models:
   - name: gpt-5-2
+    alias: gpt-5-2

@@ -49,3 +49,4 @@ plugins:
       name: semantic-lb
 ai-models:
   - name: semantic-lb
+    alias: semantic-lb

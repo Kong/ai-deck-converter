@@ -60,4 +60,6 @@ plugins:
       name: openai-files
 ai-models:
   - name: openai-batch-api
+    alias: openai-batch-api
   - name: openai-files-api
+    alias: openai-files-api
