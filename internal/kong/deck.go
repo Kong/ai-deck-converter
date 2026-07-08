@@ -10,12 +10,18 @@ const FormatVersion = "3.0"
 // Document is the top-level decK declarative configuration document.
 type Document struct {
 	FormatVersion  string          `yaml:"_format_version"`
+	Info           *DocumentInfo   `yaml:"_info,omitempty"`
 	Services       []Service       `yaml:"services,omitempty"`
 	Consumers      []Consumer      `yaml:"consumers,omitempty"`
 	ConsumerGroups []ConsumerGroup `yaml:"consumer_groups,omitempty"`
 	Plugins        []Plugin        `yaml:"plugins,omitempty"`
 	Vaults         []Vault         `yaml:"vaults,omitempty"`
-	AIModels       []AIModel       `yaml:"ai-models,omitempty"`
+	AIModels       []AIModel       `yaml:"ai_models,omitempty"`
+}
+
+// DocumentInfo holds metadata for the decK document.
+type DocumentInfo struct {
+	SelectTags []string `yaml:"select_tags,omitempty"`
 }
 
 // Ref is a name-based foreign-key reference, rendered as `{name: <x>}`.
@@ -23,8 +29,32 @@ type Ref struct {
 	Name string `yaml:"name"`
 }
 
+// Ref is a name-based foreign-key reference, rendered as `{name: <x>}`.
+type StringRef string
+
 // NewRef returns a pointer to a Ref with the given name.
 func NewRef(name string) *Ref { return &Ref{Name: name} }
+
+// NewStringRef returns a pointer to a StringRef with the given name.
+func NewStringRef(name string) *StringRef { ref := StringRef(name); return &ref }
+
+// UnmarshalYAML handles both string and {name: <x>} formats.
+func (sr *StringRef) UnmarshalYAML(unmarshal func(any) error) error {
+	var s string
+	if err := unmarshal(&s); err == nil {
+		*sr = StringRef(s)
+		return nil
+	}
+	// Try to unmarshal as an object with a name field (dbless format)
+	var obj struct {
+		Name string `yaml:"name"`
+	}
+	if err := unmarshal(&obj); err == nil {
+		*sr = StringRef(obj.Name)
+		return nil
+	}
+	return unmarshal(sr)
+}
 
 // NewDocument returns an empty document with the format version set.
 func NewDocument() *Document {
@@ -82,10 +112,10 @@ type Plugin struct {
 	Name          string         `yaml:"name"`
 	Enabled       *bool          `yaml:"enabled,omitempty"`
 	Config        map[string]any `yaml:"config,omitempty"`
-	Service       *Ref           `yaml:"service,omitempty"`
-	Route         *Ref           `yaml:"route,omitempty"`
-	Consumer      *Ref           `yaml:"consumer,omitempty"`
-	ConsumerGroup *Ref           `yaml:"consumer_group,omitempty"`
+	Service       *StringRef     `yaml:"service,omitempty"`
+	Route         *StringRef     `yaml:"route,omitempty"`
+	Consumer      *StringRef     `yaml:"consumer,omitempty"`
+	ConsumerGroup *StringRef     `yaml:"consumer_group,omitempty"`
 	Model         *Ref           `yaml:"model,omitempty"`
 	Tags          []string       `yaml:"tags,omitempty"`
 }

@@ -46,8 +46,7 @@ plugins:
       body_path: model
       max_request_body_size: 8388608
       source: body
-    route:
-      name: openai-chat
+    route: openai-chat
   - name: ai-proxy-advanced
     config:
       balancer:
@@ -91,16 +90,14 @@ plugins:
             provider: anthropic
           route_type: llm/v1/chat
           weight: 10
-    route:
-      name: openai-chat
+    route: openai-chat
     model:
       name: prod-chat
   - name: ai-prompt-guard
     config:
       allow_patterns:
         - ^safe
-    route:
-      name: openai-chat
+    route: openai-chat
     model:
       name: prod-chat
   - name: acl
@@ -108,8 +105,7 @@ plugins:
       allow:
         - premium
       include_consumer_groups: true
-    route:
-      name: openai-chat
+    route: openai-chat
     model:
       name: prod-chat
 vaults:
@@ -117,7 +113,7 @@ vaults:
     name: env
     config:
       prefix: KONG_
-ai-models:
+ai_models:
   - name: prod-chat
     alias: '@prod/prod-chat'
     tags:

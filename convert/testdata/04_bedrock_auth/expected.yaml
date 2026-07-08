@@ -33,10 +33,9 @@ plugins:
               max_tokens: 1024
             provider: bedrock
           route_type: llm/v1/chat
-    route:
-      name: bedrock-converse
+    route: bedrock-converse
     model:
       name: claude-bedrock
-ai-models:
+ai_models:
   - name: claude-bedrock
     alias: '@bedrock/claude-3-5-sonnet'

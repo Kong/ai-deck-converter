@@ -16,7 +16,7 @@ models:
       model:
         alias: '@bedrock/titan-embed-text-v2'
   - type: model
-    name: nova-canvas-image
+    name: nova-canvas
     capabilities:
       - image
     formats:
@@ -31,7 +31,7 @@ models:
       model:
         alias: '@bedrock/nova-canvas'
   - type: model
-    name: nova-sonic-audio
+    name: nova-sonic
     capabilities:
       - audio/speech
     formats:
@@ -46,7 +46,7 @@ models:
       model:
         alias: '@bedrock/nova-sonic'
   - type: model
-    name: nova-reel-video
+    name: nova-reel
     capabilities:
       - video
     formats:

@@ -161,10 +161,10 @@ func (c *Converter) projectDBLess() *kong.DBLessDocument {
 	for pluginIdx, plugin := range c.out.Plugins {
 		id := firstNonEmpty(plugin.ID, stableUUID(fmt.Sprintf("plugin:top:%s:%d", plugin.Name, pluginIdx)))
 		out.Plugins = append(out.Plugins, toDBLessPlugin(plugin, id, scopeRef{
-			service:       lookupRef(plugin.Service, ids.service),
-			route:         lookupRouteRef(plugin.Route, ids.route),
-			consumer:      lookupRef(plugin.Consumer, ids.consumer),
-			consumerGroup: lookupRef(plugin.ConsumerGroup, ids.group),
+			service:       lookupStringRef(plugin.Service, ids.service),
+			route:         lookupStringRouteRef(plugin.Route, ids.route),
+			consumer:      lookupStringRef(plugin.Consumer, ids.consumer),
+			consumerGroup: lookupStringRef(plugin.ConsumerGroup, ids.group),
 			model:         lookupRef(plugin.Model, ids.model),
 		}))
 	}
@@ -291,6 +291,26 @@ func lookupRouteRef(ref *kong.Ref, ids map[string]string) string {
 	}
 	for key, id := range ids {
 		if len(key) > len(ref.Name)+1 && key[len(key)-len(ref.Name)-1:] == "|"+ref.Name {
+			return id
+		}
+	}
+	return ""
+}
+
+func lookupStringRef(ref *kong.StringRef, ids map[string]string) string {
+	if ref == nil {
+		return ""
+	}
+	return ids[string(*ref)]
+}
+
+func lookupStringRouteRef(ref *kong.StringRef, ids map[string]string) string {
+	if ref == nil {
+		return ""
+	}
+	refName := string(*ref)
+	for key, id := range ids {
+		if len(key) > len(refName)+1 && key[len(key)-len(refName)-1:] == "|"+refName {
 			return id
 		}
 	}

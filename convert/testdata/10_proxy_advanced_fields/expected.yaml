@@ -21,8 +21,7 @@ plugins:
       body_path: model
       max_request_body_size: 8388608
       source: body
-    route:
-      name: openai-chat
+    route: openai-chat
   - name: ai-proxy-advanced
     config:
       balancer:
@@ -41,8 +40,7 @@ plugins:
             name: gpt-4o
             provider: openai
           route_type: llm/v1/chat
-    route:
-      name: openai-chat
+    route: openai-chat
     model:
       name: full-model
   - name: ai-model-selector
@@ -50,8 +48,7 @@ plugins:
       body_path: model
       max_request_body_size: 8388608
       source: body
-    route:
-      name: openai-embeddings
+    route: openai-embeddings
   - name: ai-proxy-advanced
     config:
       balancer:
@@ -67,11 +64,10 @@ plugins:
             name: text-embedding-3-small
             provider: openai
           route_type: llm/v1/embeddings
-    route:
-      name: openai-embeddings
+    route: openai-embeddings
     model:
       name: bare-model
-ai-models:
+ai_models:
   - name: full-model
     alias: full-model
   - name: bare-model

@@ -35,8 +35,7 @@ plugins:
       body_path: model
       max_request_body_size: 8388608
       source: body
-    route:
-      name: openai-chat
+    route: openai-chat
   - name: ai-proxy-advanced
     config:
       balancer:
@@ -53,23 +52,20 @@ plugins:
             name: gpt-4o
             provider: openai
           route_type: llm/v1/chat
-    route:
-      name: openai-chat
+    route: openai-chat
     model:
       name: guarded-gpt
   - name: ai-prompt-guard
     config:
       allow_patterns:
         - ^safe
-    route:
-      name: openai-chat
+    route: openai-chat
     model:
       name: guarded-gpt
   - name: http-log
     config:
       http_endpoint: https://logs.internal/ingest
-    route:
-      name: openai-chat
+    route: openai-chat
     model:
       name: guarded-gpt
   - name: acl
@@ -77,8 +73,7 @@ plugins:
       allow:
         - premium-users
       include_consumer_groups: true
-    route:
-      name: openai-chat
+    route: openai-chat
     model:
       name: guarded-gpt
 vaults:
@@ -87,7 +82,7 @@ vaults:
     description: Environment secrets
     config:
       prefix: KONG_
-ai-models:
+ai_models:
   - name: guarded-gpt
     alias: '@openai/guarded-gpt'
     tags:

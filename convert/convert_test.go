@@ -322,11 +322,11 @@ model_providers:
 	var got map[string]any
 	require.NoError(t, yaml.Unmarshal(out, &got), "unmarshal output")
 
-	aiModels, ok := got["ai-models"].([]any)
-	require.True(t, ok, "expected ai-models collection")
+	aiModels, ok := got["ai_models"].([]any)
+	require.True(t, ok, "expected ai_models collection")
 	require.Len(t, aiModels, 1)
 	aiModel, ok := aiModels[0].(map[string]any)
-	require.True(t, ok, "expected ai-models entry")
+	require.True(t, ok, "expected ai_models entry")
 	require.Equal(t, "m1", aiModel["name"])
 	require.Equal(t, "@openai/custom-m1", aiModel["alias"], "ai-models alias should match source model.alias")
 

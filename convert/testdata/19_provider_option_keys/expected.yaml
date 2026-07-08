@@ -15,8 +15,7 @@ plugins:
       body_path: model
       max_request_body_size: 8388608
       source: body
-    route:
-      name: openai-chat
+    route: openai-chat
   - name: ai-proxy-advanced
     config:
       balancer:
@@ -110,10 +109,9 @@ plugins:
                 workspace_instance_id: dbc-a1b2c3d4
             provider: databricks
           route_type: llm/v1/chat
-    route:
-      name: openai-chat
+    route: openai-chat
     model:
       name: provider-options-mix
-ai-models:
+ai_models:
   - name: provider-options-mix
     alias: '@openai/provider-options-mix'
