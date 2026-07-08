@@ -13,7 +13,8 @@ models:
           max_tokens: 1024
           region: us-east-1
     policies: []
-    acls: {allow: [], deny: []}
+    access:
+      acls: {allow: [], deny: []}
     config:
       route:
         paths: [/ai]

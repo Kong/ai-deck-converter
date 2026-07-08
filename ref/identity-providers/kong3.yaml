@@ -1,0 +1,71 @@
+_format_version: "3.0"
+services:
+- name: ai-gateway
+  url: http://ai-gateway.upstream.local
+  routes:
+  - name: openai-chat
+    paths:
+      - /ai/chat/completions
+    methods:
+      - POST
+    strip_path: false
+
+consumers:
+- username: anonymous
+  custom_id: anonymous
+  plugins:
+  - name: request-termination
+    config:
+      status_code: 401
+      message: "Unauthorized"
+
+plugins:
+- name: key-auth
+  route: 
+    name: openai-chat
+  config:
+    key_names:
+      - x-api-key
+    anonymous: anonymous
+- name: openid-connect
+  route: 
+    name: openai-chat
+  config:
+    issuer: https://dev-123456.okta.com/oauth2/default
+    anonymous: anonymous
+
+- name: ai-model-selector
+  config:
+    body_path: model
+    max_request_body_size: 8388608
+    source: body
+  route:
+    name: openai-chat
+- name: ai-proxy-advanced
+  config:
+    balancer:
+      algorithm: round-robin
+    genai_category: text/generation
+    llm_format: openai
+    response_streaming: allow
+    targets:
+      - auth:
+          header_name: Authorization
+          header_value: '{vault://ai/openai-token}'
+        description: gpt-5.4
+        model:
+          model_alias: '@openai/gpt-5.4'
+          name: gpt-5.4
+          options:
+            max_tokens: 1024
+            temperature: 1
+          provider: openai
+        route_type: llm/v1/chat
+  route:
+    name: openai-chat
+  model:
+    name: openai-gpt-5-4
+
+ai-models:
+  - name: openai-gpt-5-4
+    alias: '@openai/gpt-5.4'

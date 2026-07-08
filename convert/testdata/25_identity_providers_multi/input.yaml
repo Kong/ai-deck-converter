@@ -1,8 +1,6 @@
 models:
-  # Model-level logging must be applied to each ai-proxy-advanced target as a
-  # per-target logging record (log_statistics / log_payloads).
-  - display_name: GPT-5.2
-    name: gpt-5-2
+  - display_name: "OpenAI Prod - GPT-5.4"
+    name: openai-gpt-5-4
     type: model
     enabled: true
     capabilities: [generate]
@@ -11,17 +9,16 @@ models:
     config:
       route:
         paths: [/ai]
-      logging:
-        statistics: true
-        payloads: false
+      model:
+        alias: "@openai/gpt-5.4"
     targets:
-      - name: gpt-5.2
+      - name: gpt-5.4
         provider: openai-prod
         config:
           type: openai
     policies: []
     access:
-      acls: {allow: [], deny: []}
+      identity_providers: [okta-oidc, key-auth-default]
 providers:
   - name: openai-prod
     type: openai
@@ -32,3 +29,14 @@ providers:
         headers:
           - name: Authorization
             value: "{vault://ai/openai-token}"
+identity_providers:
+  - name: okta-oidc
+    type: openid-connect
+    display_name: Okta OIDC
+    config:
+      issuer: https://dev-123456.okta.com/oauth2/default
+  - name: key-auth-default
+    type: key-auth
+    display_name: Default Key Auth
+    config:
+      key_names: [x-api-key]

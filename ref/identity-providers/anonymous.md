@@ -1,0 +1,7 @@
+Using multiple authentication methods
+You can configure multiple authentication plugins, such as Basic Authentication and Key Authentication, on a Gateway Service. This allows clients to use different authentication methods to access the associated Gateway Service or Route. When multiple authentication plugins are configured, they must all either be configured to always perform authentication or to only perform authentication if the Consumer wasn’t already authenticated. This configuration is controlled by the config.anonymous property in the plugin schema:
+
+When config.anonymous is not set: Authentication is always performed and a 4xx error is returned if the Consumer isn’t validated. With this method, the last plugin executed will be the one setting the credentials passed to the upstream service.
+When config.anonymous is set to a valid Consumer: Authentication is only performed if the Consumer isn’t already authenticated. When authentication fails, it won’t return a 40x response. Instead, it sets the anonymous Consumer as the Consumer. With this method, the first plugin that successfully authenticates the Consumer sets the credentials passed to the upstream service or the last plugin that sets its configured anonymous Consumer.
+If you enable anonymous access so that authentication isn’t always performed but you don’t want unauthorized users to access the Gateway Service or Route, you can configure the Request Termination plugin on the anonymous Consumer.
+

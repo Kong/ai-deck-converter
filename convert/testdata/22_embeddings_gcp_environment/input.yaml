@@ -11,7 +11,8 @@ models:
         config:
           type: openai
     policies: []
-    acls: {allow: [], deny: []}
+    access:
+      acls: {allow: [], deny: []}
     config:
       route:
         paths: [/ai]

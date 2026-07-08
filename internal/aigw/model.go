@@ -15,9 +15,16 @@ type Model struct {
 	Formats      []Format      `yaml:"formats,omitempty"`
 	TargetModels []TargetModel `yaml:"targets,omitempty"`
 	Policies     []string      `yaml:"policies,omitempty"`
-	ACLs         ACLs          `yaml:"acls,omitempty"`
+	Access       ModelAccess   `yaml:"access,omitempty"`
 	Config       ModelConfig   `yaml:"config,omitempty"`
 	Labels       Labels        `yaml:"labels,omitempty"`
+}
+
+// ModelAccess is the access-control configuration for a Model: identity
+// providers gating the model's route, plus consumer/group ACLs.
+type ModelAccess struct {
+	IdentityProviders []string `yaml:"identity_providers,omitempty"`
+	ACLs              ACLs     `yaml:"acls,omitempty"`
 }
 
 // Format is a request/response format supported by a model.

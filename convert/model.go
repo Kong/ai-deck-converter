@@ -174,7 +174,7 @@ func (c *Converter) convertModels() error {
 
 		// Model policy and ACL plugins scope to each route the model produces, plus
 		// the ai-model entity for type "model".
-		plugins, err := c.scopedPlugins(m.Policies, m.ACLs)
+		plugins, err := c.scopedPlugins(entityModel, m.Policies, m.Access.ACLs)
 		if err != nil {
 			return err
 		}
@@ -185,6 +185,23 @@ func (c *Converter) convertModels() error {
 				if modelScoped {
 					p.Model = kong.NewRef(m.Name)
 				}
+				guardPlugins = append(guardPlugins, p)
+			}
+		}
+
+		// Identity provider plugins scope to the route only (no ai-model FK), and
+		// require an anonymous consumer to fall back to on failed authentication.
+		idpPlugins, err := c.scopedIdentityProviderPlugins(m.Access.IdentityProviders)
+		if err != nil {
+			return err
+		}
+		if len(idpPlugins) > 0 {
+			c.ensureAnonymousConsumer()
+		}
+		for _, routeName := range routeNames {
+			for k := range idpPlugins {
+				p := idpPlugins[k]
+				p.Route = kong.NewRef(routeName)
 				guardPlugins = append(guardPlugins, p)
 			}
 		}

@@ -120,21 +120,23 @@ type Converter struct {
 	src  *aigw.Document
 	out  *kong.Document
 
-	providers      map[string]*aigw.Provider
-	policies       map[string]*aigw.Policy
-	consumerGroups map[string]*aigw.ConsumerGroup
+	providers         map[string]*aigw.Provider
+	policies          map[string]*aigw.Policy
+	identityProviders map[string]*aigw.IdentityProvider
+	consumerGroups    map[string]*aigw.ConsumerGroup
 
 	warnings []string
 }
 
 func newConverter(doc *aigw.Document, opts Options) *Converter {
 	return &Converter{
-		opts:           opts,
-		src:            doc,
-		out:            kong.NewDocument(),
-		providers:      map[string]*aigw.Provider{},
-		policies:       map[string]*aigw.Policy{},
-		consumerGroups: map[string]*aigw.ConsumerGroup{},
+		opts:              opts,
+		src:               doc,
+		out:               kong.NewDocument(),
+		providers:         map[string]*aigw.Provider{},
+		policies:          map[string]*aigw.Policy{},
+		identityProviders: map[string]*aigw.IdentityProvider{},
+		consumerGroups:    map[string]*aigw.ConsumerGroup{},
 	}
 }
 

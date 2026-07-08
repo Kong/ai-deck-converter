@@ -13,11 +13,12 @@ models:
     policies:
       - ai-prompt-guard
       - http-log
-    acls:
-      allow:
-        - premium-users
-      deny:
-        - banned
+    access:
+      acls:
+        allow:
+          - premium-users
+        deny:
+          - banned
     config:
       model:
         alias: '@openai/guarded-gpt'

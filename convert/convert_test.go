@@ -23,7 +23,8 @@ models:
         provider: missing-provider
         config: {type: openai}
     policies: []
-    acls: {allow: [], deny: []}
+    access:
+      acls: {allow: [], deny: []}
     config:
       route: {paths: [/chat]}
       model: {}
@@ -49,9 +50,10 @@ models:
       - name: gpt-4o
         provider: p1
         config: {type: openai}
-    acls:
-      allow: [premium]
-      deny: [banned]
+    access:
+      acls:
+        allow: [premium]
+        deny: [banned]
     config:
       route: {paths: [/ai]}
       model: {alias: m1}
@@ -66,6 +68,39 @@ providers:
 		require.Contains(t, err.Error(), "allow")
 		require.Contains(t, err.Error(), "deny")
 	}
+}
+
+// A model's policies list must not reference an authentication policy
+// (key-auth/openid-connect) directly: those require anonymous fallback and a
+// companion anonymous consumer, which only the identity_providers mechanism
+// provides. Referencing one via policies is rejected rather than silently
+// emitting an auth plugin with no anonymous fallback.
+func TestConvertRejectsAuthPolicyOnModel(t *testing.T) {
+	src := []byte(`
+models:
+  - type: model
+    name: guarded
+    capabilities: [generate]
+    formats: [{type: openai}]
+    targets:
+      - name: gpt-4o
+        provider: p1
+        config: {type: openai}
+    policies: [my-key-auth]
+    config:
+      route: {paths: [/ai]}
+      model: {alias: m1}
+providers:
+  - name: p1
+    type: openai
+policies:
+  - type: key-auth
+    name: my-key-auth
+    config: {key_names: [apikey]}
+`)
+	_, _, err := Convert(src, Options{})
+	require.Error(t, err, "model policies referencing key-auth/openid-connect must be rejected")
+	require.Contains(t, err.Error(), "identity_providers")
 }
 
 // The Kong acl plugin checks a legacy per-consumer kong.db.acls entity by
@@ -86,8 +121,9 @@ models:
       - name: gpt-4o
         provider: p1
         config: {type: openai}
-    acls:
-      allow: [premium-users]
+    access:
+      acls:
+        allow: [premium-users]
     config:
       route: {paths: [/ai]}
       model: {alias: m1}
@@ -388,7 +424,8 @@ models:
         provider: missing-provider
         config: {type: openai}
     policies: []
-    acls: {allow: [], deny: []}
+    access:
+      acls: {allow: [], deny: []}
     config:
       route: {paths: [/chat]}
       model: {}
@@ -654,7 +691,8 @@ models:
         provider: p1
         config: {type: openai}
     policies: []
-    acls: {allow: [], deny: []}
+    access:
+      acls: {allow: [], deny: []}
     config:
       route:
         hosts: [ai.example.com]

@@ -19,7 +19,8 @@ models:
         config:
           type: openai
     policies: []
-    acls: {allow: [], deny: []}
+    access:
+      acls: {allow: [], deny: []}
   # Bare model (different capability -> different route group): none of the
   # three optional fields are set, so none should be emitted (omit-defaults).
   - name: bare-model
@@ -37,7 +38,8 @@ models:
         config:
           type: openai
     policies: []
-    acls: {allow: [], deny: []}
+    access:
+      acls: {allow: [], deny: []}
 providers:
   - name: openai-prod
     type: openai

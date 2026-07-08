@@ -5,6 +5,10 @@ import (
 	"github.com/Kong/ai-deck-converter/internal/kong"
 )
 
+// anonymousConsumerName mirrors convert.anonymousConsumerName: the
+// username/custom_id of the synthesized anonymous-fallback Consumer.
+const anonymousConsumerName = "anonymous"
+
 func (r *Reverter) revertConsumerGroups() error {
 	for i := range r.src.ConsumerGroups {
 		g := &r.src.ConsumerGroups[i]
@@ -30,6 +34,11 @@ func (r *Reverter) revertConsumers() error {
 		name := c.Username
 		if name == "" {
 			name = c.CustomID
+		}
+		if isSynthesizedAnonymousConsumer(c) {
+			// Converter-generated identity-provider infrastructure, not
+			// user-declared state; recreated automatically on the next convert.
+			continue
 		}
 		plugins := append(append([]kong.Plugin{}, c.Plugins...), r.idx.consumer[c.Username]...)
 		refs, acls := r.policyRefs(plugins)
@@ -59,4 +68,29 @@ func (r *Reverter) revertConsumers() error {
 		r.out.Consumers = append(r.out.Consumers, ac)
 	}
 	return nil
+}
+
+// isSynthesizedAnonymousConsumer reports whether c matches exactly what
+// convert.ensureAnonymousConsumer synthesizes: the "anonymous" consumer with
+// a single request-termination(401, "Unauthorized") plugin, no credentials or
+// groups. A hand-written "anonymous" consumer with any other shape is
+// reverted normally.
+func isSynthesizedAnonymousConsumer(c *kong.Consumer) bool {
+	if c.Username != anonymousConsumerName || c.CustomID != anonymousConsumerName {
+		return false
+	}
+	if len(c.Groups) > 0 || len(c.KeyAuthCredentials) > 0 {
+		return false
+	}
+	if len(c.Plugins) != 1 {
+		return false
+	}
+	p := c.Plugins[0]
+	if p.Name != "request-termination" {
+		return false
+	}
+	code, _ := p.Config["status_code"]
+	msg, _ := p.Config["message"]
+	statusOK := code == 401 || code == float64(401)
+	return statusOK && msg == "Unauthorized" && len(p.Config) == 2
 }

@@ -22,7 +22,8 @@ models:
         provider: openai-prod
         config: {type: openai}
     policies: []
-    acls: {allow: [], deny: []}
+    access:
+      acls: {allow: [], deny: []}
   - display_name: GPT-5.2 mini
     name: gpt-5-2-mini
     type: model
@@ -36,4 +37,5 @@ models:
         provider: openai-prod
         config: {type: openai}
     policies: []
-    acls: {allow: [], deny: []}
+    access:
+      acls: {allow: [], deny: []}

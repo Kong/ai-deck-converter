@@ -20,7 +20,8 @@ models:
           temperature: 1.0
           max_tokens: 1024
     policies: []
-    acls: {allow: [], deny: []}
+    access:
+      acls: {allow: [], deny: []}
 providers:
   - name: openai-prod
     type: openai

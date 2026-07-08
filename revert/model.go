@@ -51,7 +51,7 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 			routeGuards = append(routeGuards, p)
 		}
 	}
-	routeRefs, routeACLs := r.policyRefs(routeGuards)
+	routeRefs, routeACLs, routeIDPRefs := r.modelPolicyRefs(routeGuards)
 
 	for _, proxy := range findPlugins(plugins, "ai-proxy-advanced") {
 		cfg := proxy.Config
@@ -67,13 +67,14 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 
 		// Guard refs for this plugin's model: route-wide guards plus any scoped to
 		// this model FK.
-		refs, acls := routeRefs, routeACLs
+		refs, acls, idpRefs := routeRefs, routeACLs, routeIDPRefs
 		if fkName != "" {
-			if mRefs, mACLs := r.policyRefs(modelGuards[fkName]); len(mRefs) > 0 || !mACLs.IsEmpty() {
+			if mRefs, mACLs, mIDPRefs := r.modelPolicyRefs(modelGuards[fkName]); len(mRefs) > 0 || !mACLs.IsEmpty() || len(mIDPRefs) > 0 {
 				refs = append(append([]string{}, routeRefs...), mRefs...)
 				if !mACLs.IsEmpty() {
 					acls = mACLs
 				}
+				idpRefs = append(append([]string{}, routeIDPRefs...), mIDPRefs...)
 			}
 		}
 
@@ -112,7 +113,7 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 				continue
 			}
 
-			g, err := r.modelGroupFor(acc, rt, fkName, alias, llmFormat, base, cfg, refs, acls)
+			g, err := r.modelGroupFor(acc, rt, fkName, alias, llmFormat, base, cfg, refs, acls, idpRefs)
 			if err != nil {
 				return err
 			}
@@ -158,7 +159,7 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 // FK-less, for an alias or the route), seeding model-level config from the
 // plugin config. A non-empty fkName names the group directly (the type "model"
 // case where ai-proxy-advanced carries an ai-model FK).
-func (r *Reverter) modelGroupFor(acc *modelAcc, rt *kong.Route, fkName, alias, llmFormat, base string, cfg map[string]any, refs []string, acls aigw.ACLs) (*modelGroup, error) {
+func (r *Reverter) modelGroupFor(acc *modelAcc, rt *kong.Route, fkName, alias, llmFormat, base string, cfg map[string]any, refs []string, acls aigw.ACLs, idpRefs []string) (*modelGroup, error) {
 	var key string
 	switch {
 	case fkName != "":
@@ -211,7 +212,7 @@ func (r *Reverter) modelGroupFor(acc *modelAcc, rt *kong.Route, fkName, alias, l
 			Name:     name,
 			Formats:  []aigw.Format{{Type: llmFormat}},
 			Policies: refs,
-			ACLs:     acls,
+			Access:   aigw.ModelAccess{ACLs: acls, IdentityProviders: idpRefs},
 		},
 	}
 	g.model.Config.Model.Alias = alias
@@ -247,7 +248,7 @@ func (r *Reverter) finalizeModels(acc *modelAcc) error {
 
 		for _, p := range r.idx.model[g.model.Name] {
 			if p.Name == "acl" {
-				g.model.ACLs = aclsFromBlock(p.Config)
+				g.model.Access.ACLs = aclsFromBlock(p.Config)
 				continue
 			}
 			g.model.Policies = append(g.model.Policies, r.registerPolicy(p, false).Name)
