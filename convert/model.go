@@ -53,13 +53,10 @@ func (c *Converter) convertModels() error {
 		caps := c.expandCapabilities(m)
 		logging := modelLoggingBlock(m.Config.Logging)
 
-		// The model alias defaults to the model name when unset, and is applied
-		// identically to each target's model_alias and the ai-models entry so the
-		// two stay in sync (the reverter matches targets to ai-models by alias).
+		// Preserve the source model alias exactly as authored. When unset, omit it
+		// from both the target model_alias and the ai-models entry so alias-less
+		// fallback behavior remains available.
 		alias := m.Config.Model.Alias
-		if alias == "" {
-			alias = m.Name
-		}
 
 		// ownerKey groups targets into ai-proxy-advanced plugins: per source model
 		// for type "model" (each carries its own ai-model FK), shared for type

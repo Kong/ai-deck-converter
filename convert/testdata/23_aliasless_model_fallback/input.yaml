@@ -1,0 +1,32 @@
+models:
+  - display_name: GPT-4o
+    name: openai-chat
+    type: model
+    enabled: true
+    capabilities: [generate]
+    formats:
+      - type: openai
+    config:
+      route:
+        paths: [/ai]
+      model: {}
+      response_streaming: allow
+    targets:
+      - name: gpt-4o
+        provider: openai-prod
+        config:
+          type: openai
+          temperature: 1.0
+          max_tokens: 1024
+    policies: []
+    acls: {allow: [], deny: []}
+providers:
+  - name: openai-prod
+    type: openai
+    display_name: OpenAI Prod
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://ai/openai-token}"
