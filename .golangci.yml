@@ -1,18 +1,67 @@
+version: "2"
 run:
-  go: "1.22"
-  timeout: "5m"
-
+  timeout: 8m
+  build-tags:
+    - enterprise
 linters:
   enable:
-    - gofmt
-    - goimports
-    - govet
-    - errcheck
-    - ineffassign
+    - asciicheck
+    - bodyclose
+    - contextcheck
+    - dogsled
+    - durationcheck
+    - errname
+    - errorlint
+    - exhaustive
+    - gochecknoinits
+    - gomodguard
+    - gosec
+    - importas
+    - lll
+    - misspell
+    - mnd
+    - nakedret
+    - nilerr
+    - nolintlint
+    - predeclared
+    - revive
     - staticcheck
-    - unused
-    - gosimple
-
-linters-settings:
-  gofmt:
-    simplify: true
+    - testifylint
+    - unconvert
+    - unparam
+    - wastedassign
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      - linters:
+          - lll
+        source: "^\t*// "
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+issues:
+  max-same-issues: 0
+formatters:
+  enable:
+    - gci
+    - gofmt
+    - gofumpt
+    - goimports
+  settings:
+    gci:
+      sections:
+        - standard
+        - default
+        - prefix(github.com/kong)
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
