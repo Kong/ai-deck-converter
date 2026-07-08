@@ -1,0 +1,111 @@
+name: Release kongctl extension
+
+on:
+  push:
+    tags:
+      - "kongctl-ext-aigw-converter/v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release tag to publish in Kong/kongctl-ext-aigw-converter, for example v0.1.0.
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    name: Build and publish extension release
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      EXTENSION_DIR: extensions/kongctl-ai-gateway-converter
+      EXTENSION_BINARY: kongctl-ext-ai-gateway-converter
+      RELEASE_REPO: Kong/kongctl-ext-aigw-converter
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Setup go
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+        with:
+          go-version-file: go.mod
+          cache: true
+          cache-dependency-path: go.sum
+
+      - name: Resolve release tag
+        run: |
+          set -euo pipefail
+
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
+            release_tag="${{ inputs.version }}"
+          else
+            release_tag="${GITHUB_REF_NAME#kongctl-ext-aigw-converter/}"
+          fi
+
+          case "$release_tag" in
+            v[0-9]*.[0-9]*.[0-9]*)
+              ;;
+            *)
+              echo "release tag must look like v0.1.0, got: $release_tag" >&2
+              exit 1
+              ;;
+          esac
+
+          echo "RELEASE_TAG=$release_tag" >> "$GITHUB_ENV"
+
+      - name: Test
+        run: |
+          make test
+
+      - name: Build release archives
+        run: |
+          set -euo pipefail
+
+          rm -rf dist
+          mkdir -p dist
+
+          build_archive() {
+            goos="$1"
+            goarch="$2"
+            package_dir="dist/package-${goos}-${goarch}"
+            binary="bin/${EXTENSION_BINARY}"
+            archive="dist/${EXTENSION_BINARY}-${goos}-${goarch}.tar.gz"
+
+            mkdir -p "${package_dir}/bin"
+            cp "${EXTENSION_DIR}/kongctl-extension.yaml" "${package_dir}/"
+            cp "${EXTENSION_DIR}/README.md" "${package_dir}/"
+
+            CGO_ENABLED=0 GOOS="$goos" GOARCH="$goarch" \
+              go build -o "${package_dir}/${binary}" "./${EXTENSION_DIR}/cmd/${EXTENSION_BINARY}"
+            chmod +x "${package_dir}/${binary}"
+
+            tar -C "$package_dir" -czf "$archive" \
+              kongctl-extension.yaml README.md "$binary"
+          }
+
+          build_archive linux amd64
+          build_archive linux arm64
+          build_archive darwin amd64
+          build_archive darwin arm64
+
+          cd dist
+          sha256sum *.tar.gz > SHA256SUMS
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ secrets.KONGCTL_EXT_AIGW_CONVERTER_RELEASE_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "KONGCTL_EXT_AIGW_CONVERTER_RELEASE_TOKEN is required to publish to ${RELEASE_REPO}" >&2
+            exit 1
+          fi
+
+          gh release create "$RELEASE_TAG" \
+            dist/*.tar.gz dist/SHA256SUMS \
+            --repo "$RELEASE_REPO" \
+            --title "$RELEASE_TAG" \
+            --notes "Built from Kong/ai-deck-converter@${GITHUB_SHA}."
