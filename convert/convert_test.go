@@ -285,8 +285,7 @@ providers:
 	aiModel, ok := aiModels[0].(map[string]any)
 	require.True(t, ok, "expected ai-models entry")
 	require.Equal(t, "m1", aiModel["name"])
-	_, hasAlias := aiModel["alias"]
-	require.False(t, hasAlias, "ai-models alias should be omitted when source model.alias is unset")
+	require.Equal(t, "m1", aiModel["alias"], "ai-models alias should fall back to the model name when source model.alias is unset")
 
 	plugins, ok := got["plugins"].([]any)
 	require.True(t, ok, "expected plugins collection")
@@ -314,6 +313,67 @@ providers:
 	require.Equal(t, "gpt-4o", model["name"])
 	_, hasModelAlias := model["model_alias"]
 	require.False(t, hasModelAlias, "target model_alias should be omitted when source model.alias is unset")
+}
+
+func TestConvertDBLessSynthesizesAIModelAliasWhenUnset(t *testing.T) {
+	src := []byte(`
+models:
+  - type: api
+    name: files-api
+    capabilities: [files]
+    formats: [{type: openai}]
+    targets:
+      - name: files
+        provider: p1
+        config: {type: openai}
+    config:
+      route: {paths: [/v1]}
+      model: {name_header: false}
+providers:
+  - name: p1
+    type: openai
+`)
+
+	out, _, err := Convert(src, Options{OutputMode: "db-less"})
+	require.NoError(t, err, "convert db-less")
+
+	var got map[string]any
+	require.NoError(t, yaml.Unmarshal(out, &got), "unmarshal db-less output")
+
+	aiModels, ok := got["ai_models"].([]any)
+	require.True(t, ok, "expected ai_models collection")
+	require.Len(t, aiModels, 1)
+	aiModel, ok := aiModels[0].(map[string]any)
+	require.True(t, ok, "expected ai_models entry")
+	require.Equal(t, "files-api", aiModel["name"])
+	require.Equal(t, "files-api", aiModel["alias"], "db-less ai_models alias should fall back to the model name when source model.alias is unset")
+
+	plugins, ok := got["plugins"].([]any)
+	require.True(t, ok, "expected plugins collection")
+
+	var proxy map[string]any
+	for _, raw := range plugins {
+		plugin, ok := raw.(map[string]any)
+		require.True(t, ok, "expected plugin entry")
+		if plugin["name"] == "ai-proxy-advanced" {
+			proxy = plugin
+			break
+		}
+	}
+	require.NotNil(t, proxy, "expected ai-proxy-advanced plugin")
+
+	cfg, ok := proxy["config"].(map[string]any)
+	require.True(t, ok, "expected ai-proxy-advanced config")
+	targets, ok := cfg["targets"].([]any)
+	require.True(t, ok, "expected ai-proxy-advanced targets")
+	require.Len(t, targets, 1)
+	target, ok := targets[0].(map[string]any)
+	require.True(t, ok, "expected ai-proxy-advanced target")
+	model, ok := target["model"].(map[string]any)
+	require.True(t, ok, "expected ai-proxy-advanced model")
+	require.Equal(t, "files", model["name"])
+	_, hasModelAlias := model["model_alias"]
+	require.False(t, hasModelAlias, "db-less target model_alias should still be omitted when source model.alias is unset")
 }
 
 func TestConvertStrictFailsUnknownProvider(t *testing.T) {

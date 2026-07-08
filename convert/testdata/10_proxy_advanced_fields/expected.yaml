@@ -73,4 +73,6 @@ plugins:
       name: bare-model
 ai-models:
   - name: full-model
+    alias: full-model
   - name: bare-model
+    alias: bare-model

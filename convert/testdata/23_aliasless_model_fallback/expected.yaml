@@ -42,3 +42,4 @@ plugins:
       name: openai-chat
 ai-models:
   - name: openai-chat
+    alias: openai-chat

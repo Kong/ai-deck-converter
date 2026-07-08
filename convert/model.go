@@ -53,10 +53,16 @@ func (c *Converter) convertModels() error {
 		caps := c.expandCapabilities(m)
 		logging := modelLoggingBlock(m.Config.Logging)
 
-		// Preserve the source model alias exactly as authored. When unset, omit it
-		// from both the target model_alias and the ai-models entry so alias-less
-		// fallback behavior remains available.
-		alias := m.Config.Model.Alias
+		// Preserve the source model alias on ai-proxy-advanced targets exactly as
+		// authored so alias-less targets still participate in the DP's fallback
+		// behavior. The ai-models entity, however, still requires an alias in both
+		// decK and db-less payloads, so synthesize it from the model name when the
+		// source omitted one.
+		targetAlias := m.Config.Model.Alias
+		aiModelAlias := targetAlias
+		if aiModelAlias == "" {
+			aiModelAlias = m.Name
+		}
 
 		// ownerKey groups targets into ai-proxy-advanced plugins: per source model
 		// for type "model" (each carries its own ai-model FK), shared for type
@@ -146,7 +152,7 @@ func (c *Converter) convertModels() error {
 					g.proxyByOwner[ownerKey] = pg
 					g.proxies = append(g.proxies, pg)
 				}
-				target := c.buildTarget(tm, provider, providerType, alias, spec.RouteType, logging)
+				target := c.buildTarget(tm, provider, providerType, targetAlias, spec.RouteType, logging)
 				dedup := tm.Name + "|" + spec.RouteType
 				if !pg.seen[dedup] {
 					pg.seen[dedup] = true
@@ -162,7 +168,7 @@ func (c *Converter) convertModels() error {
 		c.out.AIModels = append(c.out.AIModels, kong.AIModel{
 			ID:    m.ID,
 			Name:  m.Name,
-			Alias: alias,
+			Alias: aiModelAlias,
 			Tags:  c.labelsToTags(m.Labels),
 		})
 
