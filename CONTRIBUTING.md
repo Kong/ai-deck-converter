@@ -9,7 +9,7 @@ We welcome contributions to ai-deck-converter! This document provides guidelines
 3. Create a feature branch (`git checkout -b feature/my-feature`)
 4. Make your changes
 5. Run tests to ensure everything works
-6. Commit your changes with clear messages
+6. Commit your changes with messages formatted as [conventional commits](https://www.conventionalcommits.org/en/v1.0.0/#summary)
 7. Push to your fork
 8. Open a pull request
 
@@ -42,7 +42,7 @@ go test ./revert -run TestGolden -update
 - Follow Go naming conventions and idioms
 - Add tests for new functionality
 - Update documentation as needed
-- Keep commits focused and well-described
+- Keep commits focused and well-described - follow [conventional commit messages](https://www.conventionalcommits.org/en/v1.0.0/#summary)
 
 ## Testing
 
@@ -56,7 +56,7 @@ For golden test changes, the PR diff should clearly show what changed and why.
 
 ## Pull Request Process
 
-1. Update the README.md with any new features or breaking changes
+1. Update the CHANGELOG.md with any new features or breaking changes
 2. Ensure all tests pass locally
 3. Provide a clear description of the changes in your PR
 4. Link any related issues
