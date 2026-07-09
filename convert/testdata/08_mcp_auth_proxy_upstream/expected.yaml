@@ -14,6 +14,7 @@ services:
               default_acl:
                 - allow:
                     - premium
+              include_consumer_groups: true
               mode: conversion-listener
               tools:
                 - description: Search available flights

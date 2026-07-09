@@ -89,6 +89,12 @@ func (c *Converter) mcpPlugin(m *aigw.MCPServer) (kong.Plugin, error) {
 	} else if acl := defaultACLBlock(m.ACLs); acl != nil {
 		cfg["default_acl"] = acl
 	}
+	// include_consumer_groups is always set alongside default_acl, mirroring aclPlugin() in
+	// acl.go: AI Gateway's only group-membership construct is consumer_groups, so an allow/deny
+	// entry naming a consumer_groups group would otherwise never match on the Kong side.
+	if _, ok := cfg["default_acl"]; ok {
+		cfg["include_consumer_groups"] = true
+	}
 	tools, err := c.mcpTools(m.Name, m.Tools)
 	if err != nil {
 		return kong.Plugin{}, err

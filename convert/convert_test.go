@@ -123,6 +123,56 @@ providers:
 		"acl plugin must set include_consumer_groups so consumer_groups-based allow/deny actually works")
 }
 
+// The ai-mcp-proxy plugin has the identical group-membership gap as the Kong acl plugin above
+// (kong/plugins/ai-mcp-proxy/schema.lua: include_consumer_groups "allows Consumer Group names to
+// be used in default ... ACL", default false) — so an MCP server's default_tool_acls must set it
+// too, the same way aclPlugin() always does for Models/Agents.
+func TestConvertMCPDefaultToolACLsIncludesConsumerGroups(t *testing.T) {
+	src := []byte(`
+mcp_servers:
+  - type: conversion-listener
+    name: group-acl-mcp
+    upstream_url: https://acl-check.example.com
+    config:
+      route: {paths: [/mcp/group-acl]}
+      auth:
+        default_tool_acls:
+          allow: [solo-caller, mcp-premium]
+    tools:
+      - name: ping
+        description: Liveness probe on the wrapped backend
+        method: GET
+        path: /ping
+`)
+	out, _, err := Convert(src, Options{OutputMode: "db-less"})
+	require.NoError(t, err, "convert")
+
+	var doc struct {
+		Plugins []struct {
+			Name   string         `yaml:"name"`
+			Config map[string]any `yaml:"config"`
+		} `yaml:"plugins"`
+	}
+	require.NoError(t, yaml.Unmarshal(out, &doc), "parse output")
+
+	var mcpProxy *struct {
+		Name   string
+		Config map[string]any
+	}
+	for i := range doc.Plugins {
+		if doc.Plugins[i].Name == "ai-mcp-proxy" {
+			mcpProxy = &struct {
+				Name   string
+				Config map[string]any
+			}{doc.Plugins[i].Name, doc.Plugins[i].Config}
+		}
+	}
+	require.NotNil(t, mcpProxy, "expected an ai-mcp-proxy plugin in the output")
+	require.NotNil(t, mcpProxy.Config["default_acl"], "expected default_acl to be set")
+	require.Equal(t, true, mcpProxy.Config["include_consumer_groups"],
+		"ai-mcp-proxy plugin must set include_consumer_groups so consumer_groups-based default_tool_acls actually works")
+}
+
 func TestConvertDocumentToDBLessYAML(t *testing.T) {
 	src := []byte(`
 models:
