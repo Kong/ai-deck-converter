@@ -207,7 +207,7 @@ func (c *Converter) convertModels() error {
 		for _, routeName := range routeNames {
 			for k := range idpPlugins {
 				p := idpPlugins[k]
-				p.Route = kong.NewRef(routeName)
+				p.Route = kong.NewStringRef(routeName)
 				guardPlugins = append(guardPlugins, p)
 			}
 		}
