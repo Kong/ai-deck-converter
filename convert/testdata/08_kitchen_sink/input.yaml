@@ -21,7 +21,8 @@ agents:
     display_name: Orchestrator
     name: orchestrator
     policies: []
-    acls: {allow: [], deny: []}
+    access:
+      acls: {allow: [], deny: []}
     config:
       url: https://orchestrator.internal/a2a
       route: {name: orch-route, paths: [/agents/orch]}

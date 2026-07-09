@@ -13,7 +13,7 @@ func (c *Converter) convertAgents() error {
 		a := &c.src.Agents[i]
 		route := buildRoute(a.Config.Route, a.Name)
 
-		guard, err := c.scopedPlugins(entityAgent, a.Policies, a.ACLs)
+		guard, err := c.scopedPlugins(entityAgent, a.Policies, a.Access.ACLs)
 		if err != nil {
 			return err
 		}

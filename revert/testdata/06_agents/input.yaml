@@ -27,3 +27,8 @@ services:
             config:
               key_names:
                 - apikey
+          - name: acl
+            config:
+              allow:
+                - forecast-users
+              include_consumer_groups: true
