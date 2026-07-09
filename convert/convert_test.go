@@ -123,6 +123,73 @@ providers:
 		"acl plugin must set include_consumer_groups so consumer_groups-based allow/deny actually works")
 }
 
+// ai-mcp-proxy has the identical include_consumer_groups gap as the Kong acl
+// plugin (see TestConvertACLIncludesConsumerGroups above): its own ACL-subject
+// extraction only recognizes consumer_groups membership when the flag is set,
+// defaulting to false. mcpPlugin() must set it by default — including for an
+// MCP server with no ACL configured at all (open-mcp below), which proves the
+// fix doesn't only trigger when default_acl/tools[].acl is present — except
+// when acl_attribute_type is oauth_access_token (oauth-mcp below), where
+// ai-mcp-proxy's own schema hard-rejects include_consumer_groups being set.
+func TestConvertMCPIncludesConsumerGroups(t *testing.T) {
+	src := []byte(`
+mcp_servers:
+  - type: conversion-listener
+    name: guarded-mcp
+    default_tool_acls:
+      allow: [premium-users]
+    config:
+      route: {paths: [/mcp/guarded]}
+    tools:
+      - {name: t, description: a tool, method: GET, path: /t, scheme: https, host: x.internal}
+  - type: conversion-listener
+    name: open-mcp
+    config:
+      route: {paths: [/mcp/open]}
+    tools:
+      - {name: t, description: a tool, method: GET, path: /t, scheme: https, host: x.internal}
+  - type: conversion-listener
+    name: oauth-mcp
+    config:
+      route: {paths: [/mcp/oauth]}
+      auth:
+        acl_attribute_type: oauth_access_token
+        access_token_claim_field: .user.email
+        default_tool_acls:
+          allow: [premium-users]
+    tools:
+      - {name: t, description: a tool, method: GET, path: /t, scheme: https, host: x.internal}
+`)
+	out, _, err := Convert(src, Options{OutputMode: "db-less"})
+	require.NoError(t, err, "convert db-less")
+
+	var doc struct {
+		Plugins []struct {
+			Name   string         `yaml:"name"`
+			Config map[string]any `yaml:"config"`
+		} `yaml:"plugins"`
+	}
+	require.NoError(t, yaml.Unmarshal(out, &doc), "parse output")
+
+	var mcpPlugins []map[string]any
+	for i := range doc.Plugins {
+		if doc.Plugins[i].Name == "ai-mcp-proxy" {
+			mcpPlugins = append(mcpPlugins, doc.Plugins[i].Config)
+		}
+	}
+	require.Len(t, mcpPlugins, 3, "expected an ai-mcp-proxy plugin per MCP server")
+	for _, cfg := range mcpPlugins[:2] {
+		require.Equal(t, true, cfg["include_consumer_groups"],
+			"ai-mcp-proxy plugin must set include_consumer_groups so consumer_groups-based allow/deny actually works")
+	}
+	// oauth_access_token is the exception: ai-mcp-proxy's schema hard-rejects
+	// include_consumer_groups being set in that mode (and subjects.lua ignores it anyway),
+	// so it must be left unset, not forced to true.
+	_, isSet := mcpPlugins[2]["include_consumer_groups"]
+	require.False(t, isSet,
+		"ai-mcp-proxy plugin must NOT set include_consumer_groups when acl_attribute_type is oauth_access_token: Kong's schema rejects that combination")
+}
+
 func TestConvertDocumentToDBLessYAML(t *testing.T) {
 	src := []byte(`
 models:

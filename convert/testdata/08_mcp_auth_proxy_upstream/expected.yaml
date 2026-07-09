@@ -31,6 +31,7 @@ services:
         plugins:
           - name: ai-mcp-proxy
             config:
+              include_consumer_groups: true
               mode: passthrough-listener
               proxy_config:
                 https_proxy_host: proxy.internal
@@ -47,6 +48,7 @@ services:
         plugins:
           - name: ai-mcp-proxy
             config:
+              include_consumer_groups: true
               mode: upstream-server
               server:
                 preserve_upstream_tool_names: true
