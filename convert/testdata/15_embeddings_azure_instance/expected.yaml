@@ -42,6 +42,7 @@ plugins:
             log_payloads: false
             log_statistics: true
           model:
+            model_alias: semantic-lb
             name: gpt-4o
             provider: openai
           route_type: llm/v1/chat

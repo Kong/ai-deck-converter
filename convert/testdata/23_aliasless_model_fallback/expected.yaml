@@ -32,6 +32,7 @@ plugins:
             log_payloads: false
             log_statistics: true
           model:
+            model_alias: openai-chat
             name: gpt-4o
             options:
               max_tokens: 1024
