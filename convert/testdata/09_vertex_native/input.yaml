@@ -36,7 +36,8 @@ models:
           max_tokens: 4096
           temperature: 1.0
     policies: []
-    acls: {allow: [], deny: []}
+    access:
+      acls: {allow: [], deny: []}
   - display_name: Text Embedding 005 (Vertex)
     name: vertex-text-embedding-005
     type: model
@@ -62,4 +63,5 @@ models:
         config:
           type: gemini
     policies: []
-    acls: {allow: [], deny: []}
+    access:
+      acls: {allow: [], deny: []}

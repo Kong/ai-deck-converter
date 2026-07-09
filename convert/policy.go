@@ -18,9 +18,28 @@ func (c *Converter) convertGlobalPolicies() {
 	}
 }
 
+// entityKind identifies the kind of entity scopedPlugins is building plugins
+// for, so it can apply entity-specific validation (e.g. rejecting
+// authentication policies on models).
+const (
+	entityModel         = "model"
+	entityMCPServer     = "mcp_server"
+	entityAgent         = "agent"
+	entityConsumer      = "consumer"
+	entityConsumerGroup = "consumer_group"
+)
+
+// authPolicyTypes are policy types that must be configured as identity
+// providers (scoped authentication with anonymous fallback) rather than as
+// plain policies, when referenced from a model.
+var authPolicyTypes = map[string]bool{
+	"key-auth":       true,
+	"openid-connect": true,
+}
+
 // scopedPlugins builds the plugins to nest under a referencing entity: one per
 // non-global policy reference, plus an acl plugin when ACLs are present.
-func (c *Converter) scopedPlugins(refs []string, acls aigw.ACLs) ([]kong.Plugin, error) {
+func (c *Converter) scopedPlugins(entityKind string, refs []string, acls aigw.ACLs) ([]kong.Plugin, error) {
 	var plugins []kong.Plugin
 	seen := map[string]bool{}
 	for _, ref := range refs {
@@ -34,6 +53,9 @@ func (c *Converter) scopedPlugins(refs []string, acls aigw.ACLs) ([]kong.Plugin,
 				return nil, err
 			}
 			continue
+		}
+		if entityKind == entityModel && authPolicyTypes[p.Type] {
+			return nil, fmt.Errorf("model policy %q has type %q, but authentication policies can only be applied to models via identity_providers, not policies", ref, p.Type)
 		}
 		if p.Global != nil && *p.Global {
 			continue // emitted once at the top level

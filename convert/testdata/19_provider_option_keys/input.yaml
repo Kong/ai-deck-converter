@@ -50,7 +50,8 @@ models:
           type: databricks
           workspace_instance_id: dbc-a1b2c3d4
     policies: []
-    acls: {allow: [], deny: []}
+    access:
+      acls: {allow: [], deny: []}
     config:
       route:
         paths: [/ai]

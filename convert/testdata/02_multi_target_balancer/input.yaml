@@ -20,7 +20,8 @@ models:
           deployment_id: gpt4o-dep
           api_version: "2024-02-01"
     policies: []
-    acls: {allow: [], deny: []}
+    access:
+      acls: {allow: [], deny: []}
     config:
       route:
         paths: [/ai]
@@ -50,7 +51,8 @@ models:
           deployment_id: gpt5.4-dep
           api_version: "2024-02-01"
     policies: []
-    acls: {allow: [], deny: []}
+    access:
+      acls: {allow: [], deny: []}
     config:
       route:
         paths: [/ai]

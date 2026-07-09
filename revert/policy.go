@@ -26,6 +26,16 @@ func (r *Reverter) revertGlobalPolicies() {
 	}
 }
 
+// authPluginNames are authentication plugins reconstructed into identity
+// providers (with a model's access.identity_providers reference) rather than
+// plain policies, but only when found on a model's route — see
+// modelPolicyRefs. On every other entity they remain plain policies, since
+// only models support identity providers.
+var authPluginNames = map[string]bool{
+	"key-auth":       true,
+	"openid-connect": true,
+}
+
 // policyRefs converts an entity's plugins into policy name references,
 // special-casing acl plugins into ACLs and skipping the AI plugins (which are
 // reconstructed into first-class entities by the service reversal steps).
@@ -43,6 +53,25 @@ func (r *Reverter) policyRefs(plugins []kong.Plugin) ([]string, aigw.ACLs) {
 		}
 	}
 	return refs, acls
+}
+
+// modelPolicyRefs is policyRefs plus identity-provider recovery: it pulls
+// key-auth/openid-connect plugins out into identity provider references
+// before delegating the remaining plugins to policyRefs. Used only for a
+// model's route/model-scoped guard plugins, since only models support
+// identity providers.
+func (r *Reverter) modelPolicyRefs(plugins []kong.Plugin) ([]string, aigw.ACLs, []string) {
+	var rest []kong.Plugin
+	var idpRefs []string
+	for _, p := range plugins {
+		if authPluginNames[p.Name] {
+			idpRefs = append(idpRefs, r.registerIdentityProvider(p).Name)
+			continue
+		}
+		rest = append(rest, p)
+	}
+	refs, acls := r.policyRefs(rest)
+	return refs, acls, idpRefs
 }
 
 // registerPolicy dedupes a plugin into the policy registry: a plugin with the

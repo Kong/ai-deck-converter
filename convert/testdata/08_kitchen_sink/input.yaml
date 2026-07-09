@@ -10,7 +10,8 @@ models:
       - {name: claude-3-5, weight: 10, provider: anthropic-main, config: {type: anthropic, version: "2023-06-01"}}
       - { name: claude-3-4, weight: 10, provider: anthropic-main, config: { type: anthropic } }
     policies: [prompt-guard]
-    acls: {allow: [premium], deny: []}
+    access:
+      acls: {allow: [premium], deny: []}
     config:
       route: {paths: [/ai]}
       model: {alias: "@prod/prod-chat"}

@@ -8,10 +8,11 @@ models:
       - embeddings
     formats:
       - type: openai
-    acls:
-      allow:
-        - consumer-alice
-        - group-admins
+    access:
+      acls:
+        allow:
+          - consumer-alice
+          - group-admins
     config:
       route:
         destinations:

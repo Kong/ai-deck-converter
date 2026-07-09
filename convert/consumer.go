@@ -8,7 +8,7 @@ import (
 func (c *Converter) convertConsumerGroups() error {
 	for i := range c.src.ConsumerGroups {
 		g := &c.src.ConsumerGroups[i]
-		plugins, err := c.scopedPlugins(g.Policies, aigw.ACLs{})
+		plugins, err := c.scopedPlugins(entityConsumerGroup, g.Policies, aigw.ACLs{})
 		if err != nil {
 			return err
 		}
@@ -25,7 +25,7 @@ func (c *Converter) convertConsumerGroups() error {
 func (c *Converter) convertConsumers() error {
 	for i := range c.src.Consumers {
 		cons := &c.src.Consumers[i]
-		plugins, err := c.scopedPlugins(cons.Policies, aigw.ACLs{})
+		plugins, err := c.scopedPlugins(entityConsumer, cons.Policies, aigw.ACLs{})
 		if err != nil {
 			return err
 		}

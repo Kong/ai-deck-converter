@@ -1,0 +1,61 @@
+_defaults:
+  kongctl:
+    namespace: ai-gateway-multiauth-models
+
+ai_gateways:
+- ref: ai-gateway
+  _external:
+    selector:
+        matchFields:
+          name: "ai-gateway"
+  
+  # /models/settings
+  identity_providers:
+  - name: okta-oidc
+    type: openid-connect
+    config:
+      issuer: https://dev-123456.okta.com/oauth2/default
+  - name: key-auth-default
+    type: key-auth
+    config:
+      key_names:
+      - x-api-key
+  
+  models:
+  - ref: openai-gpt-5-4
+    type: model
+    name: openai-gpt-5-4
+    display_name: "OpenAI Prod - GPT-5.4"
+    enabled: true
+    access:
+      identity_providers: 
+      - okta-oidc
+      acls:
+        allow: []
+    config:
+      route:
+        paths:
+        - /
+      model:
+        alias: "@openai/gpt-5.4"
+    formats:
+      - type: openai
+    target_models:
+      - name: gpt-5.4
+        provider: openai-prod
+        config:
+          type: openai
+    capabilities:
+    - generate
+
+  model_providers:  
+  - ref: openai-prod
+    name: openai-prod
+    display_name: "OpenAI Prod"
+    type: openai
+    config:
+      auth:
+        type: basic
+        headers:
+        - name: Authorization
+          value: "{vault://ai-vault/openai-api-key}"

@@ -34,4 +34,5 @@ models:
         provider: bedrock-prod
         config: {type: bedrock, region: us-east-1, embeddings_normalize: true}
     policies: []
-    acls: {allow: [], deny: []}
+    access:
+      acls: {allow: [], deny: []}
