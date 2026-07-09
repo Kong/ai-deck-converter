@@ -35,7 +35,7 @@ services:
 consumers:
   - username: app-svc
     groups:
-      - premium
+      - name: premium
     keyauth_credentials:
       - key: app-secret
 consumer_groups:

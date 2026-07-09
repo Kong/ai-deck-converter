@@ -13,7 +13,7 @@ consumers:
   - username: gregs-dev
     custom_id: dev-001
     groups:
-      - premium-users
+      - name: premium-users
     keyauth_credentials:
       - key: secret-abc
         ttl: 3600

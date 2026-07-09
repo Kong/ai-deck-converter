@@ -106,7 +106,8 @@ func (c *Converter) projectDBLess() *kong.DBLessDocument {
 				fmt.Sprintf("plugin:consumer:%s:%s:%d", consumer.Username, plugin.Name, pluginIdx)))
 			out.Plugins = append(out.Plugins, toDBLessPlugin(plugin, id, scopeRef{consumer: consumerID}))
 		}
-		for _, groupName := range consumer.Groups {
+		for _, groupRef := range consumer.Groups {
+			groupName := groupRef.Name
 			groupID, ok := ids.group[groupName]
 			if !ok {
 				groupID = stableUUID("consumer_group:" + groupName)

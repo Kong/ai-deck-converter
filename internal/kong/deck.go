@@ -23,6 +23,29 @@ type Ref struct {
 	Name string `yaml:"name"`
 }
 
+// UnmarshalYAML handles both string and {name: <x>} formats.
+func (r *Ref) UnmarshalYAML(unmarshal func(any) error) error {
+	// Try string first
+	var s string
+	stringErr := unmarshal(&s)
+	if stringErr == nil {
+		r.Name = s
+		return nil
+	}
+
+	// Try to unmarshal as an object with a name field
+	var obj struct {
+		Name string `yaml:"name"`
+	}
+	if err := unmarshal(&obj); err == nil && obj.Name != "" {
+		r.Name = obj.Name
+		return nil
+	}
+
+	// Return the original string unmarshal error if both failed
+	return stringErr
+}
+
 // Ref is a name-based foreign-key reference, rendered as `{name: <x>}`.
 type StringRef string
 
@@ -124,7 +147,7 @@ type Consumer struct {
 	ID                 string              `yaml:"id,omitempty"`
 	Username           string              `yaml:"username,omitempty"`
 	CustomID           string              `yaml:"custom_id,omitempty"`
-	Groups             []string            `yaml:"groups,omitempty"`
+	Groups             []*Ref              `yaml:"groups,omitempty"`
 	KeyAuthCredentials []KeyAuthCredential `yaml:"keyauth_credentials,omitempty"`
 	Plugins            []Plugin            `yaml:"plugins,omitempty"`
 	Tags               []string            `yaml:"tags,omitempty"`
