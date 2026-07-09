@@ -40,20 +40,25 @@ func NewStringRef(name string) *StringRef { ref := StringRef(name); return &ref 
 
 // UnmarshalYAML handles both string and {name: <x>} formats.
 func (sr *StringRef) UnmarshalYAML(unmarshal func(any) error) error {
+	// Try string first
 	var s string
-	if err := unmarshal(&s); err == nil {
+	stringErr := unmarshal(&s)
+	if stringErr == nil {
 		*sr = StringRef(s)
 		return nil
 	}
+
 	// Try to unmarshal as an object with a name field (dbless format)
 	var obj struct {
 		Name string `yaml:"name"`
 	}
-	if err := unmarshal(&obj); err == nil {
+	if err := unmarshal(&obj); err == nil && obj.Name != "" {
 		*sr = StringRef(obj.Name)
 		return nil
 	}
-	return unmarshal(sr)
+
+	// Return the original string unmarshal error if both failed
+	return stringErr
 }
 
 // NewDocument returns an empty document with the format version set.
