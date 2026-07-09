@@ -547,6 +547,66 @@ model_providers:
 	require.Equal(t, "m1", model["model_alias"], "type \"model\" target model_alias should default to the model name when source model.alias is unset")
 }
 
+// On a native (path-model) route such as bedrock's, there is no companion
+// ai-model-selector to gate Koko's model-scoping on a matching alias (see
+// #34, "skip plugin-level model FK on native routes without
+// ai-model-selector"). Defaulting the target's model_alias here anyway would
+// pull the target out of the "<default>" balancer pool with nothing left to
+// populate it from a request that never carries a body model field at all —
+// the same pool-fallback hazard PR #48/#49 fixed for type "api", just
+// reached via route shape instead of entity type.
+func TestConvertOmitsTargetModelAliasOnNativeRoutes(t *testing.T) {
+	src := []byte(`
+models:
+  - type: model
+    name: claude-bedrock
+    capabilities: [generate]
+    formats: [{type: bedrock}]
+    targets:
+      - name: anthropic.claude-3-5-sonnet
+        provider: p1
+        config: {type: bedrock, aws_region: us-east-1}
+    config:
+      route: {paths: [/ai]}
+      model: {}
+providers:
+  - name: p1
+    type: bedrock
+`)
+
+	out, _, err := Convert(src, Options{})
+	require.NoError(t, err, "convert")
+
+	var got map[string]any
+	require.NoError(t, yaml.Unmarshal(out, &got), "unmarshal output")
+
+	plugins, ok := got["plugins"].([]any)
+	require.True(t, ok, "expected plugins collection")
+
+	var proxy map[string]any
+	for _, raw := range plugins {
+		plugin, ok := raw.(map[string]any)
+		require.True(t, ok, "expected plugin entry")
+		if plugin["name"] == "ai-proxy-advanced" {
+			proxy = plugin
+			break
+		}
+	}
+	require.NotNil(t, proxy, "expected ai-proxy-advanced plugin")
+
+	cfg, ok := proxy["config"].(map[string]any)
+	require.True(t, ok, "expected ai-proxy-advanced config")
+	targets, ok := cfg["targets"].([]any)
+	require.True(t, ok, "expected ai-proxy-advanced targets")
+	require.Len(t, targets, 1)
+	target, ok := targets[0].(map[string]any)
+	require.True(t, ok, "expected ai-proxy-advanced target")
+	model, ok := target["model"].(map[string]any)
+	require.True(t, ok, "expected ai-proxy-advanced model")
+	_, hasModelAlias := model["model_alias"]
+	require.False(t, hasModelAlias, "native-route target model_alias should stay unset when source model.alias is unset, even for type \"model\"")
+}
+
 func TestConvertDBLessSynthesizesAIModelAliasWhenUnset(t *testing.T) {
 	src := []byte(`
 models:
