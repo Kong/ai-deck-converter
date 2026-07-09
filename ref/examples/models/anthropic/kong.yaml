@@ -18,7 +18,7 @@ services:
         - POST
       strip_path: false
 
-ai-models:
+ai_models:
 - name: claude-opus-4-5-chat
   alias: "@anthropic/claude-opus-4-5"
 - name: anthropic-batch-api

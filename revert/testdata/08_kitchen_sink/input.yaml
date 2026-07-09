@@ -94,6 +94,6 @@ vaults:
     name: env
     config:
       prefix: KONG_
-ai-models:
+ai_models:
   - name: prod-chat
     alias: '@prod/prod-chat'

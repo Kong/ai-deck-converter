@@ -50,7 +50,7 @@ services:
         - POST
       strip_path: false
 
-ai-models:
+ai_models:
 - name: claude-3-7-sonnet-bedrock
   alias: "@bedrock/claude-3-7-sonnet"
 - name: titan-embed-text-v2

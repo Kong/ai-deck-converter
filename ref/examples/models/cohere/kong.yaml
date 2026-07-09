@@ -17,7 +17,7 @@ services:
         - POST
       strip_path: false
 
-ai-models:
+ai_models:
 - name: cohere-rerank-3-5
   alias: "@cohere/rerank-v3.5"
 

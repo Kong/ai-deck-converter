@@ -17,7 +17,7 @@ services:
         - POST
       strip_path: false
 
-ai-models:
+ai_models:
 - name: gpt-5-2
   alias: "@openai/gpt-5.2"
 - name: claude-opus-4-6

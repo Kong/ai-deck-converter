@@ -1,6 +1,6 @@
 models:
   - type: model
-    name: gemini-2-5-pro
+    name: vertex-gemini-2-5-pro
     capabilities:
       - generate
     formats:
@@ -19,7 +19,7 @@ models:
       model:
         alias: '@vertex/gemini-2.5-pro'
   - type: model
-    name: text-embedding-005
+    name: vertex-text-embedding-005
     capabilities:
       - embeddings
     formats:

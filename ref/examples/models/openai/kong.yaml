@@ -75,7 +75,7 @@ services:
         - DELETE
       strip_path: false
 
-ai-models:
+ai_models:
 - name: gpt-5-4-chat
   alias: "@azure/gpt-5.4"
 - name: gpt-realtime

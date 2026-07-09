@@ -17,7 +17,7 @@ services:
         - POST
       strip_path: false
 
-ai-models:
+ai_models:
 - name: hf-llama-3-3-70b-tgi
   alias: "@huggingface/llama-3.3-70b-instruct"
 

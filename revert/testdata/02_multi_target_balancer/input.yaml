@@ -52,6 +52,6 @@ plugins:
           weight: 30
     route:
       name: openai-chat
-ai-models:
+ai_models:
   - name: chat-lb
     alias: '@openai/chat-lb'
