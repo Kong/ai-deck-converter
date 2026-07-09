@@ -440,6 +440,52 @@ mcp_servers:
 	require.Error(t, err, "expected strict mode to fail on MCP tool missing description")
 }
 
+func TestConvertWarnsMCPUpstreamServerNoLabels(t *testing.T) {
+	src := []byte(`
+mcp_servers:
+  - type: upstream-server
+    name: m1
+    upstream_url: https://upstream.example.com/mcp
+    config:
+      route: {paths: [/mcp]}
+      tools_cache_ttl_seconds: 60
+`)
+	_, warnings, err := Convert(src, Options{})
+	require.NoError(t, err, "convert")
+	require.Contains(t, strings.Join(warnings, "\n"), "has no labels",
+		"expected no-labels warning for an unreachable upstream-server MCP server")
+}
+
+func TestConvertStrictFailsMCPUpstreamServerNoLabels(t *testing.T) {
+	src := []byte(`
+mcp_servers:
+  - type: upstream-server
+    name: m1
+    upstream_url: https://upstream.example.com/mcp
+    config:
+      route: {paths: [/mcp]}
+      tools_cache_ttl_seconds: 60
+`)
+	_, _, err := Convert(src, Options{Strict: true})
+	require.Error(t, err, "expected strict mode to fail on a label-less upstream-server MCP server")
+}
+
+func TestConvertMCPUpstreamServerWithLabelsDoesNotWarn(t *testing.T) {
+	src := []byte(`
+mcp_servers:
+  - type: upstream-server
+    name: m1
+    labels: {mcp-group: remote}
+    upstream_url: https://upstream.example.com/mcp
+    config:
+      route: {paths: [/mcp]}
+      tools_cache_ttl_seconds: 60
+`)
+	_, warnings, err := Convert(src, Options{})
+	require.NoError(t, err, "convert")
+	require.Empty(t, warnings, "an upstream-server MCP server WITH labels is not flagged by this heuristic — must not warn")
+}
+
 func TestA2APluginDropsLogAudits(t *testing.T) {
 	a := &aigw.Agent{
 		Type: "a2a",
