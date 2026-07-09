@@ -64,25 +64,9 @@ func (c *Converter) convertModels() error {
 
 		// ai-models.alias always defaults to the model name when unset (required
 		// by the DP schema in both decK and db-less payloads).
-		//
-		// A target's own model_alias only gets that same default for type "model"
-		// (modelScoped): Koko already gates that plugin behind a matching
-		// ai-model-selector lookup on the ai-models alias (PR #30/KOKO-3787), so a
-		// request only ever reaches it with body.model == alias already — applying
-		// the same value to model_alias just keeps ai-proxy-advanced's own "cannot
-		// use own model" check consistent with that guarantee (see AMV-1/AG-1234).
-		//
-		// For type "api", targets from multiple models can share one route-scoped
-		// plugin, and an unaliased target intentionally stays in the "<default>"
-		// balancer pool as a fallback (PR #48/#49, AG-1211) — defaulting it here
-		// would pull it out of that pool and break the fallback.
 		aiModelAlias := m.Config.Model.Alias
 		if aiModelAlias == "" {
 			aiModelAlias = m.Name
-		}
-		targetAlias := m.Config.Model.Alias
-		if modelScoped && targetAlias == "" {
-			targetAlias = m.Name
 		}
 
 		var routeNames []string
@@ -130,6 +114,22 @@ func (c *Converter) convertModels() error {
 				if !routeSeen[g.route.Name] {
 					routeSeen[g.route.Name] = true
 					routeNames = append(routeNames, g.route.Name)
+				}
+
+				// A target's own model_alias only gets the model-name default on a
+				// route that also takes the model from the body (g.takesBodyModel):
+				// that's the only case where a companion ai-model-selector plugin
+				// gates entry into this model-scoped plugin on a matching
+				// ai-models.alias (PR #30/KOKO-3787), so the request is guaranteed to
+				// already carry body.model == alias by the time this target's own
+				// "cannot use own model" check runs (see AMV-1/AG-1234). A native
+				// (path-model) route has no such companion plugin, so an unaliased
+				// target must stay alias-less to remain in the "<default>" balancer
+				// pool — same reasoning as the type "api" fallback pool (PR #48/#49,
+				// AG-1211), just gated on route shape instead of entity type.
+				targetAlias := m.Config.Model.Alias
+				if modelScoped && g.takesBodyModel && targetAlias == "" {
+					targetAlias = m.Name
 				}
 
 				pg := g.proxyByOwner[ownerKey]
