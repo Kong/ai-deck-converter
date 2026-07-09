@@ -237,6 +237,80 @@ services:
 	require.Equal(t, aigw.Labels{"fallback": "service"}, byName["fallback"].Labels, "service tags should remain the fallback")
 }
 
+// TestRevertMCPToolRouteTagSuppressesPhantomAgent covers the companion side of
+// the convert/mcp.go fix: a plugin-less companion Route the forward converter
+// synthesizes for a host-less MCP conversion tool (tagged
+// aimap.MCPToolRouteTag) must not be reverted into a phantom "http" Agent —
+// its method/path are already fully present in the co-located ai-mcp-proxy
+// plugin's own tools[] config, so nothing would be gained and round-tripping
+// it back through convert would fabricate a second, unrelated Service.
+func TestRevertMCPToolRouteTagSuppressesPhantomAgent(t *testing.T) {
+	in := []byte(`
+_format_version: "3.0"
+services:
+  - name: flights-mcp
+    host: localhost
+    routes:
+      - name: flights-mcp-route
+        paths: [/mcp/flights]
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              mode: conversion-listener
+              tools:
+                - name: bookFlight
+                  description: Book a flight
+                  method: POST
+                  path: /flights/book
+      - name: flights-mcp-bookFlight-route
+        paths: [/flights/book]
+        methods: [POST]
+        strip_path: false
+        tags: [ai-deck-converter:mcp-tool-route]
+`)
+	doc, warnings, err := revertYAML(t, in, Options{Strict: true})
+	require.NoErrorf(t, err, "strict revert (warnings: %v)", warnings)
+	require.Empty(t, warnings, "want no warnings")
+	require.Len(t, doc.MCPServers, 1, "mcp servers = %+v", doc.MCPServers)
+	require.Empty(t, doc.Agents, "a tagged companion route must not be reverted into a phantom Agent, got %+v", doc.Agents)
+}
+
+// TestRevertUntaggedPlainRouteOnMCPServiceStillBecomesAgent is the negative
+// case for the fix above: an ordinary, untagged plain route that happens to
+// be co-located on the same Service as an MCP listener route (e.g.
+// hand-authored decK) is genuinely unrelated, non-converter-owned plumbing,
+// and must still be preserved as a separate Agent — only the marker tag,
+// never mere co-location, proves a route is the converter's own synthesized
+// artifact.
+func TestRevertUntaggedPlainRouteOnMCPServiceStillBecomesAgent(t *testing.T) {
+	in := []byte(`
+_format_version: "3.0"
+services:
+  - name: flights-mcp
+    host: localhost
+    routes:
+      - name: flights-mcp-route
+        paths: [/mcp/flights]
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              mode: conversion-listener
+              tools:
+                - name: bookFlight
+                  description: Book a flight
+                  method: POST
+                  path: /flights/book
+      - name: hand-authored-route
+        paths: [/hand-authored]
+`)
+	doc, warnings, err := revertYAML(t, in, Options{})
+	require.NoError(t, err, "revert")
+	require.Empty(t, warnings, "unexpected warnings: %v", warnings)
+	require.Len(t, doc.MCPServers, 1, "mcp servers = %+v", doc.MCPServers)
+	require.Lenf(t, doc.Agents, 1, "an untagged plain route co-located with an MCP route must still become an Agent, got %+v", doc.Agents)
+	require.Equal(t, "hand-authored-route", doc.Agents[0].Name)
+}
+
 func TestMismatchedAliasStillWarns(t *testing.T) {
 	// When ai-models entries exist but a target alias matches none of them,
 	// that is a genuine inconsistency and keeps its warning.

@@ -1,7 +1,10 @@
 package convert
 
 import (
+	"strings"
+
 	"github.com/Kong/ai-deck-converter/internal/aigw"
+	"github.com/Kong/ai-deck-converter/internal/aimap"
 	"github.com/Kong/ai-deck-converter/internal/kong"
 )
 
@@ -50,9 +53,68 @@ func (c *Converter) convertMCPServers() error {
 		if m.Enabled != nil && !*m.Enabled {
 			service.Enabled = m.Enabled
 		}
+		// In conversion-only/conversion-listener mode, a tool with no per-tool host
+		// override is meant to dispatch against this MCP server's own Gateway
+		// Service (per AIGatewayMCPConversionTool's own doc string: "By default,
+		// Kong will extract the host from API configuration"). At runtime,
+		// ai-mcp-proxy (kong/plugins/ai-mcp-proxy/tools.lua) resolves that by
+		// re-entering Kong's own router with the tool's raw method+path, which
+		// only reaches this Service if some Route actually matches that path. The
+		// listener route above is keyed on the server's own config.route path
+		// (e.g. /mcp/echo), not the tool's path, so it never matches. Emit a
+		// plain, plugin-less companion Route per such tool so the self-dispatch
+		// has a Route to match. Not needed for listener (no upstream to dispatch
+		// to at all), passthrough-listener (forwards to its own already-matching
+		// route, no per-tool synthesis), or upstream-server (tools are fetched
+		// from, and dispatched to, the real backend MCP server directly).
+		if m.Type == "conversion-only" || m.Type == "conversion-listener" {
+			for i := range m.Tools {
+				t := &m.Tools[i]
+				if t.Host == "" && strings.HasPrefix(t.Path, "/") {
+					service.Routes = append(service.Routes, mcpToolRoute(m.Name, t))
+				}
+			}
+		}
 		c.out.Services = append(c.out.Services, service)
 	}
 	return nil
+}
+
+// mcpToolRoute builds a plain, plugin-less companion Route for an MCP
+// conversion tool with no per-tool host override, giving the ai-mcp-proxy
+// plugin's own-Service self-dispatch (tools.lua) a real Route to match on the
+// tool's raw method+path. strip_path is forced false: Kong's default (true)
+// would strip the matched prefix before proxying, mangling the outbound
+// request the plugin expects to reach the backend unchanged.
+//
+// The route carries aimap.MCPToolRouteTag so revert/service.go can recognize
+// it as converter-owned plumbing (fully recoverable from the co-located
+// ai-mcp-proxy plugin's own tools[] config) rather than an unrelated
+// hand-authored route it must preserve as a separate Agent. MCP tools have no
+// labels field in the schema, so there are no user tags to keep alongside it.
+func mcpToolRoute(serverName string, t *aigw.MCPTool) kong.Route {
+	return kong.Route{
+		Name:      serverName + "-" + t.Name + "-route",
+		Paths:     []string{mcpToolRoutePathPrefix(t.Path)},
+		Methods:   []string{t.Method},
+		StripPath: boolPtr(false),
+		Tags:      []string{aimap.MCPToolRouteTag},
+	}
+}
+
+// mcpToolRoutePathPrefix derives a Kong route path prefix from an MCP tool's
+// path. Kong's default path matching is prefix-based, and the plugin computes
+// the actual outbound request path from the tool's raw path separately, so
+// this only needs to give the router something to match: a templated path
+// (e.g. /resource/{id}) is truncated at its first template placeholder.
+func mcpToolRoutePathPrefix(path string) string {
+	if idx := strings.Index(path, "{"); idx >= 0 {
+		path = path[:idx]
+	}
+	if trimmed := strings.TrimSuffix(path, "/"); trimmed != "" {
+		path = trimmed
+	}
+	return path
 }
 
 func (c *Converter) mcpPlugin(m *aigw.MCPServer) (kong.Plugin, error) {

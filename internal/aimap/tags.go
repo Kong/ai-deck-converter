@@ -5,6 +5,15 @@ import (
 	"strings"
 )
 
+// MCPToolRouteTag marks a Kong Route that the forward converter synthesizes
+// as a companion to an MCP conversion tool with no per-tool host override
+// (see convert/mcp.go). It is not a label-derived tag (MCP tools have no
+// labels field in the AI Gateway schema) but a converter-internal provenance
+// marker: it lets the reverter (revert/service.go) recognize the route as
+// fully recoverable from the co-located ai-mcp-proxy plugin's own tools[]
+// config, rather than an unrelated hand-authored route it must preserve.
+const MCPToolRouteTag = "ai-deck-converter:mcp-tool-route"
+
 // LabelsToTags flattens an AI Gateway label map into a deterministic, sorted
 // list of "key:value" tag strings (decK has no native label field on most
 // entities). The optional prefix namespaces the tags, e.g. "aigw/env:prod".

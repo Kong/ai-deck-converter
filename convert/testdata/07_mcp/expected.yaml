@@ -34,6 +34,14 @@ services:
                   method: POST
                   name: bookFlight
                   path: /flights/book
+      - name: flights-mcp-bookFlight-route
+        paths:
+          - /flights/book
+        methods:
+          - POST
+        strip_path: false
+        tags:
+          - ai-deck-converter:mcp-tool-route
   - name: vendor-mcp
     url: https://vendor-mcp.example.com/mcp
     routes:

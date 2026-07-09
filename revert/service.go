@@ -1,8 +1,10 @@
 package revert
 
 import (
+	"slices"
 	"sort"
 
+	"github.com/Kong/ai-deck-converter/internal/aimap"
 	"github.com/Kong/ai-deck-converter/internal/kong"
 )
 
@@ -11,6 +13,15 @@ import (
 // ai-mcp-proxy routes become MCP Servers, ai-a2a-proxy and plain routes become
 // Agents. Classification is per-route so hand-written configs that mix kinds
 // on one service still convert.
+//
+// One exception: a plugin-less route tagged aimap.MCPToolRouteTag, co-located
+// with an ai-mcp-proxy route, is the forward converter's own companion Route
+// for an MCP conversion tool with no host override (convert/mcp.go). It is
+// dropped rather than turned into a phantom Agent — its method/path are
+// already fully present in the co-located ai-mcp-proxy plugin's own tools[]
+// config, so nothing is lost. A plain route WITHOUT the tag still becomes an
+// Agent as before, even on a service that also has an ai-mcp-proxy route —
+// only the tag, not mere co-location, proves converter ownership.
 func (r *Reverter) revertServices() error {
 	acc := &modelAcc{groups: map[string]*modelGroup{}}
 	routesSeen := map[string]bool{}
@@ -48,6 +59,17 @@ func (r *Reverter) revertServices() error {
 			default:
 				plainRoutes = append(plainRoutes, rt)
 			}
+		}
+
+		if hasMCPRoute && len(plainRoutes) > 0 {
+			filtered := make([]*kong.Route, 0, len(plainRoutes))
+			for _, rt := range plainRoutes {
+				if slices.Contains(rt.Tags, aimap.MCPToolRouteTag) {
+					continue
+				}
+				filtered = append(filtered, rt)
+			}
+			plainRoutes = filtered
 		}
 
 		// Service-level plugins on a pure model service have no AI Gateway home
