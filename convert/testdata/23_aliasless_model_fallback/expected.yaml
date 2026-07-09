@@ -30,6 +30,7 @@ plugins:
             header_value: '{vault://ai/openai-token}'
           description: gpt-4o
           model:
+            model_alias: openai-chat
             name: gpt-4o
             options:
               max_tokens: 1024

@@ -290,7 +290,13 @@ providers:
 	require.Equal(t, "@openai/custom-m1", model["model_alias"], "target model_alias should match source model.alias")
 }
 
-func TestConvertOmitsSyntheticModelAliasWhenUnset(t *testing.T) {
+// For type "model", the target model_alias defaults to the model name when
+// unset, matching the ai-models alias. Koko only ever routes to this
+// model-scoped plugin via an ai-model-selector match on that same alias, so
+// the target only ever sees a request body model value equal to it; without
+// this default, ai-proxy-advanced's own "cannot use own model" check would
+// reject that value since no model_alias would be present to match against.
+func TestConvertSynthesizesTargetModelAliasWhenUnsetForModelScoped(t *testing.T) {
 	src := []byte(`
 models:
   - type: model
@@ -347,8 +353,7 @@ providers:
 	model, ok := target["model"].(map[string]any)
 	require.True(t, ok, "expected ai-proxy-advanced model")
 	require.Equal(t, "gpt-4o", model["name"])
-	_, hasModelAlias := model["model_alias"]
-	require.False(t, hasModelAlias, "target model_alias should be omitted when source model.alias is unset")
+	require.Equal(t, "m1", model["model_alias"], "type \"model\" target model_alias should default to the model name when source model.alias is unset")
 }
 
 func TestConvertDBLessSynthesizesAIModelAliasWhenUnset(t *testing.T) {

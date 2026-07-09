@@ -53,17 +53,6 @@ func (c *Converter) convertModels() error {
 		caps := c.expandCapabilities(m)
 		logging := modelLoggingBlock(m.Config.Logging)
 
-		// Preserve the source model alias on ai-proxy-advanced targets exactly as
-		// authored so alias-less targets still participate in the DP's fallback
-		// behavior. The ai-models entity, however, still requires an alias in both
-		// decK and db-less payloads, so synthesize it from the model name when the
-		// source omitted one.
-		targetAlias := m.Config.Model.Alias
-		aiModelAlias := targetAlias
-		if aiModelAlias == "" {
-			aiModelAlias = m.Name
-		}
-
 		// ownerKey groups targets into ai-proxy-advanced plugins: per source model
 		// for type "model" (each carries its own ai-model FK), shared for type
 		// "api" (route-only, all targets merged into one plugin).
@@ -71,6 +60,29 @@ func (c *Converter) convertModels() error {
 		ownerKey := ""
 		if modelScoped {
 			ownerKey = m.Name
+		}
+
+		// ai-models.alias always defaults to the model name when unset (required
+		// by the DP schema in both decK and db-less payloads).
+		//
+		// A target's own model_alias only gets that same default for type "model"
+		// (modelScoped): Koko already gates that plugin behind a matching
+		// ai-model-selector lookup on the ai-models alias (PR #30/KOKO-3787), so a
+		// request only ever reaches it with body.model == alias already — applying
+		// the same value to model_alias just keeps ai-proxy-advanced's own "cannot
+		// use own model" check consistent with that guarantee (see AMV-1/AG-1234).
+		//
+		// For type "api", targets from multiple models can share one route-scoped
+		// plugin, and an unaliased target intentionally stays in the "<default>"
+		// balancer pool as a fallback (PR #48/#49, AG-1211) — defaulting it here
+		// would pull it out of that pool and break the fallback.
+		aiModelAlias := m.Config.Model.Alias
+		if aiModelAlias == "" {
+			aiModelAlias = m.Name
+		}
+		targetAlias := m.Config.Model.Alias
+		if modelScoped && targetAlias == "" {
+			targetAlias = m.Name
 		}
 
 		var routeNames []string
