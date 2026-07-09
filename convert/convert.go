@@ -32,8 +32,6 @@ type Options struct {
 	// OutputMode controls the emitted Kong config flavor.
 	// Supported values are "deck" (default) and "db-less".
 	OutputMode string `yaml:"output_mode"`
-	// GlobalSelectTags specifies tags to be selected globally for the decK output.
-	GlobalSelectTags []string `yaml:"global_select_tags"`
 }
 
 func (o Options) withDefaults() Options {
@@ -237,9 +235,6 @@ func (c *Converter) run() error {
 	}
 	if err := c.convertAgents(); err != nil {
 		return err
-	}
-	if len(c.opts.GlobalSelectTags) > 0 {
-		c.out.Info = &kong.DocumentInfo{SelectTags: c.opts.GlobalSelectTags}
 	}
 	return nil
 }

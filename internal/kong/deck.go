@@ -10,18 +10,12 @@ const FormatVersion = "3.0"
 // Document is the top-level decK declarative configuration document.
 type Document struct {
 	FormatVersion  string          `yaml:"_format_version"`
-	Info           *DocumentInfo   `yaml:"_info,omitempty"`
 	Services       []Service       `yaml:"services,omitempty"`
 	Consumers      []Consumer      `yaml:"consumers,omitempty"`
 	ConsumerGroups []ConsumerGroup `yaml:"consumer_groups,omitempty"`
 	Plugins        []Plugin        `yaml:"plugins,omitempty"`
 	Vaults         []Vault         `yaml:"vaults,omitempty"`
 	AIModels       []AIModel       `yaml:"ai_models,omitempty"`
-}
-
-// DocumentInfo holds metadata for the decK document.
-type DocumentInfo struct {
-	SelectTags []string `yaml:"select_tags,omitempty"`
 }
 
 // Ref is a name-based foreign-key reference, rendered as `{name: <x>}`.
