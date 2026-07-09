@@ -6,6 +6,8 @@ services:
       - name: flights-mcp-route
         paths:
           - /mcp/flights
+          - /flights
+          - /flights/book
         plugins:
           - name: ai-mcp-proxy
             config:

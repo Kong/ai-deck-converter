@@ -1,6 +1,8 @@
 package convert
 
 import (
+	"strings"
+
 	"github.com/Kong/ai-deck-converter/internal/aigw"
 	"github.com/Kong/ai-deck-converter/internal/kong"
 )
@@ -89,7 +91,7 @@ func (c *Converter) mcpPlugin(m *aigw.MCPServer) (kong.Plugin, error) {
 	} else if acl := defaultACLBlock(m.ACLs); acl != nil {
 		cfg["default_acl"] = acl
 	}
-	tools, err := c.mcpTools(m.Name, m.Tools)
+	tools, err := c.mcpTools(m.Name, m.Type, m.Config.Route.Paths, m.Tools)
 	if err != nil {
 		return kong.Plugin{}, err
 	}
@@ -103,13 +105,26 @@ func (c *Converter) mcpPlugin(m *aigw.MCPServer) (kong.Plugin, error) {
 	}, nil
 }
 
-func (c *Converter) mcpTools(serverName string, tools []aigw.MCPTool) ([]map[string]any, error) {
+func (c *Converter) mcpTools(serverName, mode string, routePaths []string, tools []aigw.MCPTool) ([]map[string]any, error) {
 	out := make([]map[string]any, 0, len(tools))
 	for i := range tools {
 		t := &tools[i]
 		tool := map[string]any{"name": t.Name}
 		if t.Description == "" {
 			if err := c.warn("MCP server %q tool %q has no description; ai-mcp-proxy requires one", serverName, t.Name); err != nil {
+				return nil, err
+			}
+		}
+		// conversion-only/conversion-listener dispatch tools/call via an internal
+		// self-request at the tool's own absolute path, which must match a
+		// registered route (ai-mcp-proxy's own schema: "must match the route's
+		// paths"). A relative path is combined with the route instead and is
+		// unaffected. Neither Koko nor the plugin's own schema validate this
+		// relationship, so a mismatch loads and deploys cleanly but 404s at
+		// request time.
+		if (mode == "conversion-only" || mode == "conversion-listener") &&
+			strings.HasPrefix(t.Path, "/") && !containsPath(routePaths, t.Path) {
+			if err := c.warn("MCP server %q tool %q has absolute path %q that does not match any of its route's paths %v; ai-mcp-proxy dispatches tools/call via an internal request that must match a registered route, so this tool will 404 at runtime — use a relative path (with strip_path) or align the route's paths", serverName, t.Name, t.Path, routePaths); err != nil {
 				return nil, err
 			}
 		}
@@ -136,6 +151,15 @@ func (c *Converter) mcpTools(serverName string, tools []aigw.MCPTool) ([]map[str
 		out = append(out, tool)
 	}
 	return out, nil
+}
+
+func containsPath(paths []string, path string) bool {
+	for _, p := range paths {
+		if p == path {
+			return true
+		}
+	}
+	return false
 }
 
 func setIfNotEmpty(m map[string]any, key, val string) {

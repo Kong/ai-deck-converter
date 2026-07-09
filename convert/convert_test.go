@@ -440,6 +440,69 @@ mcp_servers:
 	require.Error(t, err, "expected strict mode to fail on MCP tool missing description")
 }
 
+// A conversion-only/conversion-listener tool's absolute path is dispatched by
+// ai-mcp-proxy via an internal self-request that must match a registered
+// route (the plugin's own schema: "must match the route's paths"). Neither
+// Koko nor the plugin validate this, so a mismatch loads and deploys cleanly
+// but 404s at request time — this warns instead of silently shipping it.
+func TestConvertWarnsMCPToolPathRouteMismatch(t *testing.T) {
+	src := []byte(`
+mcp_servers:
+  - type: conversion-only
+    name: m1
+    config:
+      route: {paths: [/mcp/flights]}
+    tools:
+      - name: searchFlights
+        description: Search available flights
+        method: GET
+        path: /flights
+`)
+	_, warnings, err := Convert(src, Options{})
+	require.NoError(t, err, "convert")
+	require.Contains(t, strings.Join(warnings, "\n"), "does not match any of its route's paths",
+		"expected tool-path/route-path mismatch warning")
+}
+
+func TestConvertStrictFailsMCPToolPathRouteMismatch(t *testing.T) {
+	src := []byte(`
+mcp_servers:
+  - type: conversion-only
+    name: m1
+    config:
+      route: {paths: [/mcp/flights]}
+    tools:
+      - name: searchFlights
+        description: Search available flights
+        method: GET
+        path: /flights
+`)
+	_, _, err := Convert(src, Options{Strict: true})
+	require.Error(t, err, "expected strict mode to fail on MCP tool path/route mismatch")
+}
+
+// A relative tool path is combined with the route's own path by the plugin
+// (resolve_final_path), not dispatched at its own absolute address — so it
+// must never trigger the mismatch warning, regardless of the route's paths.
+func TestConvertNoWarnMCPRelativeToolPath(t *testing.T) {
+	src := []byte(`
+mcp_servers:
+  - type: conversion-only
+    name: m1
+    config:
+      route: {paths: [/mcp/flights]}
+    tools:
+      - name: searchFlights
+        description: Search available flights
+        method: GET
+        path: flights
+`)
+	_, warnings, err := Convert(src, Options{})
+	require.NoError(t, err, "convert")
+	require.NotContains(t, strings.Join(warnings, "\n"), "does not match any of its route's paths",
+		"a relative tool path must not trigger the route-mismatch warning")
+}
+
 func TestA2APluginDropsLogAudits(t *testing.T) {
 	a := &aigw.Agent{
 		Type: "a2a",

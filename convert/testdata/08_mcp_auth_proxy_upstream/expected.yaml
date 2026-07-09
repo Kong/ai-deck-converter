@@ -6,6 +6,7 @@ services:
       - name: secure-flights-mcp-route
         paths:
           - /mcp/secure-flights
+          - /flights
         plugins:
           - name: ai-mcp-proxy
             config:

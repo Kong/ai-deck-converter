@@ -6,7 +6,7 @@ mcp_servers:
     acls: {allow: [], deny: []}
     default_tool_acls: {allow: [premium], deny: []}
     config:
-      route: {name: flights-mcp-route, paths: [/mcp/flights]}
+      route: {name: flights-mcp-route, paths: [/mcp/flights, /flights, /flights/book]}
       max_request_body_size: 8388608
       logging: {statistics: true, audits: true}
       server: {timeout: 10000, forward_client_headers: true}
