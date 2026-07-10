@@ -292,6 +292,7 @@ func adaptNativeCredentialToKongctl(consumerName string, index int, item map[str
 }
 
 func adaptKongctlChildToNative(kind string, item map[string]any) {
+	adaptKongctlRefToNativeID(item)
 	delete(item, "kongctl")
 	delete(item, "managed_by")
 	switch kind {
@@ -317,9 +318,19 @@ func adaptKongctlChildToNative(kind string, item map[string]any) {
 }
 
 func adaptKongctlCredentialToNative(item map[string]any) {
+	adaptKongctlRefToNativeID(item)
 	delete(item, "ai_gateway_consumer")
 	delete(item, "kongctl")
 	delete(item, "managed_by")
+}
+
+func adaptKongctlRefToNativeID(item map[string]any) {
+	if stringField(item, "id") == "" {
+		if ref := stringField(item, "ref"); ref != "" {
+			item["id"] = ref
+		}
+	}
+	delete(item, "ref")
 }
 
 func mapsFromAny(raw any) []map[string]any {

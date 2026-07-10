@@ -83,6 +83,8 @@ func TestRunShowsHelpWithNoArgs(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, stdout.String(), "Usage:")
 	require.Contains(t, stdout.String(), "kongctl convert ai-gateway <file>")
+	require.Contains(t, stdout.String(), "--gateway-display-name string")
+	require.Contains(t, stdout.String(), "--label-tag-prefix string")
 	require.Empty(t, stderr.String())
 }
 

@@ -185,7 +185,17 @@ ai_gateway_consumers:
 	doc := decodeYAML(t, out)
 	require.Equal(t, "3.0", doc["_format_version"])
 	require.NotEmpty(t, mapsFromAny(doc["services"]))
-	require.NotEmpty(t, mapsFromAny(doc["consumers"]))
+
+	aiModels := mapsFromAny(doc["ai-models"])
+	require.Len(t, aiModels, 1)
+	require.Equal(t, "support-model", aiModels[0]["id"])
+
+	consumers := mapsFromAny(doc["consumers"])
+	require.Len(t, consumers, 1)
+	require.Equal(t, "support-consumer", consumers[0]["id"])
+	credentials := mapsFromAny(consumers[0]["keyauth_credentials"])
+	require.Len(t, credentials, 1)
+	require.Equal(t, "support-key", credentials[0]["id"])
 
 	rendered := string(out)
 	require.Contains(t, rendered, "name: ai-proxy-advanced")

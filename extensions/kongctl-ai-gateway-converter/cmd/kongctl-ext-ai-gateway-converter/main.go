@@ -23,10 +23,12 @@ Flags:
       --from string            Source format: deck or kongctl.
       --to string              Target format: kongctl or deck.
       --gateway-name string    AI Gateway name to create or select.
-      --gateway-display-name   Optional display_name for deck to kongctl output.
+      --gateway-display-name string
+                               Optional display_name for deck to kongctl output.
       --output-file string     Write converted YAML to this file instead of stdout.
       --strict                 Treat conversion warnings as errors.
-      --label-tag-prefix       Prefix for label-derived tags.
+      --label-tag-prefix string
+                               Prefix for label-derived tags.
 
 Examples:
   kongctl convert ai-gateway deck.yaml --from deck --to kongctl --gateway-name support-ai
