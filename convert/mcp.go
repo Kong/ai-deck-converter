@@ -73,21 +73,30 @@ func (c *Converter) mcpPlugin(m *aigw.MCPServer) (kong.Plugin, error) {
 	if m.Config.ToolsCacheTTLSeconds != nil {
 		cfg["tools_cache_ttl_seconds"] = *m.Config.ToolsCacheTTLSeconds
 	}
+
+	// default_acl prefers default_tool_acls over acls.
+	var defaultACL []map[string]any
+
 	// Auth: emit the ACL attribute config and default_acl. Prefer the structured
 	// config.auth block; fall back to the top-level acls/default_tool_acls (the
-	// legacy input shape). default_acl prefers default_tool_acls over acls.
+	// legacy input shape).
 	if a := m.Config.Auth; a != nil {
 		setIfNotEmpty(cfg, "acl_attribute_type", a.ACLAttributeType)
 		setIfNotEmpty(cfg, "access_token_claim_field", a.AccessTokenClaimField)
-		if acl := defaultACLBlock(a.DefaultToolACLs); acl != nil {
-			cfg["default_acl"] = acl
-		} else if acl := defaultACLBlock(a.ACLs); acl != nil {
-			cfg["default_acl"] = acl
+		defaultACL = defaultACLBlock(a.DefaultToolACLs)
+		if defaultACL == nil {
+			defaultACL = defaultACLBlock(a.ACLs)
 		}
-	} else if acl := defaultACLBlock(m.DefaultToolACLs); acl != nil {
-		cfg["default_acl"] = acl
-	} else if acl := defaultACLBlock(m.ACLs); acl != nil {
-		cfg["default_acl"] = acl
+	}
+
+	if defaultACL == nil {
+		defaultACL = defaultACLBlock(m.DefaultToolACLs)
+	}
+	if defaultACL == nil {
+		defaultACL = defaultACLBlock(m.ACLs)
+	}
+	if defaultACL != nil {
+		cfg["default_acl"] = defaultACL
 	}
 	// include_consumer_groups is set by default, mirroring aclPlugin() in convert/acl.go: AI Gateway's
 	// only group-membership construct is consumer_groups (the converter never creates the legacy

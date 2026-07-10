@@ -226,6 +226,42 @@ mcp_servers:
 		"ai-mcp-proxy plugin must NOT set include_consumer_groups when acl_attribute_type is oauth_access_token: Kong's schema rejects that combination")
 }
 
+func TestConvertMCPDefaultACLFallsBackToTopLevelWhenAuthHasNoACLs(t *testing.T) {
+	src := []byte(`
+mcp_servers:
+  - type: conversion-listener
+    name: fallback-mcp
+    default_tool_acls:
+      allow: [premium-users]
+    config:
+      route: {paths: [/mcp/fallback]}
+      auth:
+        acl_attribute_type: consumer
+    tools:
+      - {name: t, description: a tool, method: GET, path: /t, scheme: https, host: x.internal}
+`)
+
+	out, _, err := Convert(src, Options{OutputMode: "db-less"})
+	require.NoError(t, err, "convert db-less")
+
+	var doc struct {
+		Plugins []struct {
+			Name   string         `yaml:"name"`
+			Config map[string]any `yaml:"config"`
+		} `yaml:"plugins"`
+	}
+	require.NoError(t, yaml.Unmarshal(out, &doc), "parse output")
+	require.Len(t, doc.Plugins, 1, "expected one ai-mcp-proxy plugin")
+	require.Equal(t, "ai-mcp-proxy", doc.Plugins[0].Name)
+
+	defaultACL, ok := doc.Plugins[0].Config["default_acl"].([]any)
+	require.True(t, ok, "expected default_acl to be present and list-shaped")
+	require.Len(t, defaultACL, 1)
+	entry, ok := defaultACL[0].(map[string]any)
+	require.True(t, ok, "expected default_acl entry to be map-shaped")
+	require.Equal(t, []any{"premium-users"}, entry["allow"])
+}
+
 func TestConvertDocumentToDBLessYAML(t *testing.T) {
 	src := []byte(`
 models:
