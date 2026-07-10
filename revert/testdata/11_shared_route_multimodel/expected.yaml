@@ -27,7 +27,7 @@ models:
     config:
       model:
         alias: '@openai/gpt-5.2-mini'
-providers:
+model_providers:
   - type: openai
     name: openai-ai
     config:

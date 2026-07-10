@@ -1,4 +1,4 @@
-providers:
+model_providers:
 - name: anthropic-prod
   type: anthropic
   display_name: "Anthropic (Prod)"

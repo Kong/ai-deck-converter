@@ -29,7 +29,7 @@ models:
         alias: '@prod/prod-chat'
       balancer:
         algorithm: lowest-latency
-providers:
+model_providers:
   - type: openai
     name: openai-env
     config:

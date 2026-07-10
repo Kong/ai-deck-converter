@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A Go CLI/library that converts in **both directions** between a high-level **AI Gateway entity-model** YAML config and a **Kong Gateway decK** declarative config (`_format_version: "3.0"`). The AI Gateway model (models, providers, mcp_servers, agents, policies, consumers, vaults) is realized in Kong as Gateway entities plus the AI plugins (`ai-proxy-advanced`, `ai-model-selector`, `ai-mcp-proxy`, `ai-a2a-proxy`). The forward direction (`convert`) lowers AI Gateway → decK; the reverse (`revert`) lifts decK → AI Gateway, best-effort for hand-written configs. See `README.md` for the full entity-mapping table and known limitations.
+A Go CLI/library that converts in **both directions** between a high-level **AI Gateway entity-model** YAML config and a **Kong Gateway decK** declarative config (`_format_version: "3.0"`). The AI Gateway model (models, model_providers, mcp_servers, agents, policies, consumers, vaults) is realized in Kong as Gateway entities plus the AI plugins (`ai-proxy-advanced`, `ai-model-selector`, `ai-mcp-proxy`, `ai-a2a-proxy`). The forward direction (`convert`) lowers AI Gateway → decK; the reverse (`revert`) lifts decK → AI Gateway, best-effort for hand-written configs. See `README.md` for the full entity-mapping table and known limitations.
 
 ## Commands
 

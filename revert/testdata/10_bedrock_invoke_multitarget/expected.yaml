@@ -61,7 +61,7 @@ models:
     config:
       model:
         alias: '@bedrock/nova-reel'
-providers:
+model_providers:
   - type: bedrock
     name: bedrock-ai
     config:

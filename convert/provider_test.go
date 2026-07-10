@@ -130,7 +130,7 @@ models:
     config:
       route: {paths: [/ai]}
       model: {}
-providers:
+model_providers:
   - type: anthropic
     name: anthropic-main
     config: {auth: {type: basic, headers: [{name: x-api-key, value: k}]}}

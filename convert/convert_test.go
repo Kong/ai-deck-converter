@@ -57,7 +57,7 @@ models:
     config:
       route: {paths: [/ai]}
       model: {alias: m1}
-providers:
+model_providers:
   - name: p1
     type: openai
 `)
@@ -90,7 +90,7 @@ models:
     config:
       route: {paths: [/ai]}
       model: {alias: m1}
-providers:
+model_providers:
   - name: p1
     type: openai
 policies:
@@ -127,7 +127,7 @@ models:
     config:
       route: {paths: [/ai]}
       model: {alias: m1}
-providers:
+model_providers:
   - name: p1
     type: openai
 `)
@@ -240,7 +240,7 @@ models:
     config:
       route: {paths: [/v1]}
       model: {alias: m1}
-providers:
+model_providers:
   - name: p1
     type: openai
 `)
@@ -311,7 +311,7 @@ models:
     config:
       route: {paths: [/v1]}
       model: {alias: "@openai/custom-m1"}
-providers:
+model_providers:
   - name: p1
     type: openai
 `)
@@ -371,7 +371,7 @@ models:
     config:
       route: {paths: [/v1]}
       model: {}
-providers:
+model_providers:
   - name: p1
     type: openai
 `)
@@ -432,7 +432,7 @@ models:
     config:
       route: {paths: [/v1]}
       model: {name_header: false}
-providers:
+model_providers:
   - name: p1
     type: openai
 `)
@@ -691,7 +691,7 @@ vaults:
   - id: vault-source-id
     type: env
     name: env
-providers:
+model_providers:
   - name: p1
     type: openai
 `)
@@ -782,7 +782,7 @@ models:
         request_buffering: true
         response_buffering: true
       model: {}
-providers:
+model_providers:
   - name: p1
     type: openai
 `)
@@ -937,7 +937,7 @@ models:
     config:
       route: {paths: [/plain]}
       model: {alias: plain-model}
-providers:
+model_providers:
   - name: p1
     type: openai
 `)
@@ -1087,7 +1087,7 @@ models:
     config:
       route: {paths: [/api-one]}
       model: {name_header: false}
-providers:
+model_providers:
   - name: p1
     type: openai
 `)

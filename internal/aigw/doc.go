@@ -7,7 +7,7 @@ import "gopkg.in/yaml.v3"
 // the corresponding entity. Credentials are nested under their Consumer.
 type Document struct {
 	Models            []Model            `yaml:"models,omitempty"`
-	Providers         []Provider         `yaml:"providers,omitempty"`
+	ModelProviders    []Provider         `yaml:"model_providers,omitempty"`
 	MCPServers        []MCPServer        `yaml:"mcp_servers,omitempty"`
 	Agents            []Agent            `yaml:"agents,omitempty"`
 	Policies          []Policy           `yaml:"policies,omitempty"`

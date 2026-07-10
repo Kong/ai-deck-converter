@@ -29,7 +29,7 @@ models:
           model:
             name: text-embedding-ada-002
             provider: azure
-providers:
+model_providers:
   - type: openai
     display_name: OpenAI Main
     name: openai-main

@@ -1,4 +1,4 @@
-providers:
+model_providers:
 - name: bedrock-prod
   type: bedrock
   display_name: "AWS Bedrock (Prod)"

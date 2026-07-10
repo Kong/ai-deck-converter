@@ -57,7 +57,7 @@ models:
         paths: [/ai]
       model:
         alias: "@openai/provider-options-mix"
-providers:
+model_providers:
   - type: llama2
     display_name: Llama2 Prov
     name: llama2-prov
