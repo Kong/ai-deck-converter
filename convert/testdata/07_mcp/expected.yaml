@@ -12,6 +12,7 @@ services:
               default_acl:
                 - allow:
                     - premium
+              include_consumer_groups: true
               logging:
                 log_audits: true
                 log_statistics: true
@@ -43,5 +44,6 @@ services:
         plugins:
           - name: ai-mcp-proxy
             config:
+              include_consumer_groups: true
               mode: passthrough-listener
               tools: []

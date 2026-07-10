@@ -18,6 +18,7 @@ services:
         plugins:
           - name: ai-mcp-proxy
             config:
+              include_consumer_groups: true
               mode: passthrough-listener
               tools: []
   - name: orchestrator

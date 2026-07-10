@@ -89,6 +89,17 @@ func (c *Converter) mcpPlugin(m *aigw.MCPServer) (kong.Plugin, error) {
 	} else if acl := defaultACLBlock(m.ACLs); acl != nil {
 		cfg["default_acl"] = acl
 	}
+	// include_consumer_groups is set by default, mirroring aclPlugin() in convert/acl.go: AI Gateway's
+	// only group-membership construct is consumer_groups (the converter never creates the legacy
+	// per-consumer kong.db.acls rows the classic acl plugin checks by default; ai-mcp-proxy's own
+	// subjects.lua ACL-subject extraction has the identical gap, defaulting to false), so allow/deny
+	// entries naming a consumer_groups group would otherwise never match anything. Exception:
+	// when acl_attribute_type is oauth_access_token, the plugin's schema hard-rejects
+	// include_consumer_groups being set (and subjects.lua ignores it in that mode regardless), so
+	// leave it unset there.
+	if m.Config.Auth == nil || m.Config.Auth.ACLAttributeType != "oauth_access_token" {
+		cfg["include_consumer_groups"] = true
+	}
 	tools, err := c.mcpTools(m.Name, m.Tools)
 	if err != nil {
 		return kong.Plugin{}, err
