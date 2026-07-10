@@ -222,7 +222,8 @@ mcp_servers:
 	// so it must be left unset, not forced to true.
 	_, isSet := mcpPlugins[2]["include_consumer_groups"]
 	require.False(t, isSet,
-		"ai-mcp-proxy plugin must NOT set include_consumer_groups when acl_attribute_type is oauth_access_token: Kong's schema rejects that combination")
+		"ai-mcp-proxy plugin must NOT set include_consumer_groups when "+
+			"acl_attribute_type is oauth_access_token: Kong's schema rejects that")
 }
 
 func TestConvertDocumentToDBLessYAML(t *testing.T) {
@@ -387,7 +388,8 @@ providers:
 	aiModel, ok := aiModels[0].(map[string]any)
 	require.True(t, ok, "expected ai-models entry")
 	require.Equal(t, "m1", aiModel["name"])
-	require.Equal(t, "m1", aiModel["alias"], "ai-models alias should fall back to the model name when source model.alias is unset")
+	require.Equal(t, "m1", aiModel["alias"],
+		"ai-models alias should fall back to the model name when source model.alias is unset")
 
 	plugins, ok := got["plugins"].([]any)
 	require.True(t, ok, "expected plugins collection")
@@ -448,7 +450,8 @@ providers:
 	aiModel, ok := aiModels[0].(map[string]any)
 	require.True(t, ok, "expected ai_models entry")
 	require.Equal(t, "files-api", aiModel["name"])
-	require.Equal(t, "files-api", aiModel["alias"], "db-less ai_models alias should fall back to the model name when source model.alias is unset")
+	require.Equal(t, "files-api", aiModel["alias"],
+		"db-less ai_models alias should fall back to the model name when source model.alias is unset")
 
 	plugins, ok := got["plugins"].([]any)
 	require.True(t, ok, "expected plugins collection")

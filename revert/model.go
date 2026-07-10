@@ -69,7 +69,8 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 		// this model FK.
 		refs, acls, idpRefs := routeRefs, routeACLs, routeIDPRefs
 		if fkName != "" {
-			if mRefs, mACLs, mIDPRefs := r.modelPolicyRefs(modelGuards[fkName]); len(mRefs) > 0 || !mACLs.IsEmpty() || len(mIDPRefs) > 0 {
+			mRefs, mACLs, mIDPRefs := r.modelPolicyRefs(modelGuards[fkName])
+			if len(mRefs) > 0 || !mACLs.IsEmpty() || len(mIDPRefs) > 0 {
 				refs = append(append([]string{}, routeRefs...), mRefs...)
 				if !mACLs.IsEmpty() {
 					acls = mACLs

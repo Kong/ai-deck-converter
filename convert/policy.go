@@ -55,7 +55,10 @@ func (c *Converter) scopedPlugins(entityKind string, refs []string, acls aigw.AC
 			continue
 		}
 		if entityKind == entityModel && authPolicyTypes[p.Type] {
-			return nil, fmt.Errorf("model policy %q has type %q, but authentication policies can only be applied to models via identity_providers, not policies", ref, p.Type)
+			return nil, fmt.Errorf(
+				"model policy %q has type %q, but authentication policies can only "+
+					"be applied to models via identity_providers, not policies",
+				ref, p.Type)
 		}
 		if p.Global != nil && *p.Global {
 			continue // emitted once at the top level
