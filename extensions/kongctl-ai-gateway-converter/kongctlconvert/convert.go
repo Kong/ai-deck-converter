@@ -19,15 +19,19 @@ const (
 	topLevelGateways = "ai_gateways"
 )
 
-var childKeys = map[string]string{
-	"providers":       "ai_gateway_providers",
-	"policies":        "ai_gateway_policies",
-	"agents":          "ai_gateway_agents",
-	"consumers":       "ai_gateway_consumers",
-	"consumer_groups": "ai_gateway_consumer_groups",
-	"models":          "ai_gateway_models",
-	"mcp_servers":     "ai_gateway_mcp_servers",
-	"vaults":          "ai_gateway_vaults",
+var childMappings = []struct {
+	native  string
+	gateway string
+	root    string
+}{
+	{native: "model_providers", gateway: "providers", root: "ai_gateway_providers"},
+	{native: "policies", gateway: "policies", root: "ai_gateway_policies"},
+	{native: "agents", gateway: "agents", root: "ai_gateway_agents"},
+	{native: "consumers", gateway: "consumers", root: "ai_gateway_consumers"},
+	{native: "consumer_groups", gateway: "consumer_groups", root: "ai_gateway_consumer_groups"},
+	{native: "models", gateway: "models", root: "ai_gateway_models"},
+	{native: "mcp_servers", gateway: "mcp_servers", root: "ai_gateway_mcp_servers"},
+	{native: "vaults", gateway: "vaults", root: "ai_gateway_vaults"},
 }
 
 // Options controls kongctl-friendly conversion.
@@ -94,15 +98,15 @@ func deckToKongctl(src []byte, opts Options) ([]byte, []string, error) {
 		gateway["display_name"] = opts.GatewayDisplayName
 	}
 
-	for key := range childKeys {
-		items := mapsFromAny(doc[key])
+	for _, mapping := range childMappings {
+		items := mapsFromAny(doc[mapping.native])
 		if len(items) == 0 {
 			continue
 		}
 		for i := range items {
-			adaptNativeChildToKongctl(key, items[i], &warnings)
+			adaptNativeChildToKongctl(mapping.native, items[i], &warnings)
 		}
-		gateway[key] = items
+		gateway[mapping.gateway] = items
 	}
 
 	if opts.Strict && len(warnings) > 0 {
@@ -124,16 +128,16 @@ func kongctlToDeck(src []byte, opts Options) ([]byte, []string, error) {
 	}
 
 	native := map[string]any{}
-	for nativeKey, rootKey := range childKeys {
-		items := append([]map[string]any{}, mapsFromAny(gateway[nativeKey])...)
-		items = append(items, rootChildrenForGateway(doc[rootKey], gatewayRef, opts.GatewayName)...)
+	for _, mapping := range childMappings {
+		items := append([]map[string]any{}, mapsFromAny(gateway[mapping.gateway])...)
+		items = append(items, rootChildrenForGateway(doc[mapping.root], gatewayRef, opts.GatewayName)...)
 		if len(items) == 0 {
 			continue
 		}
 		for i := range items {
-			adaptKongctlChildToNative(nativeKey, items[i])
+			adaptKongctlChildToNative(mapping.native, items[i])
 		}
-		native[nativeKey] = items
+		native[mapping.native] = items
 	}
 	attachRootCredentials(doc, native, gatewayRef, opts.GatewayName)
 
