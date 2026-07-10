@@ -37,8 +37,7 @@ plugins:
             provider: openai
           route_type: llm/v1/chat
     route: openai-chat
-    model:
-      name: gpt-5-2
+    model: gpt-5-2
 ai_models:
   - name: gpt-5-2
     alias: '@openai/gpt-5.2'

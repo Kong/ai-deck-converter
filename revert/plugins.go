@@ -32,7 +32,7 @@ func (r *Reverter) buildIndexes() {
 			// per-route reversal sees it, and read the model FK off the plugin.
 			r.idx.route[string(*p.Route)] = append(r.idx.route[string(*p.Route)], p)
 		case p.Model != nil:
-			r.idx.model[p.Model.Name] = append(r.idx.model[p.Model.Name], p)
+			r.idx.model[string(*p.Model)] = append(r.idx.model[string(*p.Model)], p)
 		case p.Service != nil:
 			r.idx.service[string(*p.Service)] = append(r.idx.service[string(*p.Service)], p)
 		case p.Consumer != nil:

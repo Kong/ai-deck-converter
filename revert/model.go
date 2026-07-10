@@ -46,7 +46,7 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 			continue
 		}
 		if p.Model != nil {
-			modelGuards[p.Model.Name] = append(modelGuards[p.Model.Name], p)
+			modelGuards[string(*p.Model)] = append(modelGuards[string(*p.Model)], p)
 		} else {
 			routeGuards = append(routeGuards, p)
 		}
@@ -62,7 +62,7 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 		genai := getStr(cfg, "genai_category")
 		fkName := ""
 		if proxy.Model != nil {
-			fkName = proxy.Model.Name
+			fkName = string(*proxy.Model)
 		}
 
 		// Guard refs for this plugin's model: route-wide guards plus any scoped to

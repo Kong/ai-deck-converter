@@ -43,8 +43,7 @@ plugins:
             provider: openai
           route_type: llm/v1/chat
     route: openai-chat
-    model:
-      name: semantic-lb
+    model: semantic-lb
 ai_models:
   - name: semantic-lb
     alias: semantic-lb

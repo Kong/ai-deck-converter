@@ -189,7 +189,7 @@ func (c *Converter) convertModels() error {
 				p := plugins[k]
 				p.Route = kong.NewStringRef(routeName)
 				if modelScoped {
-					p.Model = kong.NewRef(m.Name)
+					p.Model = kong.NewStringRef(m.Name)
 				}
 				guardPlugins = append(guardPlugins, p)
 			}
@@ -240,7 +240,7 @@ func (c *Converter) convertModels() error {
 				Config: pg.proxyConfig(),
 			}
 			if pg.modelName != "" {
-				plugin.Model = kong.NewRef(pg.modelName)
+				plugin.Model = kong.NewStringRef(pg.modelName)
 			}
 			c.out.Plugins = append(c.out.Plugins, plugin)
 		}

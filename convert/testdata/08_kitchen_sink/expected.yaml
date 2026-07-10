@@ -91,23 +91,20 @@ plugins:
           route_type: llm/v1/chat
           weight: 10
     route: openai-chat
-    model:
-      name: prod-chat
+    model: prod-chat
   - name: ai-prompt-guard
     config:
       allow_patterns:
         - ^safe
     route: openai-chat
-    model:
-      name: prod-chat
+    model: prod-chat
   - name: acl
     config:
       allow:
         - premium
       include_consumer_groups: true
     route: openai-chat
-    model:
-      name: prod-chat
+    model: prod-chat
 vaults:
   - prefix: env-vault
     name: env

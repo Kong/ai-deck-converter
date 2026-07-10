@@ -110,8 +110,7 @@ plugins:
             provider: databricks
           route_type: llm/v1/chat
     route: openai-chat
-    model:
-      name: provider-options-mix
+    model: provider-options-mix
 ai_models:
   - name: provider-options-mix
     alias: '@openai/provider-options-mix'

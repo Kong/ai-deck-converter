@@ -138,7 +138,7 @@ type Plugin struct {
 	Route         *StringRef     `yaml:"route,omitempty"`
 	Consumer      *StringRef     `yaml:"consumer,omitempty"`
 	ConsumerGroup *StringRef     `yaml:"consumer_group,omitempty"`
-	Model         *Ref           `yaml:"model,omitempty"`
+	Model         *StringRef     `yaml:"model,omitempty"`
 	Tags          []string       `yaml:"tags,omitempty"`
 }
 

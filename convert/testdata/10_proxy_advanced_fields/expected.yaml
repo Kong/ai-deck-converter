@@ -41,8 +41,7 @@ plugins:
             provider: openai
           route_type: llm/v1/chat
     route: openai-chat
-    model:
-      name: full-model
+    model: full-model
   - name: ai-model-selector
     config:
       body_path: model
@@ -65,8 +64,7 @@ plugins:
             provider: openai
           route_type: llm/v1/embeddings
     route: openai-embeddings
-    model:
-      name: bare-model
+    model: bare-model
 ai_models:
   - name: full-model
     alias: full-model

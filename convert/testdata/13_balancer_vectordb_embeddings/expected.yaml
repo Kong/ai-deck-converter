@@ -48,8 +48,7 @@ plugins:
         strategy: redis
         threshold: 0.7
     route: openai-chat
-    model:
-      name: semantic-lb
+    model: semantic-lb
 ai_models:
   - name: semantic-lb
     alias: semantic-lb

@@ -166,7 +166,7 @@ func (c *Converter) projectDBLess() *kong.DBLessDocument {
 			route:         lookupStringRouteRef(plugin.Route, ids.route),
 			consumer:      lookupStringRef(plugin.Consumer, ids.consumer),
 			consumerGroup: lookupStringRef(plugin.ConsumerGroup, ids.group),
-			model:         lookupRef(plugin.Model, ids.model),
+			model:         lookupStringRef(plugin.Model, ids.model),
 		}))
 	}
 
@@ -277,13 +277,6 @@ func toDBLessCIDRPorts(in []kong.CIDRPort) []kong.DBLessCIDRPort {
 		out = append(out, kong.DBLessCIDRPort(item))
 	}
 	return out
-}
-
-func lookupRef(ref *kong.Ref, ids map[string]string) string {
-	if ref == nil {
-		return ""
-	}
-	return ids[ref.Name]
 }
 
 func lookupRouteRef(ref *kong.Ref, ids map[string]string) string {

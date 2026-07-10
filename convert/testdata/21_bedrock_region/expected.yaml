@@ -43,8 +43,7 @@ plugins:
             provider: bedrock
           route_type: llm/v1/embeddings
     route: bedrock-invoke
-    model:
-      name: titan-embed-text-v2
+    model: titan-embed-text-v2
 ai_models:
   - name: titan-embed-text-v2
     alias: '@bedrock/titan-embed-text-v2'

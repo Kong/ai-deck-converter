@@ -36,8 +36,7 @@ plugins:
             provider: openai
           route_type: llm/v1/chat
     route: openai-chat
-    model:
-      name: openai-chat
+    model: openai-chat
 ai_models:
   - name: openai-chat
     alias: openai-chat
