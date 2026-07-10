@@ -37,7 +37,7 @@ mcp_servers:
     config:
       route: {name: tools-mcp-route, paths: [/mcp/tools]}
     tools: []
-providers:
+model_providers:
   - type: openai
     display_name: OpenAI Main
     name: openai-main

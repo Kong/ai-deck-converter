@@ -22,7 +22,7 @@ models:
     config:
       model:
         alias: '@openai/guarded-gpt'
-providers:
+model_providers:
   - type: openai
     name: openai-env
     config:

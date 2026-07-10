@@ -27,7 +27,7 @@ models:
           model:
             name: text-embedding-3-small
             provider: openai
-providers:
+model_providers:
   - type: openai
     display_name: OpenAI Main
     name: openai-main

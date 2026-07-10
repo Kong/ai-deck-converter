@@ -35,7 +35,7 @@ models:
     config:
       model:
         alias: '@vertex/text-embedding-005'
-providers:
+model_providers:
   - type: gemini
     name: gemini-ai
     config:

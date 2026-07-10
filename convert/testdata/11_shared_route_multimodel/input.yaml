@@ -1,6 +1,6 @@
 # Two OpenAI-format chat models share one /ai/chat/completions route; the
 # ai-proxy-advanced plugin gets one target per model (selected by alias).
-providers:
+model_providers:
   - name: openai-prod
     type: openai
     display_name: OpenAI Prod

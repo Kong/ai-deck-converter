@@ -1,4 +1,4 @@
-providers:
+model_providers:
 - name: azure-prod
   type: azure
   display_name: "Azure AI Foundry (Prod)"

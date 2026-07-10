@@ -1,4 +1,4 @@
-providers:
+model_providers:
   - name: vertex-prod
     type: vertex
     display_name: Google Vertex AI (Prod)

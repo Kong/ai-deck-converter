@@ -20,7 +20,7 @@ models:
         paths: [/ai]
       model:
         alias: "@bedrock/claude-3-5-sonnet"
-providers:
+model_providers:
   - type: bedrock
     display_name: Bedrock Prod
     name: bedrock-prod

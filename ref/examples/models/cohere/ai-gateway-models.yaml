@@ -1,4 +1,4 @@
-providers:
+model_providers:
 - name: cohere-prod
   type: cohere
   display_name: "Cohere (Prod)"
