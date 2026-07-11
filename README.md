@@ -169,3 +169,7 @@ Lossy by design (the forward direction never emits them): `display_name`,
 - **MCP upstream.** Passthrough MCP servers without an `upstream_url` get a
   placeholder host and a warning.
 - **Labels** are lossy as tags when a value contains `:`.
+
+## Community
+
+Please review our [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for community guidelines.

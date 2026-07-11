@@ -1,6 +1,6 @@
 module github.com/Kong/ai-deck-converter
 
-go 1.22.3
+go 1.26.4
 
 require (
 	github.com/stretchr/testify v1.11.1

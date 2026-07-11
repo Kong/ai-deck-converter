@@ -55,7 +55,10 @@ func (c *Converter) scopedPlugins(entityKind string, refs []string, acls aigw.AC
 			continue
 		}
 		if entityKind == entityModel && authPolicyTypes[p.Type] {
-			return nil, fmt.Errorf("model policy %q has type %q, but authentication policies can only be applied to models via identity_providers, not policies", ref, p.Type)
+			return nil, fmt.Errorf(
+				"model policy %q has type %q, but authentication policies can only "+
+					"be applied to models via identity_providers, not policies",
+				ref, p.Type)
 		}
 		if p.Global != nil && *p.Global {
 			continue // emitted once at the top level
@@ -67,7 +70,9 @@ func (c *Converter) scopedPlugins(entityKind string, refs []string, acls aigw.AC
 		// AI Gateway acl that sets both is not representable as one valid plugin,
 		// so reject it rather than emit config the gateway will refuse to load.
 		if len(acls.Allow) > 0 && len(acls.Deny) > 0 {
-			return nil, fmt.Errorf("acl policy sets both allow (%v) and deny (%v), but a Kong acl plugin permits exactly one; set only allow or only deny", acls.Allow, acls.Deny)
+			return nil, fmt.Errorf(
+				"acl policy sets both allow (%v) and deny (%v), but a Kong acl plugin permits "+
+					"exactly one; set only allow or only deny", acls.Allow, acls.Deny)
 		}
 		plugins = append(plugins, aclPlugin(acls))
 	}

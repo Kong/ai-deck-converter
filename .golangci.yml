@@ -1,0 +1,65 @@
+version: "2"
+run:
+  timeout: 2m
+linters:
+  enable:
+    - asciicheck
+    - bodyclose
+    - contextcheck
+    - dogsled
+    - durationcheck
+    - errname
+    - errorlint
+    - exhaustive
+    - gochecknoinits
+    - gomodguard
+    - gosec
+    - importas
+    - lll
+    - misspell
+    - mnd
+    - nakedret
+    - nilerr
+    - nolintlint
+    - predeclared
+    - revive
+    - staticcheck
+    - testifylint
+    - unconvert
+    - unparam
+    - wastedassign
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      - linters:
+          - lll
+        source: "^\t*// "
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+issues:
+  max-same-issues: 0
+formatters:
+  enable:
+    - gci
+    - gofmt
+    - gofumpt
+    - goimports
+  settings:
+    gci:
+      sections:
+        - standard
+        - default
+        - prefix(github.com/kong)
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

@@ -9,6 +9,8 @@ import (
 // username/custom_id of the synthesized anonymous-fallback Consumer.
 const anonymousConsumerName = "anonymous"
 
+const unauthorizedStatusCode = 401
+
 func (r *Reverter) revertConsumerGroups() error {
 	for i := range r.src.ConsumerGroups {
 		g := &r.src.ConsumerGroups[i]
@@ -89,8 +91,8 @@ func isSynthesizedAnonymousConsumer(c *kong.Consumer) bool {
 	if p.Name != "request-termination" {
 		return false
 	}
-	code, _ := p.Config["status_code"]
-	msg, _ := p.Config["message"]
-	statusOK := code == 401 || code == float64(401)
+	code := p.Config["status_code"]
+	msg := p.Config["message"]
+	statusOK := code == unauthorizedStatusCode || code == float64(unauthorizedStatusCode)
 	return statusOK && msg == "Unauthorized" && len(p.Config) == 2
 }

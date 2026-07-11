@@ -1,14 +1,17 @@
 package convert
 
 import (
-	"crypto/sha1"
+	"crypto/sha1" //nolint:gosec
 	"fmt"
 	"net/url"
 
 	"github.com/Kong/ai-deck-converter/internal/kong"
 )
 
-var dbLessNamespace = [16]byte{0x8f, 0x17, 0x73, 0x5c, 0x41, 0x02, 0x49, 0x6b, 0xa3, 0x2f, 0x92, 0x0c, 0x4d, 0x18, 0x62, 0xf1}
+var dbLessNamespace = [16]byte{
+	0x8f, 0x17, 0x73, 0x5c, 0x41, 0x02, 0x49, 0x6b,
+	0xa3, 0x2f, 0x92, 0x0c, 0x4d, 0x18, 0x62, 0xf1,
+}
 
 type dbLessIDs struct {
 	service  map[string]string
@@ -99,7 +102,8 @@ func (c *Converter) projectDBLess() *kong.DBLessDocument {
 			})
 		}
 		for pluginIdx, plugin := range consumer.Plugins {
-			id := firstNonEmpty(plugin.ID, stableUUID(fmt.Sprintf("plugin:consumer:%s:%s:%d", consumer.Username, plugin.Name, pluginIdx)))
+			id := firstNonEmpty(plugin.ID, stableUUID(
+				fmt.Sprintf("plugin:consumer:%s:%s:%d", consumer.Username, plugin.Name, pluginIdx)))
 			out.Plugins = append(out.Plugins, toDBLessPlugin(plugin, id, scopeRef{consumer: consumerID}))
 		}
 		for _, groupName := range consumer.Groups {
@@ -128,7 +132,8 @@ func (c *Converter) projectDBLess() *kong.DBLessDocument {
 			Tags: group.Tags,
 		})
 		for pluginIdx, plugin := range group.Plugins {
-			id := firstNonEmpty(plugin.ID, stableUUID(fmt.Sprintf("plugin:consumer_group:%s:%s:%d", group.Name, plugin.Name, pluginIdx)))
+			id := firstNonEmpty(plugin.ID, stableUUID(
+				fmt.Sprintf("plugin:consumer_group:%s:%s:%d", group.Name, plugin.Name, pluginIdx)))
 			out.Plugins = append(out.Plugins, toDBLessPlugin(plugin, id, scopeRef{consumerGroup: groupID}))
 		}
 	}
@@ -268,10 +273,7 @@ func toDBLessCIDRPorts(in []kong.CIDRPort) []kong.DBLessCIDRPort {
 	}
 	out := make([]kong.DBLessCIDRPort, 0, len(in))
 	for _, item := range in {
-		out = append(out, kong.DBLessCIDRPort{
-			IP:   item.IP,
-			Port: item.Port,
-		})
+		out = append(out, kong.DBLessCIDRPort(item))
 	}
 	return out
 }
@@ -303,19 +305,19 @@ func defaultPort(parsed *url.URL) int {
 	}
 	switch parsed.Scheme {
 	case "http", "ws":
-		return 80
+		return 80 //nolint:mnd
 	case "https", "wss":
-		return 443
+		return 443 //nolint:mnd
 	default:
 		return 0
 	}
 }
 
 func stableUUID(key string) string {
-	sum := sha1.Sum(append(dbLessNamespace[:], []byte(key)...))
+	sum := sha1.Sum(append(dbLessNamespace[:], []byte(key)...)) //nolint:gosec
 	b := sum[:16]
-	b[6] = (b[6] & 0x0f) | 0x50
-	b[8] = (b[8] & 0x3f) | 0x80
+	b[6] = (b[6] & 0x0f) | 0x50 //nolint:mnd
+	b[8] = (b[8] & 0x3f) | 0x80 //nolint:mnd
 	return fmt.Sprintf("%08x-%04x-%04x-%04x-%012x",
 		b[0:4],
 		b[4:6],

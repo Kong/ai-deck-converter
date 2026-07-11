@@ -89,7 +89,9 @@ func (c *Converter) convertModels() error {
 				}
 			}
 			if provider == nil {
-				if err := c.warn("model %q target %q references unknown provider %q; auth/options may be incomplete", m.Name, tm.Name, tm.Provider); err != nil {
+				if err := c.warn(
+					"model %q target %q references unknown provider %q; auth/options may be incomplete",
+					m.Name, tm.Name, tm.Provider); err != nil {
 					return err
 				}
 			}
@@ -98,7 +100,9 @@ func (c *Converter) convertModels() error {
 			for _, capability := range caps {
 				spec, ok := aimap.LookupEndpoint(sec, capability)
 				if !ok {
-					if err := c.warn("model %q: provider section %q has no endpoint for capability %q; skipping", m.Name, sec, capability); err != nil {
+					if err := c.warn(
+						"model %q: provider section %q has no endpoint for capability %q; skipping",
+						m.Name, sec, capability); err != nil {
 						return err
 					}
 					continue
@@ -107,7 +111,9 @@ func (c *Converter) convertModels() error {
 				g := groups[key]
 				if g == nil {
 					g = &routeGroup{
-						route:          buildModelRoute(m.Config.Route, sec+"-"+spec.RouteLabel, aimap.RoutePath(base, spec), spec.Methods),
+						route: buildModelRoute(
+							m.Config.Route, sec+"-"+spec.RouteLabel,
+							aimap.RoutePath(base, spec), spec.Methods),
 						takesBodyModel: spec.TakesBodyModel,
 						bodySize:       aimap.DefaultMaxBodySize,
 						proxyByOwner:   map[string]*proxyGroup{},
@@ -290,7 +296,10 @@ func modelLoggingBlock(l *aigw.Logging) map[string]any {
 // buildTarget builds one ai-proxy-advanced target from a target model. The
 // model-level logging block (if any) is applied to every target, since
 // ai-proxy-advanced carries logging per target rather than per plugin.
-func (c *Converter) buildTarget(tm *aigw.TargetModel, provider *aigw.Provider, providerType, alias, routeType string, logging map[string]any) map[string]any {
+func (c *Converter) buildTarget(
+	tm *aigw.TargetModel, provider *aigw.Provider,
+	providerType, alias, routeType string, logging map[string]any,
+) map[string]any {
 	model := map[string]any{
 		"provider": aimap.PluginProvider(providerType),
 		"name":     tm.Name,

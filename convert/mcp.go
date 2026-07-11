@@ -39,7 +39,9 @@ func (c *Converter) convertMCPServers() error {
 		} else {
 			service.Host = placeholderHost
 			if m.Type == "passthrough-listener" {
-				if err := c.warn("MCP server %q is passthrough-listener but has no upstream_url; using placeholder host %q", m.Name, placeholderHost); err != nil {
+				if err := c.warn(
+					"MCP server %q is passthrough-listener but has no upstream_url; using placeholder host %q",
+					m.Name, placeholderHost); err != nil {
 					return err
 				}
 			}
@@ -120,7 +122,9 @@ func (c *Converter) mcpTools(serverName string, tools []aigw.MCPTool) ([]map[str
 		t := &tools[i]
 		tool := map[string]any{"name": t.Name}
 		if t.Description == "" {
-			if err := c.warn("MCP server %q tool %q has no description; ai-mcp-proxy requires one", serverName, t.Name); err != nil {
+			if err := c.warn(
+				"MCP server %q tool %q has no description; ai-mcp-proxy requires one",
+				serverName, t.Name); err != nil {
 				return nil, err
 			}
 		}

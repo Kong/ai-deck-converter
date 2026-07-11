@@ -40,7 +40,9 @@ func (c *Converter) convertConsumers() error {
 		for j := range cons.Credentials {
 			cred := &cons.Credentials[j]
 			if cred.Type != "" && cred.Type != "api-key" {
-				if err := c.warn("consumer %q credential %q has unsupported type %q; only api-key (keyauth) is supported", cons.Name, cred.Name, cred.Type); err != nil {
+				if err := c.warn(
+					"consumer %q credential %q has unsupported type %q; only api-key (keyauth) is supported",
+					cons.Name, cred.Name, cred.Type); err != nil {
 					return err
 				}
 				continue

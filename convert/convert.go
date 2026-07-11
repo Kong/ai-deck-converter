@@ -7,11 +7,10 @@ import (
 	"bytes"
 	"fmt"
 
-	"gopkg.in/yaml.v3"
-
 	publicaigw "github.com/Kong/ai-deck-converter/aigw"
 	"github.com/Kong/ai-deck-converter/internal/aigw"
 	"github.com/Kong/ai-deck-converter/internal/kong"
+	"gopkg.in/yaml.v3"
 )
 
 // yamlIndent is the indentation (in spaces) used for the emitted decK YAML.
@@ -70,7 +69,8 @@ func marshalYAML(v any) ([]byte, error) {
 // ConvertDocument translates a parsed AI Gateway document into a Kong decK
 // document, returning collected warnings. Unresolved references are warnings
 // unless Options.Strict is set, in which case they become errors.
-func ConvertDocument(doc *aigw.Document, opts Options) (*kong.Document, []string, error) {
+func ConvertDocument(doc *aigw.Document, opts Options) (*kong.Document, []string, error) { //nolint:revive
+
 	c := newConverter(doc, opts.withDefaults())
 	if err := c.run(); err != nil {
 		return nil, c.warnings, err
@@ -80,7 +80,8 @@ func ConvertDocument(doc *aigw.Document, opts Options) (*kong.Document, []string
 
 // ConvertDocumentToDBLessYAML translates a parsed AI Gateway document into the
 // flattened db-less YAML payload understood by Kong data planes.
-func ConvertDocumentToDBLessYAML(doc *publicaigw.Document, opts Options) ([]byte, []string, error) {
+func ConvertDocumentToDBLessYAML(doc *publicaigw.Document, opts Options) ([]byte, []string, error) { //nolint:revive
+
 	typed, warnings, err := convertDocumentToDBLess(doc, opts)
 	if err != nil {
 		return nil, warnings, err

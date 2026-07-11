@@ -9,7 +9,11 @@ import (
 // that identity-provider authentication plugins fall back to when a request
 // isn't authenticated, so it can be rejected by a request-termination plugin
 // instead of silently reaching the upstream.
-const anonymousConsumerName = "anonymous"
+const (
+	anonymousConsumerName    = "anonymous"
+	unauthorizedStatusCode   = 401
+	unauthorizedErrorMessage = "Unauthorized"
+)
 
 // scopedIdentityProviderPlugins builds one authentication plugin per identity
 // provider reference, each configured to fall back to the anonymous consumer.
@@ -58,8 +62,11 @@ func (c *Converter) ensureAnonymousConsumer() {
 		Username: anonymousConsumerName,
 		CustomID: anonymousConsumerName,
 		Plugins: []kong.Plugin{{
-			Name:   "request-termination",
-			Config: map[string]any{"status_code": 401, "message": "Unauthorized"},
+			Name: "request-termination",
+			Config: map[string]any{
+				"status_code": unauthorizedStatusCode,
+				"message":     unauthorizedErrorMessage,
+			},
 		}},
 	})
 }
