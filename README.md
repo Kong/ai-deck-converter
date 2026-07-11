@@ -75,14 +75,14 @@ A single YAML document grouping AI Gateway entities by kind. Credentials are
 nested under their consumer.
 
 ```yaml
-models:        [ ... ]   # -> routes (per capability/format) + ai-proxy-advanced + ai-models
-providers:     [ ... ]   # folded into ai-proxy-advanced targets (not standalone)
-mcp_servers:   [ ... ]   # -> Service + Route + ai-mcp-proxy
-agents:        [ ... ]   # -> Service + Route (+ ai-a2a-proxy when type: a2a)
-policies:      [ ... ]   # -> Kong plugins (global, or scoped per reference)
-consumers:     [ ... ]   # -> consumers (+ nested keyauth_credentials, groups)
+models:          [ ... ] # -> routes (per capability/format) + ai-proxy-advanced + ai-models
+model_providers: [ ... ] # folded into ai-proxy-advanced targets (not standalone)
+mcp_servers:     [ ... ] # -> Service + Route + ai-mcp-proxy
+agents:          [ ... ] # -> Service + Route (+ ai-a2a-proxy when type: a2a)
+policies:        [ ... ] # -> Kong plugins (global, or scoped per reference)
+consumers:       [ ... ] # -> consumers (+ nested keyauth_credentials, groups)
 consumer_groups: [ ... ] # -> consumer_groups
-vaults:        [ ... ]   # -> vaults
+vaults:          [ ... ] # -> vaults
 ```
 
 A Model's `config.route.paths[0]` provides the **base path** (e.g. `/ai`); the

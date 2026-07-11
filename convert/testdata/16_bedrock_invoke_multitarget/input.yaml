@@ -1,6 +1,6 @@
 # Four Bedrock models whose capabilities (embeddings/image/audio/video) all map
 # to the shared /invoke endpoint -> one bedrock-invoke route with four targets.
-providers:
+model_providers:
   - name: bedrock-prod
     type: bedrock
     display_name: Bedrock Prod

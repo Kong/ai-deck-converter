@@ -19,7 +19,7 @@ models:
     policies: []
     access:
       identity_providers: [okta-oidc]
-providers:
+model_providers:
   - name: openai-prod
     type: openai
     display_name: OpenAI Prod

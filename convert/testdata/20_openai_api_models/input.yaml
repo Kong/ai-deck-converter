@@ -40,7 +40,7 @@ models:
       model: {}
       response_streaming: deny
       max_request_body_size: 536870912
-providers:
+model_providers:
   - type: openai
     display_name: OpenAI Prod
     name: openai-prod

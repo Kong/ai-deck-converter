@@ -118,9 +118,9 @@ services:
 `)
 	doc, warnings, err := revertYAML(t, in, Options{})
 	require.NoErrorf(t, err, "revert (warnings: %v)", warnings)
-	require.Lenf(t, doc.Providers, 2, "identical auth must dedupe: %+v", doc.Providers)
-	require.Equal(t, "openai-env", doc.Providers[0].Name, "first provider name")
-	require.Equal(t, "openai-other", doc.Providers[1].Name, "second provider name")
+	require.Lenf(t, doc.ModelProviders, 2, "identical auth must dedupe: %+v", doc.ModelProviders)
+	require.Equal(t, "openai-env", doc.ModelProviders[0].Name, "first provider name")
+	require.Equal(t, "openai-other", doc.ModelProviders[1].Name, "second provider name")
 }
 
 func TestLegacyConfigWithoutAIModels(t *testing.T) {

@@ -40,7 +40,7 @@ models:
     policies: []
     access:
       acls: {allow: [], deny: []}
-providers:
+model_providers:
   - name: openai-prod
     type: openai
     display_name: OpenAI Prod

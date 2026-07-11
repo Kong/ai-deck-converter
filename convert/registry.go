@@ -2,8 +2,8 @@ package convert
 
 // buildRegistries indexes source entities by name for cross-reference resolution.
 func (c *Converter) buildRegistries() {
-	for i := range c.src.Providers {
-		p := &c.src.Providers[i]
+	for i := range c.src.ModelProviders {
+		p := &c.src.ModelProviders[i]
 		c.providers[p.Name] = p
 	}
 	for i := range c.src.Policies {

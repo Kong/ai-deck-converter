@@ -33,7 +33,7 @@ models:
         methods: [POST]
       model:
         alias: my-gpt
-providers:
+model_providers:
   - type: openai
     display_name: OpenAI Main
     name: openai-main
@@ -73,8 +73,8 @@ func TestParseEnvelope(t *testing.T) {
 	require.NotContains(t, tm.Config.Options, "type", "type should be stripped from options")
 	require.Equal(t, 0.7, tm.Config.Options["temperature"], "temperature") //nolint:testifylint
 	require.Equal(t, "gpt-route", m.Config.Route.Name, "route name")
-	require.Len(t, doc.Providers, 1, "provider not parsed")
-	require.Equal(t, "Authorization", doc.Providers[0].Config.Auth.Headers[0].Name, "provider auth not parsed")
+	require.Len(t, doc.ModelProviders, 1, "provider not parsed")
+	require.Equal(t, "Authorization", doc.ModelProviders[0].Config.Auth.Headers[0].Name, "provider auth not parsed")
 	require.Len(t, doc.Consumers, 1, "consumer not parsed")
 	require.Len(t, doc.Consumers[0].Credentials, 1, "credential not parsed")
 	require.Len(t, doc.Vaults, 1, "vault not parsed")

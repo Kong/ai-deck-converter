@@ -17,7 +17,7 @@ models:
       route:
         paths:
           - /llm
-providers:
+model_providers:
   - type: openai
     name: openai-secrets
     config:

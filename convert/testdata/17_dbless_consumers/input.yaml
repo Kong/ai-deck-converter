@@ -10,7 +10,7 @@ models:
     config:
       route: {paths: [/v1]}
       model: {alias: my-alias}
-providers:
+model_providers:
   - type: openai
     name: openai-main
     config:

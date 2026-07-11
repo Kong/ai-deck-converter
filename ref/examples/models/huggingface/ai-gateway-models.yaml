@@ -1,4 +1,4 @@
-providers:
+model_providers:
 - name: huggingface-prod
   type: huggingface
   display_name: "Hugging Face (Prod)"

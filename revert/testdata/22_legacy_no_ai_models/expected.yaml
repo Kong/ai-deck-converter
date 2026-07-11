@@ -27,7 +27,7 @@ models:
         provider: openai-ai
         config:
           type: openai
-providers:
+model_providers:
   - type: openai
     name: openai-ai
     config:
