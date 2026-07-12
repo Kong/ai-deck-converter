@@ -15,8 +15,7 @@ plugins:
       body_path: model
       max_request_body_size: 8388608
       source: body
-    route:
-      name: openai-chat
+    route: openai-chat
   - name: ai-proxy-advanced
     config:
       balancer:
@@ -43,10 +42,8 @@ plugins:
             name: gpt-4o
             provider: openai
           route_type: llm/v1/chat
-    route:
-      name: openai-chat
-    model:
-      name: semantic-lb
-ai-models:
+    route: openai-chat
+    model: semantic-lb
+ai_models:
   - name: semantic-lb
     alias: semantic-lb

@@ -49,10 +49,14 @@ func (r *Reverter) revertConsumers() error {
 				return err
 			}
 		}
+		groups := make([]string, len(c.Groups))
+		for j, g := range c.Groups {
+			groups[j] = g.Name
+		}
 		ac := aigw.Consumer{
 			Name:           name,
 			CustomID:       c.CustomID,
-			ConsumerGroups: c.Groups,
+			ConsumerGroups: groups,
 			Policies:       refs,
 			Labels:         r.tagsToLabels(c.Tags),
 		}

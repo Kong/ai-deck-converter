@@ -42,7 +42,7 @@ plugins:
           route_type: llm/v1/chat
     route:
       name: openai-chat
-ai-models:
+ai_models:
   - name: gpt-5-2
     alias: '@openai/gpt-5.2'
   - name: gpt-5-2-mini

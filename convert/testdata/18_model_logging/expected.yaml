@@ -15,8 +15,7 @@ plugins:
       body_path: model
       max_request_body_size: 8388608
       source: body
-    route:
-      name: openai-chat
+    route: openai-chat
   - name: ai-proxy-advanced
     config:
       balancer:
@@ -35,10 +34,8 @@ plugins:
             name: gpt-5.2
             provider: openai
           route_type: llm/v1/chat
-    route:
-      name: openai-chat
-    model:
-      name: gpt-5-2
-ai-models:
+    route: openai-chat
+    model: gpt-5-2
+ai_models:
   - name: gpt-5-2
     alias: gpt-5-2

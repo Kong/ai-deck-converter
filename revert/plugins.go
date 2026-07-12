@@ -30,15 +30,15 @@ func (r *Reverter) buildIndexes() {
 			// A plugin may carry both route and model FKs (ai-proxy-advanced and
 			// guard plugins for a type "model" entity); index it by route so the
 			// per-route reversal sees it, and read the model FK off the plugin.
-			r.idx.route[p.Route.Name] = append(r.idx.route[p.Route.Name], p)
+			r.idx.route[string(*p.Route)] = append(r.idx.route[string(*p.Route)], p)
 		case p.Model != nil:
-			r.idx.model[p.Model.Name] = append(r.idx.model[p.Model.Name], p)
+			r.idx.model[string(*p.Model)] = append(r.idx.model[string(*p.Model)], p)
 		case p.Service != nil:
-			r.idx.service[p.Service.Name] = append(r.idx.service[p.Service.Name], p)
+			r.idx.service[string(*p.Service)] = append(r.idx.service[string(*p.Service)], p)
 		case p.Consumer != nil:
-			r.idx.consumer[p.Consumer.Name] = append(r.idx.consumer[p.Consumer.Name], p)
+			r.idx.consumer[string(*p.Consumer)] = append(r.idx.consumer[string(*p.Consumer)], p)
 		case p.ConsumerGroup != nil:
-			r.idx.group[p.ConsumerGroup.Name] = append(r.idx.group[p.ConsumerGroup.Name], p)
+			r.idx.group[string(*p.ConsumerGroup)] = append(r.idx.group[string(*p.ConsumerGroup)], p)
 		default:
 			r.idx.global = append(r.idx.global, p)
 		}

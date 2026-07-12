@@ -36,8 +36,7 @@ plugins:
             name: batch-api
             provider: openai
           route_type: llm/v1/batches
-    route:
-      name: openai-batches
+    route: openai-batches
   - name: ai-proxy-advanced
     config:
       balancer:
@@ -56,9 +55,8 @@ plugins:
             name: files-api
             provider: openai
           route_type: llm/v1/files
-    route:
-      name: openai-files
-ai-models:
+    route: openai-files
+ai_models:
   - name: openai-batch-api
     alias: openai-batch-api
   - name: openai-files-api

@@ -33,7 +33,7 @@ services:
         - POST
       strip_path: false
 
-ai-models:
+ai_models:
 - name: gemini-2-5-pro
   alias: "@gemini/gemini-2.5-pro"
 - name: gemini-embedding-004

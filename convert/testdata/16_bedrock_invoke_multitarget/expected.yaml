@@ -31,10 +31,8 @@ plugins:
                 embeddings_normalize: true
             provider: bedrock
           route_type: llm/v1/embeddings
-    route:
-      name: bedrock-invoke
-    model:
-      name: titan-embed-text-v2
+    route: bedrock-invoke
+    model: titan-embed-text-v2
   - name: ai-proxy-advanced
     config:
       balancer:
@@ -54,10 +52,8 @@ plugins:
                 aws_region: us-east-1
             provider: bedrock
           route_type: image/v1/images/generations
-    route:
-      name: bedrock-invoke
-    model:
-      name: nova-canvas-image
+    route: bedrock-invoke
+    model: nova-canvas-image
   - name: ai-proxy-advanced
     config:
       balancer:
@@ -77,10 +73,8 @@ plugins:
                 aws_region: us-east-1
             provider: bedrock
           route_type: llm/v1/chat
-    route:
-      name: bedrock-invoke
-    model:
-      name: nova-sonic-audio
+    route: bedrock-invoke
+    model: nova-sonic-audio
   - name: ai-proxy-advanced
     config:
       balancer:
@@ -101,11 +95,9 @@ plugins:
                 video_output_s3_uri: s3://kong/nova-reel/
             provider: bedrock
           route_type: video/v1/videos/generations
-    route:
-      name: bedrock-invoke
-    model:
-      name: nova-reel-video
-ai-models:
+    route: bedrock-invoke
+    model: nova-reel-video
+ai_models:
   - name: titan-embed-text-v2
     alias: '@bedrock/titan-embed-text-v2'
   - name: nova-canvas-image

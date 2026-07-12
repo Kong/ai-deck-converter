@@ -29,11 +29,15 @@ func (c *Converter) convertConsumers() error {
 		if err != nil {
 			return err
 		}
+		groups := make([]*kong.Ref, len(cons.ConsumerGroups))
+		for j, g := range cons.ConsumerGroups {
+			groups[j] = kong.NewRef(g)
+		}
 		kc := kong.Consumer{
 			ID:       cons.ID,
 			Username: cons.Name,
 			CustomID: cons.CustomID,
-			Groups:   cons.ConsumerGroups,
+			Groups:   groups,
 			Plugins:  plugins,
 			Tags:     c.labelsToTags(cons.Labels),
 		}

@@ -177,7 +177,7 @@ services:
               targets:
                 - route_type: llm/v1/chat
                   model: {provider: openai, name: gpt-4o}
-ai-models:
+ai_models:
   - name: m1
     alias: m1
 `)
@@ -270,7 +270,7 @@ services:
               targets:
                 - route_type: llm/v1/chat
                   model: {provider: openai, name: gpt-4o, model_alias: '@openai/gpt-4o'}
-ai-models:
+ai_models:
   - name: other-model
     alias: '@openai/other'
 `)

@@ -106,7 +106,8 @@ func (c *Converter) projectDBLess() *kong.DBLessDocument {
 				fmt.Sprintf("plugin:consumer:%s:%s:%d", consumer.Username, plugin.Name, pluginIdx)))
 			out.Plugins = append(out.Plugins, toDBLessPlugin(plugin, id, scopeRef{consumer: consumerID}))
 		}
-		for _, groupName := range consumer.Groups {
+		for _, groupRef := range consumer.Groups {
+			groupName := groupRef.Name
 			groupID, ok := ids.group[groupName]
 			if !ok {
 				groupID = stableUUID("consumer_group:" + groupName)
@@ -161,11 +162,11 @@ func (c *Converter) projectDBLess() *kong.DBLessDocument {
 	for pluginIdx, plugin := range c.out.Plugins {
 		id := firstNonEmpty(plugin.ID, stableUUID(fmt.Sprintf("plugin:top:%s:%d", plugin.Name, pluginIdx)))
 		out.Plugins = append(out.Plugins, toDBLessPlugin(plugin, id, scopeRef{
-			service:       lookupRef(plugin.Service, ids.service),
-			route:         lookupRouteRef(plugin.Route, ids.route),
-			consumer:      lookupRef(plugin.Consumer, ids.consumer),
-			consumerGroup: lookupRef(plugin.ConsumerGroup, ids.group),
-			model:         lookupRef(plugin.Model, ids.model),
+			service:       lookupStringRef(plugin.Service, ids.service),
+			route:         lookupStringRouteRef(plugin.Route, ids.route),
+			consumer:      lookupStringRef(plugin.Consumer, ids.consumer),
+			consumerGroup: lookupStringRef(plugin.ConsumerGroup, ids.group),
+			model:         lookupStringRef(plugin.Model, ids.model),
 		}))
 	}
 
@@ -278,19 +279,20 @@ func toDBLessCIDRPorts(in []kong.CIDRPort) []kong.DBLessCIDRPort {
 	return out
 }
 
-func lookupRef(ref *kong.Ref, ids map[string]string) string {
+func lookupStringRef(ref *kong.StringRef, ids map[string]string) string {
 	if ref == nil {
 		return ""
 	}
-	return ids[ref.Name]
+	return ids[string(*ref)]
 }
 
-func lookupRouteRef(ref *kong.Ref, ids map[string]string) string {
+func lookupStringRouteRef(ref *kong.StringRef, ids map[string]string) string {
 	if ref == nil {
 		return ""
 	}
+	refName := string(*ref)
 	for key, id := range ids {
-		if len(key) > len(ref.Name)+1 && key[len(key)-len(ref.Name)-1:] == "|"+ref.Name {
+		if len(key) > len(refName)+1 && key[len(key)-len(refName)-1:] == "|"+refName {
 			return id
 		}
 	}

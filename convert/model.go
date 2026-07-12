@@ -187,9 +187,9 @@ func (c *Converter) convertModels() error {
 		for _, routeName := range routeNames {
 			for k := range plugins {
 				p := plugins[k]
-				p.Route = kong.NewRef(routeName)
+				p.Route = kong.NewStringRef(routeName)
 				if modelScoped {
-					p.Model = kong.NewRef(m.Name)
+					p.Model = kong.NewStringRef(m.Name)
 				}
 				guardPlugins = append(guardPlugins, p)
 			}
@@ -207,7 +207,7 @@ func (c *Converter) convertModels() error {
 		for _, routeName := range routeNames {
 			for k := range idpPlugins {
 				p := idpPlugins[k]
-				p.Route = kong.NewRef(routeName)
+				p.Route = kong.NewStringRef(routeName)
 				guardPlugins = append(guardPlugins, p)
 			}
 		}
@@ -225,7 +225,7 @@ func (c *Converter) convertModels() error {
 		if g.takesBodyModel {
 			c.out.Plugins = append(c.out.Plugins, kong.Plugin{
 				Name:  "ai-model-selector",
-				Route: kong.NewRef(g.route.Name),
+				Route: kong.NewStringRef(g.route.Name),
 				Config: map[string]any{
 					"source":                "body",
 					"body_path":             "model",
@@ -236,11 +236,11 @@ func (c *Converter) convertModels() error {
 		for _, pg := range g.proxies {
 			plugin := kong.Plugin{
 				Name:   "ai-proxy-advanced",
-				Route:  kong.NewRef(pg.routeName),
+				Route:  kong.NewStringRef(pg.routeName),
 				Config: pg.proxyConfig(),
 			}
 			if pg.modelName != "" {
-				plugin.Model = kong.NewRef(pg.modelName)
+				plugin.Model = kong.NewStringRef(pg.modelName)
 			}
 			c.out.Plugins = append(c.out.Plugins, plugin)
 		}
