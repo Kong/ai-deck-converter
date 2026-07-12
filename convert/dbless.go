@@ -279,18 +279,6 @@ func toDBLessCIDRPorts(in []kong.CIDRPort) []kong.DBLessCIDRPort {
 	return out
 }
 
-func lookupRouteRef(ref *kong.Ref, ids map[string]string) string {
-	if ref == nil {
-		return ""
-	}
-	for key, id := range ids {
-		if len(key) > len(ref.Name)+1 && key[len(key)-len(ref.Name)-1:] == "|"+ref.Name {
-			return id
-		}
-	}
-	return ""
-}
-
 func lookupStringRef(ref *kong.StringRef, ids map[string]string) string {
 	if ref == nil {
 		return ""
