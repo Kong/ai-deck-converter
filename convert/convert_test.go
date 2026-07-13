@@ -662,6 +662,79 @@ consumers:
 	require.Contains(t, got, "consumer_group_consumers", "expected consumer_group_consumers in db-less output: %s", out)
 }
 
+func TestConvertDBLessDisambiguatesServiceNameCollisions(t *testing.T) {
+	src := []byte(`
+agents:
+  - type: http
+    name: shared-name-proxy
+    config:
+      url: https://shared.internal/api
+      route:
+        name: shared-name-agent-route
+        paths: [/agents/shared]
+mcp_servers:
+  - type: conversion-listener
+    name: shared-name-proxy
+    config:
+      route:
+        name: shared-name-mcp-route
+        paths: [/mcp/shared]
+    tools:
+      - name: ping
+        description: Health ping tool
+        method: GET
+        path: /ping
+        scheme: http
+        host: ping.internal
+`)
+
+	out, warnings, err := Convert(src, Options{OutputMode: "db-less"})
+	require.NoError(t, err, "convert db-less")
+	require.Contains(t, strings.Join(warnings, "\n"), "service name collision")
+
+	var got struct {
+		Services []struct {
+			ID   string `yaml:"id"`
+			Name string `yaml:"name"`
+		} `yaml:"services"`
+		Routes []struct {
+			Name    string `yaml:"name"`
+			Service struct {
+				ID string `yaml:"id"`
+			} `yaml:"service"`
+		} `yaml:"routes"`
+	}
+	require.NoError(t, yaml.Unmarshal(out, &got), "unmarshal output")
+	require.Len(t, got.Services, 2, "expected one service per source entity: %s", out)
+
+	serviceIDs := map[string]bool{}
+	serviceNames := map[string]bool{}
+	for _, service := range got.Services {
+		require.NotEmpty(t, service.ID, "service missing id: %#v", service)
+		require.False(t, serviceIDs[service.ID], "service id %q was reused", service.ID)
+		serviceIDs[service.ID] = true
+		require.False(t, serviceNames[service.Name], "service name %q was reused", service.Name)
+		serviceNames[service.Name] = true
+	}
+	require.Contains(t, serviceNames, "shared-name-proxy")
+	require.Len(t, serviceNames, 2, "expected the colliding service to be renamed: %s", out)
+
+	routeServiceIDs := map[string]string{}
+	for _, route := range got.Routes {
+		require.NotEmpty(t, route.Service.ID, "route %q missing service ref", route.Name)
+		require.True(t, serviceIDs[route.Service.ID], "route %q references unknown service id %q", route.Name, route.Service.ID)
+		routeServiceIDs[route.Name] = route.Service.ID
+	}
+	require.Contains(t, routeServiceIDs, "shared-name-mcp-route")
+	require.Contains(t, routeServiceIDs, "shared-name-agent-route")
+	require.NotEqual(t, routeServiceIDs["shared-name-mcp-route"], routeServiceIDs["shared-name-agent-route"],
+		"routes from different source entities must not point at the same service")
+
+	_, _, err = Convert(src, Options{Strict: true, OutputMode: "db-less"})
+	require.Error(t, err, "strict mode must reject the service-name collision warning")
+	require.Contains(t, err.Error(), "service name collision")
+}
+
 func TestConvertDBLessPreservesInputIDsWhenProvided(t *testing.T) {
 	src := []byte(`
 consumer_groups:

@@ -35,8 +35,12 @@ func (c *Converter) convertAgents() error {
 				return err
 			}
 		}
+		serviceName, err := c.uniqueServiceName(entityAgent, a.Name, a.Name)
+		if err != nil {
+			return err
+		}
 		svc := kong.Service{
-			Name:   a.Name,
+			Name:   serviceName,
 			URL:    a.Config.URL,
 			Routes: []kong.Route{route},
 			Tags:   c.labelsToTags(a.Labels),
