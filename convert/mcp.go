@@ -70,7 +70,9 @@ func (c *Converter) mcpPlugin(m *aigw.MCPServer) (kong.Plugin, error) {
 	}
 	// proxy_config is honored by the plugin only in passthrough-listener mode,
 	// but we pass it through whenever set and let the plugin validate.
-	setIfNotEmptyMap(cfg, "proxy_config", m.Config.Proxy)
+	if pc := proxyConfigBlock(m.Config.Proxy); pc != nil {
+		cfg["proxy_config"] = pc
+	}
 	// tools_cache_ttl_seconds is required by the plugin in upstream-server mode.
 	if m.Config.ToolsCacheTTLSeconds != nil {
 		cfg["tools_cache_ttl_seconds"] = *m.Config.ToolsCacheTTLSeconds

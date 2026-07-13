@@ -31,8 +31,9 @@ mcp_servers:
         paths:
           - /mcp/vendor-proxy
       proxy:
-        https_proxy_host: proxy.internal
-        https_proxy_port: 8080
+        https_proxy:
+          host: proxy.internal
+          port: 8080
     tools:
       - name: vendorTool
         description: A vendor tool

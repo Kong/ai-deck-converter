@@ -31,9 +31,9 @@ type MCPServerConfig struct {
 	// ai-mcp-proxy plugin's acl_attribute_type / access_token_claim_field /
 	// default_acl fields.
 	Auth *MCPAuth `yaml:"auth,omitempty"`
-	// Proxy maps directly to the ai-mcp-proxy plugin's proxy_config (only
-	// honored by the plugin in passthrough-listener mode).
-	Proxy map[string]any `yaml:"proxy,omitempty"`
+	// Proxy lowers to the ai-mcp-proxy plugin's proxy_config (only honored by
+	// the plugin in passthrough-listener mode).
+	Proxy *ProxyConfig `yaml:"proxy,omitempty"`
 	// ToolsCacheTTLSeconds maps to the ai-mcp-proxy plugin's
 	// tools_cache_ttl_seconds (required by the plugin in upstream-server mode).
 	ToolsCacheTTLSeconds *int `yaml:"tools_cache_ttl_seconds,omitempty"`

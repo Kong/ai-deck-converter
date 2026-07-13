@@ -39,6 +39,7 @@ type ModelConfig struct {
 	ResponseStreaming  string        `yaml:"response_streaming,omitempty"`
 	MaxRequestBodySize *int          `yaml:"max_request_body_size,omitempty"`
 	Model              ModelSelector `yaml:"model,omitempty"`
+	Proxy              *ProxyConfig  `yaml:"proxy,omitempty"`
 	Balancer           *Balancer     `yaml:"balancer,omitempty"`
 }
 

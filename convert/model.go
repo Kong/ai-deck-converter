@@ -32,6 +32,7 @@ type proxyGroup struct {
 	responseStreaming string
 	modelNameHeader   *bool
 	maxBodySize       *int
+	proxy             map[string]any
 	targets           []map[string]any
 	seen              map[string]bool
 }
@@ -153,6 +154,7 @@ func (c *Converter) convertModels() error {
 						responseStreaming: m.Config.ResponseStreaming,
 						modelNameHeader:   modelNameHeader,
 						maxBodySize:       m.Config.MaxRequestBodySize,
+						proxy:             proxyConfigBlock(m.Config.Proxy),
 						seen:              map[string]bool{},
 					}
 					g.proxyByOwner[ownerKey] = pg
@@ -272,6 +274,9 @@ func (g *proxyGroup) proxyConfig() map[string]any {
 	}
 	if g.maxBodySize != nil {
 		cfg["max_request_body_size"] = *g.maxBodySize
+	}
+	if g.proxy != nil {
+		cfg["proxy_config"] = g.proxy
 	}
 	return cfg
 }
