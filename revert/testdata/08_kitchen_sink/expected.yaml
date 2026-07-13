@@ -25,6 +25,9 @@ models:
         allow:
           - premium
     config:
+      logging:
+        payloads: false
+        statistics: true
       model:
         alias: '@prod/prod-chat'
       balancer:
@@ -53,6 +56,10 @@ mcp_servers:
       route:
         paths:
           - /mcp/tools
+      logging:
+        payloads: false
+        statistics: true
+        audits: true
     upstream_url: https://tools.internal/mcp
 agents:
   - type: a2a
@@ -64,7 +71,9 @@ agents:
         paths:
           - /agents/orch
       logging:
+        payloads: false
         statistics: true
+        max_payload_size: 1048576
 policies:
   - type: ai-prompt-guard
     name: ai-prompt-guard

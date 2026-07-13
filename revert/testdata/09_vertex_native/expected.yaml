@@ -16,6 +16,9 @@ models:
           temperature: 1
           type: gemini
     config:
+      logging:
+        payloads: false
+        statistics: true
       model:
         alias: '@vertex/gemini-2.5-pro'
   - type: model
@@ -33,6 +36,9 @@ models:
             project_id: kong-vertex-project
           type: gemini
     config:
+      logging:
+        payloads: false
+        statistics: true
       model:
         alias: '@vertex/text-embedding-005'
 model_providers:

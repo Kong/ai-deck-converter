@@ -17,6 +17,9 @@ models:
       route:
         paths:
           - /llm
+      logging:
+        payloads: false
+        statistics: true
 model_providers:
   - type: openai
     name: openai-secrets

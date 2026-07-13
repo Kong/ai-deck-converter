@@ -20,6 +20,9 @@ models:
         deny:
           - banned
     config:
+      logging:
+        payloads: false
+        statistics: true
       model:
         alias: '@openai/guarded-gpt'
 model_providers:

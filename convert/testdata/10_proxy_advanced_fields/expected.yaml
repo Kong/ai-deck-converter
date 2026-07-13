@@ -36,6 +36,9 @@ plugins:
             header_name: Authorization
             header_value: '{vault://ai/openai-token}'
           description: gpt-4o
+          logging:
+            log_payloads: false
+            log_statistics: true
           model:
             name: gpt-4o
             provider: openai
@@ -59,6 +62,9 @@ plugins:
             header_name: Authorization
             header_value: '{vault://ai/openai-token}'
           description: text-embedding-3-small
+          logging:
+            log_payloads: false
+            log_statistics: true
           model:
             name: text-embedding-3-small
             provider: openai

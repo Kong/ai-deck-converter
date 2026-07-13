@@ -52,7 +52,7 @@ func (c *Converter) convertModels() error {
 		m := &c.src.Models[i]
 		bases := basePaths(m)
 		caps := c.expandCapabilities(m)
-		logging := modelLoggingBlock(m.Config.Logging)
+		logging := modelLoggingBlock(withLoggingDefaults(m.Config.Logging, false, false))
 
 		// Preserve the source model alias on ai-proxy-advanced targets exactly as
 		// authored so alias-less targets still participate in the DP's fallback

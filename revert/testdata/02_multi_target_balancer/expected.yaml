@@ -20,6 +20,9 @@ models:
           deployment_id: gpt4o-dep
           type: azure
     config:
+      logging:
+        payloads: false
+        statistics: true
       model:
         alias: '@openai/chat-lb'
       balancer:

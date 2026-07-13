@@ -38,6 +38,9 @@ plugins:
       llm_format: openai
       targets:
         - description: gpt-4o
+          logging:
+            log_payloads: false
+            log_statistics: true
           model:
             name: gpt-4o
             provider: openai
