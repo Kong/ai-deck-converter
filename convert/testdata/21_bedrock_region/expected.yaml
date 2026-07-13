@@ -23,6 +23,7 @@ plugins:
         model:
           name: text-embedding-ada-002
           options:
+            anthropic_version: bedrock-2023-05-31
             bedrock:
               aws_region: us-east-1
           provider: bedrock
@@ -37,6 +38,7 @@ plugins:
             model_alias: '@bedrock/titan-embed-text-v2'
             name: amazon.titan-embed-text-v2:0
             options:
+              anthropic_version: bedrock-2023-05-31
               bedrock:
                 aws_region: us-east-1
                 embeddings_normalize: true

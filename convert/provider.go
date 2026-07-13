@@ -150,13 +150,19 @@ func mapEmbeddingsOptions(emb map[string]any, provider *aigw.Provider) {
 			}
 		}
 	case "bedrock":
-		if opts, ok := model["options"].(map[string]any); ok {
-			if b, ok := opts["bedrock"].(map[string]any); ok {
-				if v, ok := b["region"]; ok {
-					b["aws_region"] = v
-					delete(b, "region")
-				}
+		opts, ok := model["options"].(map[string]any)
+		if !ok {
+			opts = map[string]any{}
+			model["options"] = opts
+		}
+		if b, ok := opts["bedrock"].(map[string]any); ok {
+			if v, ok := b["region"]; ok {
+				b["aws_region"] = v
+				delete(b, "region")
 			}
+		}
+		if opts["anthropic_version"] == nil {
+			opts["anthropic_version"] = "bedrock-2023-05-31"
 		}
 	}
 }
@@ -238,6 +244,9 @@ func mapOptions(opts map[string]any, providerType string, provider *aigw.Provide
 	if provider != nil {
 		if providerType == "anthropic" && out["anthropic_version"] == nil {
 			out["anthropic_version"] = "2023-06-01"
+		}
+		if providerType == "bedrock" && out["anthropic_version"] == nil {
+			out["anthropic_version"] = "bedrock-2023-05-31"
 		}
 		if providerType == "azure" && provider.Config.Instance != "" {
 			out["azure_instance"] = provider.Config.Instance
