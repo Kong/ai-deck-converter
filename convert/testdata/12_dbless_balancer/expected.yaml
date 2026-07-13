@@ -14,6 +14,7 @@ routes:
       id: 947a4e23-b483-5a65-8165-da9aed24565b
     paths:
       - /v1/chat/completions/chat/completions
+      - /v1/embeddings/chat/completions
     hosts:
       - ai.example.com
       - ai-internal.example.com
@@ -56,6 +57,7 @@ routes:
       id: 947a4e23-b483-5a65-8165-da9aed24565b
     paths:
       - /v1/chat/completions/embeddings
+      - /v1/embeddings/embeddings
     hosts:
       - ai.example.com
       - ai-internal.example.com

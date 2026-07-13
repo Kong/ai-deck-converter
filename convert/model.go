@@ -50,7 +50,7 @@ func (c *Converter) convertModels() error {
 
 	for i := range c.src.Models {
 		m := &c.src.Models[i]
-		base := basePath(m)
+		bases := basePaths(m)
 		caps := c.expandCapabilities(m)
 		logging := modelLoggingBlock(m.Config.Logging)
 
@@ -111,10 +111,14 @@ func (c *Converter) convertModels() error {
 				key := sec + "|" + spec.RouteLabel
 				g := groups[key]
 				if g == nil {
+					paths := make([]string, len(bases))
+					for i, b := range bases {
+						paths[i] = aimap.RoutePath(b, spec)
+					}
 					g = &routeGroup{
 						route: buildModelRoute(
 							m.Config.Route, sec+"-"+spec.RouteLabel,
-							aimap.RoutePath(base, spec), spec.Methods),
+							paths, spec.Methods),
 						takesBodyModel: spec.TakesBodyModel,
 						bodySize:       aimap.DefaultMaxBodySize,
 						proxyByOwner:   map[string]*proxyGroup{},
@@ -378,11 +382,17 @@ func balancerExtra(b *aigw.Balancer, key string) any {
 	return b.Fields[key]
 }
 
-func basePath(m *aigw.Model) string {
-	if len(m.Config.Route.Paths) > 0 && m.Config.Route.Paths[0] != "" {
-		return m.Config.Route.Paths[0]
+func basePaths(m *aigw.Model) []string {
+	var out []string
+	for _, p := range m.Config.Route.Paths {
+		if p != "" {
+			out = append(out, p)
+		}
 	}
-	return aimap.DefaultBasePath
+	if len(out) == 0 {
+		return []string{aimap.DefaultBasePath}
+	}
+	return out
 }
 
 // The assistants, batches, and files endpoints do not route by model,

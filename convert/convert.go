@@ -181,10 +181,10 @@ func buildRoute(rc aigw.RouteConfig, entityName string) kong.Route {
 	}
 }
 
-func buildModelRoute(rc aigw.RouteConfig, routeName, path string, defaultMethods []string) kong.Route {
+func buildModelRoute(rc aigw.RouteConfig, routeName string, paths []string, defaultMethods []string) kong.Route {
 	route := buildRoute(rc, routeName)
 	route.Name = routeName
-	route.Paths = []string{path}
+	route.Paths = paths
 	if len(route.Methods) == 0 {
 		route.Methods = defaultMethods
 	}
