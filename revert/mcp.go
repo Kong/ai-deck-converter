@@ -41,7 +41,7 @@ func (r *Reverter) revertMCPServer(svc *kong.Service, rt *kong.Route, plugins, s
 	m.Config.MaxRequestBodySize = getInt(cfg, "max_request_body_size")
 	m.Config.Logging = loggingFromBlock(getMap(cfg, "logging"))
 	m.Config.Server = getMap(cfg, "server")
-	m.Config.Proxy = getMap(cfg, "proxy_config")
+	m.Config.Proxy = proxyFromConfig(getMap(cfg, "proxy_config"))
 	m.Config.ToolsCacheTTLSeconds = getInt(cfg, "tools_cache_ttl_seconds")
 
 	// Auth: the ACL attribute config and default_acl live in the plugin config;
