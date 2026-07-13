@@ -104,7 +104,8 @@ func TestMapOptionsBedrockNesting(t *testing.T) {
 		"region":     "us-east-1",
 	}, "bedrock", p)
 	want := map[string]any{
-		"max_tokens": 1024,
+		"max_tokens":        1024,
+		"anthropic_version": "bedrock-2023-05-31",
 		"bedrock": map[string]any{
 			"aws_region":          "us-east-1",
 			"aws_assume_role_arn": "arn:role",
