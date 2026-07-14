@@ -13,7 +13,10 @@ services:
               acl_attribute_type: oauth_access_token
               default_acl:
                 - allow:
+                    - gold
                     - premium
+                  deny:
+                    - platinum
               logging:
                 log_audits: false
                 log_payloads: false
@@ -38,6 +41,7 @@ services:
               acl_attribute_type: consumer
               default_acl:
                 - allow:
+                    - agents
                     - premium
               include_consumer_groups: true
               logging:
