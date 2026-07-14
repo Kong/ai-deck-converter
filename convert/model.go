@@ -316,7 +316,7 @@ func (c *Converter) buildTarget(
 	if alias != "" {
 		model["model_alias"] = alias
 	}
-	if opts := mapOptions(tm.Config.Options, providerType, provider); opts != nil {
+	if opts := mapOptions(tm.Config.Options, providerType, tm.Name, provider); opts != nil {
 		model["options"] = opts
 	}
 

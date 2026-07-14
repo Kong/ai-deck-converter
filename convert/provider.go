@@ -1,6 +1,8 @@
 package convert
 
 import (
+	"strings"
+
 	"github.com/Kong/ai-deck-converter/internal/aigw"
 	"github.com/Kong/ai-deck-converter/internal/aimap"
 )
@@ -151,17 +153,17 @@ func mapEmbeddingsOptions(emb map[string]any, provider *aigw.Provider) {
 		}
 	case "bedrock":
 		opts, ok := model["options"].(map[string]any)
-		if !ok {
-			opts = map[string]any{}
-			model["options"] = opts
-		}
 		if b, ok := opts["bedrock"].(map[string]any); ok {
 			if v, ok := b["region"]; ok {
 				b["aws_region"] = v
 				delete(b, "region")
 			}
 		}
-		if opts["anthropic_version"] == nil {
+		if isBedrockAnthropicModel(model) && (!ok || opts["anthropic_version"] == nil) {
+			if !ok {
+				opts = map[string]any{}
+				model["options"] = opts
+			}
 			opts["anthropic_version"] = "bedrock-2023-05-31"
 		}
 	}
@@ -187,7 +189,7 @@ func embeddingsNested(model map[string]any, prov string) map[string]any {
 // model.options map. It renames/nests provider-specific keys per provider type
 // and folds in provider-level fields (azure instance, gemini project id, bedrock
 // assume-role auth). Keys not handled specially pass through flat.
-func mapOptions(opts map[string]any, providerType string, provider *aigw.Provider) map[string]any {
+func mapOptions(opts map[string]any, providerType, modelName string, provider *aigw.Provider) map[string]any {
 	out := map[string]any{}
 	nested := map[string]map[string]any{}
 	addNested := func(prov, key string, val any) {
@@ -245,7 +247,7 @@ func mapOptions(opts map[string]any, providerType string, provider *aigw.Provide
 		if providerType == "anthropic" && out["anthropic_version"] == nil {
 			out["anthropic_version"] = "2023-06-01"
 		}
-		if providerType == "bedrock" && out["anthropic_version"] == nil {
+		if providerType == "bedrock" && isBedrockAnthropicModelName(modelName) && out["anthropic_version"] == nil {
 			out["anthropic_version"] = "bedrock-2023-05-31"
 		}
 		if providerType == "azure" && provider.Config.Instance != "" {
@@ -275,4 +277,13 @@ func mapOptions(opts map[string]any, providerType string, provider *aigw.Provide
 		return nil
 	}
 	return out
+}
+
+func isBedrockAnthropicModel(model map[string]any) bool {
+	name, _ := model["name"].(string)
+	return isBedrockAnthropicModelName(name)
+}
+
+func isBedrockAnthropicModelName(name string) bool {
+	return strings.Contains(strings.ToLower(name), "anthropic.claude")
 }
