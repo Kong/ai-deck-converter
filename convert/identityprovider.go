@@ -65,26 +65,24 @@ func (c *Converter) ensureAnonymousConsumer() {
 
 	// Overwrite for both 'username: anonymous' and 'custom_id: anonymous' because
 	// our auth plugins look for both at random unpredictable loop iterations
-	matched := false
+	providedConfigContainsAnonConsumer := false
 	for i := range c.out.Consumers {
-		if c.out.Consumers[i].Username != anonymousConsumerName && c.out.Consumers[i].CustomID != anonymousConsumerName {
-			continue
-		}
-		matched = true
-
-		overwritten := false
-		for j, p := range c.out.Consumers[i].Plugins {
-			if p.Name == "request-termination" {
-				c.out.Consumers[i].Plugins[j] = requestTerminationPlugin
-				overwritten = true
-				break
+		if c.out.Consumers[i].Username == anonymousConsumerName || c.out.Consumers[i].CustomID == anonymousConsumerName {
+			providedConfigContainsAnonConsumer = true
+			requestTerminationPluginOverwritten := false
+			for j, p := range c.out.Consumers[i].Plugins {
+				if p.Name == "request-termination" {
+					c.out.Consumers[i].Plugins[j] = requestTerminationPlugin
+					requestTerminationPluginOverwritten = true
+					break
+				}
+			}
+			if !requestTerminationPluginOverwritten {
+				c.out.Consumers[i].Plugins = append(c.out.Consumers[i].Plugins, requestTerminationPlugin)
 			}
 		}
-		if !overwritten {
-			c.out.Consumers[i].Plugins = append(c.out.Consumers[i].Plugins, requestTerminationPlugin)
-		}
 	}
-	if matched {
+	if providedConfigContainsAnonConsumer {
 		return
 	}
 
