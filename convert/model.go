@@ -1,6 +1,7 @@
 package convert
 
 import (
+	"hash/fnv"
 	"sort"
 	"strconv"
 	"strings"
@@ -118,8 +119,8 @@ func (c *Converter) convertModels() error {
 				// with different identity-provider sets therefore cannot share a
 				// route: a route-scoped auth plugin would otherwise protect every
 				// model on that route.
-				identityKey := identityProviderKey(m.Access.IdentityProviders)
-				key := sec + "|" + spec.RouteLabel + "|" + identityKey
+				key := sec + "|" + spec.RouteLabel + "|" + identityKey + "|" + routePathsKey(m.Config.Route.Paths)
+
 				g := groups[key]
 				if g == nil {
 					paths := make([]string, len(bases))
@@ -429,6 +430,20 @@ func balancerExtra(b *aigw.Balancer, key string) any {
 		return nil
 	}
 	return b.Fields[key]
+}
+
+// routePathsKey sorts and hashes a model's custom route paths so models that
+// share a section and capability but declare different route.paths don't
+// collapse into (and clobber) the same route group.
+func routePathsKey(paths []string) string {
+	sorted := append([]string(nil), paths...)
+	sort.Strings(sorted)
+	h := fnv.New64a()
+	for _, p := range sorted {
+		h.Write([]byte(p))
+		h.Write([]byte{0})
+	}
+	return strconv.FormatUint(h.Sum64(), 36)
 }
 
 func basePaths(m *aigw.Model) []string {
