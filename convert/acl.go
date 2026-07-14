@@ -22,6 +22,23 @@ func aclBlock(acls aigw.ACLs) map[string]any {
 	return config
 }
 
+// mergeACLs unions two AI Gateway ACLs' allow and deny lists, base first, so a
+// broader ACL (a server-wide acls block) and a narrower one (default_tool_acls)
+// both apply instead of one shadowing the other. Duplicate subjects are kept
+// as-authored; Kong tolerates them.
+func mergeACLs(base, extra aigw.ACLs) aigw.ACLs {
+	if extra.IsEmpty() {
+		return base
+	}
+	if base.IsEmpty() {
+		return extra
+	}
+	return aigw.ACLs{
+		Allow: append(append([]string{}, base.Allow...), extra.Allow...),
+		Deny:  append(append([]string{}, base.Deny...), extra.Deny...),
+	}
+}
+
 // defaultACLBlock wraps an AI Gateway ACL into the ai-mcp-proxy config.default_acl
 // array shape: a list of {scope, allow, deny} entries. Returns nil when empty.
 // scope is left unset (Kong defaults it to "tools") per the omit-defaults policy.

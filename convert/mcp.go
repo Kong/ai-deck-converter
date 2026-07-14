@@ -79,18 +79,16 @@ func (c *Converter) mcpPlugin(m *aigw.MCPServer) (kong.Plugin, error) {
 	}
 	// Auth: emit the ACL attribute config and default_acl. Prefer the structured
 	// config.auth block; fall back to the top-level acls/default_tool_acls (the
-	// legacy input shape). default_acl prefers default_tool_acls over acls.
+	// legacy input shape). default_acl merges the server-wide acls with
+	// default_tool_acls (acls first) so both apply rather than one shadowing the
+	// other.
 	if a := m.Config.Auth; a != nil {
 		setIfNotEmpty(cfg, "acl_attribute_type", a.ACLAttributeType)
 		setIfNotEmpty(cfg, "access_token_claim_field", a.AccessTokenClaimField)
-		if acl := defaultACLBlock(a.DefaultToolACLs); acl != nil {
-			cfg["default_acl"] = acl
-		} else if acl := defaultACLBlock(a.ACLs); acl != nil {
+		if acl := defaultACLBlock(mergeACLs(a.ACLs, a.DefaultToolACLs)); acl != nil {
 			cfg["default_acl"] = acl
 		}
-	} else if acl := defaultACLBlock(m.DefaultToolACLs); acl != nil {
-		cfg["default_acl"] = acl
-	} else if acl := defaultACLBlock(m.ACLs); acl != nil {
+	} else if acl := defaultACLBlock(mergeACLs(m.ACLs, m.DefaultToolACLs)); acl != nil {
 		cfg["default_acl"] = acl
 	}
 	// include_consumer_groups is set by default, mirroring aclPlugin() in convert/acl.go: AI Gateway's
