@@ -77,12 +77,13 @@ func (r *Reverter) revertConsumers() error {
 }
 
 // isSynthesizedAnonymousConsumer reports whether c matches exactly what
-// convert.ensureAnonymousConsumer synthesizes: the "anonymous" consumer with
-// a single request-termination(401, "Unauthorized") plugin, no credentials or
-// groups. A hand-written "anonymous" consumer with any other shape is
-// reverted normally.
+// convert.ensureAnonymousConsumer synthesizes: a consumer named "anonymous"
+// (by username and/or custom_id) with a single
+// request-termination(401, "Unauthorized") plugin, no credentials or groups.
+// A hand-written "anonymous" consumer with any other shape is reverted
+// normally.
 func isSynthesizedAnonymousConsumer(c *kong.Consumer) bool {
-	if c.Username != anonymousConsumerName || c.CustomID != anonymousConsumerName {
+	if c.Username != anonymousConsumerName && c.CustomID != anonymousConsumerName {
 		return false
 	}
 	if len(c.Groups) > 0 || len(c.KeyAuthCredentials) > 0 {

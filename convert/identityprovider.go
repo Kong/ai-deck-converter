@@ -53,20 +53,42 @@ func identityProviderPlugin(idp *aigw.IdentityProvider) kong.Plugin {
 // request-termination plugin so unauthenticated requests get a 401) if one
 // isn't already present in the output document.
 func (c *Converter) ensureAnonymousConsumer() {
+	enabled := true
+	requestTerminationPlugin := kong.Plugin{
+		Name:    "request-termination",
+		Enabled: &enabled,
+		Config: map[string]any{
+			"status_code": unauthorizedStatusCode,
+			"message":     unauthorizedErrorMessage,
+		},
+	}
+
+	// Overwrite for both 'username: anonymous' and 'custom_id: anonymous' because
+	// our auth plugins look for both at random unpredictable loop iterations
+	providedConfigContainsAnonConsumer := false
 	for i := range c.out.Consumers {
-		if c.out.Consumers[i].Username == anonymousConsumerName {
-			return
+		if c.out.Consumers[i].Username == anonymousConsumerName || c.out.Consumers[i].CustomID == anonymousConsumerName {
+			providedConfigContainsAnonConsumer = true
+			requestTerminationPluginOverwritten := false
+			for j, p := range c.out.Consumers[i].Plugins {
+				if p.Name == "request-termination" {
+					c.out.Consumers[i].Plugins[j] = requestTerminationPlugin
+					requestTerminationPluginOverwritten = true
+					break
+				}
+			}
+			if !requestTerminationPluginOverwritten {
+				c.out.Consumers[i].Plugins = append(c.out.Consumers[i].Plugins, requestTerminationPlugin)
+			}
 		}
 	}
+	if providedConfigContainsAnonConsumer {
+		return
+	}
+
 	c.out.Consumers = append(c.out.Consumers, kong.Consumer{
 		Username: anonymousConsumerName,
 		CustomID: anonymousConsumerName,
-		Plugins: []kong.Plugin{{
-			Name: "request-termination",
-			Config: map[string]any{
-				"status_code": unauthorizedStatusCode,
-				"message":     unauthorizedErrorMessage,
-			},
-		}},
+		Plugins:  []kong.Plugin{requestTerminationPlugin},
 	})
 }
