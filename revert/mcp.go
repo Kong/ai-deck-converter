@@ -39,7 +39,7 @@ func (r *Reverter) revertMCPServer(svc *kong.Service, rt *kong.Route, plugins, s
 
 	m.Config.Route = routeConfig(rt, svc.Name)
 	m.Config.MaxRequestBodySize = getInt(cfg, "max_request_body_size")
-	m.Config.Logging = loggingFromBlock(getMap(cfg, "logging"))
+	m.Config.Logging = loggingFromBlockWithDefaults(getMap(cfg, "logging"), true, false)
 	m.Config.Server = getMap(cfg, "server")
 	m.Config.Proxy = proxyFromConfig(getMap(cfg, "proxy_config"))
 	m.Config.ToolsCacheTTLSeconds = getInt(cfg, "tools_cache_ttl_seconds")

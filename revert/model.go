@@ -131,7 +131,7 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 			// model-level block in the AI Gateway model; lift it back from the
 			// first target that has it (all of a model's targets share the block).
 			if g.model.Config.Logging == nil {
-				g.model.Config.Logging = loggingFromBlock(getMap(target, "logging"))
+				g.model.Config.Logging = loggingFromBlockWithDefaults(getMap(target, "logging"), false, false)
 			}
 			if !g.capsSeen[capability] {
 				g.capsSeen[capability] = true

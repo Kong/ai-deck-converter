@@ -62,7 +62,7 @@ func (c *Converter) mcpPlugin(m *aigw.MCPServer) (kong.Plugin, error) {
 	if m.Config.MaxRequestBodySize != nil {
 		cfg["max_request_body_size"] = *m.Config.MaxRequestBodySize
 	}
-	if logging := loggingBlock(m.Config.Logging); logging != nil {
+	if logging := loggingBlock(withLoggingDefaults(m.Config.Logging, true, false)); logging != nil {
 		cfg["logging"] = logging
 	}
 	if len(m.Config.Server) > 0 {
@@ -78,9 +78,8 @@ func (c *Converter) mcpPlugin(m *aigw.MCPServer) (kong.Plugin, error) {
 		cfg["tools_cache_ttl_seconds"] = *m.Config.ToolsCacheTTLSeconds
 	}
 	// Access: emit the ACL attribute config and default_acl. Prefer the
-	// structured config.access block; fall back to the top-level access
-	// acls/default_tool_acls (the legacy input shape). default_acl prefers
-	// default_tool_acls over acls.
+	// structured config.access block; fall back to the server-level access
+	// block. default_acl prefers default_tool_acls over acls.
 	if a := m.Config.Access; a != nil {
 		setIfNotEmpty(cfg, "acl_attribute_type", a.ACLAttributeType)
 		setIfNotEmpty(cfg, "access_token_claim_field", a.AccessTokenClaimField)

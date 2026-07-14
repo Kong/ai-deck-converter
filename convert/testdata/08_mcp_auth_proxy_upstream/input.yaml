@@ -1,6 +1,6 @@
 mcp_servers:
   # conversion-listener carrying OAuth ACL config (acl_attribute_type +
-  # access_token_claim_field + default_tool_acls) under config.auth.
+  # access_token_claim_field + default_tool_acls) under config.access.
   - type: conversion-listener
     display_name: Secure Flights MCP OAUTH
     name: secure-flights-mcp-oauth
@@ -24,7 +24,7 @@ mcp_servers:
         scheme: https
         host: flights.internal
   # conversion-listener carrying OAuth ACL config (acl_attribute_type +
-  # access_token_claim_field + default_tool_acls) under config.auth.
+  # access_token_claim_field + default_tool_acls) under config.access.
   - type: conversion-listener
     display_name: Secure Flights MCP Consumer
     name: secure-flights-mcp-consumer

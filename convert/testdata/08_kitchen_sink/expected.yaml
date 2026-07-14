@@ -19,6 +19,10 @@ services:
           - name: ai-mcp-proxy
             config:
               include_consumer_groups: true
+              logging:
+                log_audits: false
+                log_payloads: false
+                log_statistics: true
               mode: passthrough-listener
               tools: []
   - name: orchestrator
@@ -31,7 +35,9 @@ services:
           - name: ai-a2a-proxy
             config:
               logging:
+                log_payloads: false
                 log_statistics: true
+                max_payload_size: 1048576
 consumers:
   - username: app-svc
     groups:
@@ -58,6 +64,9 @@ plugins:
             header_name: Authorization
             header_value: '{vault://env/openai-key}'
           description: gpt-4o
+          logging:
+            log_payloads: false
+            log_statistics: true
           model:
             model_alias: '@prod/prod-chat'
             name: gpt-4o
@@ -70,6 +79,9 @@ plugins:
             header_name: x-api-key
             header_value: '{vault://env/anthropic-key}'
           description: claude-3-5
+          logging:
+            log_payloads: false
+            log_statistics: true
           model:
             model_alias: '@prod/prod-chat'
             name: claude-3-5
@@ -82,6 +94,9 @@ plugins:
             header_name: x-api-key
             header_value: '{vault://env/anthropic-key}'
           description: claude-3-4
+          logging:
+            log_payloads: false
+            log_statistics: true
           model:
             model_alias: '@prod/prod-chat'
             name: claude-3-4
