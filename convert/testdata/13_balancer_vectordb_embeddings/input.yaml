@@ -36,7 +36,8 @@ models:
             header_value: "{vault://env/openai-key}"
           model:
             name: text-embedding-3-small
-            provider: openai
+            config:
+              type: openai
 model_providers:
   - type: openai
     display_name: OpenAI Main
