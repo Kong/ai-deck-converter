@@ -28,7 +28,8 @@ models:
           provider: embed-azure
           model:
             name: text-embedding-ada-002
-            provider: azure
+            config:
+              type: azure
 model_providers:
   - type: openai
     display_name: OpenAI Main

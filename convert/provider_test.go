@@ -119,16 +119,18 @@ func TestMapOptionsBedrockNonAnthropicDoesNotDefaultAnthropicVersion(t *testing.
 	require.Nil(t, got)
 }
 
-func TestMapEmbeddingsOptionsBedrockNonAnthropicDoesNotDefaultAnthropicVersion(t *testing.T) {
+func TestLowerEmbeddingsModelBedrockNonAnthropicDoesNotDefaultAnthropicVersion(t *testing.T) {
 	embeddings := map[string]any{
 		"model": map[string]any{
-			"name":     "amazon.titan-embed-text-v2:0",
-			"provider": "bedrock",
+			"name":   "amazon.titan-embed-text-v2:0",
+			"config": map[string]any{"type": "bedrock"},
 		},
 	}
 
-	mapEmbeddingsOptions(embeddings, &aigw.Provider{Type: "bedrock"})
-	require.NotContains(t, embeddings["model"].(map[string]any), "options")
+	lowerEmbeddingsModel(embeddings, &aigw.Provider{Type: "bedrock"})
+	model := embeddings["model"].(map[string]any)
+	require.Equal(t, "bedrock", model["provider"])
+	require.NotContains(t, model, "options")
 }
 
 func TestConvertWarnsUnsupportedCapability(t *testing.T) {

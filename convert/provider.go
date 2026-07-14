@@ -77,32 +77,35 @@ func resolveAuth(p *aigw.Provider, allowOverride *bool) map[string]any {
 	return auth
 }
 
-// resolveEmbeddings folds a referenced provider's auth into the embeddings
-// block. When `embeddings.provider` names a top-level provider entity, its auth
-// is resolved via resolveAuth and merged into `embeddings.auth` (any explicitly
-// configured auth keys win), then the provider reference is dropped — the
-// ai-proxy-advanced embeddings schema has no top-level provider field.
+// resolveEmbeddings lowers a model's embeddings block into the ai-proxy-advanced
+// embeddings shape. When `embeddings.provider` names a top-level provider entity,
+// its auth is resolved via resolveAuth and merged into `embeddings.auth` (any
+// explicitly configured auth keys win), then the provider reference is dropped —
+// the ai-proxy-advanced embeddings schema has no top-level provider field. The
+// embeddings model's `config` block is lowered regardless of whether a provider
+// entity is referenced.
 func (c *Converter) resolveEmbeddings(raw any) (any, error) {
 	emb, ok := raw.(map[string]any)
 	if !ok {
 		return raw, nil
 	}
-	provName, ok := emb["provider"].(string)
-	if !ok || provName == "" {
-		return emb, nil
-	}
-	delete(emb, "provider")
 
-	provider := c.providers[provName]
-	if provider == nil {
-		if err := c.warn("model embeddings reference unknown provider %q; auth may be incomplete", provName); err != nil {
-			return nil, err
+	var provider *aigw.Provider
+	if provName, _ := emb["provider"].(string); provName != "" {
+		delete(emb, "provider")
+		provider = c.providers[provName]
+		if provider == nil {
+			if err := c.warn("model embeddings reference unknown provider %q; auth may be incomplete", provName); err != nil {
+				return nil, err
+			}
 		}
-		return emb, nil
 	}
 
-	mapEmbeddingsOptions(emb, provider)
+	lowerEmbeddingsModel(emb, provider)
 
+	if provider == nil {
+		return emb, nil
+	}
 	resolved := resolveAuth(provider, nil)
 	if resolved == nil {
 		return emb, nil
@@ -120,69 +123,65 @@ func (c *Converter) resolveEmbeddings(raw any) (any, error) {
 	return emb, nil
 }
 
-// mapEmbeddingsOptions folds a referenced provider's non-auth, provider-specific
-// fields into the embeddings model's options block. The embeddings schema nests
-// these under model.options.<provider> with bare keys (e.g.
-// model.options.azure.instance) — distinct from mapOptions, which emits flat
-// azure_* keys for ai-proxy-advanced targets. Currently only the azure instance
-// is mapped; extend the switch as more provider fields are surfaced.
-func mapEmbeddingsOptions(emb map[string]any, provider *aigw.Provider) {
+// lowerEmbeddingsModel lowers an embeddings model's `config` block (a
+// TargetModelConfig-shaped {type, ...flat options}) into the ai-proxy-advanced
+// embeddings schema's model.{provider, options} shape, reusing the same target
+// option mapping (mapOptions). Provider-specific keys nest under
+// model.options.<provider>; unlike ai-proxy-advanced targets, azure options nest
+// under model.options.azure rather than using flat azure_* keys. A model with no
+// `config` block is already lowered (e.g. produced by the reverse converter), so
+// it is left untouched — keeping the forward conversion idempotent.
+func lowerEmbeddingsModel(emb map[string]any, provider *aigw.Provider) {
 	model, ok := emb["model"].(map[string]any)
 	if !ok {
 		return
 	}
-	providerType, _ := model["provider"].(string)
-	if providerType == "" {
+	config, ok := model["config"].(map[string]any)
+	if !ok {
+		return
+	}
+	delete(model, "config")
+
+	providerType, _ := config["type"].(string)
+	if providerType == "" && provider != nil {
 		providerType = provider.Type
 	}
-	switch providerType {
-	case "azure":
-		if provider.Config.Instance != "" {
-			embeddingsNested(model, "azure")["instance"] = provider.Config.Instance
+	model["provider"] = providerType
+
+	opts := map[string]any{}
+	for k, v := range config {
+		if k != "type" {
+			opts[k] = v
 		}
-	case "gemini", "vertex":
-		if opts, ok := model["options"].(map[string]any); ok {
-			if gemini, ok := opts["gemini"].(map[string]any); ok {
-				if env, ok := gemini["gcp_environment"].(map[string]any); ok {
-					for k, v := range env {
-						gemini[k] = v
-					}
-					delete(gemini, "gcp_environment")
-				}
-			}
-		}
-	case "bedrock":
-		opts, ok := model["options"].(map[string]any)
-		if b, ok := opts["bedrock"].(map[string]any); ok {
-			if v, ok := b["region"]; ok {
-				b["aws_region"] = v
-				delete(b, "region")
-			}
-		}
-		if isBedrockAnthropicModel(model) && (!ok || opts["anthropic_version"] == nil) {
-			if !ok {
-				opts = map[string]any{}
-				model["options"] = opts
-			}
-			opts["anthropic_version"] = "bedrock-2023-05-31"
-		}
+	}
+	name, _ := model["name"].(string)
+	options := mapOptions(opts, providerType, name, provider)
+	if providerType == "azure" {
+		options = nestAzureEmbeddingsOptions(options)
+	}
+	if len(options) > 0 {
+		model["options"] = options
 	}
 }
 
-// embeddingsNested returns model.options.<prov>, creating the options map and the
-// provider sub-map if absent.
-func embeddingsNested(model map[string]any, prov string) map[string]any {
-	options, ok := model["options"].(map[string]any)
-	if !ok {
-		options = map[string]any{}
-		model["options"] = options
+// nestAzureEmbeddingsOptions rewrites the flat azure_* keys mapOptions emits for
+// ai-proxy-advanced targets into the nested model.options.azure.<key> shape the
+// embeddings schema expects (e.g. azure_instance -> azure.instance).
+func nestAzureEmbeddingsOptions(options map[string]any) map[string]any {
+	for k, v := range options {
+		suffix, ok := strings.CutPrefix(k, "azure_")
+		if !ok {
+			continue
+		}
+		azure, _ := options["azure"].(map[string]any)
+		if azure == nil {
+			azure = map[string]any{}
+			options["azure"] = azure
+		}
+		azure[suffix] = v
+		delete(options, k)
 	}
-	sub, ok := options[prov].(map[string]any)
-	if !ok {
-		sub = map[string]any{}
-		options[prov] = sub
-	}
-	return sub
+	return options
 }
 
 // mapOptions translates a target model's option map into an ai-proxy-advanced
@@ -277,11 +276,6 @@ func mapOptions(opts map[string]any, providerType, modelName string, provider *a
 		return nil
 	}
 	return out
-}
-
-func isBedrockAnthropicModel(model map[string]any) bool {
-	name, _ := model["name"].(string)
-	return isBedrockAnthropicModelName(name)
 }
 
 func isBedrockAnthropicModelName(name string) bool {

@@ -25,10 +25,9 @@ models:
           provider: bedrock-prod
           model:
             name: text-embedding-ada-002
-            provider: bedrock
-            options:
-              bedrock:
-                region: us-east-1
+            config:
+              type: bedrock
+              region: us-east-1
     targets:
       - name: amazon.titan-embed-text-v2:0
         provider: bedrock-prod
