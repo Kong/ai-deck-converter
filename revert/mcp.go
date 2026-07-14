@@ -8,7 +8,7 @@ import (
 // revertMCPServer lifts a service route carrying ai-mcp-proxy back into an AI
 // Gateway MCP Server: config.mode becomes the type, the plugin's embedded tools
 // come back out as Tools, the ACL config (acl_attribute_type /
-// access_token_claim_field / default_acl) becomes config.auth, and any other
+// access_token_claim_field / default_acl) becomes config.access, and any other
 // route- or service-level plugins become policies.
 func (r *Reverter) revertMCPServer(svc *kong.Service, rt *kong.Route, plugins, svcPlugins []kong.Plugin) error {
 	mcpPlugin := findPlugin(plugins, "ai-mcp-proxy")
@@ -44,8 +44,8 @@ func (r *Reverter) revertMCPServer(svc *kong.Service, rt *kong.Route, plugins, s
 	m.Config.Proxy = proxyFromConfig(getMap(cfg, "proxy_config"))
 	m.Config.ToolsCacheTTLSeconds = getInt(cfg, "tools_cache_ttl_seconds")
 
-	// Auth: the ACL attribute config and default_acl live in the plugin config;
-	// lift them back into the structured config.auth block.
+	// Access: the ACL attribute config and default_acl live in the plugin
+	// config; lift them back into the structured config.access block.
 	attrType := getStr(cfg, "acl_attribute_type")
 	claimField := getStr(cfg, "access_token_claim_field")
 	var defaultToolACLs aigw.ACLs
@@ -62,7 +62,7 @@ func (r *Reverter) revertMCPServer(svc *kong.Service, rt *kong.Route, plugins, s
 		}
 	}
 	if attrType != "" || claimField != "" || !defaultToolACLs.IsEmpty() {
-		m.Config.Auth = &aigw.MCPAuth{
+		m.Config.Access = &aigw.MCPConfigAccess{
 			ACLAttributeType:      attrType,
 			AccessTokenClaimField: claimField,
 			DefaultToolACLs:       defaultToolACLs,
@@ -79,7 +79,7 @@ func (r *Reverter) revertMCPServer(svc *kong.Service, rt *kong.Route, plugins, s
 
 	refs, acls := r.policyRefs(append(append([]kong.Plugin{}, plugins...), svcPlugins...))
 	m.Policies = refs
-	m.ACLs = acls
+	m.Access.ACLs = acls
 
 	r.out.MCPServers = append(r.out.MCPServers, m)
 	return nil
@@ -108,10 +108,7 @@ func mcpTool(tool map[string]any) aigw.MCPTool {
 		}
 	}
 	if acl := getMap(tool, "acl"); acl != nil {
-		acls := aclsFromBlock(acl)
-		if !acls.IsEmpty() {
-			t.ACLs = &acls
-		}
+		t.Access.ACLs = aclsFromBlock(acl)
 	}
 	return t
 }

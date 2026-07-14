@@ -12,7 +12,7 @@ mcp_servers:
       server:
         forward_client_headers: true
         timeout: 10000
-      auth:
+      access:
         default_tool_acls:
           allow:
             - premium
@@ -27,9 +27,10 @@ mcp_servers:
         description: Book a flight
         method: POST
         path: /flights/book
-        acls:
-          allow:
-            - agents
+        access:
+          acls:
+            allow:
+              - agents
   - type: passthrough-listener
     name: vendor-mcp
     config:

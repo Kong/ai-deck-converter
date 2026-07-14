@@ -1,9 +1,9 @@
 _format_version: "3.0"
 services:
-  - name: secure-flights-mcp
+  - name: secure-flights-mcp-oauth
     host: localhost
     routes:
-      - name: secure-flights-mcp-route
+      - name: secure-flights-mcp-oauth-route
         paths:
           - /mcp/secure-flights
         plugins:
@@ -14,6 +14,28 @@ services:
               default_acl:
                 - allow:
                     - premium
+              mode: conversion-listener
+              tools:
+                - description: Search available flights
+                  host: flights.internal
+                  method: GET
+                  name: searchFlights
+                  path: /flights
+                  scheme: https
+  - name: secure-flights-mcp-consumer
+    host: localhost
+    routes:
+      - name: secure-flights-mcp-consumer-route
+        paths:
+          - /mcp/secure-flights
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              acl_attribute_type: consumer
+              default_acl:
+                - allow:
+                    - premium
+              include_consumer_groups: true
               mode: conversion-listener
               tools:
                 - description: Search available flights
