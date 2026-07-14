@@ -15,6 +15,7 @@ services:
               include_consumer_groups: true
               logging:
                 log_audits: true
+                log_payloads: false
                 log_statistics: true
               max_request_body_size: 8388608
               mode: conversion-listener
@@ -45,5 +46,9 @@ services:
           - name: ai-mcp-proxy
             config:
               include_consumer_groups: true
+              logging:
+                log_audits: false
+                log_payloads: false
+                log_statistics: true
               mode: passthrough-listener
               tools: []

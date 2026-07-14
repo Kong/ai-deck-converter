@@ -27,6 +27,9 @@ plugins:
             header_name: Authorization
             header_value: '{vault://env/llama2-key}'
           description: llama-3
+          logging:
+            log_payloads: false
+            log_statistics: true
           model:
             model_alias: '@openai/provider-options-mix'
             name: llama-3
@@ -39,6 +42,9 @@ plugins:
             header_name: Authorization
             header_value: '{vault://env/mistral-key}'
           description: mistral-large
+          logging:
+            log_payloads: false
+            log_statistics: true
           model:
             model_alias: '@openai/provider-options-mix'
             name: mistral-large
@@ -50,6 +56,9 @@ plugins:
             header_name: Authorization
             header_value: '{vault://env/dashscope-key}'
           description: qwen-max
+          logging:
+            log_payloads: false
+            log_statistics: true
           model:
             model_alias: '@openai/provider-options-mix'
             name: qwen-max
@@ -62,6 +71,9 @@ plugins:
             header_name: Authorization
             header_value: '{vault://env/kimi-key}'
           description: kimi-k2
+          logging:
+            log_payloads: false
+            log_statistics: true
           model:
             model_alias: '@openai/provider-options-mix'
             name: kimi-k2
@@ -74,6 +86,9 @@ plugins:
             header_name: Authorization
             header_value: '{vault://env/cohere-key}'
           description: command-r
+          logging:
+            log_payloads: false
+            log_statistics: true
           model:
             model_alias: '@openai/provider-options-mix'
             name: command-r
@@ -88,6 +103,9 @@ plugins:
             header_name: Authorization
             header_value: '{vault://env/hf-key}'
           description: hf-zephyr
+          logging:
+            log_payloads: false
+            log_statistics: true
           model:
             model_alias: '@openai/provider-options-mix'
             name: hf-zephyr
@@ -101,6 +119,9 @@ plugins:
             header_name: Authorization
             header_value: '{vault://env/databricks-key}'
           description: dbrx-instruct
+          logging:
+            log_payloads: false
+            log_statistics: true
           model:
             model_alias: '@openai/provider-options-mix'
             name: dbrx-instruct

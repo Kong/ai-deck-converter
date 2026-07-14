@@ -33,6 +33,9 @@ plugins:
             aws_access_key_id: '{vault://ai/aws-access-key-id}'
             aws_secret_access_key: '{vault://ai/aws-secret-access-key}'
           description: amazon.titan-embed-text-v2:0
+          logging:
+            log_payloads: false
+            log_statistics: true
           model:
             model_alias: '@bedrock/titan-embed-text-v2'
             name: amazon.titan-embed-text-v2:0

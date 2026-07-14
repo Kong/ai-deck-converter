@@ -15,6 +15,9 @@ models:
         - openid-connect-1
         - key-auth-1
     config:
+      logging:
+        payloads: false
+        statistics: true
       model:
         alias: '@openai/gpt-5.4'
 model_providers:

@@ -62,7 +62,7 @@ func (c *Converter) mcpPlugin(m *aigw.MCPServer) (kong.Plugin, error) {
 	if m.Config.MaxRequestBodySize != nil {
 		cfg["max_request_body_size"] = *m.Config.MaxRequestBodySize
 	}
-	if logging := loggingBlock(m.Config.Logging); logging != nil {
+	if logging := loggingBlock(withLoggingDefaults(m.Config.Logging, true, false)); logging != nil {
 		cfg["logging"] = logging
 	}
 	if len(m.Config.Server) > 0 {

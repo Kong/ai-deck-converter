@@ -51,6 +51,9 @@ plugins:
             header_name: Authorization
             header_value: Bearer sk-test
           description: gpt-4o
+          logging:
+            log_payloads: false
+            log_statistics: true
           model:
             model_alias: my-alias
             name: gpt-4o

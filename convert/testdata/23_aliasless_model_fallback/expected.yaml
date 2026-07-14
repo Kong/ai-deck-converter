@@ -28,6 +28,9 @@ plugins:
             header_name: Authorization
             header_value: '{vault://ai/openai-token}'
           description: gpt-4o
+          logging:
+            log_payloads: false
+            log_statistics: true
           model:
             name: gpt-4o
             options:

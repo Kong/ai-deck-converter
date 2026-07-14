@@ -32,6 +32,9 @@ plugins:
             header_name: Authorization
             header_value: '{vault://env/openai-key}'
           description: batch-api
+          logging:
+            log_payloads: false
+            log_statistics: true
           model:
             name: batch-api
             provider: openai
@@ -51,6 +54,9 @@ plugins:
             header_name: Authorization
             header_value: '{vault://env/openai-key}'
           description: files-api
+          logging:
+            log_payloads: false
+            log_statistics: true
           model:
             name: files-api
             provider: openai

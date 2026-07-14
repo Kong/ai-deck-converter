@@ -13,6 +13,9 @@ models:
           region: us-east-1
           type: bedrock
     config:
+      logging:
+        payloads: false
+        statistics: true
       model:
         alias: '@bedrock/claude-3-5-sonnet'
 model_providers:
