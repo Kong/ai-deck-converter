@@ -722,7 +722,8 @@ mcp_servers:
 	routeServiceIDs := map[string]string{}
 	for _, route := range got.Routes {
 		require.NotEmpty(t, route.Service.ID, "route %q missing service ref", route.Name)
-		require.True(t, serviceIDs[route.Service.ID], "route %q references unknown service id %q", route.Name, route.Service.ID)
+		require.True(t, serviceIDs[route.Service.ID], "route %q references unknown service id %q",
+			route.Name, route.Service.ID)
 		routeServiceIDs[route.Name] = route.Service.ID
 	}
 	require.Contains(t, routeServiceIDs, "shared-name-mcp-route")
