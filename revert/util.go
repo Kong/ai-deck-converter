@@ -117,8 +117,13 @@ func loggingFromBlockWithDefaults(block map[string]any, defaultAudits, defaultMa
 	return l
 }
 
-func boolPtr(b bool) *bool { return &b }
-func intPtr(i int) *int   { return &i }
+func boolPtr(b bool) *bool {
+	return &b
+}
+
+func intPtr(i int) *int {
+	return &i
+}
 
 // routeConfig lifts a Kong route back into an AI Gateway route config. The
 // route name is omitted when it matches the forward converter's default
