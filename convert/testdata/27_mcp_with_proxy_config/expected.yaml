@@ -55,7 +55,7 @@ services:
             config:
               include_consumer_groups: true
               logging:
-                log_audits: true
+                log_audits: false
                 log_payloads: false
                 log_statistics: true
               mode: passthrough-listener

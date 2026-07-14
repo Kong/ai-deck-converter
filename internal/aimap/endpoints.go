@@ -40,7 +40,7 @@ const (
 	DefaultMaxBodySize    = 8388608
 	DefaultLogStatistics  = true
 	DefaultLogPayloads    = false
-	DefaultLogAudits      = true
+	DefaultLogAudits      = false
 	DefaultMaxPayloadSize = 1048576
 
 	GatewayServiceName = "ai-gateway"

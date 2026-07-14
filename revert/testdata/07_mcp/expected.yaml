@@ -40,5 +40,5 @@ mcp_servers:
       logging:
         payloads: false
         statistics: true
-        audits: true
+        audits: false
     upstream_url: https://vendor-mcp.example.com/mcp
