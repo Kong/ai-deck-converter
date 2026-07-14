@@ -171,8 +171,9 @@ func TestConvertMCPIncludesConsumerGroups(t *testing.T) {
 mcp_servers:
   - type: conversion-listener
     name: guarded-mcp
-    default_tool_acls:
-      allow: [premium-users]
+    access:
+      default_tool_acls:
+        allow: [premium-users]
     config:
       route: {paths: [/mcp/guarded]}
     tools:
@@ -187,7 +188,7 @@ mcp_servers:
     name: oauth-mcp
     config:
       route: {paths: [/mcp/oauth]}
-      auth:
+      access:
         acl_attribute_type: oauth_access_token
         access_token_claim_field: .user.email
         default_tool_acls:
