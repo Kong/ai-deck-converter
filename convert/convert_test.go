@@ -34,6 +34,54 @@ models:
 		"expected unknown-provider warning")
 }
 
+// A single model whose capabilities all resolve to the same route (e.g. a
+// Bedrock model exposing embeddings+image+video, all served by /invoke) would
+// otherwise collapse into one ai-proxy-advanced carrying one genai_category but
+// targets with mismatched route_types — a config the data plane rejects. The
+// converter must keep the first capability and warn/skip the rest, and make the
+// collision fatal under -strict rather than silently emitting the bad config.
+func TestConvertGuardsMultimodalCollapse(t *testing.T) {
+	src := []byte(`
+model_providers:
+  - name: bedrock-prod
+    type: bedrock
+models:
+  - type: model
+    name: nova-omni
+    capabilities: [embeddings, image, video]
+    formats: [{type: bedrock}]
+    targets:
+      - name: amazon.nova-omni-v1:0
+        provider: bedrock-prod
+        config: {type: bedrock, region: us-east-1}
+    policies: []
+    access:
+      acls: {allow: [], deny: []}
+    config:
+      route: {paths: [/ai]}
+      model: {alias: "@bedrock/nova-omni"}
+`)
+
+	// Non-strict: emits a loadable config serving only the first capability, and
+	// warns about each dropped one.
+	out, warnings, err := Convert(src, Options{})
+	require.NoError(t, err, "convert")
+	joined := strings.Join(warnings, "\n")
+	require.Contains(t, joined, "cannot serve multiple genai categories")
+	require.Contains(t, joined, `capability "image"`)
+	require.Contains(t, joined, `capability "video"`)
+	require.Contains(t, string(out), "genai_category: text/embeddings")
+	require.NotContains(t, string(out), "image/v1/images/generations",
+		"the skipped image capability must not leak a target into the output")
+	require.NotContains(t, string(out), "video/v1/videos/generations",
+		"the skipped video capability must not leak a target into the output")
+
+	// Strict: the collision is fatal, no output produced.
+	_, _, err = Convert(src, Options{Strict: true})
+	require.Error(t, err, "collapse must be fatal under -strict")
+	require.Contains(t, err.Error(), "cannot serve multiple genai categories")
+}
+
 // A Kong acl plugin permits exactly one of config.allow / config.deny
 // (only_one_of in its schema). An AI Gateway acl that sets both is not
 // representable as a single valid acl plugin, so the converter must reject it

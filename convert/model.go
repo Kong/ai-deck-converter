@@ -159,6 +159,23 @@ func (c *Converter) convertModels() error {
 					}
 					g.proxyByOwner[ownerKey] = pg
 					g.proxies = append(g.proxies, pg)
+				} else if pg.genaiCategory != spec.GenaiCategory {
+					// Multiple capabilities on one model collapsed onto the same
+					// (section, route) but resolve to different genai_categories
+					// (e.g. a single Bedrock model exposing embeddings+image+video,
+					// all served by the shared /invoke endpoint). A single
+					// ai-proxy-advanced carries one genai_category and a balancer
+					// pool of interchangeable targets, so it cannot serve more than
+					// one category; emitting anyway yields a config the data plane
+					// rejects. Skip the conflicting capability (fatal under -strict).
+					if err := c.warn(
+						"model %q: capability %q (genai_category %q) collapses onto route %q, which already "+
+							"serves genai_category %q; a single ai-proxy-advanced cannot serve multiple genai "+
+							"categories, skipping this capability",
+						m.Name, capability, spec.GenaiCategory, g.route.Name, pg.genaiCategory); err != nil {
+						return err
+					}
+					continue
 				}
 				target := c.buildTarget(tm, provider, providerType, targetAlias, spec.RouteType, logging)
 				dedup := tm.Name + "|" + spec.RouteType
