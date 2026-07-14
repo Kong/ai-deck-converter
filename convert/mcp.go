@@ -77,10 +77,10 @@ func (c *Converter) mcpPlugin(m *aigw.MCPServer) (kong.Plugin, error) {
 	if m.Config.ToolsCacheTTLSeconds != nil {
 		cfg["tools_cache_ttl_seconds"] = *m.Config.ToolsCacheTTLSeconds
 	}
-	// Auth: emit the ACL attribute config and default_acl. Prefer the structured
-	// config.auth block; fall back to the top-level acls/default_tool_acls (the
-	// legacy input shape). default_acl prefers default_tool_acls over acls.
-	if a := m.Config.Auth; a != nil {
+	// Access: emit the ACL attribute config and default_acl. Prefer the
+	// structured config.access block; fall back to the server-level access
+	// block. default_acl prefers default_tool_acls over acls.
+	if a := m.Config.Access; a != nil {
 		setIfNotEmpty(cfg, "acl_attribute_type", a.ACLAttributeType)
 		setIfNotEmpty(cfg, "access_token_claim_field", a.AccessTokenClaimField)
 		if acl := defaultACLBlock(a.DefaultToolACLs); acl != nil {
@@ -88,9 +88,9 @@ func (c *Converter) mcpPlugin(m *aigw.MCPServer) (kong.Plugin, error) {
 		} else if acl := defaultACLBlock(a.ACLs); acl != nil {
 			cfg["default_acl"] = acl
 		}
-	} else if acl := defaultACLBlock(m.DefaultToolACLs); acl != nil {
+	} else if acl := defaultACLBlock(m.Access.DefaultToolACLs); acl != nil {
 		cfg["default_acl"] = acl
-	} else if acl := defaultACLBlock(m.ACLs); acl != nil {
+	} else if acl := defaultACLBlock(m.Access.ACLs); acl != nil {
 		cfg["default_acl"] = acl
 	}
 	// include_consumer_groups is set by default, mirroring aclPlugin() in convert/acl.go: AI Gateway's
@@ -101,7 +101,7 @@ func (c *Converter) mcpPlugin(m *aigw.MCPServer) (kong.Plugin, error) {
 	// when acl_attribute_type is oauth_access_token, the plugin's schema hard-rejects
 	// include_consumer_groups being set (and subjects.lua ignores it in that mode regardless), so
 	// leave it unset there.
-	if m.Config.Auth == nil || m.Config.Auth.ACLAttributeType != "oauth_access_token" {
+	if m.Config.Access == nil || m.Config.Access.ACLAttributeType != "oauth_access_token" {
 		cfg["include_consumer_groups"] = true
 	}
 	tools, err := c.mcpTools(m.Name, m.Tools)
@@ -145,10 +145,8 @@ func (c *Converter) mcpTools(serverName string, tools []aigw.MCPTool) ([]map[str
 		setIfNotEmptyMap(tool, "annotations", t.Annotations)
 		setIfNotEmptyMap(tool, "input_schema", t.InputSchema)
 		setIfNotEmptyMap(tool, "output_schema", t.OutputSchema)
-		if t.ACLs != nil {
-			if acl := aclBlock(*t.ACLs); acl != nil {
-				tool["acl"] = acl
-			}
+		if acl := aclBlock(t.Access.ACLs); acl != nil {
+			tool["acl"] = acl
 		}
 		out = append(out, tool)
 	}
