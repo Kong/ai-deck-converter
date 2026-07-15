@@ -280,6 +280,42 @@ ai_models:
 		"want a no-ai-models-entry-for-alias warning")
 }
 
+func TestDefoldOptionsUnnestsProviderRecords(t *testing.T) {
+	// Mirrors convert.mapOptions' addNested for the provider types whose nested
+	// record is a flat copy of the target's options (no auth/target-level
+	// fields to hoist, unlike bedrock/gemini). Un-nesting them here keeps them
+	// out of the reconstructed AI Gateway config as raw provider-shaped keys,
+	// so convert's mapOptions never has to accept such a key from input again.
+	cases := []struct {
+		providerType string
+		nested       map[string]any
+		want         map[string]any
+	}{
+		{"dashscope", map[string]any{"international": true}, map[string]any{"international": true}},
+		{"kimi", map[string]any{"international": false}, map[string]any{"international": false}},
+		{
+			"cohere",
+			map[string]any{"embedding_input_type": "search_document", "wait_for_model": true},
+			map[string]any{"embedding_input_type": "search_document", "wait_for_model": true},
+		},
+		{
+			"huggingface",
+			map[string]any{"use_cache": true, "wait_for_model": false},
+			map[string]any{"use_cache": true, "wait_for_model": false},
+		},
+		{
+			"databricks",
+			map[string]any{"workspace_instance_id": "dbc-a1b2c3d4"},
+			map[string]any{"workspace_instance_id": "dbc-a1b2c3d4"},
+		},
+	}
+	for _, tc := range cases {
+		var d defoldedTarget
+		defoldOptions(map[string]any{tc.providerType: tc.nested}, tc.providerType, &d)
+		require.Equalf(t, tc.want, d.options, "defoldOptions(%s) mismatch", tc.providerType)
+	}
+}
+
 func TestStrictModeMakesDropsFatal(t *testing.T) {
 	in := []byte(`
 _format_version: "3.0"

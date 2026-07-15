@@ -94,6 +94,141 @@ func TestMapOptionsDropsUnknownKeys(t *testing.T) {
 		"unknown keys must be reported sorted for a deterministic warning")
 }
 
+func TestMapOptionsValidatesRawBedrockNestedKey(t *testing.T) {
+	// A hand-author may write the DP's own nested shape directly (`bedrock:
+	// {...}`) instead of the AI Gateway's flat keys. mapOptions must accept it,
+	// but validate each sub-field against the real DP schema
+	// (kong/llm/schemas/options.lua bedrock_options_schema) individually:
+	// known sub-fields pass through nested, unknown ones are dropped and
+	// reported rather than sinking the whole block (AG-1246 follow-up).
+	p := &aigw.Provider{Type: "bedrock", Config: aigw.ProviderConfig{Auth: aigw.ProviderAuth{Type: "aws"}}}
+	got, dropped := mapOptions(map[string]any{
+		"max_tokens": 1024,
+		"bedrock": map[string]any{
+			"aws_region":        "eu-central-1",
+			"unvalidated_field": "whatever",
+		},
+	}, "bedrock", "anthropic.claude-3-5-sonnet", p)
+	want := map[string]any{
+		"max_tokens":        1024,
+		"anthropic_version": "bedrock-2023-05-31",
+		"bedrock":           map[string]any{"aws_region": "eu-central-1"},
+	}
+	require.Equal(t, want, got, "known bedrock sub-fields must pass through nested")
+	require.Equal(t, []string{"bedrock.unvalidated_field"}, dropped,
+		"unknown bedrock sub-field must be reported as dropped")
+}
+
+func TestMapOptionsValidatesRawGeminiNestedKey(t *testing.T) {
+	p := &aigw.Provider{Type: "vertex"}
+	got, dropped := mapOptions(map[string]any{
+		"gemini": map[string]any{
+			"project_id": "kong-proj",
+			"region":     "us-central1", // not a real gemini sub-field
+		},
+	}, "vertex", "gemini-2.5-pro", p)
+	want := map[string]any{
+		"gemini": map[string]any{"project_id": "kong-proj"},
+	}
+	require.Equal(t, want, got, "known gemini sub-fields must pass through nested")
+	require.Equal(t, []string{"gemini.region"}, dropped, "unknown gemini sub-field must be reported as dropped")
+}
+
+func TestMapOptionsValidatesRawSimpleNestedProviderKeys(t *testing.T) {
+	// cohere, huggingface, databricks, dashscope, kimi have no rename/hoist of
+	// their own: their AI-Gateway-flat key names are identical to the DP's
+	// nested sub-field names, so the same per-provider allowlist gates both.
+	cases := []struct {
+		providerType string
+		nested       map[string]any
+		wantNested   map[string]any
+		wantDropped  []string
+	}{
+		{
+			"cohere",
+			map[string]any{"embedding_input_type": "search_document", "bogus": true},
+			map[string]any{"embedding_input_type": "search_document"},
+			[]string{"cohere.bogus"},
+		},
+		{
+			"huggingface",
+			map[string]any{"use_cache": true, "bogus": true},
+			map[string]any{"use_cache": true},
+			[]string{"huggingface.bogus"},
+		},
+		{
+			"databricks",
+			map[string]any{"workspace_instance_id": "dbc-a1b2c3d4", "bogus": true},
+			map[string]any{"workspace_instance_id": "dbc-a1b2c3d4"},
+			[]string{"databricks.bogus"},
+		},
+		{
+			"dashscope",
+			map[string]any{"international": true, "bogus": true},
+			map[string]any{"international": true},
+			[]string{"dashscope.bogus"},
+		},
+		{
+			"kimi",
+			map[string]any{"international": false, "bogus": true},
+			map[string]any{"international": false},
+			[]string{"kimi.bogus"},
+		},
+	}
+	for _, tc := range cases {
+		got, dropped := mapOptions(map[string]any{tc.providerType: tc.nested}, tc.providerType, "m", nil)
+		require.Equalf(t, map[string]any{tc.providerType: tc.wantNested}, got, "provider %s", tc.providerType)
+		require.Equalf(t, tc.wantDropped, dropped, "provider %s", tc.providerType)
+	}
+}
+
+func TestMapOptionsDropsRawAzureNestedKeyEntirely(t *testing.T) {
+	// Unlike bedrock/gemini/cohere/..., "azure" is not a nested field of the
+	// ai-proxy-advanced target's model.options schema at all (only the flat
+	// azure_instance/azure_api_version/azure_deployment_id are) — a raw nested
+	// "azure" key must be dropped wholesale regardless of its sub-fields, not
+	// validated against a per-subkey allowlist.
+	got, dropped := mapOptions(map[string]any{
+		"azure": map[string]any{"instance": "kong-az"},
+	}, "azure", "gpt-4o", &aigw.Provider{Type: "azure"})
+	require.Empty(t, got, "raw \"azure\" input key is not part of the target options schema")
+	require.Equal(t, []string{"azure"}, dropped, "the whole azure key must be reported as dropped")
+}
+
+func TestMapOptionsDropsMalformedNestedBlockWithWarning(t *testing.T) {
+	// A nested-provider-record key whose value isn't a map (e.g. a typo'd
+	// `bedrock: "eu-central-1"` instead of `bedrock: {aws_region: ...}`) must
+	// still be reported as dropped, not silently discarded — dropping it with
+	// no trace even under -strict would defeat the whole point of this warning
+	// mechanism.
+	got, dropped := mapOptions(map[string]any{
+		"max_tokens": 1024,
+		"bedrock":    "eu-central-1",
+	}, "bedrock", "anthropic.claude-3-5-sonnet", nil)
+	require.Equal(t, map[string]any{"max_tokens": 1024}, got, "malformed nested block must not appear in output")
+	require.Equal(t, []string{"bedrock"}, dropped, "malformed nested block must be reported as dropped")
+}
+
+func TestMapOptionsNestedBlockTakesPrecedenceOverFlatKey(t *testing.T) {
+	// A target that sets both the flat AI-Gateway key ("region") and the raw
+	// DP-shaped nested block ("bedrock: {aws_region: ...}") for the same
+	// record: the raw block takes over the record entirely (the flat key's
+	// contribution is skipped, not merged), so there is no per-subfield
+	// ordering to resolve and the result is deterministic regardless of Go's
+	// randomized map iteration order over opts.
+	for i := 0; i < 20; i++ {
+		got, dropped := mapOptions(map[string]any{
+			"region": "us-east-1",
+			"bedrock": map[string]any{
+				"aws_region": "eu-west-1",
+			},
+		}, "bedrock", "amazon.titan-embed-text-v2:0", nil)
+		require.Equal(t, map[string]any{"bedrock": map[string]any{"aws_region": "eu-west-1"}}, got,
+			"nested block must deterministically win over the flat rename on every run")
+		require.Empty(t, dropped, "the superseded flat key is a recognized key, not an unknown one")
+	}
+}
+
 func TestMapOptionsDropsUnknownGCPEnvironmentKeys(t *testing.T) {
 	p := &aigw.Provider{Type: "vertex"}
 	got, dropped := mapOptions(map[string]any{
@@ -106,7 +241,9 @@ func TestMapOptionsDropsUnknownGCPEnvironmentKeys(t *testing.T) {
 		"gemini": map[string]any{"project_id": "kong-proj"},
 	}
 	require.Equal(t, want, got, "unknown gcp_environment keys must not pass through flat")
-	require.Equal(t, []string{"region"}, dropped, "unknown gcp_environment key must be reported")
+	require.Equal(t, []string{"gemini.region"}, dropped,
+		"unknown gcp_environment key must be reported with the gemini.<key> prefix, "+
+			"consistent with mergeNestedBlock's format")
 }
 
 func TestMapOptionsGeminiNesting(t *testing.T) {
