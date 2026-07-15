@@ -761,6 +761,54 @@ mcp_servers:
 	require.Nil(t, byName["on-mcp"], "enabled MCP server should not emit the flag")
 }
 
+func TestConvertDisabledModelDisablesProxyPlugins(t *testing.T) {
+	src := []byte(`
+model_providers:
+  - name: openai
+    type: openai
+models:
+  - type: model
+    name: disabled
+    enabled: false
+    capabilities: [agentic, generate, image]
+    formats: [{type: openai}]
+    targets: [{name: gpt-5, provider: openai, config: {type: openai}}]
+    config:
+      route: {paths: [/gpt-chat]}
+      model: {alias: gpt-chat}
+`)
+
+	out, _, err := Convert(src, Options{OutputMode: "db-less"})
+	require.NoError(t, err, "convert db-less")
+
+	var got struct {
+		Plugins []struct {
+			Name    string `yaml:"name"`
+			Enabled *bool  `yaml:"enabled"`
+			Model   *struct {
+				Name string `yaml:"name"`
+			} `yaml:"model"`
+		} `yaml:"plugins"`
+		AIModels []struct {
+			Name string `yaml:"name"`
+		} `yaml:"ai_models"`
+	}
+	require.NoError(t, yaml.Unmarshal(out, &got), "unmarshal output")
+
+	require.Len(t, got.AIModels, 1)
+	require.Equal(t, "disabled", got.AIModels[0].Name)
+
+	proxyPlugins := 0
+	for _, plugin := range got.Plugins {
+		if plugin.Name == "ai-proxy-advanced" && plugin.Model != nil {
+			require.NotNil(t, plugin.Enabled)
+			require.False(t, *plugin.Enabled)
+			proxyPlugins++
+		}
+	}
+	require.Equal(t, 3, proxyPlugins, "one disabled proxy plugin per capability")
+}
+
 func TestConvertDBLessFlattensConsumerCredentialsAndGroups(t *testing.T) {
 	src := []byte(`
 consumer_groups:
