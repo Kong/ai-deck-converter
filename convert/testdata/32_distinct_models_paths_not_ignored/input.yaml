@@ -1,0 +1,42 @@
+# Two OpenAI-format chat models share a section+capability but declare
+# different custom route.paths; they must land in separate routes with
+# distinct names instead of collapsing into each other.
+model_providers:
+  - name: openai-prod
+    type: openai
+    display_name: OpenAI Prod
+    config:
+      auth:
+        type: basic
+        headers: [{name: Authorization, value: "{vault://ai/openai-token}"}]
+models:
+  - display_name: GPT-5.2 A
+    name: gpt-5-2-a
+    type: model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/ai/a]}
+      model: {alias: "@openai/gpt-5.2-a"}
+    targets:
+      - name: gpt-5.2-a
+        provider: openai-prod
+        config: {type: openai}
+    policies: []
+    access:
+      acls: {allow: [], deny: []}
+  - display_name: GPT-5.2 B
+    name: gpt-5-2-b
+    type: model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/ai/b]}
+      model: {alias: "@openai/gpt-5.2-b"}
+    targets:
+      - name: gpt-5.2-b
+        provider: openai-prod
+        config: {type: openai}
+    policies: []
+    access:
+      acls: {allow: [], deny: []}
