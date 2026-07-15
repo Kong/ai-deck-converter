@@ -28,6 +28,7 @@ type routeGroup struct {
 type proxyGroup struct {
 	routeName         string
 	modelName         string // ai-model FK; empty scopes the plugin route-only
+	enabled           *bool
 	llmFormat         string
 	genaiCategory     string
 	balancer          map[string]any
@@ -75,6 +76,12 @@ func (c *Converter) convertModels() error {
 		// for type "model" (each carries its own ai-model FK), shared for type
 		// "api" (route-only, all targets merged into one plugin).
 		modelScoped := isModelType(m)
+		// API models share route-only ai-proxy-advanced plugins, so disabling one
+		// plugin could disable other models on the same route. Exclude explicitly
+		// disabled API models until they can be represented with independent scopes.
+		if !modelScoped && m.Enabled != nil && !*m.Enabled {
+			continue
+		}
 		ownerKey := ""
 		if modelScoped {
 			ownerKey = m.Name
@@ -162,6 +169,7 @@ func (c *Converter) convertModels() error {
 					pg = &proxyGroup{
 						routeName:         g.route.Name,
 						modelName:         modelName,
+						enabled:           disabledModelPluginEnabled(m.Enabled),
 						llmFormat:         llmFormat(m),
 						genaiCategory:     spec.GenaiCategory,
 						balancer:          balancerConfig(m.Config.Balancer),
@@ -258,9 +266,10 @@ func (c *Converter) convertModels() error {
 		}
 		for _, pg := range g.proxies {
 			plugin := kong.Plugin{
-				Name:   "ai-proxy-advanced",
-				Route:  kong.NewStringRef(pg.routeName),
-				Config: pg.proxyConfig(),
+				Name:    "ai-proxy-advanced",
+				Enabled: pg.enabled,
+				Route:   kong.NewStringRef(pg.routeName),
+				Config:  pg.proxyConfig(),
 			}
 			if pg.modelName != "" {
 				plugin.Model = kong.NewStringRef(pg.modelName)
@@ -456,6 +465,16 @@ func supportsModelNameHeader(spec aimap.EndpointSpec) bool {
 // opposed to an "api" entity for files/batches). An empty type defaults to
 // "model", the discriminator default and the common synchronous case.
 func isModelType(m *aigw.Model) bool { return m.Type != "api" }
+
+// disabledModelPluginEnabled returns false only when the source model is
+// explicitly disabled. Omitting enabled for active models preserves Kong's
+// default behavior and keeps generated configuration minimal.
+func disabledModelPluginEnabled(enabled *bool) *bool {
+	if enabled != nil && !*enabled {
+		return enabled
+	}
+	return nil
+}
 
 func llmFormat(m *aigw.Model) string {
 	if len(m.Formats) > 0 && m.Formats[0].Type != "" {
