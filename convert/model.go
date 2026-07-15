@@ -54,6 +54,7 @@ func (c *Converter) convertModels() error {
 	var guardPlugins []kong.Plugin
 	usedRouteNames := map[string]bool{}
 	identityPluginSeen := map[string]bool{}
+	routeNameSeq := map[string]int{}
 
 	for i := range c.src.Models {
 		m := &c.src.Models[i]
@@ -115,11 +116,13 @@ func (c *Converter) convertModels() error {
 					}
 					continue
 				}
+
 				// Authentication plugins execute before the model selector. Models
 				// with different identity-provider sets therefore cannot share a
 				// route: a route-scoped auth plugin would otherwise protect every
 				// model on that route.
-				key := sec + "|" + spec.RouteLabel + "|" + identityKey + "|" + routePathsKey(m.Config.Route.Paths)
+				base := sec + "-" + spec.RouteLabel + "|" + identityKey
+				key := base + "|" + routePathsKey(m.Config.Route.Paths)
 
 				g := groups[key]
 				if g == nil {
@@ -127,7 +130,13 @@ func (c *Converter) convertModels() error {
 					for i, b := range bases {
 						paths[i] = aimap.RoutePath(b, spec)
 					}
+
 					routeName := uniqueModelRouteName(sec+"-"+spec.RouteLabel, usedRouteNames)
+					if n := routeNameSeq[base]; n > 0 {
+						routeName = sec + "-" + spec.RouteLabel + "-" + strconv.Itoa(n+1)
+					}
+					routeNameSeq[base]++
+
 					g = &routeGroup{
 						route: buildModelRoute(
 							m.Config.Route, routeName,
@@ -434,7 +443,7 @@ func balancerExtra(b *aigw.Balancer, key string) any {
 
 // routePathsKey sorts and hashes a model's custom route paths so models that
 // share a section and capability but declare different route.paths don't
-// collapse into (and clobber) the same route group.
+// collapse into the same route group.
 func routePathsKey(paths []string) string {
 	sorted := append([]string(nil), paths...)
 	sort.Strings(sorted)
