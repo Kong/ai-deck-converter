@@ -564,6 +564,26 @@ func TestA2APluginDropsLogAudits(t *testing.T) {
 	require.Equal(t, true, logging["log_statistics"], "expected log_statistics true")
 }
 
+func TestMCPPluginDropsMaxPayloadSize(t *testing.T) {
+	m := &aigw.MCPServer{
+		Type: "conversion-only",
+		Name: "mcp1",
+		Config: aigw.MCPServerConfig{
+			Logging: &aigw.Logging{
+				Statistics:     boolPtr(true),
+				MaxPayloadSize: intPtr(262144), // ai-a2a-proxy field; invalid for ai-mcp-proxy
+			},
+		},
+	}
+	c := &Converter{}
+	plugin, err := c.mcpPlugin(m)
+	require.NoError(t, err, "mcpPlugin")
+	logging, ok := plugin.Config["logging"].(map[string]any)
+	require.True(t, ok, "expected logging block, got %v", plugin.Config["logging"])
+	require.NotContains(t, logging, "max_payload_size", "ai-mcp-proxy must not emit max_payload_size, got %v", logging)
+	require.Equal(t, true, logging["log_statistics"], "expected log_statistics true")
+}
+
 func TestConvertDisabledAgentDisablesService(t *testing.T) {
 	src := []byte(`
 agents:
