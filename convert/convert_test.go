@@ -809,6 +809,70 @@ models:
 	require.Equal(t, 3, proxyPlugins, "one disabled proxy plugin per capability")
 }
 
+func TestConvertModelsWithDifferentRoutesDoNotShareEndpointRoute(t *testing.T) {
+	src := []byte(`
+model_providers:
+  - name: xai
+    type: xai
+  - name: openai
+    type: openai
+models:
+  - type: model
+    name: xai-chat
+    formats: [{type: openai}]
+    capabilities: [generate]
+    targets: [{name: grok-4, provider: xai, config: {type: xai}}]
+    config:
+      route: {paths: [/xai-chat]}
+      model: {alias: xai-chat}
+  - type: model
+    name: openai-chat
+    formats: [{type: openai}]
+    capabilities: [generate]
+    targets: [{name: gpt-5, provider: openai, config: {type: openai}}]
+    config:
+      route: {paths: [/openai-chat]}
+      model: {alias: openai-chat}
+`)
+
+	out, _, err := Convert(src, Options{})
+	require.NoError(t, err, "convert")
+
+	var got struct {
+		Services []struct {
+			Routes []struct {
+				Name  string   `yaml:"name"`
+				Paths []string `yaml:"paths"`
+			} `yaml:"routes"`
+		} `yaml:"services"`
+		Plugins []struct {
+			Name  string `yaml:"name"`
+			Route string `yaml:"route"`
+			Model string `yaml:"model"`
+		} `yaml:"plugins"`
+	}
+	require.NoError(t, yaml.Unmarshal(out, &got), "unmarshal output")
+	require.Len(t, got.Services, 1)
+	require.Len(t, got.Services[0].Routes, 2)
+
+	routeByPath := map[string]string{}
+	for _, route := range got.Services[0].Routes {
+		require.Len(t, route.Paths, 1)
+		routeByPath[route.Paths[0]] = route.Name
+	}
+	require.Equal(t, "openai-chat", routeByPath["/xai-chat/chat/completions"])
+	require.Equal(t, "openai-chat-2", routeByPath["/openai-chat/chat/completions"])
+
+	pluginRouteByModel := map[string]string{}
+	for _, plugin := range got.Plugins {
+		if plugin.Name == "ai-proxy-advanced" {
+			pluginRouteByModel[plugin.Model] = plugin.Route
+		}
+	}
+	require.Equal(t, routeByPath["/xai-chat/chat/completions"], pluginRouteByModel["xai-chat"])
+	require.Equal(t, routeByPath["/openai-chat/chat/completions"], pluginRouteByModel["openai-chat"])
+}
+
 func TestConvertDBLessFlattensConsumerCredentialsAndGroups(t *testing.T) {
 	src := []byte(`
 consumer_groups:
