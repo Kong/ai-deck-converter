@@ -1,0 +1,100 @@
+_format_version: "3.0"
+_transform: false
+services:
+  - id: 947a4e23-b483-5a65-8165-da9aed24565b
+    name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    host: ai-gateway.upstream.local
+    port: 80
+    protocol: http
+routes:
+  - id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+    name: openai-chat
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /xai-chat/chat/completions
+    methods:
+      - POST
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: 2384fe9d-eacc-5ac2-ae4c-4752cc597f81
+    name: openai-chat-2
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /openai-chat/chat/completions
+    methods:
+      - POST
+    protocols:
+      - http
+      - https
+    strip_path: false
+plugins:
+  - id: 17fa8192-4b9f-5b5a-8379-20ad8bc836a7
+    name: ai-model-selector
+    config:
+      body_path: model
+      max_request_body_size: 8388608
+      source: body
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+  - id: f3adc007-171c-5519-8763-3a0eef79bde3
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - description: grok-4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: xai-chat
+            name: grok-4
+            provider: xai
+          route_type: llm/v1/chat
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+    model:
+      id: 7e73ac51-6578-51cd-b62d-e00779580f2b
+  - id: dcebfb31-cc0f-5469-b6d7-9d8807a4e8d2
+    name: ai-model-selector
+    config:
+      body_path: model
+      max_request_body_size: 8388608
+      source: body
+    route:
+      id: 2384fe9d-eacc-5ac2-ae4c-4752cc597f81
+  - id: 75ff22ed-6245-594b-895f-6a9fa36f4581
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - description: gpt-5
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: openai-chat
+            name: gpt-5
+            provider: openai
+          route_type: llm/v1/chat
+    route:
+      id: 2384fe9d-eacc-5ac2-ae4c-4752cc597f81
+    model:
+      id: 1eabdb41-bfad-51da-9ce5-6c2683bbb5f5
+ai_models:
+  - id: 7e73ac51-6578-51cd-b62d-e00779580f2b
+    name: xai-chat
+    alias: xai-chat
+  - id: 1eabdb41-bfad-51da-9ce5-6c2683bbb5f5
+    name: openai-chat
+    alias: openai-chat

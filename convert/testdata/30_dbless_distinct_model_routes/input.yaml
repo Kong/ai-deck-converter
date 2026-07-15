@@ -1,0 +1,40 @@
+model_providers:
+  - name: xai
+    type: xai
+  - name: openai
+    type: openai
+models:
+  - type: model
+    name: xai-chat
+    capabilities:
+      - generate
+    formats:
+      - type: openai
+    targets:
+      - name: grok-4
+        provider: xai
+        config:
+          type: xai
+    config:
+      route:
+        paths:
+          - /xai-chat
+      model:
+        alias: xai-chat
+  - type: model
+    name: openai-chat
+    capabilities:
+      - generate
+    formats:
+      - type: openai
+    targets:
+      - name: gpt-5
+        provider: openai
+        config:
+          type: openai
+    config:
+      route:
+        paths:
+          - /openai-chat
+      model:
+        alias: openai-chat
