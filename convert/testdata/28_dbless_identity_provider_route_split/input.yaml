@@ -1,0 +1,58 @@
+models:
+  - type: model
+    name: oidc-repro-model-a
+    display_name: "OIDC Leak Repro - Model A (no auth)"
+    enabled: true
+    capabilities: [generate]
+    formats:
+      - type: openai
+    config:
+      route:
+        paths: [/oidc-repro/model-a]
+      model:
+        alias: "@oidc-repro/model-a"
+    targets:
+      - name: gpt-5-mini
+        provider: oidc-repro-openai
+        config:
+          type: openai
+  - type: model
+    name: oidc-repro-model-b
+    display_name: "OIDC Leak Repro - Model B (with OIDC auth)"
+    enabled: true
+    capabilities: [generate]
+    formats:
+      - type: openai
+    config:
+      route:
+        paths: [/oidc-repro/model-b]
+      model:
+        alias: "@oidc-repro/model-b"
+    targets:
+      - name: gpt-5-mini
+        provider: oidc-repro-openai
+        config:
+          type: openai
+    access:
+      identity_providers: [oidc-repro-idp]
+model_providers:
+  - name: oidc-repro-openai
+    display_name: "OIDC Leak Repro - OpenAI"
+    type: openai
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://oidc-repro-secrets/openai-auth-token}"
+identity_providers:
+  - name: oidc-repro-idp
+    display_name: "OIDC Leak Repro - Identity Provider"
+    type: openid-connect
+    config:
+      issuer: https://your-idp.example.com/oauth2/default
+      auth_methods: [bearer]
+      bearer_token_param_type: [header]
+      consumer_optional: true
+      hide_credentials: true
+      cache_tokens_salt: REPRO-SALT
