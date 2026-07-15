@@ -1,6 +1,7 @@
 package convert
 
 import (
+	"encoding/json"
 	"sort"
 	"strconv"
 	"strings"
@@ -11,8 +12,9 @@ import (
 )
 
 // routeGroup accumulates everything that maps to a single Kong route, keyed by
-// (section, routeLabel). The route and its ai-model-selector are shared by every
-// model that resolves to the endpoint; each owning model contributes its own
+// (section, routeLabel, route configuration). The route and its
+// ai-model-selector are shared only by models with the same endpoint and
+// client-facing route configuration; each owning model contributes its own
 // ai-proxy-advanced plugin (a proxyGroup).
 type routeGroup struct {
 	route          kong.Route
@@ -126,7 +128,11 @@ func (c *Converter) convertModels() error {
 				// route: a route-scoped auth plugin would otherwise protect every
 				// model on that route.
 				identityKey := identityProviderKey(m.Access.IdentityProviders)
-				key := sec + "|" + spec.RouteLabel + "|" + identityKey
+				routeConfigKey, err := modelRouteConfigKey(m.Config.Route)
+				if err != nil {
+					return err
+				}
+				key := sec + "|" + spec.RouteLabel + "|" + identityKey + "|" + routeConfigKey
 				g := groups[key]
 				if g == nil {
 					paths := make([]string, len(bases))
@@ -298,8 +304,20 @@ func identityProviderKey(refs []string) string {
 	return strings.Join(unique, "\x00")
 }
 
+// modelRouteConfigKey returns a stable representation of the client-facing
+// route configuration. Endpoint paths are derived separately, but the base
+// paths and every other route matcher must agree before models can share a
+// route.
+func modelRouteConfigKey(route aigw.RouteConfig) (string, error) {
+	b, err := json.Marshal(route)
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
+}
+
 // uniqueModelRouteName reserves base if available, otherwise returns a stable
-// numeric suffix. A route is split only when models differ in access policy.
+// numeric suffix for another route serving the same endpoint.
 func uniqueModelRouteName(base string, used map[string]bool) string {
 	if !used[base] {
 		used[base] = true
