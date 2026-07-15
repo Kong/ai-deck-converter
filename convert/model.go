@@ -1,6 +1,10 @@
 package convert
 
 import (
+	"sort"
+	"strconv"
+	"strings"
+
 	"github.com/Kong/ai-deck-converter/internal/aigw"
 	"github.com/Kong/ai-deck-converter/internal/aimap"
 	"github.com/Kong/ai-deck-converter/internal/kong"
@@ -47,6 +51,8 @@ func (c *Converter) convertModels() error {
 	groups := map[string]*routeGroup{}
 	var order []string
 	var guardPlugins []kong.Plugin
+	usedRouteNames := map[string]bool{}
+	identityPluginSeen := map[string]bool{}
 
 	for i := range c.src.Models {
 		m := &c.src.Models[i]
@@ -108,16 +114,22 @@ func (c *Converter) convertModels() error {
 					}
 					continue
 				}
-				key := sec + "|" + spec.RouteLabel
+				// Authentication plugins execute before the model selector. Models
+				// with different identity-provider sets therefore cannot share a
+				// route: a route-scoped auth plugin would otherwise protect every
+				// model on that route.
+				identityKey := identityProviderKey(m.Access.IdentityProviders)
+				key := sec + "|" + spec.RouteLabel + "|" + identityKey
 				g := groups[key]
 				if g == nil {
 					paths := make([]string, len(bases))
 					for i, b := range bases {
 						paths[i] = aimap.RoutePath(b, spec)
 					}
+					routeName := uniqueModelRouteName(sec+"-"+spec.RouteLabel, usedRouteNames)
 					g = &routeGroup{
 						route: buildModelRoute(
-							m.Config.Route, sec+"-"+spec.RouteLabel,
+							m.Config.Route, routeName,
 							paths, spec.Methods),
 						takesBodyModel: spec.TakesBodyModel,
 						bodySize:       aimap.DefaultMaxBodySize,
@@ -201,8 +213,8 @@ func (c *Converter) convertModels() error {
 			}
 		}
 
-		// Identity provider plugins scope to the route only (no ai-model FK), and
-		// require an anonymous consumer to fall back to on failed authentication.
+		// Each route group contains only models with the same identity-provider
+		// set, so these plugins can safely remain route-scoped.
 		idpPlugins, err := c.scopedIdentityProviderPlugins(m.Access.IdentityProviders)
 		if err != nil {
 			return err
@@ -211,6 +223,11 @@ func (c *Converter) convertModels() error {
 			c.ensureAnonymousConsumer()
 		}
 		for _, routeName := range routeNames {
+			key := routeName + "\x00" + identityProviderKey(m.Access.IdentityProviders)
+			if identityPluginSeen[key] {
+				continue
+			}
+			identityPluginSeen[key] = true
 			for k := range idpPlugins {
 				p := idpPlugins[k]
 				p.Route = kong.NewStringRef(routeName)
@@ -254,6 +271,38 @@ func (c *Converter) convertModels() error {
 	c.out.Services = append(c.out.Services, service)
 	c.out.Plugins = append(c.out.Plugins, guardPlugins...)
 	return nil
+}
+
+// identityProviderKey canonicalizes identity-provider references for route
+// grouping. Duplicate references have no semantic effect, and their ordering
+// must not make otherwise identical access policies create separate routes.
+func identityProviderKey(refs []string) string {
+	seen := make(map[string]bool, len(refs))
+	var unique []string
+	for _, ref := range refs {
+		if !seen[ref] {
+			seen[ref] = true
+			unique = append(unique, ref)
+		}
+	}
+	sort.Strings(unique)
+	return strings.Join(unique, "\x00")
+}
+
+// uniqueModelRouteName reserves base if available, otherwise returns a stable
+// numeric suffix. A route is split only when models differ in access policy.
+func uniqueModelRouteName(base string, used map[string]bool) string {
+	if !used[base] {
+		used[base] = true
+		return base
+	}
+	for n := 2; ; n++ {
+		name := base + "-" + strconv.Itoa(n)
+		if !used[name] {
+			used[name] = true
+			return name
+		}
+	}
 }
 
 // proxyConfig assembles the ai-proxy-advanced plugin config for a proxy group.

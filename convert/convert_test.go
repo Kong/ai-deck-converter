@@ -54,7 +54,7 @@ models:
         allow: [premium]
         deny: [banned]
     config:
-      route: {paths: [/ai]}
+      route: {paths: [/oidc-repro/model-a]}
       model: {alias: m1}
 model_providers:
   - name: p1
@@ -87,7 +87,7 @@ models:
         config: {type: openai}
     policies: [my-key-auth]
     config:
-      route: {paths: [/ai]}
+      route: {paths: [/oidc-repro/model-b]}
       model: {alias: m1}
 model_providers:
   - name: p1
@@ -100,6 +100,128 @@ policies:
 	_, _, err := Convert(src, Options{})
 	require.Error(t, err, "model policies referencing key-auth/openid-connect must be rejected")
 	require.Contains(t, err.Error(), "identity_providers")
+}
+
+func TestConvertScopesIdentityProvidersWithoutLeakingAcrossSharedRoutes(t *testing.T) {
+	src := []byte(`
+models:
+  - type: model
+    name: public-model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    targets:
+      - name: gpt-public
+        provider: p1
+        config: {type: openai}
+    config:
+      route: {paths: [/oidc-repro/model-a]}
+      model: {alias: public}
+  - type: model
+    name: protected-model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    targets:
+      - name: gpt-protected
+        provider: p1
+        config: {type: openai}
+    access:
+      identity_providers: [oidc]
+    config:
+      route: {paths: [/oidc-repro/model-b]}
+      model: {alias: protected}
+model_providers:
+  - name: p1
+    type: openai
+identity_providers:
+  - name: oidc
+    type: openid-connect
+    config: {issuer: https://id.example.test}
+`)
+
+	out, _, err := Convert(src, Options{})
+	require.NoError(t, err, "convert")
+
+	var doc struct {
+		Plugins []struct {
+			Name  string `yaml:"name"`
+			Route string `yaml:"route"`
+			Model string `yaml:"model"`
+		} `yaml:"plugins"`
+	}
+	require.NoError(t, yaml.Unmarshal(out, &doc), "parse output")
+
+	var oidcRoute, publicRoute, protectedRoute string
+	for _, plugin := range doc.Plugins {
+		if plugin.Name == "openid-connect" {
+			require.Empty(t, plugin.Model, "OIDC must be enforced at route scope")
+			oidcRoute = plugin.Route
+		}
+		if plugin.Name == "ai-proxy-advanced" {
+			switch plugin.Model {
+			case "public-model":
+				publicRoute = plugin.Route
+			case "protected-model":
+				protectedRoute = plugin.Route
+			}
+		}
+	}
+	require.NotEmpty(t, oidcRoute)
+	require.Equal(t, protectedRoute, oidcRoute, "OIDC guards only the protected model's route")
+	require.NotEqual(t, publicRoute, oidcRoute, "the public model must not share the OIDC route")
+}
+
+func TestConvertSharesIdentityProviderForUniformlyGuardedSharedRoute(t *testing.T) {
+	src := []byte(`
+models:
+  - type: model
+    name: model-a
+    capabilities: [generate]
+    formats: [{type: openai}]
+    targets:
+      - name: gpt-a
+        provider: p1
+        config: {type: openai}
+    access: {identity_providers: [oidc]}
+    config: {route: {paths: [/ai]}, model: {alias: a}}
+  - type: model
+    name: model-b
+    capabilities: [generate]
+    formats: [{type: openai}]
+    targets:
+      - name: gpt-b
+        provider: p1
+        config: {type: openai}
+    access: {identity_providers: [oidc]}
+    config: {route: {paths: [/ai]}, model: {alias: b}}
+model_providers:
+  - name: p1
+    type: openai
+identity_providers:
+  - name: oidc
+    type: openid-connect
+`)
+
+	out, _, err := Convert(src, Options{})
+	require.NoError(t, err, "convert")
+
+	var doc struct {
+		Plugins []struct {
+			Name  string `yaml:"name"`
+			Route string `yaml:"route"`
+			Model string `yaml:"model"`
+		} `yaml:"plugins"`
+	}
+	require.NoError(t, yaml.Unmarshal(out, &doc), "parse output")
+
+	var count int
+	for _, plugin := range doc.Plugins {
+		if plugin.Name == "openid-connect" {
+			count++
+			require.Equal(t, "openai-chat", plugin.Route)
+			require.Empty(t, plugin.Model, "uniformly guarded models share the route plugin")
+		}
+	}
+	require.Equal(t, 1, count)
 }
 
 // The Kong acl plugin checks a legacy per-consumer kong.db.acls entity by
