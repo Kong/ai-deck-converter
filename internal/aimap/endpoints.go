@@ -289,14 +289,83 @@ func PluginProvider(providerType string) string {
 	return providerType
 }
 
-// GeminiOptionKeys are target-config keys that nest under model.options.gemini
-// for the gemini and vertex provider types.
+// The option-key sets below mirror the DP's closed model.options record for
+// ai-proxy-advanced targets (kong/llm/schemas/init.lua model_options_schema,
+// which composes the per-provider nested records from
+// kong/llm/schemas/options.lua). Kong's "azure" and "anthropic" nested option
+// records exist in options.lua but are not part of that target schema (they
+// back an unrelated metadata/introspection schema instead) — only the flat
+// azure_*/anthropic_version keys are valid for a target, so no nested key set
+// exists for them here.
+
+// GeminiOptionKeys are the sub-fields of model.options.gemini (the llm_gemini
+// variant, which adds endpoint_id over the plain gemini record). Also used to
+// validate the gcp_environment source keys that fold into that nested record.
 var GeminiOptionKeys = map[string]bool{
 	"location_id": true, "api_endpoint": true, "endpoint_id": true, "project_id": true,
 }
 
-// BedrockOptionKeys are target-config keys that nest under model.options.bedrock.
+// BedrockOptionKeys are target-config keys (AI Gateway's flat vocabulary, not
+// the DP's own nested field names) that fold into model.options.bedrock.
 var BedrockOptionKeys = map[string]bool{
 	"region": true, "embeddings_normalize": true, "video_output_s3_uri": true,
 	"batch_bucket_prefix": true, "batch_role_arn": true, "performance_config_latency": true,
+}
+
+// BedrockNestedOptionKeys are the sub-fields of model.options.bedrock itself
+// (the DP's own field names, e.g. "aws_region" rather than BedrockOptionKeys'
+// "region") — used to validate a target-config `bedrock: {...}` block written
+// directly in the DP's shape instead of through the flat rename above.
+var BedrockNestedOptionKeys = map[string]bool{
+	"aws_region": true, "aws_assume_role_arn": true, "aws_role_session_name": true,
+	"aws_sts_endpoint_url": true, "embeddings_normalize": true, "performance_config_latency": true,
+	"video_output_s3_uri": true, "batch_bucket_prefix": true, "batch_role_arn": true,
+}
+
+// CohereOptionKeys are the sub-fields of model.options.cohere.
+var CohereOptionKeys = map[string]bool{
+	"api_version": true, "embedding_input_type": true, "wait_for_model": true,
+}
+
+// HuggingFaceOptionKeys are the sub-fields of model.options.huggingface.
+var HuggingFaceOptionKeys = map[string]bool{
+	"use_cache": true, "wait_for_model": true,
+}
+
+// DatabricksOptionKeys are the sub-fields of model.options.databricks.
+var DatabricksOptionKeys = map[string]bool{
+	"workspace_instance_id": true,
+}
+
+// DashscopeOptionKeys are the sub-fields of model.options.dashscope.
+var DashscopeOptionKeys = map[string]bool{
+	"international": true,
+}
+
+// KimiOptionKeys are the sub-fields of model.options.kimi.
+var KimiOptionKeys = map[string]bool{
+	"international": true,
+}
+
+// ModelOptionKeys are the flat scalar keys the DP's closed model.options record
+// accepts as raw pass-through input. It deliberately excludes the per-provider
+// nested record names (bedrock, gemini, cohere, ...): a raw opts key sharing a
+// nested record's name is validated sub-field-by-sub-field against that
+// record's own key set instead (see mapOptions), rather than accepted or
+// dropped as a whole (AG-1246 follow-up).
+var ModelOptionKeys = map[string]bool{
+	"anthropic_version":     true,
+	"azure_api_version":     true,
+	"azure_deployment_id":   true,
+	"azure_instance":        true,
+	"embeddings_dimensions": true,
+	"input_cost":            true,
+	"llama2_format":         true,
+	"max_tokens":            true,
+	"mistral_format":        true,
+	"output_cost":           true,
+	"temperature":           true,
+	"top_k":                 true,
+	"top_p":                 true,
+	"upstream_url":          true,
 }

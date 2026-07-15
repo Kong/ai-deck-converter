@@ -1,6 +1,7 @@
 package convert
 
 import (
+	"sort"
 	"strings"
 
 	"github.com/Kong/ai-deck-converter/internal/aigw"
@@ -101,7 +102,18 @@ func (c *Converter) resolveEmbeddings(raw any) (any, error) {
 		}
 	}
 
-	lowerEmbeddingsModel(emb, provider)
+	dropped := lowerEmbeddingsModel(emb, provider)
+	if len(dropped) > 0 {
+		name := ""
+		if m, ok := emb["model"].(map[string]any); ok {
+			name, _ = m["name"].(string)
+		}
+		if err := c.warn(
+			"embeddings model %q: dropped option key(s) %s unsupported by the ai-proxy-advanced model.options schema",
+			name, strings.Join(dropped, ", ")); err != nil {
+			return nil, err
+		}
+	}
 
 	if provider == nil {
 		return emb, nil
@@ -131,14 +143,14 @@ func (c *Converter) resolveEmbeddings(raw any) (any, error) {
 // under model.options.azure rather than using flat azure_* keys. A model with no
 // `config` block is already lowered (e.g. produced by the reverse converter), so
 // it is left untouched — keeping the forward conversion idempotent.
-func lowerEmbeddingsModel(emb map[string]any, provider *aigw.Provider) {
+func lowerEmbeddingsModel(emb map[string]any, provider *aigw.Provider) []string {
 	model, ok := emb["model"].(map[string]any)
 	if !ok {
-		return
+		return nil
 	}
 	config, ok := model["config"].(map[string]any)
 	if !ok {
-		return
+		return nil
 	}
 	delete(model, "config")
 
@@ -155,13 +167,14 @@ func lowerEmbeddingsModel(emb map[string]any, provider *aigw.Provider) {
 		}
 	}
 	name, _ := model["name"].(string)
-	options := mapOptions(opts, providerType, name, provider)
+	options, dropped := mapOptions(opts, providerType, name, provider)
 	if providerType == "azure" {
 		options = nestAzureEmbeddingsOptions(options)
 	}
 	if len(options) > 0 {
 		model["options"] = options
 	}
+	return dropped
 }
 
 // nestAzureEmbeddingsOptions rewrites the flat azure_* keys mapOptions emits for
@@ -188,14 +201,58 @@ func nestAzureEmbeddingsOptions(options map[string]any) map[string]any {
 // model.options map. It renames/nests provider-specific keys per provider type
 // and folds in provider-level fields (azure instance, gemini project id, bedrock
 // assume-role auth). Keys not handled specially pass through flat.
-func mapOptions(opts map[string]any, providerType, modelName string, provider *aigw.Provider) map[string]any {
+func mapOptions(opts map[string]any, providerType, modelName string,
+	provider *aigw.Provider,
+) (map[string]any, []string) {
 	out := map[string]any{}
 	nested := map[string]map[string]any{}
+	var dropped []string
 	addNested := func(prov, key string, val any) {
 		if nested[prov] == nil {
 			nested[prov] = map[string]any{}
 		}
 		nested[prov][key] = val
+	}
+	// mergeNestedBlock accepts a nested provider record written directly in the
+	// DP's own shape (e.g. a hand-authored `bedrock: {...}` instead of the
+	// AI-Gateway flat keys), keeping only the sub-fields the real DP schema
+	// declares for that provider and reporting the rest as dropped (prefixed
+	// "<prov>." for consistency with the gcp_environment sub-loop below).
+	// A non-map value is reported as the bare provider key: there is no
+	// sub-field to blame, and the whole block would otherwise vanish silently.
+	mergeNestedBlock := func(prov string, allowed map[string]bool, v any) {
+		block, ok := v.(map[string]any)
+		if !ok {
+			dropped = append(dropped, prov)
+			return
+		}
+		for bk, bv := range block {
+			if allowed[bk] {
+				addNested(prov, bk, bv)
+			} else {
+				dropped = append(dropped, prov+"."+bk)
+			}
+		}
+	}
+
+	hasRawBlock := map[string]bool{}
+	for k := range opts {
+		switch {
+		case (providerType == "gemini" || providerType == "vertex") && k == "gemini":
+			hasRawBlock["gemini"] = true
+		case providerType == "bedrock" && k == "bedrock":
+			hasRawBlock["bedrock"] = true
+		case providerType == "dashscope" && k == "dashscope":
+			hasRawBlock["dashscope"] = true
+		case providerType == "kimi" && k == "kimi":
+			hasRawBlock["kimi"] = true
+		case providerType == "cohere" && k == "cohere":
+			hasRawBlock["cohere"] = true
+		case providerType == "huggingface" && k == "huggingface":
+			hasRawBlock["huggingface"] = true
+		case providerType == "databricks" && k == "databricks":
+			hasRawBlock["databricks"] = true
+		}
 	}
 
 	for k, v := range opts {
@@ -206,17 +263,30 @@ func mapOptions(opts map[string]any, providerType, modelName string, provider *a
 			out["azure_api_version"] = v
 		case providerType == "anthropic" && k == "version":
 			out["anthropic_version"] = v
+		case (providerType == "gemini" || providerType == "vertex") && k == "gemini":
+			mergeNestedBlock("gemini", aimap.GeminiOptionKeys, v)
 		case (providerType == "gemini" || providerType == "vertex") && k == "gcp_environment":
+			if hasRawBlock["gemini"] {
+				continue // superseded by the raw gemini block above.
+			}
 			if env, ok := v.(map[string]any); ok {
 				for ek, ev := range env {
-					if aimap.GeminiOptionKeys[ek] {
+					switch {
+					case aimap.GeminiOptionKeys[ek]:
 						addNested("gemini", ek, ev)
-					} else {
+					case aimap.ModelOptionKeys[ek]:
 						out[ek] = ev
+					default:
+						dropped = append(dropped, "gemini."+ek)
 					}
 				}
 			}
+		case providerType == "bedrock" && k == "bedrock":
+			mergeNestedBlock("bedrock", aimap.BedrockNestedOptionKeys, v)
 		case providerType == "bedrock" && aimap.BedrockOptionKeys[k]:
+			if hasRawBlock["bedrock"] {
+				continue // superseded by the raw bedrock block above.
+			}
 			if k == "region" {
 				addNested("bedrock", "aws_region", v)
 			} else {
@@ -226,19 +296,45 @@ func mapOptions(opts map[string]any, providerType, modelName string, provider *a
 			out["llama2_format"] = v
 		case providerType == "mistral" && k == "format":
 			out["mistral_format"] = v
-		case providerType == "dashscope" && k == "international":
+		case providerType == "dashscope" && k == "dashscope":
+			mergeNestedBlock("dashscope", aimap.DashscopeOptionKeys, v)
+		case providerType == "dashscope" && aimap.DashscopeOptionKeys[k]:
+			if hasRawBlock["dashscope"] {
+				continue
+			}
 			addNested("dashscope", k, v)
-		case providerType == "kimi" && k == "international":
+		case providerType == "kimi" && k == "kimi":
+			mergeNestedBlock("kimi", aimap.KimiOptionKeys, v)
+		case providerType == "kimi" && aimap.KimiOptionKeys[k]:
+			if hasRawBlock["kimi"] {
+				continue
+			}
 			addNested("kimi", k, v)
-		case providerType == "cohere" &&
-			(k == "embedding_input_type" || k == "wait_for_model" || k == "api_version"):
+		case providerType == "cohere" && k == "cohere":
+			mergeNestedBlock("cohere", aimap.CohereOptionKeys, v)
+		case providerType == "cohere" && aimap.CohereOptionKeys[k]:
+			if hasRawBlock["cohere"] {
+				continue
+			}
 			addNested("cohere", k, v)
-		case providerType == "huggingface" && (k == "use_cache" || k == "wait_for_model"):
+		case providerType == "huggingface" && k == "huggingface":
+			mergeNestedBlock("huggingface", aimap.HuggingFaceOptionKeys, v)
+		case providerType == "huggingface" && aimap.HuggingFaceOptionKeys[k]:
+			if hasRawBlock["huggingface"] {
+				continue
+			}
 			addNested("huggingface", k, v)
-		case providerType == "databricks" && k == "workspace_instance_id":
+		case providerType == "databricks" && k == "databricks":
+			mergeNestedBlock("databricks", aimap.DatabricksOptionKeys, v)
+		case providerType == "databricks" && aimap.DatabricksOptionKeys[k]:
+			if hasRawBlock["databricks"] {
+				continue
+			}
 			addNested("databricks", k, v)
-		default:
+		case aimap.ModelOptionKeys[k]:
 			out[k] = v
+		default:
+			dropped = append(dropped, k)
 		}
 	}
 
@@ -273,9 +369,10 @@ func mapOptions(opts map[string]any, providerType, modelName string, provider *a
 		out[prov] = m
 	}
 	if len(out) == 0 {
-		return nil
+		out = nil
 	}
-	return out
+	sort.Strings(dropped)
+	return out, dropped
 }
 
 func isBedrockAnthropicModelName(name string) bool {

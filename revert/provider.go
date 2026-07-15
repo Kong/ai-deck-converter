@@ -78,9 +78,18 @@ func defoldAuth(auth map[string]any) (aigw.ProviderAuth, *bool) {
 	return a, getBool(auth, "allow_override")
 }
 
+// flatNestedProviderRecords are the provider types whose mapOptions addNested
+// record is a plain flat copy of the source options (no auth/target-level
+// field to hoist out, unlike bedrock/gemini) — un-nesting them is a straight
+// merge back into the target's options.
+var flatNestedProviderRecords = map[string]bool{
+	"dashscope": true, "kimi": true, "cohere": true, "huggingface": true, "databricks": true,
+}
+
 // defoldOptions reverses convert's mapOptions: it un-nests the provider-scoped
-// option blocks (gemini, bedrock), undoes the provider-specific renames, and
-// hoists provider-level fields out of the option map.
+// option blocks (gemini, bedrock, and the flat-record providers), undoes the
+// provider-specific renames, and hoists provider-level fields out of the
+// option map.
 func defoldOptions(options map[string]any, providerType string, d *defoldedTarget) {
 	out := map[string]any{}
 	for k, v := range options {
@@ -120,6 +129,11 @@ func defoldOptions(options map[string]any, providerType string, d *defoldedTarge
 				default:
 					out[bk] = bv
 				}
+			}
+		case flatNestedProviderRecords[providerType] && k == providerType:
+			block, _ := v.(map[string]any)
+			for bk, bv := range block {
+				out[bk] = bv
 			}
 		default:
 			out[k] = v

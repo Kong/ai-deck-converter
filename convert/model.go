@@ -1,6 +1,8 @@
 package convert
 
 import (
+	"strings"
+
 	"github.com/Kong/ai-deck-converter/internal/aigw"
 	"github.com/Kong/ai-deck-converter/internal/aimap"
 	"github.com/Kong/ai-deck-converter/internal/kong"
@@ -98,6 +100,7 @@ func (c *Converter) convertModels() error {
 			}
 			sec := aimap.SectionFor(llmFormat(m), providerType)
 
+			var droppedOpts []string
 			for _, capability := range caps {
 				spec, ok := aimap.LookupEndpoint(sec, capability)
 				if !ok {
@@ -164,7 +167,8 @@ func (c *Converter) convertModels() error {
 					g.proxyByOwner[ownerKey] = pg
 					g.proxies = append(g.proxies, pg)
 				}
-				target := c.buildTarget(tm, provider, providerType, targetAlias, spec.RouteType, logging)
+				target, dropped := c.buildTarget(tm, provider, providerType, targetAlias, spec.RouteType, logging)
+				droppedOpts = dropped
 				dedup := tm.Name + "|" + spec.RouteType
 				if !pg.seen[dedup] {
 					pg.seen[dedup] = true
@@ -172,6 +176,16 @@ func (c *Converter) convertModels() error {
 				}
 				if bs := bodySizeOrDefault(m); bs > g.bodySize {
 					g.bodySize = bs
+				}
+			}
+
+			// Option keys are identical across a target's capabilities, so warn
+			// once per target rather than once per emitted route.
+			if len(droppedOpts) > 0 {
+				if err := c.warn(
+					"model %q target %q: dropped option key(s) %s unsupported by the ai-proxy-advanced model.options schema",
+					m.Name, tm.Name, strings.Join(droppedOpts, ", ")); err != nil {
+					return err
 				}
 			}
 		}
@@ -308,7 +322,7 @@ func modelLoggingBlock(l *aigw.Logging) map[string]any {
 func (c *Converter) buildTarget(
 	tm *aigw.TargetModel, provider *aigw.Provider,
 	providerType, alias, routeType string, logging map[string]any,
-) map[string]any {
+) (map[string]any, []string) {
 	model := map[string]any{
 		"provider": aimap.PluginProvider(providerType),
 		"name":     tm.Name,
@@ -316,7 +330,8 @@ func (c *Converter) buildTarget(
 	if alias != "" {
 		model["model_alias"] = alias
 	}
-	if opts := mapOptions(tm.Config.Options, providerType, tm.Name, provider); opts != nil {
+	opts, dropped := mapOptions(tm.Config.Options, providerType, tm.Name, provider)
+	if opts != nil {
 		model["options"] = opts
 	}
 
@@ -338,7 +353,7 @@ func (c *Converter) buildTarget(
 	if logging != nil {
 		target["logging"] = logging
 	}
-	return target
+	return target, dropped
 }
 
 // expandCapabilities normalizes a model's capabilities into canonical keys.

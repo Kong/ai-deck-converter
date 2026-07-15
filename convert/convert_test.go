@@ -504,6 +504,54 @@ models:
 	require.Error(t, err, "expected strict mode to fail on unknown provider")
 }
 
+const unknownOptionKeysSrc = `
+model_providers:
+  - type: bedrock
+    name: bedrock-full
+    config:
+      auth:
+        type: aws
+        access_key_id: AKIAIOSFODNN7EXAMPLE
+        secret_access_key: dummy-secret-access-key
+models:
+  - type: model
+    name: claude-guardrails
+    capabilities: [chat]
+    formats: [{type: bedrock}]
+    targets:
+      - name: anthropic.claude-sonnet-4-5
+        provider: bedrock-full
+        config:
+          type: bedrock
+          region: eu-central-1
+          max_tokens: 2048
+          guardrail_identifier: gr-abc123
+          guardrail_version: "3"
+          trace: enabled
+    policies: []
+    access:
+      acls: {allow: [], deny: []}
+    config:
+      route: {paths: [/ai]}
+      model: {}
+`
+
+func TestConvertWarnsUnknownOptionKeys(t *testing.T) {
+	out, warnings, err := Convert([]byte(unknownOptionKeysSrc), Options{})
+	require.NoError(t, err, "convert")
+	joined := strings.Join(warnings, "\n")
+	require.Contains(t, joined, "guardrail_identifier", "expected dropped-option warning")
+	require.Contains(t, joined, "guardrail_version")
+	require.Contains(t, joined, "trace")
+	require.NotContains(t, string(out), "guardrail_identifier",
+		"unknown key must not leak into generated model.options")
+}
+
+func TestConvertStrictFailsUnknownOptionKeys(t *testing.T) {
+	_, _, err := Convert([]byte(unknownOptionKeysSrc), Options{Strict: true})
+	require.Error(t, err, "expected strict mode to fail on unknown option keys")
+}
+
 func TestConvertWarnsUnknownPolicy(t *testing.T) {
 	src := []byte(`
 consumers:
