@@ -109,12 +109,12 @@ func (c *Converter) convertModels() error {
 					continue
 				}
 				key := sec + "|" + spec.RouteLabel
+				paths := make([]string, len(bases))
+				for i, b := range bases {
+					paths[i] = aimap.RoutePath(b, spec)
+				}
 				g := groups[key]
 				if g == nil {
-					paths := make([]string, len(bases))
-					for i, b := range bases {
-						paths[i] = aimap.RoutePath(b, spec)
-					}
 					g = &routeGroup{
 						route: buildModelRoute(
 							m.Config.Route, sec+"-"+spec.RouteLabel,
@@ -125,6 +125,8 @@ func (c *Converter) convertModels() error {
 					}
 					groups[key] = g
 					order = append(order, key)
+				} else {
+					g.route.Paths = mergePaths(g.route.Paths, paths)
 				}
 				if !routeSeen[g.route.Name] {
 					routeSeen[g.route.Name] = true
@@ -380,6 +382,24 @@ func balancerExtra(b *aigw.Balancer, key string) any {
 		return nil
 	}
 	return b.Fields[key]
+}
+
+// mergePaths appends paths from add that aren't already in existing, so models
+// that share a route (same section + capability) each contribute their own
+// configured paths as alternates rather than one silently overriding another.
+func mergePaths(existing, add []string) []string {
+	seen := make(map[string]bool, len(existing))
+	for _, p := range existing {
+		seen[p] = true
+	}
+	out := existing
+	for _, p := range add {
+		if !seen[p] {
+			seen[p] = true
+			out = append(out, p)
+		}
+	}
+	return out
 }
 
 func basePaths(m *aigw.Model) []string {
