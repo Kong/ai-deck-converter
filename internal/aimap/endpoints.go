@@ -300,3 +300,36 @@ var BedrockOptionKeys = map[string]bool{
 	"region": true, "embeddings_normalize": true, "video_output_s3_uri": true,
 	"batch_bucket_prefix": true, "batch_role_arn": true, "performance_config_latency": true,
 }
+
+// ModelOptionKeys are the top-level keys the DP's closed model.options record
+// (the ai-proxy-advanced options schema) accepts: the flat scalar fields plus
+// the per-provider nested record names that convert.mapOptions emits via
+// addNested.
+var ModelOptionKeys = map[string]bool{
+	// Flat scalar fields.
+	"anthropic_version":     true,
+	"azure_api_version":     true,
+	"azure_deployment_id":   true,
+	"azure_instance":        true,
+	"embeddings_dimensions": true,
+	"input_cost":            true,
+	"llama2_format":         true,
+	"max_tokens":            true,
+	"mistral_format":        true,
+	"output_cost":           true,
+	"temperature":           true,
+	"top_k":                 true,
+	"top_p":                 true,
+	"upstream_path":         true,
+	"upstream_url":          true,
+	// Per-provider nested record names (mapOptions addNested targets, plus the
+	// nested azure record used by the embeddings path).
+	"azure":       true,
+	"bedrock":     true,
+	"cohere":      true,
+	"dashscope":   true,
+	"databricks":  true,
+	"gemini":      true,
+	"huggingface": true,
+	"kimi":        true,
+}

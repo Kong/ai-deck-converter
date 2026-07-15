@@ -60,7 +60,7 @@ func TestResolveAuthNilProvider(t *testing.T) {
 
 func TestMapOptionsAzureRenames(t *testing.T) {
 	p := &aigw.Provider{Type: "azure", Config: aigw.ProviderConfig{Instance: "kong-az"}}
-	got := mapOptions(map[string]any{
+	got, dropped := mapOptions(map[string]any{
 		"temperature":   0.5,
 		"deployment_id": "gpt4o-dep",
 		"api_version":   "2024-02-01",
@@ -72,11 +72,46 @@ func TestMapOptionsAzureRenames(t *testing.T) {
 		"azure_instance":      "kong-az",
 	}
 	require.Equal(t, want, got, "mapOptions mismatch")
+	require.Empty(t, dropped, "no keys should be dropped")
+}
+
+func TestMapOptionsDropsUnknownKeys(t *testing.T) {
+	p := &aigw.Provider{Type: "bedrock", Config: aigw.ProviderConfig{Auth: aigw.ProviderAuth{Type: "aws"}}}
+	got, dropped := mapOptions(map[string]any{
+		"max_tokens":           2048,
+		"region":               "eu-central-1",
+		"guardrail_identifier": "gr-abc123",
+		"guardrail_version":    "3",
+		"trace":                "enabled",
+	}, "bedrock", "anthropic.claude-sonnet-4-5", p)
+	want := map[string]any{
+		"max_tokens":        2048,
+		"anthropic_version": "bedrock-2023-05-31",
+		"bedrock":           map[string]any{"aws_region": "eu-central-1"},
+	}
+	require.Equal(t, want, got, "unknown keys must not pass through flat")
+	require.Equal(t, []string{"guardrail_identifier", "guardrail_version", "trace"}, dropped,
+		"unknown keys must be reported sorted for a deterministic warning")
+}
+
+func TestMapOptionsDropsUnknownGCPEnvironmentKeys(t *testing.T) {
+	p := &aigw.Provider{Type: "vertex"}
+	got, dropped := mapOptions(map[string]any{
+		"gcp_environment": map[string]any{
+			"project_id": "kong-proj",
+			"region":     "us-central1",
+		},
+	}, "vertex", "gemini-2.5-pro", p)
+	want := map[string]any{
+		"gemini": map[string]any{"project_id": "kong-proj"},
+	}
+	require.Equal(t, want, got, "unknown gcp_environment keys must not pass through flat")
+	require.Equal(t, []string{"region"}, dropped, "unknown gcp_environment key must be reported")
 }
 
 func TestMapOptionsGeminiNesting(t *testing.T) {
 	p := &aigw.Provider{Type: "vertex", Config: aigw.ProviderConfig{}}
-	got := mapOptions(map[string]any{
+	got, dropped := mapOptions(map[string]any{
 		"max_tokens": 4096,
 		"gcp_environment": map[string]any{
 			"project_id":   "kong-proj",
@@ -93,13 +128,14 @@ func TestMapOptionsGeminiNesting(t *testing.T) {
 		},
 	}
 	require.Equal(t, want, got, "mapOptions gemini mismatch")
+	require.Empty(t, dropped, "no keys should be dropped")
 }
 
 func TestMapOptionsBedrockNesting(t *testing.T) {
 	p := &aigw.Provider{Type: "bedrock", Config: aigw.ProviderConfig{Auth: aigw.ProviderAuth{
 		Type: "aws", AssumeRoleARN: "arn:role",
 	}}}
-	got := mapOptions(map[string]any{
+	got, dropped := mapOptions(map[string]any{
 		"max_tokens": 1024,
 		"region":     "us-east-1",
 	}, "bedrock", "anthropic.claude-3-5-sonnet", p)
@@ -112,11 +148,13 @@ func TestMapOptionsBedrockNesting(t *testing.T) {
 		},
 	}
 	require.Equal(t, want, got, "mapOptions bedrock mismatch")
+	require.Empty(t, dropped, "no keys should be dropped")
 }
 
 func TestMapOptionsBedrockNonAnthropicDoesNotDefaultAnthropicVersion(t *testing.T) {
-	got := mapOptions(nil, "bedrock", "amazon.titan-embed-text-v2:0", &aigw.Provider{Type: "bedrock"})
+	got, dropped := mapOptions(nil, "bedrock", "amazon.titan-embed-text-v2:0", &aigw.Provider{Type: "bedrock"})
 	require.Nil(t, got)
+	require.Empty(t, dropped, "no keys should be dropped")
 }
 
 func TestLowerEmbeddingsModelBedrockNonAnthropicDoesNotDefaultAnthropicVersion(t *testing.T) {
