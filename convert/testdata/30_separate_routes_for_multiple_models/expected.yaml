@@ -6,6 +6,11 @@ services:
       - name: openai-audio-transcribe
         paths:
           - /transcribev0/audio/transcriptions
+        methods:
+          - POST
+        strip_path: false
+      - name: openai-audio-transcribe-2
+        paths:
           - /transcribev1/audio/transcriptions
         methods:
           - POST
@@ -42,6 +47,12 @@ plugins:
           route_type: audio/v1/audio/transcriptions
     route: openai-audio-transcribe
     model: gpt-5-2
+  - name: ai-model-selector
+    config:
+      body_path: model
+      max_request_body_size: 8388608
+      source: body
+    route: openai-audio-transcribe-2
   - name: ai-proxy-advanced
     config:
       balancer:
@@ -65,7 +76,7 @@ plugins:
               temperature: 1
             provider: openai
           route_type: audio/v1/audio/transcriptions
-    route: openai-audio-transcribe
+    route: openai-audio-transcribe-2
     model: gpt-5-2.1
 ai_models:
   - name: gpt-5-2
