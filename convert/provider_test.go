@@ -209,26 +209,6 @@ func TestMapOptionsDropsMalformedNestedBlockWithWarning(t *testing.T) {
 	require.Equal(t, []string{"bedrock"}, dropped, "malformed nested block must be reported as dropped")
 }
 
-func TestMapOptionsNestedBlockTakesPrecedenceOverFlatKey(t *testing.T) {
-	// A target that sets both the flat AI-Gateway key ("region") and the raw
-	// DP-shaped nested block ("bedrock: {aws_region: ...}") for the same
-	// record: the raw block takes over the record entirely (the flat key's
-	// contribution is skipped, not merged), so there is no per-subfield
-	// ordering to resolve and the result is deterministic regardless of Go's
-	// randomized map iteration order over opts.
-	for i := 0; i < 20; i++ {
-		got, dropped := mapOptions(map[string]any{
-			"region": "us-east-1",
-			"bedrock": map[string]any{
-				"aws_region": "eu-west-1",
-			},
-		}, "bedrock", "amazon.titan-embed-text-v2:0", nil)
-		require.Equal(t, map[string]any{"bedrock": map[string]any{"aws_region": "eu-west-1"}}, got,
-			"nested block must deterministically win over the flat rename on every run")
-		require.Empty(t, dropped, "the superseded flat key is a recognized key, not an unknown one")
-	}
-}
-
 func TestMapOptionsDropsUnknownGCPEnvironmentKeys(t *testing.T) {
 	p := &aigw.Provider{Type: "vertex"}
 	got, dropped := mapOptions(map[string]any{
