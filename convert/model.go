@@ -54,7 +54,6 @@ func (c *Converter) convertModels() error {
 	var guardPlugins []kong.Plugin
 	usedRouteNames := map[string]bool{}
 	identityPluginSeen := map[string]bool{}
-	routeNameSeq := map[string]int{}
 
 	for i := range c.src.Models {
 		m := &c.src.Models[i]
@@ -121,7 +120,8 @@ func (c *Converter) convertModels() error {
 				// with different identity-provider sets therefore cannot share a
 				// route: a route-scoped auth plugin would otherwise protect every
 				// model on that route.
-				base := sec + "-" + spec.RouteLabel + "|" + identityKey
+				identityKey := identityProviderKey(m.Access.IdentityProviders)
+				base := sec + "|" + spec.RouteLabel + "|" + identityKey
 				key := base + "|" + routePathsKey(m.Config.Route.Paths)
 
 				g := groups[key]
@@ -132,10 +132,6 @@ func (c *Converter) convertModels() error {
 					}
 
 					routeName := uniqueModelRouteName(sec+"-"+spec.RouteLabel, usedRouteNames)
-					if n := routeNameSeq[base]; n > 0 {
-						routeName = sec + "-" + spec.RouteLabel + "-" + strconv.Itoa(n+1)
-					}
-					routeNameSeq[base]++
 
 					g = &routeGroup{
 						route: buildModelRoute(
