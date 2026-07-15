@@ -1,0 +1,179 @@
+_format_version: "3.0"
+_transform: false
+services:
+  - id: 947a4e23-b483-5a65-8165-da9aed24565b
+    name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    host: ai-gateway.upstream.local
+    port: 80
+    protocol: http
+routes:
+  - id: cbac5221-6bcd-5bfa-9575-4519bea13df0
+    name: openai-batches
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /scope-api/batches
+    methods:
+      - GET
+      - POST
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: b433d478-0f40-5518-b6bb-815583936241
+    name: openai-files
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /scope-api/files
+    methods:
+      - GET
+      - POST
+      - DELETE
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+    name: openai-chat
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /scope/chat/completions
+    methods:
+      - POST
+    protocols:
+      - http
+      - https
+    strip_path: false
+plugins:
+  - id: 4f272023-c721-52f1-a99f-03afec02ed35
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      model_name_header: false
+      response_streaming: deny
+      targets:
+        - auth:
+            header_name: name
+            header_value: value
+            param_location: body
+            param_name: name
+            param_value: value
+          description: batches-api
+          logging:
+            log_payloads: false
+            log_statistics: false
+          model:
+            name: batches-api
+            provider: openai
+          route_type: llm/v1/batches
+    route:
+      id: cbac5221-6bcd-5bfa-9575-4519bea13df0
+  - id: f3adc007-171c-5519-8763-3a0eef79bde3
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      max_request_body_size: 536870912
+      model_name_header: false
+      response_streaming: deny
+      targets:
+        - auth:
+            header_name: name
+            header_value: value
+            param_location: body
+            param_name: name
+            param_value: value
+          description: files-api
+          logging:
+            log_payloads: false
+            log_statistics: false
+          model:
+            name: files-api
+            provider: openai
+          route_type: llm/v1/files
+    route:
+      id: b433d478-0f40-5518-b6bb-815583936241
+  - id: dcebfb31-cc0f-5469-b6d7-9d8807a4e8d2
+    name: ai-model-selector
+    config:
+      body_path: model
+      max_request_body_size: 8388608
+      source: body
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+  - id: 75ff22ed-6245-594b-895f-6a9fa36f4581
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: priority
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: name
+            header_value: value
+            param_location: body
+            param_name: name
+            param_value: value
+          description: gpt-4o
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: '@scope/gpt-4o'
+            name: gpt-4o
+            provider: openai
+          route_type: llm/v1/chat
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+    model:
+      id: b2d446a5-2f80-48b9-9b44-4c174c845fc4
+  - id: 12106a5c-cbd2-5942-8432-ef9bc4adca1b
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: lowest-usage
+        tokens_count_strategy: total-tokens
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: name
+            header_value: value
+            param_location: body
+            param_name: name
+            param_value: value
+          description: gpt-4o-mini
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: '@scope/gpt-4o-mini'
+            name: gpt-4o-mini
+            provider: openai
+          route_type: llm/v1/chat
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+    model:
+      id: be25ed98-34fd-4e85-bd39-0d23ce1eccc9
+ai_models:
+  - id: 0e4b92f1-7942-48ba-b984-357e8c66b6c9
+    name: scope-openai-batches
+    alias: scope-openai-batches
+  - id: 76e78277-2307-40fb-858a-2143c97fe93c
+    name: scope-openai-files
+    alias: scope-openai-files
+  - id: b2d446a5-2f80-48b9-9b44-4c174c845fc4
+    name: scope-gpt-4o
+    alias: '@scope/gpt-4o'
+  - id: be25ed98-34fd-4e85-bd39-0d23ce1eccc9
+    name: scope-gpt-4o-mini
+    alias: '@scope/gpt-4o-mini'

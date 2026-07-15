@@ -1,0 +1,95 @@
+_format_version: "3.0"
+_transform: false
+services:
+  - id: 947a4e23-b483-5a65-8165-da9aed24565b
+    name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    host: ai-gateway.upstream.local
+    port: 80
+    protocol: http
+routes:
+  - id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+    name: openai-chat
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /scope/chat/completions
+    methods:
+      - POST
+    protocols:
+      - http
+      - https
+    strip_path: false
+plugins:
+  - id: 17fa8192-4b9f-5b5a-8379-20ad8bc836a7
+    name: ai-model-selector
+    config:
+      body_path: model
+      max_request_body_size: 8388608
+      source: body
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+  - id: f3adc007-171c-5519-8763-3a0eef79bde3
+    name: ai-proxy-advanced
+    enabled: false
+    config:
+      balancer:
+        algorithm: lowest-usage
+        tokens_count_strategy: total-tokens
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: name
+            header_value: value
+            param_location: body
+            param_name: name
+            param_value: value
+          description: gpt-4o-mini
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: '@scope/gpt-4o-mini'
+            name: gpt-4o-mini
+            provider: openai
+          route_type: llm/v1/chat
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+    model:
+      id: 68251480-8f51-40f6-80d6-2982e4cc120a
+  - id: fe4129f3-2075-5492-8b59-90def2cf73ab
+    name: ai-proxy-advanced
+    enabled: false
+    config:
+      balancer:
+        algorithm: priority
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: name
+            header_value: value
+            param_location: body
+            param_name: name
+            param_value: value
+          description: gpt-4o
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: '@scope/gpt-4o'
+            name: gpt-4o
+            provider: openai
+          route_type: llm/v1/chat
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+    model:
+      id: d088ac72-91b4-4d8e-9800-86d3e8096006
+ai_models:
+  - id: 68251480-8f51-40f6-80d6-2982e4cc120a
+    name: scope-gpt-4o-mini
+    alias: '@scope/gpt-4o-mini'
+  - id: d088ac72-91b4-4d8e-9800-86d3e8096006
+    name: scope-gpt-4o
+    alias: '@scope/gpt-4o'

@@ -1,0 +1,146 @@
+agents: []
+consumer_groups: []
+consumers: []
+identity_providers: []
+mcp_servers: []
+model_providers:
+  - config:
+      auth:
+        headers:
+          - name: name
+            value: value
+        params:
+          - location: body
+            name: name
+            value: value
+        type: basic
+    created_at: 1.784124109e+09
+    display_name: OpenAI Provider
+    id: c6cddce1-3543-4163-b77f-a241a61f3e91
+    managed_by:
+      owner: terraform
+    name: my-openai-provider
+    type: openai
+  - config:
+      auth:
+        headers:
+          - name: name
+            value: value
+        params:
+          - location: body
+            name: name
+            value: value
+        type: basic
+    created_at: 1.784124109e+09
+    display_name: Azure AI SE
+    id: d478cdd3-c3f1-427a-94b8-ec684de0bca5
+    managed_by:
+      owner: terraform
+    name: my-main-provider
+    type: anthropic
+models:
+  - access:
+      acls: {}
+    capabilities:
+      - files
+    config:
+      logging:
+        payloads: false
+        statistics: false
+      max_request_body_size: 5.36870912e+08
+      model: {}
+      response_streaming: deny
+      route:
+        paths:
+          - /scope-api
+    created_at: 1.784124115e+09
+    display_name: OpenAI Files API
+    enabled: false
+    formats:
+      - type: openai
+    id: 4b06fe90-23c6-43a5-9892-95571a5f0e61
+    name: scope-openai-files
+    targets:
+      - config:
+          type: openai
+        name: files-api
+        provider: my-openai-provider
+    type: api
+  - access:
+      acls: {}
+    capabilities:
+      - generate
+    config:
+      balancer:
+        algorithm: lowest-usage
+        tokens_count_strategy: total-tokens
+      model:
+        alias: '@scope/gpt-4o-mini'
+      route:
+        paths:
+          - /scope
+    created_at: 1.784124114e+09
+    display_name: Scoped GPT 4o Mini
+    enabled: false
+    formats:
+      - type: openai
+    id: 68251480-8f51-40f6-80d6-2982e4cc120a
+    name: scope-gpt-4o-mini
+    targets:
+      - config:
+          type: openai
+        name: gpt-4o-mini
+        provider: my-openai-provider
+    type: model
+  - access:
+      acls: {}
+    capabilities:
+      - batches
+    config:
+      logging:
+        payloads: false
+        statistics: false
+      model: {}
+      response_streaming: deny
+      route:
+        paths:
+          - /scope-api
+    created_at: 1.784124117e+09
+    display_name: OpenAI Batches API
+    enabled: false
+    formats:
+      - type: openai
+    id: 92bb41ca-6f32-4224-847e-007f973be3b5
+    name: scope-openai-batches
+    targets:
+      - config:
+          type: openai
+        name: batches-api
+        provider: my-openai-provider
+    type: api
+  - access:
+      acls: {}
+    capabilities:
+      - generate
+    config:
+      balancer:
+        algorithm: priority
+      model:
+        alias: '@scope/gpt-4o'
+      route:
+        paths:
+          - /scope
+    created_at: 1.784124109e+09
+    display_name: Scoped GPT 4o
+    enabled: false
+    formats:
+      - type: openai
+    id: d088ac72-91b4-4d8e-9800-86d3e8096006
+    name: scope-gpt-4o
+    targets:
+      - config:
+          type: openai
+        name: gpt-4o
+        provider: my-openai-provider
+    type: model
+policies: []
