@@ -57,10 +57,13 @@ func TestEndpointSectionFor(t *testing.T) {
 		// Vertex renders shared capabilities on Gemini's client paths...
 		{"gemini", "vertex", "generate", "gemini"},
 		{"gemini", "vertex", "embeddings", "gemini"},
+		{"gemini", "vertex", "batches", "gemini"},
 		// ...but keeps the Vertex section for its exclusive capabilities.
 		{"gemini", "vertex", "image", "vertex"},
 		{"gemini", "vertex", "video", "vertex"},
 		{"gemini", "vertex", "rerank", "vertex"},
+		// Vertex does not implement Gemini's Files API; don't map it to gemini.
+		{"gemini", "vertex", "files", "vertex"},
 		// Gemini served by Gemini is unaffected.
 		{"gemini", "gemini", "generate", "gemini"},
 		// Non-rendering sections pass through regardless of capability.
