@@ -3,6 +3,8 @@ package revert
 import (
 	"fmt"
 	"reflect"
+	"strconv"
+	"strings"
 
 	"github.com/Kong/ai-deck-converter/internal/aigw"
 	"github.com/Kong/ai-deck-converter/internal/kong"
@@ -40,7 +42,10 @@ var authPluginNames = map[string]bool{
 // policyRefs converts an entity's plugins into policy name references,
 // special-casing acl plugins into ACLs and skipping the AI plugins (which are
 // reconstructed into first-class entities by the service reversal steps).
-func (r *Reverter) policyRefs(plugins []kong.Plugin) ([]string, aigw.ACLs) {
+// scope is the AI Gateway scope of the owning entity (models, mcp-servers,
+// agents, consumers, consumer-groups); a plugin whose type is not permitted in
+// that scope is dropped with a warning, since the API would reject it.
+func (r *Reverter) policyRefs(plugins []kong.Plugin, scope string) ([]string, aigw.ACLs) {
 	var refs []string
 	var acls aigw.ACLs
 	for _, p := range plugins {
@@ -49,6 +54,9 @@ func (r *Reverter) policyRefs(plugins []kong.Plugin) ([]string, aigw.ACLs) {
 			continue
 		case p.Name == "acl":
 			acls = aclsFromBlock(p.Config)
+		case !policies.PolicyAllowedInScope(p.Name, scope):
+			r.warn("policy %q (type %q) is not supported on scope %q; dropped", //nolint:errcheck
+				p.Name, p.Name, scope)
 		default:
 			refs = append(refs, r.registerPolicy(p, false).Name)
 		}
@@ -71,7 +79,7 @@ func (r *Reverter) modelPolicyRefs(plugins []kong.Plugin) ([]string, aigw.ACLs, 
 		}
 		rest = append(rest, p)
 	}
-	refs, acls := r.policyRefs(rest)
+	refs, acls := r.policyRefs(rest, "models")
 	return refs, acls, idpRefs
 }
 
@@ -86,6 +94,15 @@ func (r *Reverter) registerPolicy(p kong.Plugin, global bool) *aigw.Policy {
 	src := p.Config
 	if p.Name == "ai-rate-limiting-advanced" {
 		src = reshapeAIRateLimiting(src)
+	}
+	if p.Name == "ai-mcp-oauth2" {
+		src = r.reshapeMCPOAuth2Proxy(src)
+	}
+	if p.Name == "ai-request-transformer" || p.Name == "ai-response-transformer" {
+		src = reshapeTransformerProxy(src)
+	}
+	if p.Name == "openid-connect" {
+		src = r.reshapeOpenIDConnect(src)
 	}
 
 	// Drop fields/enum values that exist in the API Gateway 3.15 plugin schema
@@ -175,13 +192,193 @@ func reshapeAIRateLimiting(cfg map[string]any) map[string]any {
 	return nc
 }
 
+// reshapeMCPOAuth2Proxy rewrites the API Gateway 3.15 ai-mcp-oauth2 flat
+// forward-proxy fields (http_proxy/https_proxy URL strings,
+// http_proxy_authorization/https_proxy_authorization, no_proxy) into the AI
+// Gateway 2.0 nested config.proxy_config object (…_host/…_port split,
+// auth_username/auth_password, no_proxy). Null fields are simply dropped. The
+// returned map is a shallow copy, so the caller's p.Config is never mutated.
+func (r *Reverter) reshapeMCPOAuth2Proxy(cfg map[string]any) map[string]any {
+	flat := []string{
+		"http_proxy", "https_proxy", "no_proxy",
+		"http_proxy_authorization", "https_proxy_authorization",
+	}
+	present := false
+	for _, k := range flat {
+		if _, ok := cfg[k]; ok {
+			present = true
+			break
+		}
+	}
+	if !present {
+		return cfg
+	}
+
+	nc := make(map[string]any, len(cfg))
+	for k, v := range cfg {
+		nc[k] = v
+	}
+
+	pc := map[string]any{}
+	if host, port := parseProxyURL(getStr(cfg, "http_proxy")); host != "" {
+		pc["http_proxy_host"] = host
+		if port != 0 {
+			pc["http_proxy_port"] = port
+		}
+	}
+	if host, port := parseProxyURL(getStr(cfg, "https_proxy")); host != "" {
+		pc["https_proxy_host"] = host
+		if port != 0 {
+			pc["https_proxy_port"] = port
+		}
+	}
+	if np := getStr(cfg, "no_proxy"); np != "" {
+		pc["no_proxy"] = np
+	}
+	// The 3.15 *_authorization header values have no clean auth_username/
+	// auth_password split in the 2.0 proxy_config; surface rather than guess.
+	if getStr(cfg, "http_proxy_authorization") != "" || getStr(cfg, "https_proxy_authorization") != "" {
+		r.warn("ai-mcp-oauth2 policy: proxy authorization header is not migratable to " +
+			"proxy_config.auth_username/auth_password; configure it manually") //nolint:errcheck
+	}
+
+	for _, k := range flat {
+		delete(nc, k)
+	}
+	if len(pc) > 0 {
+		nc["proxy_config"] = pc
+	}
+	return nc
+}
+
+// reshapeTransformerProxy relocates the ai-request-transformer /
+// ai-response-transformer flat forward-proxy fields (already in
+// http_proxy_host/http_proxy_port form) into the AI Gateway 2.0 nested
+// config.proxy_config object. Null fields are dropped. The returned map is a
+// shallow copy, so the caller's p.Config is never mutated.
+func reshapeTransformerProxy(cfg map[string]any) map[string]any {
+	proxyFields := []string{
+		"http_proxy_host", "http_proxy_port",
+		"https_proxy_host", "https_proxy_port",
+		"proxy_scheme", "auth_username", "auth_password", "no_proxy",
+	}
+	present := false
+	for _, k := range proxyFields {
+		if _, ok := cfg[k]; ok {
+			present = true
+			break
+		}
+	}
+	if !present {
+		return cfg
+	}
+
+	nc := make(map[string]any, len(cfg))
+	for k, v := range cfg {
+		nc[k] = v
+	}
+	pc := map[string]any{}
+	for _, k := range proxyFields {
+		if v, ok := nc[k]; ok {
+			if v != nil {
+				pc[k] = v
+			}
+			delete(nc, k)
+		}
+	}
+	if len(pc) > 0 {
+		nc["proxy_config"] = pc
+	}
+	return nc
+}
+
+// parseProxyURL splits a proxy address ("http://host:8080", "host:8080",
+// "host") into host and port (port 0 when absent/invalid).
+func parseProxyURL(s string) (string, int) {
+	if s == "" {
+		return "", 0
+	}
+	rest := s
+	if i := strings.Index(rest, "://"); i >= 0 {
+		rest = rest[i+3:]
+	}
+	rest = strings.TrimRight(rest, "/")
+	host, portStr, ok := strings.Cut(rest, ":")
+	if !ok {
+		return rest, 0
+	}
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		return host, 0
+	}
+	return host, port
+}
+
+// oidcRemovedIn20 are openid-connect config fields present in API Gateway 3.15
+// but rejected by the AI Gateway 2.0 openid-connect schema with no replacement.
+var oidcRemovedIn20 = []string{
+	"bearer_token_header_name", "cluster_cache_items",
+	"principals", "proof_of_possession_mtls_from_header",
+}
+
+// reshapeOpenIDConnect migrates an openid-connect config from the 3.15 shape to
+// AI Gateway 2.0: the flat session_redis_* fields collapse into the nested
+// `redis` object (prefix stripped), consumer_claim is renamed to the plural
+// consumer_claims, and the fields with no 2.0 equivalent are dropped. The
+// returned map is a shallow copy, so the caller's config is never mutated.
+func (r *Reverter) reshapeOpenIDConnect(cfg map[string]any) map[string]any {
+	if cfg == nil {
+		return nil
+	}
+	nc := make(map[string]any, len(cfg))
+	redis := map[string]any{}
+	for k, v := range cfg {
+		switch {
+		case strings.HasPrefix(k, "session_redis_"):
+			if v != nil {
+				redis[strings.TrimPrefix(k, "session_redis_")] = v
+			}
+		case k == "consumer_claim":
+			// Removed in 2.0. The 2.0 replacement `consumer_claims` is a list of
+			// claim *paths* (list of lists); when the source already carries it,
+			// keep that and drop the singular. Otherwise synthesize it by
+			// wrapping each claim into a single-element path.
+			if _, ok := cfg["consumer_claims"]; !ok && v != nil {
+				if claims, isList := v.([]any); isList {
+					wrapped := make([]any, len(claims))
+					for i, c := range claims {
+						wrapped[i] = []any{c}
+					}
+					nc["consumer_claims"] = wrapped
+				}
+			}
+		default:
+			nc[k] = v
+		}
+	}
+	for _, k := range oidcRemovedIn20 {
+		if _, ok := nc[k]; ok {
+			if k == "principals" && nc[k] != nil {
+				r.warn("openid-connect: `principals` config has no AI Gateway 2.0 " + //nolint:errcheck
+					"equivalent and was dropped")
+			}
+			delete(nc, k)
+		}
+	}
+	if len(redis) > 0 {
+		nc["redis"] = redis
+	}
+	return nc
+}
+
 // uniquePolicyName returns base, or base-N on collision.
 func (r *Reverter) uniquePolicyName(base string) string {
 	name := base
-	for n := 2; r.policyNames[name]; n++ {
+	for n := 2; r.policyNames[name] || r.usedNames[name]; n++ {
 		name = fmt.Sprintf("%s-%d", base, n)
 	}
 	r.policyNames[name] = true
+	r.usedNames[name] = true
 	return name
 }
 

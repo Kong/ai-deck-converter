@@ -237,7 +237,7 @@ func (r *Reverter) modelGroupFor(
 	g.model.Config.ResponseStreaming = getStr(cfg, "response_streaming")
 	g.model.Config.Proxy = proxyFromConfig(getMap(cfg, "proxy_config"))
 	g.model.Config.MaxRequestBodySize = getInt(cfg, "max_request_body_size")
-	g.model.Config.Balancer = balancerFromConfig(getMap(cfg, "balancer"), cfg["vectordb"], cfg["embeddings"])
+	g.model.Config.Balancer = r.balancerFromConfig(getMap(cfg, "balancer"), cfg["vectordb"], cfg["embeddings"])
 	switch {
 	case verbatim:
 		// Non-conventional route: preserve the real Kong route (paths, methods,
@@ -381,7 +381,7 @@ func isAPIOnly(caps []string) bool {
 // {algorithm: round-robin} default the forward converter emits. The top-level
 // vectordb/embeddings config keys (siblings of `balancer` in ai-proxy-advanced)
 // are folded back into the balancer block, mirroring convert's hoisting.
-func balancerFromConfig(cfg map[string]any, vectordb, embeddings any) *aigw.Balancer {
+func (r *Reverter) balancerFromConfig(cfg map[string]any, vectordb, embeddings any) *aigw.Balancer {
 	algo := getStr(cfg, "algorithm")
 	fields := map[string]any{}
 	for k, v := range cfg {
@@ -390,10 +390,24 @@ func balancerFromConfig(cfg map[string]any, vectordb, embeddings any) *aigw.Bala
 		}
 	}
 	if vectordb != nil {
-		fields["vectordb"] = vectordb
+		// The entity model flattens the vectordb: `strategy` becomes `type`, the
+		// selected pgvector/redis sub-block is hoisted to the top level, and the
+		// flat redis cluster_/keepalive_/sentinel_ keys nest into objects.
+		if vd, ok := vectordb.(map[string]any); ok {
+			fields["vectordb"] = vectorDBFromConfig(vd)
+		} else {
+			fields["vectordb"] = vectordb
+		}
 	}
 	if embeddings != nil {
-		fields["embeddings"] = embeddings
+		// The AI Gateway entity model expects the embeddings model de-folded
+		// into {allow_auth_override, provider(ref), name, config}, mirroring a
+		// target — not the raw ai-proxy-advanced auth+model.options block.
+		if emb, ok := embeddings.(map[string]any); ok {
+			fields["embeddings"] = r.embeddingsFromConfig(emb)
+		} else {
+			fields["embeddings"] = embeddings
+		}
 	}
 	if len(cfg) == 0 && len(fields) == 0 {
 		return nil

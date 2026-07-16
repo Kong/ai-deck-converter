@@ -1,5 +1,7 @@
 models:
-  - type: model
+  - ref: gpt-5-2
+    type: model
+    display_name: gpt-5-2
     name: gpt-5-2
     capabilities:
       - generate
@@ -16,7 +18,9 @@ models:
         statistics: true
       model:
         alias: '@openai/gpt-5.2'
-  - type: model
+  - ref: gpt-5-2-mini
+    type: model
+    display_name: gpt-5-2-mini
     name: gpt-5-2-mini
     capabilities:
       - generate
@@ -34,7 +38,9 @@ models:
       model:
         alias: '@openai/gpt-5.2-mini'
 model_providers:
-  - type: openai
+  - ref: openai-ai
+    type: openai
+    display_name: openai-ai
     name: openai-ai
     config:
       auth:

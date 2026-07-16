@@ -1,5 +1,7 @@
 models:
-  - type: model
+  - ref: aigw34-route
+    type: model
+    display_name: aigw34-route
     name: aigw34-route
     capabilities:
       - generate
@@ -24,7 +26,9 @@ models:
         payloads: false
         statistics: true
 model_providers:
-  - type: azure
+  - ref: azure-kv
+    type: azure
+    display_name: azure-kv
     name: azure-kv
     config:
       auth:
@@ -34,7 +38,9 @@ model_providers:
             value: '{vault://kv/azure-key}'
       instance: se-ai-gw-resource
 policies:
-  - type: ai-rate-limiting-advanced
+  - ref: ai-rate-limiting-advanced
+    type: ai-rate-limiting-advanced
+    display_name: ai-rate-limiting-advanced
     name: ai-rate-limiting-advanced
     enabled: true
     config:

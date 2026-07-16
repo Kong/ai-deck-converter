@@ -12,6 +12,7 @@ import (
 // plugins), so an ai-a2a-proxy attached at the service level is still detected.
 func (r *Reverter) revertAgent(svc *kong.Service, rt *kong.Route, name string, plugins []kong.Plugin) error {
 	a := aigw.Agent{
+		Ref:    name,
 		Type:   "http",
 		Name:   name,
 		Labels: r.tagsToLabels(svc.Tags),
@@ -30,7 +31,7 @@ func (r *Reverter) revertAgent(svc *kong.Service, rt *kong.Route, name string, p
 	}
 	a.Config.Route = routeConfig(rt, name)
 
-	refs, acls := r.policyRefs(plugins)
+	refs, acls := r.policyRefs(plugins, "agents")
 	a.Policies = refs
 	a.Access.ACLs = acls
 

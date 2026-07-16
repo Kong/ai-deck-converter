@@ -1,5 +1,7 @@
 models:
-  - type: model
+  - ref: aigw82-route
+    type: model
+    display_name: aigw82-route
     name: aigw82-route
     capabilities:
       - generate
@@ -28,7 +30,9 @@ models:
       model:
         name_header: true
 model_providers:
-  - type: anthropic
+  - ref: anthropic-ai
+    type: anthropic
+    display_name: anthropic-ai
     name: anthropic-ai
     config:
       auth:

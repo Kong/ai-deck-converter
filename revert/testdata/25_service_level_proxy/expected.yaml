@@ -1,5 +1,7 @@
 models:
-  - type: model
+  - ref: azure-gpt-5
+    type: model
+    display_name: azure-gpt-5
     name: azure-gpt-5
     capabilities:
       - generate
@@ -38,7 +40,9 @@ models:
         alias: azure/gpt-5
         name_header: true
 model_providers:
-  - type: azure
+  - ref: azure-ai
+    type: azure
+    display_name: azure-ai
     name: azure-ai
     config:
       auth:
@@ -48,7 +52,9 @@ model_providers:
             value: '{vault://ai/azure-token}'
       instance: se-ai-gw-resource
 policies:
-  - type: ai-prompt-guard
+  - ref: ai-prompt-guard
+    type: ai-prompt-guard
+    display_name: ai-prompt-guard
     name: ai-prompt-guard
     enabled: true
     config:
@@ -58,7 +64,9 @@ policies:
       llm_format: openai
       max_request_body_size: 8192
 identity_providers:
-  - type: openid-connect
+  - ref: openid-connect-1
+    type: openid-connect
+    display_name: openid-connect-1
     name: openid-connect-1
     config:
       auth_methods:

@@ -4,6 +4,7 @@ package aigw
 // (conversion-only | conversion-listener | listener | passthrough-listener |
 // upstream-server), which maps to the ai-mcp-proxy plugin's config.mode.
 type MCPServer struct {
+	Ref         string          `yaml:"ref,omitempty"`
 	Type        string          `yaml:"type,omitempty"`
 	DisplayName string          `yaml:"display_name,omitempty"`
 	Name        string          `yaml:"name,omitempty"`
@@ -14,9 +15,10 @@ type MCPServer struct {
 	Access      MCPAccess       `yaml:"access,omitempty"`
 	Labels      Labels          `yaml:"labels,omitempty"`
 
-	// UpstreamURL is the upstream MCP server URL for passthrough-listener mode.
-	// Not part of the strict schema (passthrough proxies to the Gateway Service
-	// upstream), but accepted here so the converter can build the Kong Service.
+	// UpstreamURL is a legacy, input-only alias for the upstream MCP server URL.
+	// The AI Gateway schema carries the upstream URL as config.url (see
+	// MCPServerConfig.URL); this top-level field is still accepted on input for
+	// backward compatibility with older hand-written configs but is never emitted.
 	UpstreamURL string `yaml:"upstream_url,omitempty"`
 }
 
@@ -33,6 +35,10 @@ type MCPServerConfig struct {
 	Logging            *Logging       `yaml:"logging,omitempty"`
 	MaxRequestBodySize *int           `yaml:"max_request_body_size,omitempty"`
 	Server             map[string]any `yaml:"server,omitempty"`
+	// URL is the upstream MCP server URL (${scheme}://${host}:${port}/${path}),
+	// required by the AI Gateway schema for every mode except listener. It lowers
+	// to the Kong Gateway Service URL.
+	URL string `yaml:"url,omitempty"`
 	// Access carries the attribute-based ACL configuration. It maps to the
 	// ai-mcp-proxy plugin's acl_attribute_type / access_token_claim_field /
 	// default_acl fields.

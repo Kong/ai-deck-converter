@@ -59,6 +59,18 @@ func defoldAuth(auth map[string]any) (aigw.ProviderAuth, *bool) {
 	a.MetadataURL = getStr(auth, "gcp_metadata_url")
 	a.OAuthTokenURL = getStr(auth, "gcp_oauth_token_url")
 
+	// Only a *true* flag signals its auth type — the source spells out every
+	// flag (including the irrelevant false ones), so treating non-nil as a
+	// signal misdetects e.g. a gcp provider carrying azure_use_managed_identity:
+	// false as azure. Normalize false back to nil so it neither drives
+	// inference nor is emitted.
+	if !boolVal(a.UseManagedIdentity) {
+		a.UseManagedIdentity = nil
+	}
+	if !boolVal(a.UseGCPServiceAccount) {
+		a.UseGCPServiceAccount = nil
+	}
+
 	switch {
 	case len(a.Headers) > 0 || len(a.Params) > 0:
 		a.Type = "basic"
@@ -139,6 +151,167 @@ func defoldTarget(target map[string]any, providerType string) defoldedTarget {
 	return d
 }
 
+// embeddingsFromConfig reverses convert.resolveEmbeddings: it de-folds an
+// ai-proxy-advanced config.balancer.embeddings block (auth + model.{provider,
+// name, options}) into the AI Gateway entity shape (allow_auth_override,
+// provider reference, name, config). The embeddings model is treated like a
+// target — auth becomes a synthesized model_provider, options become the
+// config block, and provider-level fields (azure instance) are hoisted onto
+// the provider.
+func (r *Reverter) embeddingsFromConfig(emb map[string]any) map[string]any {
+	model := getMap(emb, "model")
+	providerType := detectProviderType(getStr(model, "provider"), "")
+
+	var d defoldedTarget
+	d.auth, d.allowOverride = defoldAuth(getMap(emb, "auth"))
+	defoldOptions(flattenEmbeddingsOptions(getMap(model, "options")), providerType, &d)
+
+	config := map[string]any{"type": providerType}
+	for k, v := range d.options {
+		config[k] = v
+	}
+
+	// Azure embeddings config requires upstream_url. When the source only
+	// carries the instance (upstream_url null), derive the canonical Azure
+	// OpenAI embeddings endpoint from it.
+	if providerType == "azure" && config["upstream_url"] == nil && d.instance != "" {
+		config["upstream_url"] = fmt.Sprintf(
+			"https://%s.openai.azure.com/openai/v1/embeddings", d.instance)
+		r.warn("embeddings model %q: azure upstream_url derived from instance %q",
+			getStr(model, "name"), d.instance) //nolint:errcheck
+	}
+
+	out := map[string]any{
+		"provider": r.providerFor(providerType, &d),
+		"name":     getStr(model, "name"),
+		"config":   config,
+	}
+	if d.allowOverride != nil {
+		out["allow_auth_override"] = *d.allowOverride
+	}
+	return out
+}
+
+// flattenEmbeddingsOptions converts the nested embeddings option shape produced
+// by convert.nestAzureEmbeddingsOptions (azure.{instance,...}) back into the
+// flat azure_* keys defoldOptions expects, and drops the empty provider-block
+// siblings (bedrock/gemini/huggingface: null) the plugin schema emits.
+func flattenEmbeddingsOptions(options map[string]any) map[string]any {
+	flat := map[string]any{}
+	for k, v := range options {
+		if v == nil {
+			continue
+		}
+		if k == "azure" {
+			if azure, ok := v.(map[string]any); ok {
+				for ak, av := range azure {
+					flat["azure_"+ak] = av
+				}
+				continue
+			}
+		}
+		flat[k] = v
+	}
+	return flat
+}
+
+// vectorDBFromConfig converts an ai-proxy-advanced config.balancer.vectordb
+// block into the AI Gateway entity shape: the `strategy` discriminator becomes
+// `type`, dimensions/distance_metric/threshold stay at the top, and the
+// selected strategy's sub-block is hoisted up with its flat redis keys nested
+// into cluster/keepalive/sentinel objects (pgvector ssl_* keys into an ssl
+// object). Nil values are dropped so the strict (additionalProperties:false)
+// entity schema accepts the result.
+func vectorDBFromConfig(vd map[string]any) map[string]any {
+	strategy := getStr(vd, "strategy")
+	out := map[string]any{}
+	if strategy != "" {
+		out["type"] = strategy
+	}
+	for _, k := range []string{"dimensions", "distance_metric", "threshold"} {
+		if v := vd[k]; v != nil {
+			out[k] = v
+		}
+	}
+	sub := getMap(vd, strategy)
+	switch strategy {
+	case "redis":
+		hoistRedis(sub, out)
+	case "pgvector":
+		hoistPgvector(sub, out)
+	}
+	return out
+}
+
+// putNested assigns out[group][field] = val (creating the group), skipping nils.
+func putNested(out map[string]any, group, field string, val any) {
+	if val == nil {
+		return
+	}
+	m, _ := out[group].(map[string]any)
+	if m == nil {
+		m = map[string]any{}
+		out[group] = m
+	}
+	m[field] = val
+}
+
+// hoistRedis maps the flat ai-proxy-advanced redis keys onto the entity's redis
+// vectordb fields, nesting the cluster_/keepalive_/sentinel_ families.
+func hoistRedis(sub, out map[string]any) {
+	nested := map[string][2]string{
+		"cluster_max_redirections": {"cluster", "max_redirections"},
+		"cluster_nodes":            {"cluster", "nodes"},
+		"cluster_addresses":        {"cluster", "nodes"},
+		"keepalive_backlog":        {"keepalive", "backlog"},
+		"keepalive_pool_size":      {"keepalive", "pool_size"},
+		"sentinel_master":          {"sentinel", "master"},
+		"sentinel_nodes":           {"sentinel", "nodes"},
+		"sentinel_addresses":       {"sentinel", "nodes"},
+		"sentinel_password":        {"sentinel", "password"},
+		"sentinel_role":            {"sentinel", "role"},
+		"sentinel_username":        {"sentinel", "username"},
+	}
+	// timeout has no entity equivalent (connect/read/send_timeout carry it).
+	drop := map[string]bool{"timeout": true}
+	for k, v := range sub {
+		if v == nil || drop[k] {
+			continue
+		}
+		if dst, ok := nested[k]; ok {
+			putNested(out, dst[0], dst[1], v)
+			continue
+		}
+		out[k] = v
+	}
+}
+
+// hoistPgvector maps the flat ai-proxy-advanced pgvector keys onto the entity's
+// pgvector vectordb fields, nesting the ssl_* family into an ssl object.
+func hoistPgvector(sub, out map[string]any) {
+	nested := map[string][2]string{
+		"ssl_cert":     {"ssl", "cert"},
+		"ssl_cert_key": {"ssl", "cert_key"},
+		"ssl_required": {"ssl", "required"},
+		"ssl_verify":   {"ssl", "verify"},
+		"ssl_version":  {"ssl", "version"},
+	}
+	for k, v := range sub {
+		if v == nil {
+			continue
+		}
+		if k == "ssl" { // plugin boolean -> ssl.enabled
+			putNested(out, "ssl", "enabled", v)
+			continue
+		}
+		if dst, ok := nested[k]; ok {
+			putNested(out, dst[0], dst[1], v)
+			continue
+		}
+		out[k] = v
+	}
+}
+
 // vaultRefRe extracts the vault prefix from a "{vault://prefix/key}" reference.
 var vaultRefRe = regexp.MustCompile(`\{vault://([^/}]+)/`)
 
@@ -153,11 +326,24 @@ func (r *Reverter) providerFor(providerType string, d *defoldedTarget) string {
 	}
 
 	name := r.uniqueProviderName(providerType, d)
+	auth := d.auth
+	// The current Konnect SDK rejects config.auth.use_managed_identity /
+	// use_gcp_service_account outright, so they cannot be migrated. A true flag
+	// signals a keyless auth mode (azure managed identity / gcp service
+	// account) that must be reconfigured manually; drop it and warn.
+	if boolVal(auth.UseManagedIdentity) {
+		r.warn("provider %q: azure managed-identity auth is not migratable; configure it manually", name) //nolint:errcheck
+	}
+	if boolVal(auth.UseGCPServiceAccount) {
+		r.warn("provider %q: gcp service-account auth is not migratable; configure it manually", name) //nolint:errcheck
+	}
+	auth.UseManagedIdentity = nil
+	auth.UseGCPServiceAccount = nil
 	p := aigw.Provider{
 		Type: providerType,
 		Name: name,
 		Config: aigw.ProviderConfig{
-			Auth:      d.auth,
+			Auth:      auth,
 			Instance:  d.instance,
 			ProjectID: d.projectID,
 		},
@@ -207,23 +393,28 @@ func ptrVal(b *bool) any {
 	return *b
 }
 
+func boolVal(b *bool) bool {
+	return b != nil && *b
+}
+
 // uniqueProviderName derives a stable, human-readable provider name.
 func (r *Reverter) uniqueProviderName(providerType string, d *defoldedTarget) string {
 	base := ""
 	if prefix := vaultPrefix(d.auth); prefix != "" {
 		base = providerType + "-" + prefix
 	}
-	if base == "" || r.providerNames[base] {
+	if base == "" || r.providerNames[base] || r.usedNames[base] {
 		for {
 			r.providerCounts[providerType]++
 			candidate := fmt.Sprintf("%s-%d", providerType, r.providerCounts[providerType])
-			if !r.providerNames[candidate] {
+			if !r.providerNames[candidate] && !r.usedNames[candidate] {
 				base = candidate
 				break
 			}
 		}
 	}
 	r.providerNames[base] = true
+	r.usedNames[base] = true
 	return base
 }
 

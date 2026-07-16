@@ -49,3 +49,7 @@ coverage.html
 
 # macOS
 .DS_Store
+
+
+ai.yaml
+revert_bug_list.yaml

@@ -104,6 +104,12 @@ var Diffs = map[string]SchemaDiff{
 		// 2.0 in favor of the required `policies` array.
 		RemovedIn20: []string{"llm_providers", "llm_format"},
 	},
+	"ai-request-transformer": {
+		RemovedIn20: []string{"llm.model.options.upstream_path"},
+	},
+	"ai-response-transformer": {
+		RemovedIn20: []string{"llm.model.options.upstream_path"},
+	},
 	"rate-limiting-advanced": {
 		RemovedIn20: []string{"counter_key"},
 	},

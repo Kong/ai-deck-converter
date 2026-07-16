@@ -1,5 +1,7 @@
 agents:
-  - type: a2a
+  - ref: booking-agent
+    type: a2a
+    display_name: booking-agent
     name: booking-agent
     config:
       url: https://booking-agent.internal:8443/a2a
@@ -14,7 +16,9 @@ agents:
         payloads: false
         statistics: true
         max_payload_size: 524288
-  - type: http
+  - ref: weather-agent
+    type: http
+    display_name: weather-agent
     name: weather-agent
     policies:
       - key-auth
@@ -29,7 +33,9 @@ agents:
         paths:
           - /agents/weather
 policies:
-  - type: key-auth
+  - ref: key-auth
+    type: key-auth
+    display_name: key-auth
     name: key-auth
     config:
       key_names:

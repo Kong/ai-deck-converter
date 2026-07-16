@@ -1,5 +1,7 @@
 models:
-  - type: model
+  - ref: titan-embed-text-v2
+    type: model
+    display_name: titan-embed-text-v2
     name: titan-embed-text-v2
     capabilities:
       - embeddings
@@ -18,7 +20,9 @@ models:
         statistics: true
       model:
         alias: '@bedrock/titan-embed-text-v2'
-  - type: model
+  - ref: nova-canvas-image
+    type: model
+    display_name: nova-canvas-image
     name: nova-canvas-image
     capabilities:
       - image
@@ -36,7 +40,9 @@ models:
         statistics: true
       model:
         alias: '@bedrock/nova-canvas'
-  - type: model
+  - ref: nova-sonic-audio
+    type: model
+    display_name: nova-sonic-audio
     name: nova-sonic-audio
     capabilities:
       - audio/speech
@@ -54,7 +60,9 @@ models:
         statistics: true
       model:
         alias: '@bedrock/nova-sonic'
-  - type: model
+  - ref: nova-reel-video
+    type: model
+    display_name: nova-reel-video
     name: nova-reel-video
     capabilities:
       - video
@@ -74,7 +82,9 @@ models:
       model:
         alias: '@bedrock/nova-reel'
 model_providers:
-  - type: bedrock
+  - ref: bedrock-ai
+    type: bedrock
+    display_name: bedrock-ai
     name: bedrock-ai
     config:
       auth:

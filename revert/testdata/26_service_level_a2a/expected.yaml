@@ -1,5 +1,7 @@
 agents:
-  - type: a2a
+  - ref: a2a-currency-agent
+    type: a2a
+    display_name: a2a-currency-agent
     name: a2a-currency-agent
     policies:
       - rate-limiting-advanced
@@ -15,7 +17,9 @@ agents:
         statistics: true
         max_payload_size: 1048576
 policies:
-  - type: rate-limiting-advanced
+  - ref: rate-limiting-advanced
+    type: rate-limiting-advanced
+    display_name: rate-limiting-advanced
     name: rate-limiting-advanced
     enabled: true
     config:

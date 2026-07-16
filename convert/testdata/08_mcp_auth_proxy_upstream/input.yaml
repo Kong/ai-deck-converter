@@ -49,8 +49,8 @@ mcp_servers:
   # passthrough-listener carrying a proxy block (-> proxy_config).
   - type: passthrough-listener
     name: vendor-proxy-mcp
-    upstream_url: https://vendor.example.com/mcp
     config:
+      url: https://vendor.example.com/mcp
       route:
         paths:
           - /mcp/vendor-proxy
@@ -65,8 +65,8 @@ mcp_servers:
   # this mode) and per-tool input/output schema.
   - type: upstream-server
     name: upstream-mcp
-    upstream_url: https://upstream.example.com/mcp
     config:
+      url: https://upstream.example.com/mcp
       route:
         paths:
           - /mcp/upstream

@@ -1,5 +1,7 @@
 models:
-  - type: model
+  - ref: chat-lb
+    type: model
+    display_name: chat-lb
     name: chat-lb
     capabilities:
       - generate
@@ -29,7 +31,9 @@ models:
         algorithm: round-robin
         slots: 10000
 model_providers:
-  - type: openai
+  - ref: openai-env
+    type: openai
+    display_name: openai-env
     name: openai-env
     config:
       auth:
@@ -37,7 +41,9 @@ model_providers:
         headers:
           - name: Authorization
             value: '{vault://env/openai-key}'
-  - type: azure
+  - ref: azure-env
+    type: azure
+    display_name: azure-env
     name: azure-env
     config:
       auth:
