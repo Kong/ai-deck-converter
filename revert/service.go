@@ -9,8 +9,11 @@ import (
 // revertServices walks every Kong service and classifies each route by the AI
 // plugin it carries: ai-proxy-advanced routes accumulate into Models,
 // ai-mcp-proxy routes become MCP Servers, ai-a2a-proxy and plain routes become
-// Agents. Classification is per-route so hand-written configs that mix kinds
-// on one service still convert.
+// Agents. Classification is per-route so hand-written configs that mix kinds on
+// one service still convert. Because Kong applies a service-level plugin to
+// every route on the service, each route is classified and reconstructed from
+// its own plugins *plus* the service-level plugins — real Konnect configs
+// commonly attach the AI plugin (and its guards) at the service level.
 func (r *Reverter) revertServices() error {
 	acc := &modelAcc{groups: map[string]*modelGroup{}}
 	routesSeen := map[string]bool{}
@@ -29,44 +32,36 @@ func (r *Reverter) revertServices() error {
 			continue
 		}
 
-		var plainRoutes []*kong.Route
-		hasModelRoute, hasMCPRoute := false, false
+		type plainRoute struct {
+			rt      *kong.Route
+			plugins []kong.Plugin
+		}
+		var plainRoutes []plainRoute
 		for j := range svc.Routes {
 			rt := &svc.Routes[j]
-			plugins := r.routePlugins(rt)
+			// Effective plugins for this route: nested route plugins first,
+			// then the service-level plugins that apply to every route.
+			plugins := append(append([]kong.Plugin{}, r.routePlugins(rt)...), svcPlugins...)
 			switch {
 			case hasPlugin(plugins, "ai-proxy-advanced"):
 				if err := r.accumulateModelRoute(acc, rt, plugins); err != nil {
 					return err
 				}
-				hasModelRoute = true
 			case hasPlugin(plugins, "ai-mcp-proxy"):
-				if err := r.revertMCPServer(svc, rt, plugins, svcPlugins); err != nil {
+				if err := r.revertMCPServer(svc, rt, plugins); err != nil {
 					return err
 				}
-				hasMCPRoute = true
 			default:
-				plainRoutes = append(plainRoutes, rt)
+				plainRoutes = append(plainRoutes, plainRoute{rt, plugins})
 			}
 		}
 
-		// Service-level plugins on a pure model service have no AI Gateway home
-		// (model policies scope via the ai-models FK, not the service); MCP
-		// servers and agents absorb them as policies instead.
-		if hasModelRoute && !hasMCPRoute && len(plainRoutes) == 0 && len(svcPlugins) > 0 {
-			if err := r.warn(
-				"service %q: service-level plugins on a model service have no AI Gateway representation; dropped",
-				svc.Name); err != nil {
-				return err
-			}
-		}
-
-		for _, rt := range plainRoutes {
+		for _, pr := range plainRoutes {
 			name := svc.Name
 			if len(svc.Routes) > 1 {
-				name = rt.Name
+				name = pr.rt.Name
 			}
-			if err := r.revertAgent(svc, rt, name, svcPlugins); err != nil {
+			if err := r.revertAgent(svc, pr.rt, name, pr.plugins); err != nil {
 				return err
 			}
 		}

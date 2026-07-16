@@ -9,8 +9,9 @@ import (
 // Gateway MCP Server: config.mode becomes the type, the plugin's embedded tools
 // come back out as Tools, the ACL config (acl_attribute_type /
 // access_token_claim_field / default_acl) becomes config.access, and any other
-// route- or service-level plugins become policies.
-func (r *Reverter) revertMCPServer(svc *kong.Service, rt *kong.Route, plugins, svcPlugins []kong.Plugin) error {
+// route- or service-level plugins become policies. plugins is the route's
+// effective plugin list (nested route plugins plus service-level plugins).
+func (r *Reverter) revertMCPServer(svc *kong.Service, rt *kong.Route, plugins []kong.Plugin) error {
 	mcpPlugin := findPlugin(plugins, "ai-mcp-proxy")
 	cfg := mcpPlugin.Config
 
@@ -77,7 +78,7 @@ func (r *Reverter) revertMCPServer(svc *kong.Service, rt *kong.Route, plugins, s
 		m.Tools = append(m.Tools, mcpTool(tool))
 	}
 
-	refs, acls := r.policyRefs(append(append([]kong.Plugin{}, plugins...), svcPlugins...))
+	refs, acls := r.policyRefs(plugins)
 	m.Policies = refs
 	m.Access.ACLs = acls
 

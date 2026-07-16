@@ -1,0 +1,60 @@
+models:
+  - type: model
+    name: azure-gpt-5
+    capabilities:
+      - generate
+    formats:
+      - type: openai
+    targets:
+      - name: gpt-5
+        weight: 100
+        provider: azure-ai
+        config:
+          api_version: v1
+          deployment_id: gpt-5
+          temperature: 1
+          type: azure
+          upstream_url: https://se-ai-gw-resource.openai.azure.com/openai/v1/chat/completions
+    policies:
+      - ai-prompt-guard
+    access:
+      identity_providers:
+        - openid-connect-1
+    config:
+      logging:
+        payloads: true
+        statistics: true
+      response_streaming: allow
+      max_request_body_size: 8192
+      model:
+        alias: azure/gpt-5
+        name_header: true
+model_providers:
+  - type: azure
+    name: azure-ai
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: '{vault://ai/azure-token}'
+      instance: se-ai-gw-resource
+policies:
+  - type: ai-prompt-guard
+    name: ai-prompt-guard
+    enabled: true
+    config:
+      deny_patterns:
+        - .*(W|w)ar.*
+      genai_category: text/generation
+      llm_format: openai
+      max_request_body_size: 8192
+identity_providers:
+  - type: openid-connect
+    name: openid-connect-1
+    config:
+      auth_methods:
+        - bearer
+      consumer_claim:
+        - sub
+      issuer: https://konghq.okta.com/oauth2/default

@@ -1,0 +1,34 @@
+# A hand-authored / Konnect-style decK config that attaches ai-a2a-proxy at the
+# SERVICE level. The service's route must be reconstructed as an "a2a" agent
+# (not a plain "http" agent), with the service-level rate-limiting plugin
+# becoming a policy.
+_format_version: "3.0"
+services:
+  - name: a2a-currency-agent
+    host: a2a-currency-agent-service.currency-agent.svc
+    port: 80
+    protocol: http
+    plugins:
+      - name: ai-a2a-proxy
+        enabled: true
+        config:
+          logging:
+            log_payloads: true
+            log_statistics: true
+            max_payload_size: 1048576
+          max_request_body_size: 1048576
+      - name: rate-limiting-advanced
+        enabled: true
+        config:
+          identifier: consumer
+          limit:
+            - 1000
+          strategy: local
+          window_size:
+            - 30
+          window_type: sliding
+    routes:
+      - name: a2a-currency-agent-route
+        paths:
+          - /currency-agent
+        strip_path: true

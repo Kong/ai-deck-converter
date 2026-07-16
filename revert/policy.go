@@ -6,6 +6,7 @@ import (
 
 	"github.com/Kong/ai-deck-converter/internal/aigw"
 	"github.com/Kong/ai-deck-converter/internal/kong"
+	"github.com/Kong/ai-deck-converter/internal/policies"
 )
 
 // aiPluginNames are plugins reconstructed into first-class AI Gateway entities
@@ -78,6 +79,11 @@ func (r *Reverter) modelPolicyRefs(plugins []kong.Plugin) ([]string, aigw.ACLs, 
 // same type, config, enabled state, and scope kind reuses the existing policy;
 // otherwise a new policy is registered under a unique name.
 func (r *Reverter) registerPolicy(p kong.Plugin, global bool) *aigw.Policy {
+	// Drop fields/enum values that exist in the API Gateway 3.15 plugin schema
+	// but are rejected by the AI Gateway 2.0 policy schema, so the migrated
+	// policy validates. The shared p.Config map is never mutated.
+	cfg := policies.SanitizeConfig(p.Name, p.Config)
+
 	for i := range r.policies {
 		existing := &r.policies[i]
 		if existing.Type != p.Name {
@@ -89,7 +95,7 @@ func (r *Reverter) registerPolicy(p kong.Plugin, global bool) *aigw.Policy {
 		if !boolPtrEqual(existing.Enabled, p.Enabled) {
 			continue
 		}
-		if !reflect.DeepEqual(existing.Config, p.Config) {
+		if !reflect.DeepEqual(existing.Config, cfg) {
 			continue
 		}
 		return existing
@@ -99,7 +105,7 @@ func (r *Reverter) registerPolicy(p kong.Plugin, global bool) *aigw.Policy {
 		Type:    p.Name,
 		Name:    r.uniquePolicyName(p.Name),
 		Enabled: p.Enabled,
-		Config:  p.Config,
+		Config:  cfg,
 	}
 	if global {
 		policy.Global = boolPtr(true)

@@ -1,0 +1,28 @@
+agents:
+  - type: a2a
+    name: a2a-currency-agent
+    policies:
+      - rate-limiting-advanced
+    config:
+      url: http://a2a-currency-agent-service.currency-agent.svc:80
+      route:
+        paths:
+          - /currency-agent
+        strip_path: true
+      max_request_body_size: 1048576
+      logging:
+        payloads: true
+        statistics: true
+        max_payload_size: 1048576
+policies:
+  - type: rate-limiting-advanced
+    name: rate-limiting-advanced
+    enabled: true
+    config:
+      identifier: consumer
+      limit:
+        - 1000
+      strategy: local
+      window_size:
+        - 30
+      window_type: sliding

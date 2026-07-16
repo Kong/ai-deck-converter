@@ -7,10 +7,10 @@ import (
 
 // revertAgent lifts a non-AI service route back into an AI Gateway agent: an
 // ai-a2a-proxy plugin marks an "a2a" agent, anything else is a plain "http"
-// agent (the same shape the forward converter emits for http agents).
-func (r *Reverter) revertAgent(svc *kong.Service, rt *kong.Route, name string, svcPlugins []kong.Plugin) error {
-	plugins := r.routePlugins(rt)
-
+// agent (the same shape the forward converter emits for http agents). plugins is
+// the route's effective plugin list (nested route plugins plus service-level
+// plugins), so an ai-a2a-proxy attached at the service level is still detected.
+func (r *Reverter) revertAgent(svc *kong.Service, rt *kong.Route, name string, plugins []kong.Plugin) error {
 	a := aigw.Agent{
 		Type:   "http",
 		Name:   name,
@@ -30,7 +30,7 @@ func (r *Reverter) revertAgent(svc *kong.Service, rt *kong.Route, name string, s
 	}
 	a.Config.Route = routeConfig(rt, name)
 
-	refs, acls := r.policyRefs(append(append([]kong.Plugin{}, plugins...), svcPlugins...))
+	refs, acls := r.policyRefs(plugins)
 	a.Policies = refs
 	a.Access.ACLs = acls
 
