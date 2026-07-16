@@ -16,6 +16,13 @@ func (r *Reverter) revertAgent(svc *kong.Service, rt *kong.Route, name string, s
 		Name:   name,
 		Labels: r.tagsToLabels(svc.Tags),
 	}
+	// The forward converter maps a disabled agent to a disabled Gateway Service;
+	// lift that back so the round trip preserves enabled: false. Mirror the
+	// forward guard (only carry the flag when explicitly disabled) to keep the
+	// two directions symmetric.
+	if svc.Enabled != nil && !*svc.Enabled {
+		a.Enabled = svc.Enabled
+	}
 	if a2a := findPlugin(plugins, "ai-a2a-proxy"); a2a != nil {
 		a.Type = "a2a"
 		a.Config.Logging = loggingFromBlockWithDefaults(getMap(a2a.Config, "logging"), false, true)
