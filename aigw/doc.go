@@ -28,6 +28,20 @@ type (
 	MCPServer         = internal.MCPServer
 	Agent             = internal.Agent
 	Vault             = internal.Vault
+
+	// Field types of the above, re-exported so external consumers can build them as
+	// composite literals (previously only reachable via field assignment).
+	ModelAccess      = internal.ModelAccess
+	AccessConfig     = internal.AccessConfig
+	IdentityProvider = internal.IdentityProvider
+	AgentConfig      = internal.AgentConfig
+	MCPServerConfig  = internal.MCPServerConfig
+	MCPAccess        = internal.MCPAccess
+	MCPConfigAccess  = internal.MCPConfigAccess
+	MCPTool          = internal.MCPTool
+	ProxyConfig      = internal.ProxyConfig
+	ProxyAuth        = internal.ProxyAuth
+	ProxyHost        = internal.ProxyHost
 )
 
 func Parse(data []byte) (*Document, error) {
