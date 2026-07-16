@@ -36,7 +36,8 @@ type (
 	IdentityProvider = internal.IdentityProvider
 	AgentConfig      = internal.AgentConfig
 	MCPServerConfig  = internal.MCPServerConfig
-	MCPAuth          = internal.MCPAuth
+	MCPAccess        = internal.MCPAccess
+	MCPConfigAccess  = internal.MCPConfigAccess
 	MCPTool          = internal.MCPTool
 	ProxyConfig      = internal.ProxyConfig
 	ProxyAuth        = internal.ProxyAuth
