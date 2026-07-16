@@ -98,10 +98,15 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 			providerType := detectProviderType(getStr(modelMap, "provider"), path)
 			section := aimap.SectionFor(llmFormat, providerType)
 
-			var capability, base string
+			var capability string
+			var bases []string
 			if match, ok := resolveEndpoint(section, routeType, genai, rt.Name, path); ok {
 				capability = match.capability
-				base, _ = basePathFor(path, match.spec)
+				for _, p := range rt.Paths {
+					if b, ok := basePathFor(p, match.spec); ok {
+						bases = append(bases, b)
+					}
+				}
 			} else if routeType == "llm/v1/chat" {
 				capability = "generate"
 				if err := r.warn(
@@ -118,7 +123,7 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 				continue
 			}
 
-			g, err := r.modelGroupFor(acc, rt, fkName, alias, llmFormat, base, cfg, refs, acls, idpRefs)
+			g, err := r.modelGroupFor(acc, rt, fkName, alias, llmFormat, bases, cfg, refs, acls, idpRefs)
 			if err != nil {
 				return err
 			}
@@ -126,7 +131,7 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 			// model-level block in the AI Gateway model; lift it back from the
 			// first target that has it (all of a model's targets share the block).
 			if g.model.Config.Logging == nil {
-				g.model.Config.Logging = loggingFromBlock(getMap(target, "logging"))
+				g.model.Config.Logging = loggingFromBlockWithDefaults(getMap(target, "logging"), false, false)
 			}
 			if !g.capsSeen[capability] {
 				g.capsSeen[capability] = true
@@ -165,7 +170,7 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 // plugin config. A non-empty fkName names the group directly (the type "model"
 // case where ai-proxy-advanced carries an ai-model FK).
 func (r *Reverter) modelGroupFor(
-	acc *modelAcc, rt *kong.Route, fkName, alias, llmFormat, base string,
+	acc *modelAcc, rt *kong.Route, fkName, alias, llmFormat string, bases []string,
 	cfg map[string]any, refs []string, acls aigw.ACLs, idpRefs []string,
 ) (*modelGroup, error) {
 	var key string
@@ -229,8 +234,8 @@ func (r *Reverter) modelGroupFor(
 	g.model.Config.Proxy = proxyFromConfig(getMap(cfg, "proxy_config"))
 	g.model.Config.MaxRequestBodySize = getInt(cfg, "max_request_body_size")
 	g.model.Config.Balancer = balancerFromConfig(getMap(cfg, "balancer"), cfg["vectordb"], cfg["embeddings"])
-	if base != "" && base != aimap.DefaultBasePath {
-		g.model.Config.Route.Paths = []string{base}
+	if len(bases) > 1 || (len(bases) == 1 && bases[0] != aimap.DefaultBasePath) {
+		g.model.Config.Route.Paths = bases
 	}
 	acc.groups[key] = g
 	acc.order = append(acc.order, key)

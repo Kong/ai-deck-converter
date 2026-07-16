@@ -1,14 +1,20 @@
 package convert
 
 import (
+	"encoding/json"
+	"sort"
+	"strconv"
+	"strings"
+
 	"github.com/Kong/ai-deck-converter/internal/aigw"
 	"github.com/Kong/ai-deck-converter/internal/aimap"
 	"github.com/Kong/ai-deck-converter/internal/kong"
 )
 
 // routeGroup accumulates everything that maps to a single Kong route, keyed by
-// (section, routeLabel). The route and its ai-model-selector are shared by every
-// model that resolves to the endpoint; each owning model contributes its own
+// (section, routeLabel, route configuration). The route and its
+// ai-model-selector are shared only by models with the same endpoint and
+// client-facing route configuration; each owning model contributes its own
 // ai-proxy-advanced plugin (a proxyGroup).
 type routeGroup struct {
 	route          kong.Route
@@ -24,6 +30,7 @@ type routeGroup struct {
 type proxyGroup struct {
 	routeName         string
 	modelName         string // ai-model FK; empty scopes the plugin route-only
+	enabled           *bool
 	llmFormat         string
 	genaiCategory     string
 	balancer          map[string]any
@@ -47,12 +54,14 @@ func (c *Converter) convertModels() error {
 	groups := map[string]*routeGroup{}
 	var order []string
 	var guardPlugins []kong.Plugin
+	usedRouteNames := map[string]bool{}
+	identityPluginSeen := map[string]bool{}
 
 	for i := range c.src.Models {
 		m := &c.src.Models[i]
-		base := basePath(m)
+		bases := basePaths(m)
 		caps := c.expandCapabilities(m)
-		logging := modelLoggingBlock(m.Config.Logging)
+		logging := modelLoggingBlock(withLoggingDefaults(m.Config.Logging, false, false))
 
 		// Preserve the source model alias on ai-proxy-advanced targets exactly as
 		// authored so alias-less targets still participate in the DP's fallback
@@ -69,6 +78,12 @@ func (c *Converter) convertModels() error {
 		// for type "model" (each carries its own ai-model FK), shared for type
 		// "api" (route-only, all targets merged into one plugin).
 		modelScoped := isModelType(m)
+		// API models share route-only ai-proxy-advanced plugins, so disabling one
+		// plugin could disable other models on the same route. Exclude explicitly
+		// disabled API models until they can be represented with independent scopes.
+		if !modelScoped && m.Enabled != nil && !*m.Enabled {
+			continue
+		}
 		ownerKey := ""
 		if modelScoped {
 			ownerKey = m.Name
@@ -108,13 +123,27 @@ func (c *Converter) convertModels() error {
 					}
 					continue
 				}
-				key := sec + "|" + spec.RouteLabel
+				// Authentication plugins execute before the model selector. Models
+				// with different identity-provider sets therefore cannot share a
+				// route: a route-scoped auth plugin would otherwise protect every
+				// model on that route.
+				identityKey := identityProviderKey(m.Access.IdentityProviders)
+				routeConfigKey, err := modelRouteConfigKey(m.Config.Route)
+				if err != nil {
+					return err
+				}
+				key := sec + "|" + spec.RouteLabel + "|" + identityKey + "|" + routeConfigKey
 				g := groups[key]
 				if g == nil {
+					paths := make([]string, len(bases))
+					for i, b := range bases {
+						paths[i] = aimap.RoutePath(b, spec)
+					}
+					routeName := uniqueModelRouteName(sec+"-"+spec.RouteLabel, usedRouteNames)
 					g = &routeGroup{
 						route: buildModelRoute(
-							m.Config.Route, sec+"-"+spec.RouteLabel,
-							aimap.RoutePath(base, spec), spec.Methods),
+							m.Config.Route, routeName,
+							paths, spec.Methods),
 						takesBodyModel: spec.TakesBodyModel,
 						bodySize:       aimap.DefaultMaxBodySize,
 						proxyByOwner:   map[string]*proxyGroup{},
@@ -146,6 +175,7 @@ func (c *Converter) convertModels() error {
 					pg = &proxyGroup{
 						routeName:         g.route.Name,
 						modelName:         modelName,
+						enabled:           disabledModelPluginEnabled(m.Enabled),
 						llmFormat:         llmFormat(m),
 						genaiCategory:     spec.GenaiCategory,
 						balancer:          balancerConfig(m.Config.Balancer),
@@ -197,8 +227,8 @@ func (c *Converter) convertModels() error {
 			}
 		}
 
-		// Identity provider plugins scope to the route only (no ai-model FK), and
-		// require an anonymous consumer to fall back to on failed authentication.
+		// Each route group contains only models with the same identity-provider
+		// set, so these plugins can safely remain route-scoped.
 		idpPlugins, err := c.scopedIdentityProviderPlugins(m.Access.IdentityProviders)
 		if err != nil {
 			return err
@@ -207,6 +237,11 @@ func (c *Converter) convertModels() error {
 			c.ensureAnonymousConsumer()
 		}
 		for _, routeName := range routeNames {
+			key := routeName + "\x00" + identityProviderKey(m.Access.IdentityProviders)
+			if identityPluginSeen[key] {
+				continue
+			}
+			identityPluginSeen[key] = true
 			for k := range idpPlugins {
 				p := idpPlugins[k]
 				p.Route = kong.NewStringRef(routeName)
@@ -237,9 +272,10 @@ func (c *Converter) convertModels() error {
 		}
 		for _, pg := range g.proxies {
 			plugin := kong.Plugin{
-				Name:   "ai-proxy-advanced",
-				Route:  kong.NewStringRef(pg.routeName),
-				Config: pg.proxyConfig(),
+				Name:    "ai-proxy-advanced",
+				Enabled: pg.enabled,
+				Route:   kong.NewStringRef(pg.routeName),
+				Config:  pg.proxyConfig(),
 			}
 			if pg.modelName != "" {
 				plugin.Model = kong.NewStringRef(pg.modelName)
@@ -250,6 +286,50 @@ func (c *Converter) convertModels() error {
 	c.out.Services = append(c.out.Services, service)
 	c.out.Plugins = append(c.out.Plugins, guardPlugins...)
 	return nil
+}
+
+// identityProviderKey canonicalizes identity-provider references for route
+// grouping. Duplicate references have no semantic effect, and their ordering
+// must not make otherwise identical access policies create separate routes.
+func identityProviderKey(refs []string) string {
+	seen := make(map[string]bool, len(refs))
+	var unique []string
+	for _, ref := range refs {
+		if !seen[ref] {
+			seen[ref] = true
+			unique = append(unique, ref)
+		}
+	}
+	sort.Strings(unique)
+	return strings.Join(unique, "\x00")
+}
+
+// modelRouteConfigKey returns a stable representation of the client-facing
+// route configuration. Endpoint paths are derived separately, but the base
+// paths and every other route matcher must agree before models can share a
+// route.
+func modelRouteConfigKey(route aigw.RouteConfig) (string, error) {
+	b, err := json.Marshal(route)
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
+}
+
+// uniqueModelRouteName reserves base if available, otherwise returns a stable
+// numeric suffix for another route serving the same endpoint.
+func uniqueModelRouteName(base string, used map[string]bool) string {
+	if !used[base] {
+		used[base] = true
+		return base
+	}
+	for n := 2; ; n++ {
+		name := base + "-" + strconv.Itoa(n)
+		if !used[name] {
+			used[name] = true
+			return name
+		}
+	}
 }
 
 // proxyConfig assembles the ai-proxy-advanced plugin config for a proxy group.
@@ -312,7 +392,7 @@ func (c *Converter) buildTarget(
 	if alias != "" {
 		model["model_alias"] = alias
 	}
-	if opts := mapOptions(tm.Config.Options, providerType, provider); opts != nil {
+	if opts := mapOptions(tm.Config.Options, providerType, tm.Name, provider); opts != nil {
 		model["options"] = opts
 	}
 
@@ -378,11 +458,17 @@ func balancerExtra(b *aigw.Balancer, key string) any {
 	return b.Fields[key]
 }
 
-func basePath(m *aigw.Model) string {
-	if len(m.Config.Route.Paths) > 0 && m.Config.Route.Paths[0] != "" {
-		return m.Config.Route.Paths[0]
+func basePaths(m *aigw.Model) []string {
+	var out []string
+	for _, p := range m.Config.Route.Paths {
+		if p != "" {
+			out = append(out, p)
+		}
 	}
-	return aimap.DefaultBasePath
+	if len(out) == 0 {
+		return []string{aimap.DefaultBasePath}
+	}
+	return out
 }
 
 // The assistants, batches, and files endpoints do not route by model,
@@ -397,6 +483,16 @@ func supportsModelNameHeader(spec aimap.EndpointSpec) bool {
 // opposed to an "api" entity for files/batches). An empty type defaults to
 // "model", the discriminator default and the common synchronous case.
 func isModelType(m *aigw.Model) bool { return m.Type != "api" }
+
+// disabledModelPluginEnabled returns false only when the source model is
+// explicitly disabled. Omitting enabled for active models preserves Kong's
+// default behavior and keeps generated configuration minimal.
+func disabledModelPluginEnabled(enabled *bool) *bool {
+	if enabled != nil && !*enabled {
+		return enabled
+	}
+	return nil
+}
 
 func llmFormat(m *aigw.Model) string {
 	if len(m.Formats) > 0 && m.Formats[0].Type != "" {

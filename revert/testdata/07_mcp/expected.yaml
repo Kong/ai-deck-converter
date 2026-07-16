@@ -6,13 +6,14 @@ mcp_servers:
         paths:
           - /mcp/flights
       logging:
+        payloads: false
         statistics: true
         audits: true
       max_request_body_size: 8388608
       server:
         forward_client_headers: true
         timeout: 10000
-      auth:
+      access:
         default_tool_acls:
           allow:
             - premium
@@ -27,13 +28,18 @@ mcp_servers:
         description: Book a flight
         method: POST
         path: /flights/book
-        acls:
-          allow:
-            - agents
+        access:
+          acls:
+            allow:
+              - agents
   - type: passthrough-listener
     name: vendor-mcp
     config:
       route:
         paths:
           - /mcp/vendor
+      logging:
+        payloads: false
+        statistics: true
+        audits: false
     upstream_url: https://vendor-mcp.example.com/mcp

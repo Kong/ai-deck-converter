@@ -18,7 +18,7 @@ func (r *Reverter) revertAgent(svc *kong.Service, rt *kong.Route, name string, s
 	}
 	if a2a := findPlugin(plugins, "ai-a2a-proxy"); a2a != nil {
 		a.Type = "a2a"
-		a.Config.Logging = loggingFromBlock(getMap(a2a.Config, "logging"))
+		a.Config.Logging = loggingFromBlockWithDefaults(getMap(a2a.Config, "logging"), false, true)
 		a.Config.MaxRequestBodySize = getInt(a2a.Config, "max_request_body_size")
 	}
 

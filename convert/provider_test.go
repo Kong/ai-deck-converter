@@ -64,7 +64,7 @@ func TestMapOptionsAzureRenames(t *testing.T) {
 		"temperature":   0.5,
 		"deployment_id": "gpt4o-dep",
 		"api_version":   "2024-02-01",
-	}, "azure", p)
+	}, "azure", "gpt-4o", p)
 	want := map[string]any{
 		"temperature":         0.5,
 		"azure_deployment_id": "gpt4o-dep",
@@ -83,7 +83,7 @@ func TestMapOptionsGeminiNesting(t *testing.T) {
 			"location_id":  "us-central1",
 			"api_endpoint": "https://us-central1-aiplatform.googleapis.com",
 		},
-	}, "vertex", p)
+	}, "vertex", "gemini-2.5-pro", p)
 	want := map[string]any{
 		"max_tokens": 4096,
 		"gemini": map[string]any{
@@ -102,7 +102,7 @@ func TestMapOptionsBedrockNesting(t *testing.T) {
 	got := mapOptions(map[string]any{
 		"max_tokens": 1024,
 		"region":     "us-east-1",
-	}, "bedrock", p)
+	}, "bedrock", "anthropic.claude-3-5-sonnet", p)
 	want := map[string]any{
 		"max_tokens":        1024,
 		"anthropic_version": "bedrock-2023-05-31",
@@ -112,6 +112,25 @@ func TestMapOptionsBedrockNesting(t *testing.T) {
 		},
 	}
 	require.Equal(t, want, got, "mapOptions bedrock mismatch")
+}
+
+func TestMapOptionsBedrockNonAnthropicDoesNotDefaultAnthropicVersion(t *testing.T) {
+	got := mapOptions(nil, "bedrock", "amazon.titan-embed-text-v2:0", &aigw.Provider{Type: "bedrock"})
+	require.Nil(t, got)
+}
+
+func TestLowerEmbeddingsModelBedrockNonAnthropicDoesNotDefaultAnthropicVersion(t *testing.T) {
+	embeddings := map[string]any{
+		"model": map[string]any{
+			"name":   "amazon.titan-embed-text-v2:0",
+			"config": map[string]any{"type": "bedrock"},
+		},
+	}
+
+	lowerEmbeddingsModel(embeddings, &aigw.Provider{Type: "bedrock"})
+	model := embeddings["model"].(map[string]any)
+	require.Equal(t, "bedrock", model["provider"])
+	require.NotContains(t, model, "options")
 }
 
 func TestConvertWarnsUnsupportedCapability(t *testing.T) {

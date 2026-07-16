@@ -172,5 +172,3 @@ func (r *Reverter) tagsToLabels(tags []string) aigw.Labels {
 	labels, _ := aimap.TagsToLabels(tags, r.opts.LabelTagPrefix)
 	return labels
 }
-
-func boolPtr(b bool) *bool { return &b }

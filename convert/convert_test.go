@@ -54,7 +54,7 @@ models:
         allow: [premium]
         deny: [banned]
     config:
-      route: {paths: [/ai]}
+      route: {paths: [/oidc-repro/model-a]}
       model: {alias: m1}
 model_providers:
   - name: p1
@@ -87,7 +87,7 @@ models:
         config: {type: openai}
     policies: [my-key-auth]
     config:
-      route: {paths: [/ai]}
+      route: {paths: [/oidc-repro/model-b]}
       model: {alias: m1}
 model_providers:
   - name: p1
@@ -100,6 +100,128 @@ policies:
 	_, _, err := Convert(src, Options{})
 	require.Error(t, err, "model policies referencing key-auth/openid-connect must be rejected")
 	require.Contains(t, err.Error(), "identity_providers")
+}
+
+func TestConvertScopesIdentityProvidersWithoutLeakingAcrossSharedRoutes(t *testing.T) {
+	src := []byte(`
+models:
+  - type: model
+    name: public-model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    targets:
+      - name: gpt-public
+        provider: p1
+        config: {type: openai}
+    config:
+      route: {paths: [/oidc-repro/model-a]}
+      model: {alias: public}
+  - type: model
+    name: protected-model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    targets:
+      - name: gpt-protected
+        provider: p1
+        config: {type: openai}
+    access:
+      identity_providers: [oidc]
+    config:
+      route: {paths: [/oidc-repro/model-b]}
+      model: {alias: protected}
+model_providers:
+  - name: p1
+    type: openai
+identity_providers:
+  - name: oidc
+    type: openid-connect
+    config: {issuer: https://id.example.test}
+`)
+
+	out, _, err := Convert(src, Options{})
+	require.NoError(t, err, "convert")
+
+	var doc struct {
+		Plugins []struct {
+			Name  string `yaml:"name"`
+			Route string `yaml:"route"`
+			Model string `yaml:"model"`
+		} `yaml:"plugins"`
+	}
+	require.NoError(t, yaml.Unmarshal(out, &doc), "parse output")
+
+	var oidcRoute, publicRoute, protectedRoute string
+	for _, plugin := range doc.Plugins {
+		if plugin.Name == "openid-connect" {
+			require.Empty(t, plugin.Model, "OIDC must be enforced at route scope")
+			oidcRoute = plugin.Route
+		}
+		if plugin.Name == "ai-proxy-advanced" {
+			switch plugin.Model {
+			case "public-model":
+				publicRoute = plugin.Route
+			case "protected-model":
+				protectedRoute = plugin.Route
+			}
+		}
+	}
+	require.NotEmpty(t, oidcRoute)
+	require.Equal(t, protectedRoute, oidcRoute, "OIDC guards only the protected model's route")
+	require.NotEqual(t, publicRoute, oidcRoute, "the public model must not share the OIDC route")
+}
+
+func TestConvertSharesIdentityProviderForUniformlyGuardedSharedRoute(t *testing.T) {
+	src := []byte(`
+models:
+  - type: model
+    name: model-a
+    capabilities: [generate]
+    formats: [{type: openai}]
+    targets:
+      - name: gpt-a
+        provider: p1
+        config: {type: openai}
+    access: {identity_providers: [oidc]}
+    config: {route: {paths: [/ai]}, model: {alias: a}}
+  - type: model
+    name: model-b
+    capabilities: [generate]
+    formats: [{type: openai}]
+    targets:
+      - name: gpt-b
+        provider: p1
+        config: {type: openai}
+    access: {identity_providers: [oidc]}
+    config: {route: {paths: [/ai]}, model: {alias: b}}
+model_providers:
+  - name: p1
+    type: openai
+identity_providers:
+  - name: oidc
+    type: openid-connect
+`)
+
+	out, _, err := Convert(src, Options{})
+	require.NoError(t, err, "convert")
+
+	var doc struct {
+		Plugins []struct {
+			Name  string `yaml:"name"`
+			Route string `yaml:"route"`
+			Model string `yaml:"model"`
+		} `yaml:"plugins"`
+	}
+	require.NoError(t, yaml.Unmarshal(out, &doc), "parse output")
+
+	var count int
+	for _, plugin := range doc.Plugins {
+		if plugin.Name == "openid-connect" {
+			count++
+			require.Equal(t, "openai-chat", plugin.Route)
+			require.Empty(t, plugin.Model, "uniformly guarded models share the route plugin")
+		}
+	}
+	require.Equal(t, 1, count)
 }
 
 // The Kong acl plugin checks a legacy per-consumer kong.db.acls entity by
@@ -171,8 +293,9 @@ func TestConvertMCPIncludesConsumerGroups(t *testing.T) {
 mcp_servers:
   - type: conversion-listener
     name: guarded-mcp
-    default_tool_acls:
-      allow: [premium-users]
+    access:
+      default_tool_acls:
+        allow: [premium-users]
     config:
       route: {paths: [/mcp/guarded]}
     tools:
@@ -187,7 +310,7 @@ mcp_servers:
     name: oauth-mcp
     config:
       route: {paths: [/mcp/oauth]}
-      auth:
+      access:
         acl_attribute_type: oauth_access_token
         access_token_claim_field: .user.email
         default_tool_acls:
@@ -636,6 +759,118 @@ mcp_servers:
 	require.NotNil(t, byName["off-mcp"], "disabled MCP server must emit enabled")
 	require.False(t, *byName["off-mcp"], "disabled MCP server service must be enabled=false")
 	require.Nil(t, byName["on-mcp"], "enabled MCP server should not emit the flag")
+}
+
+func TestConvertDisabledModelDisablesProxyPlugins(t *testing.T) {
+	src := []byte(`
+model_providers:
+  - name: openai
+    type: openai
+models:
+  - type: model
+    name: disabled
+    enabled: false
+    capabilities: [agentic, generate, image]
+    formats: [{type: openai}]
+    targets: [{name: gpt-5, provider: openai, config: {type: openai}}]
+    config:
+      route: {paths: [/gpt-chat]}
+      model: {alias: gpt-chat}
+`)
+
+	out, _, err := Convert(src, Options{OutputMode: "db-less"})
+	require.NoError(t, err, "convert db-less")
+
+	var got struct {
+		Plugins []struct {
+			Name    string `yaml:"name"`
+			Enabled *bool  `yaml:"enabled"`
+			Model   *struct {
+				Name string `yaml:"name"`
+			} `yaml:"model"`
+		} `yaml:"plugins"`
+		AIModels []struct {
+			Name string `yaml:"name"`
+		} `yaml:"ai_models"`
+	}
+	require.NoError(t, yaml.Unmarshal(out, &got), "unmarshal output")
+
+	require.Len(t, got.AIModels, 1)
+	require.Equal(t, "disabled", got.AIModels[0].Name)
+
+	proxyPlugins := 0
+	for _, plugin := range got.Plugins {
+		if plugin.Name == "ai-proxy-advanced" && plugin.Model != nil {
+			require.NotNil(t, plugin.Enabled)
+			require.False(t, *plugin.Enabled)
+			proxyPlugins++
+		}
+	}
+	require.Equal(t, 3, proxyPlugins, "one disabled proxy plugin per capability")
+}
+
+func TestConvertModelsWithDifferentRoutesDoNotShareEndpointRoute(t *testing.T) {
+	src := []byte(`
+model_providers:
+  - name: xai
+    type: xai
+  - name: openai
+    type: openai
+models:
+  - type: model
+    name: xai-chat
+    formats: [{type: openai}]
+    capabilities: [generate]
+    targets: [{name: grok-4, provider: xai, config: {type: xai}}]
+    config:
+      route: {paths: [/xai-chat]}
+      model: {alias: xai-chat}
+  - type: model
+    name: openai-chat
+    formats: [{type: openai}]
+    capabilities: [generate]
+    targets: [{name: gpt-5, provider: openai, config: {type: openai}}]
+    config:
+      route: {paths: [/openai-chat]}
+      model: {alias: openai-chat}
+`)
+
+	out, _, err := Convert(src, Options{})
+	require.NoError(t, err, "convert")
+
+	var got struct {
+		Services []struct {
+			Routes []struct {
+				Name  string   `yaml:"name"`
+				Paths []string `yaml:"paths"`
+			} `yaml:"routes"`
+		} `yaml:"services"`
+		Plugins []struct {
+			Name  string `yaml:"name"`
+			Route string `yaml:"route"`
+			Model string `yaml:"model"`
+		} `yaml:"plugins"`
+	}
+	require.NoError(t, yaml.Unmarshal(out, &got), "unmarshal output")
+	require.Len(t, got.Services, 1)
+	require.Len(t, got.Services[0].Routes, 2)
+
+	routeByPath := map[string]string{}
+	for _, route := range got.Services[0].Routes {
+		require.Len(t, route.Paths, 1)
+		routeByPath[route.Paths[0]] = route.Name
+	}
+	require.Equal(t, "openai-chat", routeByPath["/xai-chat/chat/completions"])
+	require.Equal(t, "openai-chat-2", routeByPath["/openai-chat/chat/completions"])
+
+	pluginRouteByModel := map[string]string{}
+	for _, plugin := range got.Plugins {
+		if plugin.Name == "ai-proxy-advanced" {
+			pluginRouteByModel[plugin.Model] = plugin.Route
+		}
+	}
+	require.Equal(t, routeByPath["/xai-chat/chat/completions"], pluginRouteByModel["xai-chat"])
+	require.Equal(t, routeByPath["/openai-chat/chat/completions"], pluginRouteByModel["openai-chat"])
 }
 
 func TestConvertDBLessFlattensConsumerCredentialsAndGroups(t *testing.T) {

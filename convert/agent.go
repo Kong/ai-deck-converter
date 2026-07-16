@@ -2,6 +2,7 @@ package convert
 
 import (
 	"github.com/Kong/ai-deck-converter/internal/aigw"
+	"github.com/Kong/ai-deck-converter/internal/aimap"
 	"github.com/Kong/ai-deck-converter/internal/kong"
 )
 
@@ -54,7 +55,7 @@ func (c *Converter) convertAgents() error {
 
 func a2aPlugin(a *aigw.Agent) kong.Plugin {
 	cfg := map[string]any{}
-	if logging := loggingBlock(a.Config.Logging); logging != nil {
+	if logging := loggingBlock(withLoggingDefaults(a.Config.Logging, false, true)); logging != nil {
 		// log_audits is an ai-mcp-proxy field; the ai-a2a-proxy schema has no
 		// such key, so drop it to avoid emitting an unknown field.
 		delete(logging, "log_audits")
@@ -66,6 +67,36 @@ func a2aPlugin(a *aigw.Agent) kong.Plugin {
 		cfg["max_request_body_size"] = *a.Config.MaxRequestBodySize
 	}
 	return kong.Plugin{Name: "ai-a2a-proxy", Config: cfg}
+}
+
+// withLoggingDefaults returns a copy of l with statistics/payloads defaulted
+// when unset, and audits/max_payload_size defaulted only when the caller's
+// plugin schema supports them (indicated by the defaultAudits and
+// defaultMaxPayloadSize flags). The result is never nil.
+func withLoggingDefaults(l *aigw.Logging, defaultAudits, defaultMaxPayloadSize bool) *aigw.Logging {
+	if l == nil {
+		l = &aigw.Logging{}
+	} else {
+		l = &aigw.Logging{
+			Statistics:     l.Statistics,
+			Payloads:       l.Payloads,
+			Audits:         l.Audits,
+			MaxPayloadSize: l.MaxPayloadSize,
+		}
+	}
+	if l.Statistics == nil {
+		l.Statistics = boolPtr(aimap.DefaultLogStatistics)
+	}
+	if l.Payloads == nil {
+		l.Payloads = boolPtr(aimap.DefaultLogPayloads)
+	}
+	if defaultAudits && l.Audits == nil {
+		l.Audits = boolPtr(aimap.DefaultLogAudits)
+	}
+	if defaultMaxPayloadSize && l.MaxPayloadSize == nil {
+		l.MaxPayloadSize = intPtr(aimap.DefaultMaxPayloadSize)
+	}
+	return l
 }
 
 // loggingBlock maps AI Gateway logging to the {log_statistics, log_payloads,
@@ -92,3 +123,5 @@ func loggingBlock(l *aigw.Logging) map[string]any {
 	}
 	return block
 }
+
+func intPtr(i int) *int { return &i }

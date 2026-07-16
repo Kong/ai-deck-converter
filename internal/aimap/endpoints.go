@@ -35,9 +35,13 @@ const (
 
 // Shared defaults and the converged gateway service identity.
 const (
-	DefaultLLMFormat   = "openai"
-	DefaultBasePath    = "/ai"
-	DefaultMaxBodySize = 8388608
+	DefaultLLMFormat      = "openai"
+	DefaultBasePath       = "/ai"
+	DefaultMaxBodySize    = 8388608
+	DefaultLogStatistics  = true
+	DefaultLogPayloads    = false
+	DefaultLogAudits      = false
+	DefaultMaxPayloadSize = 1048576
 
 	GatewayServiceName = "ai-gateway"
 	GatewayServiceURL  = "http://ai-gateway.upstream.local"

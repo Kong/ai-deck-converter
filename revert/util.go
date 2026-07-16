@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/Kong/ai-deck-converter/internal/aigw"
+	"github.com/Kong/ai-deck-converter/internal/aimap"
 	"github.com/Kong/ai-deck-converter/internal/kong"
 )
 
@@ -90,6 +91,38 @@ func loggingFromBlock(block map[string]any) *aigw.Logging {
 		return nil
 	}
 	return l
+}
+
+// loggingFromBlockWithDefaults reverses a logging block and fills in the same
+// defaults the forward converter applies when statistics/payloads (and where
+// applicable, audits/max_payload_size) are absent from decK. This mirrors
+// convert's withLoggingDefaults behavior on the reverse path.
+func loggingFromBlockWithDefaults(block map[string]any, defaultAudits, defaultMaxPayloadSize bool) *aigw.Logging {
+	l := loggingFromBlock(block)
+	if l == nil {
+		l = &aigw.Logging{}
+	}
+	if l.Statistics == nil {
+		l.Statistics = boolPtr(aimap.DefaultLogStatistics)
+	}
+	if l.Payloads == nil {
+		l.Payloads = boolPtr(aimap.DefaultLogPayloads)
+	}
+	if defaultAudits && l.Audits == nil {
+		l.Audits = boolPtr(aimap.DefaultLogAudits)
+	}
+	if defaultMaxPayloadSize && l.MaxPayloadSize == nil {
+		l.MaxPayloadSize = intPtr(aimap.DefaultMaxPayloadSize)
+	}
+	return l
+}
+
+func boolPtr(b bool) *bool {
+	return &b
+}
+
+func intPtr(i int) *int {
+	return &i
 }
 
 // routeConfig lifts a Kong route back into an AI Gateway route config. The

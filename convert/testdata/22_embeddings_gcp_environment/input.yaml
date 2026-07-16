@@ -23,14 +23,13 @@ models:
           provider: gemini-prod
           model:
             name: text-embedding-004
-            options:
-              gemini:
-                gcp_environment:
-                  api_endpoint: us-central1-aiplatform.googleapis.com
-                  location_id: us-central1
-                  project_id: my-project-id
+            config:
+              type: gemini
+              gcp_environment:
+                api_endpoint: us-central1-aiplatform.googleapis.com
+                location_id: us-central1
+                project_id: my-project-id
               upstream_url: https://generativelanguage.googleapis.com
-            provider: gemini
 model_providers:
   - name: gemini-prod
     type: gemini

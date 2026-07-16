@@ -1,0 +1,24 @@
+model_providers:
+  - name: openai
+    type: openai
+models:
+  - type: model
+    name: disabled-chat
+    enabled: false
+    capabilities:
+      - agentic
+      - generate
+      - image
+    formats:
+      - type: openai
+    targets:
+      - name: gpt-5
+        provider: openai
+        config:
+          type: openai
+    config:
+      route:
+        paths:
+          - /disabled-chat
+      model:
+        alias: disabled-chat
