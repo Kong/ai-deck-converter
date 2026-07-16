@@ -86,8 +86,12 @@ var renderingSections = map[string]string{
 func EndpointSectionFor(format, providerType, capability string) string {
 	sec := SectionFor(format, providerType)
 	if base, ok := renderingSections[sec]; ok {
-		if _, ok := LookupEndpoint(base, capability); ok {
-			return base
+		// Only fall back when the rendering section supports this capability too,
+		// otherwise we may accidentally enable base-only capabilities (e.g. files).
+		if _, ok := LookupEndpoint(sec, capability); ok {
+			if _, ok := LookupEndpoint(base, capability); ok {
+				return base
+			}
 		}
 	}
 	return sec
