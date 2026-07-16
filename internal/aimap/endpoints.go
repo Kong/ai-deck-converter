@@ -75,6 +75,24 @@ var renderingSections = map[string]string{
 	"vertex": "gemini",
 }
 
+// EndpointSectionFor selects the EndpointTable section that serves a single
+// capability's route. It starts from SectionFor (which keeps a provider-specific
+// rendering like Vertex distinct so capability enumeration is accurate) but, for
+// such a rendering, prefers the base client format's section for any capability
+// that format already serves. So gemini-format traffic served by Vertex renders
+// generate/embeddings on Gemini's client paths (a Vertex backend is still
+// reached via the gcp options and the gemini provider enum), while Vertex's
+// exclusive image/video/rerank endpoints keep the Vertex project/location paths.
+func EndpointSectionFor(format, providerType, capability string) string {
+	sec := SectionFor(format, providerType)
+	if base, ok := renderingSections[sec]; ok {
+		if _, ok := LookupEndpoint(base, capability); ok {
+			return base
+		}
+	}
+	return sec
+}
+
 // Formats returns the client-facing wire formats a model may declare (the valid Format.Type
 // values), sorted. Provider-rendering sections such as "vertex" are EndpointTable keys but not
 // formats, so they are excluded.

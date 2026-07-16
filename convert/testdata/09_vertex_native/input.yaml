@@ -22,7 +22,7 @@ models:
       - name: gemini-2.5-pro-with-gcp-env
         provider: vertex-prod
         config:
-          type: gemini
+          type: vertex
           gcp_environment:
             api_endpoint: https://us-central1-aiplatform.googleapis.com
             location_id: us-central1
@@ -32,7 +32,7 @@ models:
       - name: gemini-2.6-pro-without-gcp-env
         provider: vertex-prod
         config:
-          type: gemini
+          type: vertex
           max_tokens: 4096
           temperature: 1.0
     policies: []
@@ -53,15 +53,16 @@ models:
       - name: text-embedding-005-with-gcp-env
         provider: vertex-prod
         config:
-          type: gemini
+          type: vertex
           gcp_environment:
+            endpoint_id: "my-endpoint-id"
             api_endpoint: https://us-central2-aiplatform.googleapis.com
             location_id: us-central2
             project_id: other-vertex-project
       - name: text-embedding-006-without-gcp-env
         provider: vertex-prod
         config:
-          type: gemini
+          type: vertex
     policies: []
     access:
       acls: {allow: [], deny: []}

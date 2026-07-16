@@ -93,6 +93,7 @@ plugins:
             options:
               gemini:
                 api_endpoint: https://us-central2-aiplatform.googleapis.com
+                endpoint_id: my-endpoint-id
                 location_id: us-central2
                 project_id: other-vertex-project
             provider: gemini

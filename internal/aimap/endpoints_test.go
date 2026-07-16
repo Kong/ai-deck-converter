@@ -50,6 +50,29 @@ func TestSectionDerivation(t *testing.T) {
 	}
 }
 
+func TestEndpointSectionFor(t *testing.T) {
+	cases := []struct {
+		format, providerType, capability, want string
+	}{
+		// Vertex renders shared capabilities on Gemini's client paths...
+		{"gemini", "vertex", "generate", "gemini"},
+		{"gemini", "vertex", "embeddings", "gemini"},
+		// ...but keeps the Vertex section for its exclusive capabilities.
+		{"gemini", "vertex", "image", "vertex"},
+		{"gemini", "vertex", "video", "vertex"},
+		{"gemini", "vertex", "rerank", "vertex"},
+		// Gemini served by Gemini is unaffected.
+		{"gemini", "gemini", "generate", "gemini"},
+		// Non-rendering sections pass through regardless of capability.
+		{"openai", "openai", "generate", "openai"},
+	}
+	for _, tc := range cases {
+		got := EndpointSectionFor(tc.format, tc.providerType, tc.capability)
+		require.Equalf(t, tc.want, got,
+			"EndpointSectionFor(%q,%q,%q)", tc.format, tc.providerType, tc.capability)
+	}
+}
+
 func TestEndpointLookupAndNormalization(t *testing.T) {
 	// chat -> generate -> openai chat completions.
 	for _, capability := range NormalizeCapability("chat") {
