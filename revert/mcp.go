@@ -24,6 +24,13 @@ func (r *Reverter) revertMCPServer(svc *kong.Service, rt *kong.Route, plugins, s
 		Name:   svc.Name,
 		Labels: labels,
 	}
+	// The forward converter maps a disabled MCP server to a disabled Gateway
+	// Service; lift that back so the round trip preserves enabled: false. Mirror
+	// the forward guard (only carry the flag when explicitly disabled) to keep
+	// the two directions symmetric.
+	if svc.Enabled != nil && !*svc.Enabled {
+		m.Enabled = svc.Enabled
+	}
 	if m.Type == "" {
 		if err := r.warn("MCP server %q: ai-mcp-proxy has no mode; defaulting to listener", svc.Name); err != nil {
 			return err
