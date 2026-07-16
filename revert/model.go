@@ -123,7 +123,11 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 				continue
 			}
 
-			g, err := r.modelGroupFor(acc, rt, fkName, alias, llmFormat, bases, cfg, refs, acls, idpRefs)
+			// A route whose paths do not all decompose into (base + endpoint
+			// suffix) is not conventional (hand-authored / real Konnect export);
+			// preserve its route verbatim rather than dropping it.
+			verbatim := len(rt.Paths) > 0 && len(bases) < len(rt.Paths)
+			g, err := r.modelGroupFor(acc, rt, fkName, alias, llmFormat, bases, verbatim, cfg, refs, acls, idpRefs)
 			if err != nil {
 				return err
 			}
@@ -170,7 +174,7 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 // plugin config. A non-empty fkName names the group directly (the type "model"
 // case where ai-proxy-advanced carries an ai-model FK).
 func (r *Reverter) modelGroupFor(
-	acc *modelAcc, rt *kong.Route, fkName, alias, llmFormat string, bases []string,
+	acc *modelAcc, rt *kong.Route, fkName, alias, llmFormat string, bases []string, verbatim bool,
 	cfg map[string]any, refs []string, acls aigw.ACLs, idpRefs []string,
 ) (*modelGroup, error) {
 	var key string
@@ -234,7 +238,18 @@ func (r *Reverter) modelGroupFor(
 	g.model.Config.Proxy = proxyFromConfig(getMap(cfg, "proxy_config"))
 	g.model.Config.MaxRequestBodySize = getInt(cfg, "max_request_body_size")
 	g.model.Config.Balancer = balancerFromConfig(getMap(cfg, "balancer"), cfg["vectordb"], cfg["embeddings"])
-	if len(bases) > 1 || (len(bases) == 1 && bases[0] != aimap.DefaultBasePath) {
+	switch {
+	case verbatim:
+		// Non-conventional route: preserve the real Kong route (paths, methods,
+		// strip_path, …) rather than a stripped base path.
+		rc := routeConfig(rt, name)
+		// The route name carries no extra information when it equals the model
+		// name; omit it so it does not round-trip as explicit config.
+		if rc.Name == name {
+			rc.Name = ""
+		}
+		g.model.Config.Route = rc
+	case len(bases) > 1 || (len(bases) == 1 && bases[0] != aimap.DefaultBasePath):
 		g.model.Config.Route.Paths = bases
 	}
 	acc.groups[key] = g

@@ -79,10 +79,19 @@ func (r *Reverter) modelPolicyRefs(plugins []kong.Plugin) ([]string, aigw.ACLs, 
 // same type, config, enabled state, and scope kind reuses the existing policy;
 // otherwise a new policy is registered under a unique name.
 func (r *Reverter) registerPolicy(p kong.Plugin, global bool) *aigw.Policy {
+	// Reshape the 3.15 ai-rate-limiting-advanced llm_providers shape into the
+	// AI Gateway 2.0 config.policies shape before the field-drop below removes
+	// the now-consumed llm_providers/llm_format. Operates on a copy so the
+	// shared p.Config map is never mutated.
+	src := p.Config
+	if p.Name == "ai-rate-limiting-advanced" {
+		src = reshapeAIRateLimiting(src)
+	}
+
 	// Drop fields/enum values that exist in the API Gateway 3.15 plugin schema
 	// but are rejected by the AI Gateway 2.0 policy schema, so the migrated
 	// policy validates. The shared p.Config map is never mutated.
-	cfg := policies.SanitizeConfig(p.Name, p.Config)
+	cfg := policies.SanitizeConfig(p.Name, src)
 
 	for i := range r.policies {
 		existing := &r.policies[i]
@@ -112,6 +121,58 @@ func (r *Reverter) registerPolicy(p kong.Plugin, global bool) *aigw.Policy {
 	}
 	r.policies = append(r.policies, policy)
 	return &r.policies[len(r.policies)-1]
+}
+
+// reshapeAIRateLimiting rewrites the API Gateway 3.15 ai-rate-limiting-advanced
+// per-provider limit shape (config.llm_providers: [{name, limit: [...],
+// window_size: [...]}]) into the AI Gateway 2.0 config.policies shape
+// (config.policies: [{match: [{type: provider, values: [name]}], limits:
+// [{limit, window_size, tokens_count_strategy}]}]). limit and window_size are
+// parallel arrays; tokens_count_strategy is lifted from the top-level config.
+//
+// Only configs that actually carry a populated llm_providers list are reshaped;
+// when it is null/absent (e.g. instances already authored with config.policies)
+// the config is returned unchanged. The returned map is a shallow copy when
+// reshaped, so the caller's p.Config is never mutated (the following
+// policies.SanitizeConfig then drops the consumed llm_providers/llm_format).
+func reshapeAIRateLimiting(cfg map[string]any) map[string]any {
+	provs := getSlice(cfg, "llm_providers")
+	if len(provs) == 0 {
+		return cfg
+	}
+	tcs := cfg["tokens_count_strategy"]
+
+	var out []any
+	for _, raw := range provs {
+		pr, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		limits := getSlice(pr, "limit")
+		windows := getSlice(pr, "window_size")
+		var lims []any
+		for i, lim := range limits {
+			entry := map[string]any{"limit": lim, "tokens_count_strategy": tcs}
+			if i < len(windows) {
+				entry["window_size"] = windows[i]
+			}
+			lims = append(lims, entry)
+		}
+		out = append(out, map[string]any{
+			"match":  []any{map[string]any{"type": "provider", "values": []any{pr["name"]}}},
+			"limits": lims,
+		})
+	}
+	if len(out) == 0 {
+		return cfg
+	}
+
+	nc := make(map[string]any, len(cfg)+1)
+	for k, v := range cfg {
+		nc[k] = v
+	}
+	nc["policies"] = out
+	return nc
 }
 
 // uniquePolicyName returns base, or base-N on collision.

@@ -1,0 +1,40 @@
+# A route-nested ai-proxy-advanced whose route path does not follow the
+# converter's {base}/{endpoint-suffix} convention (a real Konnect export). The
+# reverted model must preserve config.route verbatim — the actual path and its
+# explicit methods — rather than dropping it.
+_format_version: "3.0"
+services:
+  - name: aigw82-svc
+    host: api.anthropic.com
+    port: 443
+    protocol: https
+    routes:
+      - name: aigw82-route
+        methods:
+          - POST
+          - OPTIONS
+        paths:
+          - /aigw82/claude
+        strip_path: true
+        plugins:
+          - name: ai-proxy-advanced
+            enabled: true
+            config:
+              llm_format: anthropic
+              max_request_body_size: 10485760
+              model_name_header: true
+              response_streaming: allow
+              targets:
+                - auth:
+                    header_name: x-api-key
+                    header_value: '{vault://ai/anthropic-key}'
+                  logging:
+                    log_payloads: false
+                    log_statistics: true
+                  model:
+                    name: claude-sonnet-4-6
+                    options:
+                      upstream_url: https://api.anthropic.com/v1/messages
+                    provider: anthropic
+                  route_type: llm/v1/chat
+                  weight: 100

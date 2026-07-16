@@ -21,6 +21,14 @@ models:
       identity_providers:
         - openid-connect-1
     config:
+      route:
+        name: ai-gateway-unified
+        paths:
+          - /ai
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: true
       logging:
         payloads: true
         statistics: true
