@@ -167,7 +167,7 @@ var EndpointTable = map[string]map[string]EndpointSpec{
 			catTranscript, true, false,
 		},
 		"video":   {"videos", "/videos/generations", false, mPost, "video/v1/videos/generations", catVideo, true, true},
-		"batches": {"batches", "/batches", false, mGetPost, "llm/v1/batches", catTextGen, false, true},
+		"batches": {"batches", "/batches", false, mGetPost, "llm/v1/batches", catTextGen, false, false},
 		"files": {
 			"files", "/files", false, []string{"GET", "POST", "DELETE"}, "llm/v1/files", catTextGen, false, true,
 		},
