@@ -115,3 +115,58 @@ func TestRoutePath(t *testing.T) {
 		require.Equalf(t, tc.want, RoutePath(tc.base, tc.spec), "RoutePath(%q) [%s]", tc.base, tc.name)
 	}
 }
+
+func TestModelExtractionMapping(t *testing.T) {
+	type tc struct {
+		name                string
+		section             string
+		capability          string
+		wantExtractionType  string
+		wantExtractionPath  string
+	}
+
+	cases := []tc{
+		{
+			name:               "openai generate uses body extraction",
+			section:            "openai",
+			capability:         "generate",
+			wantExtractionType: ModelExtractionBody,
+		},
+		{
+			name:               "openai files has no extraction",
+			section:            "openai",
+			capability:         "files",
+			wantExtractionType: ModelExtractionNone,
+		},
+		{
+			name:               "bedrock generate uses path extraction",
+			section:            "bedrock",
+			capability:         "generate",
+			wantExtractionType: ModelExtractionPath,
+			wantExtractionPath: "/model/([^/]+)/",
+		},
+		{
+			name:               "gemini generate uses path extraction",
+			section:            "gemini",
+			capability:         "generate",
+			wantExtractionType: ModelExtractionPath,
+			wantExtractionPath: "/models/([^:/]+):",
+		},
+		{
+			name:               "vertex generate uses path extraction",
+			section:            "vertex",
+			capability:         "generate",
+			wantExtractionType: ModelExtractionPath,
+			wantExtractionPath: "/models/([^:/]+):",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			spec, ok := LookupEndpoint(c.section, c.capability)
+			require.True(t, ok)
+			require.Equal(t, c.wantExtractionType, spec.ModelExtraction.Type)
+			require.Equal(t, c.wantExtractionPath, spec.ModelExtraction.PathPattern)
+		})
+	}
+}

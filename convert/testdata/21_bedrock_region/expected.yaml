@@ -11,6 +11,11 @@ services:
           - POST
         strip_path: false
 plugins:
+  - name: ai-model-selector
+    config:
+      path_pattern: /model/([^/]+)/
+      source: path
+    route: bedrock-invoke
   - name: ai-proxy-advanced
     config:
       balancer:
@@ -47,6 +52,39 @@ plugins:
           route_type: llm/v1/embeddings
     route: bedrock-invoke
     model: titan-embed-text-v2
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: semantic
+        slots: 10000
+      embeddings:
+        auth:
+          aws_access_key_id: '{vault://ai/aws-access-key-id}'
+          aws_secret_access_key: '{vault://ai/aws-secret-access-key}'
+        model:
+          name: text-embedding-ada-002
+          options:
+            bedrock:
+              aws_region: us-east-1
+          provider: bedrock
+      genai_category: text/embeddings
+      llm_format: bedrock
+      targets:
+        - auth:
+            aws_access_key_id: '{vault://ai/aws-access-key-id}'
+            aws_secret_access_key: '{vault://ai/aws-secret-access-key}'
+          description: amazon.titan-embed-text-v2:0
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            options:
+              bedrock:
+                aws_region: us-east-1
+                embeddings_normalize: true
+            provider: bedrock
+          route_type: llm/v1/embeddings
+    route: bedrock-invoke
 ai_models:
   - name: titan-embed-text-v2
     alias: '@bedrock/titan-embed-text-v2'

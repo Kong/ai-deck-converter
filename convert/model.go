@@ -17,12 +17,12 @@ import (
 // client-facing route configuration; each owning model contributes its own
 // ai-proxy-advanced plugin (a proxyGroup).
 type routeGroup struct {
-	route          kong.Route
-	takesBodyModel bool
-	bodySize       int
-	proxies        []*proxyGroup
-	proxyByOwner   map[string]*proxyGroup
-	wildcard       *proxyGroup
+	route           kong.Route
+	modelExtraction aimap.ModelExtraction
+	bodySize        int
+	proxies         []*proxyGroup
+	proxyByOwner    map[string]*proxyGroup
+	wildcard        *proxyGroup
 }
 
 // proxyGroup accumulates one ai-proxy-advanced plugin: the targets owned by a
@@ -144,9 +144,9 @@ func (c *Converter) convertModels() error {
 						route: buildModelRoute(
 							m.Config.Route, routeName,
 							paths, spec.Methods),
-						takesBodyModel: spec.TakesBodyModel,
-						bodySize:       aimap.DefaultMaxBodySize,
-						proxyByOwner:   map[string]*proxyGroup{},
+						modelExtraction: spec.ModelExtraction,
+						bodySize:        aimap.DefaultMaxBodySize,
+						proxyByOwner:    map[string]*proxyGroup{},
 					}
 					groups[key] = g
 					order = append(order, key)
@@ -157,7 +157,7 @@ func (c *Converter) convertModels() error {
 				}
 
 				// A target's own model_alias only gets the model-name default on a
-				// route that also takes the model from the body (g.takesBodyModel):
+				// route that extracts the model from the body:
 				// that's the only case where a companion ai-model-selector plugin
 				// gates entry into this model-scoped plugin on a matching
 				// ai-models.alias (PR #30/KOKO-3787), so the request is guaranteed to
@@ -168,7 +168,7 @@ func (c *Converter) convertModels() error {
 				// pool — same reasoning as the type "api" fallback pool (PR #48/#49,
 				// AG-1211), just gated on route shape instead of entity type.
 				targetAlias := m.Config.Model.Alias
-				if modelScoped && g.takesBodyModel && targetAlias == "" {
+				if modelScoped && g.modelExtraction.Type == aimap.ModelExtractionBody && targetAlias == "" {
 					targetAlias = m.Name
 				}
 
@@ -212,7 +212,7 @@ func (c *Converter) convertModels() error {
 					pg.seen[dedup] = true
 					pg.targets = append(pg.targets, target)
 				}
-				if g.takesBodyModel {
+				if g.modelExtraction.Type != aimap.ModelExtractionNone {
 					wildcard := wildcardTarget(target)
 					if wildcard != nil {
 						if g.wildcard == nil {
@@ -230,11 +230,11 @@ func (c *Converter) convertModels() error {
 								seen:              map[string]bool{},
 							}
 						}
-					wildcardDedup := dedup + "|any"
-					if !g.wildcard.seen[wildcardDedup] {
-						g.wildcard.seen[wildcardDedup] = true
-						g.wildcard.targets = append(g.wildcard.targets, wildcard)
-					}
+						wildcardDedup := dedup + "|any"
+						if !g.wildcard.seen[wildcardDedup] {
+							g.wildcard.seen[wildcardDedup] = true
+							g.wildcard.targets = append(g.wildcard.targets, wildcard)
+						}
 					}
 				}
 				if bs := bodySizeOrDefault(m); bs > g.bodySize {
@@ -300,15 +300,11 @@ func (c *Converter) convertModels() error {
 	for _, key := range order {
 		g := groups[key]
 		service.Routes = append(service.Routes, g.route)
-		if g.takesBodyModel {
+		if cfg := modelSelectorConfig(g.modelExtraction, g.bodySize); cfg != nil {
 			c.out.Plugins = append(c.out.Plugins, kong.Plugin{
-				Name:  "ai-model-selector",
-				Route: kong.NewStringRef(g.route.Name),
-				Config: map[string]any{
-					"source":                "body",
-					"body_path":             "model",
-					"max_request_body_size": g.bodySize,
-				},
+				Name:   "ai-model-selector",
+				Route:  kong.NewStringRef(g.route.Name),
+				Config: cfg,
 			})
 		}
 		for _, pg := range g.proxies {
@@ -589,3 +585,24 @@ func bodySizeOrDefault(m *aigw.Model) int {
 }
 
 func boolPtr(b bool) *bool { return &b }
+
+func modelSelectorConfig(extraction aimap.ModelExtraction, bodySize int) map[string]any {
+	switch extraction.Type {
+	case aimap.ModelExtractionBody:
+		return map[string]any{
+			"source":                "body",
+			"body_path":             "model",
+			"max_request_body_size": bodySize,
+		}
+	case aimap.ModelExtractionPath:
+		if extraction.PathPattern == "" {
+			return nil
+		}
+		return map[string]any{
+			"source":       "path",
+			"path_pattern": extraction.PathPattern,
+		}
+	default:
+		return nil
+	}
+}

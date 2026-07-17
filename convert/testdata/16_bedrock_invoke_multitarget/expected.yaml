@@ -11,6 +11,11 @@ services:
           - POST
         strip_path: false
 plugins:
+  - name: ai-model-selector
+    config:
+      path_pattern: /model/([^/]+)/
+      source: path
+    route: bedrock-invoke
   - name: ai-proxy-advanced
     config:
       balancer:
@@ -109,6 +114,68 @@ plugins:
           route_type: video/v1/videos/generations
     route: bedrock-invoke
     model: nova-reel-video
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/embeddings
+      llm_format: bedrock
+      targets:
+        - auth:
+            aws_access_key_id: '{vault://ai/aws-access-key-id}'
+            aws_secret_access_key: '{vault://ai/aws-secret-access-key}'
+          description: amazon.titan-embed-text-v2:0
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            options:
+              bedrock:
+                aws_region: us-east-1
+                embeddings_normalize: true
+            provider: bedrock
+          route_type: llm/v1/embeddings
+        - auth:
+            aws_access_key_id: '{vault://ai/aws-access-key-id}'
+            aws_secret_access_key: '{vault://ai/aws-secret-access-key}'
+          description: amazon.nova-canvas-v1:0
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            options:
+              bedrock:
+                aws_region: us-east-1
+            provider: bedrock
+          route_type: image/v1/images/generations
+        - auth:
+            aws_access_key_id: '{vault://ai/aws-access-key-id}'
+            aws_secret_access_key: '{vault://ai/aws-secret-access-key}'
+          description: amazon.nova-sonic-v1:0
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            options:
+              bedrock:
+                aws_region: us-east-1
+            provider: bedrock
+          route_type: llm/v1/chat
+        - auth:
+            aws_access_key_id: '{vault://ai/aws-access-key-id}'
+            aws_secret_access_key: '{vault://ai/aws-secret-access-key}'
+          description: amazon.nova-reel-v1:1
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            options:
+              bedrock:
+                aws_region: us-east-1
+                video_output_s3_uri: s3://kong/nova-reel/
+            provider: bedrock
+          route_type: video/v1/videos/generations
+    route: bedrock-invoke
 ai_models:
   - name: titan-embed-text-v2
     alias: '@bedrock/titan-embed-text-v2'

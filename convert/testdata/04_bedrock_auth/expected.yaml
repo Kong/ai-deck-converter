@@ -11,6 +11,11 @@ services:
           - POST
         strip_path: false
 plugins:
+  - name: ai-model-selector
+    config:
+      path_pattern: /model/([^/]+)/
+      source: path
+    route: bedrock-converse
   - name: ai-proxy-advanced
     config:
       balancer:
@@ -39,6 +44,31 @@ plugins:
           route_type: llm/v1/chat
     route: bedrock-converse
     model: claude-bedrock
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: bedrock
+      targets:
+        - auth:
+            aws_access_key_id: '{vault://env/aws-key-id}'
+            aws_secret_access_key: '{vault://env/aws-secret}'
+          description: anthropic.claude-3-5-sonnet
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            options:
+              anthropic_version: bedrock-2023-05-31
+              bedrock:
+                aws_assume_role_arn: arn:aws:iam::123:role/bedrock
+                aws_region: us-east-1
+                aws_role_session_name: kong-session
+              max_tokens: 1024
+            provider: bedrock
+          route_type: llm/v1/chat
+    route: bedrock-converse
 ai_models:
   - name: claude-bedrock
     alias: '@bedrock/claude-3-5-sonnet'

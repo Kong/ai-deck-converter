@@ -170,6 +170,68 @@ identity_providers:
 	require.NotEqual(t, publicRoute, oidcRoute, "the public model must not share the OIDC route")
 }
 
+func TestConvertPathBasedModelSelectorForGeminiAndBedrock(t *testing.T) {
+	src := []byte(`
+models:
+  - type: model
+    name: gemini-native
+    capabilities: [generate]
+    formats: [{type: gemini}]
+    targets:
+      - name: gemini-2.0-flash
+        provider: gemini-provider
+        config: {type: gemini}
+    config:
+      route: {paths: [/gemini-native]}
+      model: {}
+  - type: model
+    name: bedrock-native
+    capabilities: [generate]
+    formats: [{type: bedrock}]
+    targets:
+      - name: anthropic.claude-3-5-sonnet
+        provider: bedrock-provider
+        config: {type: bedrock, aws_region: us-east-1}
+    config:
+      route: {paths: [/bedrock-native]}
+      model: {}
+providers:
+  - name: gemini-provider
+    type: gemini
+  - name: bedrock-provider
+    type: bedrock
+`)
+
+	out, _, err := Convert(src, Options{})
+	require.NoError(t, err, "convert")
+
+	var got map[string]any
+	require.NoError(t, yaml.Unmarshal(out, &got), "unmarshal output")
+
+	plugins, ok := got["plugins"].([]any)
+	require.True(t, ok, "expected plugins collection")
+
+	patterns := map[string]bool{}
+	for _, raw := range plugins {
+		plugin, ok := raw.(map[string]any)
+		require.True(t, ok, "expected plugin entry")
+		if plugin["name"] != "ai-model-selector" {
+			continue
+		}
+		cfg, ok := plugin["config"].(map[string]any)
+		require.True(t, ok, "expected ai-model-selector config")
+		require.Equal(t, "path", cfg["source"], "native gemini/bedrock routes should extract model from path")
+		_, hasBodyPath := cfg["body_path"]
+		require.False(t, hasBodyPath, "path extraction should not emit body_path")
+		pattern, _ := cfg["path_pattern"].(string)
+		require.NotEmpty(t, pattern, "path extraction should emit path_pattern")
+		patterns[pattern] = true
+	}
+
+	require.True(t, patterns["/models/([^:/]+):"], "expected gemini path extraction pattern")
+	require.True(t, patterns["/model/([^/]+)/"], "expected bedrock path extraction pattern")
+}
+
 func TestConvertSharesIdentityProviderForUniformlyGuardedSharedRoute(t *testing.T) {
 	src := []byte(`
 models:
@@ -599,7 +661,7 @@ providers:
 
 	proxy, wildcardProxy := splitProxyPlugins(plugins)
 	require.NotNil(t, proxy, "expected ai-proxy-advanced plugin")
-	require.Nil(t, wildcardProxy, "did not expect wildcard ai-proxy-advanced plugin on native route")
+	require.NotNil(t, wildcardProxy, "expected wildcard ai-proxy-advanced plugin on path-model route")
 
 	cfg, ok := proxy["config"].(map[string]any)
 	require.True(t, ok, "expected ai-proxy-advanced config")

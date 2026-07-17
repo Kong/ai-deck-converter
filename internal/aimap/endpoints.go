@@ -14,15 +14,39 @@ import (
 // Routes are grouped by (section, RouteLabel); specs sharing a label collapse to
 // one route whose ai-proxy-advanced plugin carries one target per capability/model.
 type EndpointSpec struct {
-	RouteLabel            string   // route name suffix, e.g. "chat", "invoke"
-	PathSuffix            string   // appended after the base path (regex body when IsRegex)
-	IsRegex               bool     // emit a Kong regex route ("~" prefix)
-	Methods               []string // route methods
-	RouteType             string   // ai-proxy-advanced target route_type
-	GenaiCategory         string   // ai-proxy-advanced config.genai_category
-	TakesBodyModel        bool     // whether requests carry a body `model` field (ai-model-selector)
-	SupportsLogStatistics bool     // whether the endpoint supports log statistics
+	RouteLabel            string          // route name suffix, e.g. "chat", "invoke"
+	PathSuffix            string          // appended after the base path (regex body when IsRegex)
+	IsRegex               bool            // emit a Kong regex route ("~" prefix)
+	Methods               []string        // route methods
+	RouteType             string          // ai-proxy-advanced target route_type
+	GenaiCategory         string          // ai-proxy-advanced config.genai_category
+	SupportsLogStatistics bool            // whether the endpoint supports log statistics
+	ModelExtraction       ModelExtraction // how ai-model-selector extracts the model
 }
+
+// ModelExtraction describes how ai-model-selector should read the model alias
+// for a route group.
+type ModelExtraction struct {
+	Type        string // "", "body", or "path"
+	PathPattern string // Lua pattern, required when Type == "path"
+}
+
+const (
+	ModelExtractionNone = ""
+	ModelExtractionBody = "body"
+	ModelExtractionPath = "path"
+)
+
+var (
+	extractNone = ModelExtraction{Type: ModelExtractionNone}
+	extractBody = ModelExtraction{Type: ModelExtractionBody}
+	// Captures provider model name in Bedrock native paths like
+	// /model/<model-name>/converse.
+	extractPathBedrockModel = ModelExtraction{Type: ModelExtractionPath, PathPattern: "/model/([^/]+)/"}
+	// Captures provider model name in Gemini/Vertex native paths like
+	// /.../models/<model-name>:generateContent.
+	extractPathModelsSegment = ModelExtraction{Type: ModelExtractionPath, PathPattern: "/models/([^:/]+):"}
+)
 
 const (
 	catTextGen    = "text/generation"
@@ -148,129 +172,127 @@ func CapabilitiesFor(format, providerType string) []string {
 // ref/supported-endpoints.md and the reference kong.yaml examples.
 var EndpointTable = map[string]map[string]EndpointSpec{
 	"openai": {
-		"generate":   {"chat", "/chat/completions", false, mPost, "llm/v1/chat", catTextGen, true, true},
-		"agentic":    {"responses", "/responses", false, mPost, "llm/v1/responses", catTextGen, true, true},
-		"realtime":   {"realtime", "/realtime", false, mGetPost, "realtime/v1/realtime", catRealtime, true, true},
-		"embeddings": {"embeddings", "/embeddings", false, mPost, "llm/v1/embeddings", catEmbeddings, true, true},
+		"generate":   {"chat", "/chat/completions", false, mPost, "llm/v1/chat", catTextGen, true, extractBody},
+		"agentic":    {"responses", "/responses", false, mPost, "llm/v1/responses", catTextGen, true, extractBody},
+		"realtime":   {"realtime", "/realtime", false, mGetPost, "realtime/v1/realtime", catRealtime, true, extractBody},
+		"embeddings": {"embeddings", "/embeddings", false, mPost, "llm/v1/embeddings", catEmbeddings, true, extractBody},
 		"image": {
-			"images", "/images/generations", false, mPost, "image/v1/images/generations", catImage, true, true,
+			"images", "/images/generations", false, mPost, "image/v1/images/generations", catImage, true, extractBody,
 		},
 		"audio/speech": {
-			"audio-speech", "/audio/speech", false, mPost, "audio/v1/audio/speech", catSpeech, true, false,
+			"audio-speech", "/audio/speech", false, mPost, "audio/v1/audio/speech", catSpeech, false, extractBody,
 		},
 		"audio/transcription": {
 			"audio-transcribe", "/audio/transcriptions", false, mPost, "audio/v1/audio/transcriptions",
-			catTranscript, true, false,
+			catTranscript, false, extractBody,
 		},
 		"audio/translation": {
 			"audio-translate", "/audio/translations", false, mPost, "audio/v1/audio/translations",
-			catTranscript, true, false,
+			catTranscript, false, extractBody,
 		},
 		"video": {
 			"videos", "/videos", false,
 			[]string{"GET", "POST", "DELETE"},
 			"video/v1/videos/generations",
-			catVideo, true, true,
+			catVideo, true, extractBody,
 		},
-		"batches": {"batches", "/batches", false, mGetPost, "llm/v1/batches", catTextGen, false, false},
+		"batches": {"batches", "/batches", false, mGetPost, "llm/v1/batches", catTextGen, false, extractNone},
 		"files": {
-			"files", "/files", false, []string{"GET", "POST", "DELETE"}, "llm/v1/files", catTextGen, false, true,
+			"files", "/files", false, []string{"GET", "POST", "DELETE"}, "llm/v1/files", catTextGen, true, extractNone,
 		},
 	},
 	"anthropic": {
-		"generate": {"messages", "/v1/messages", false, mPost, "llm/v1/chat", catTextGen, true, true},
-		"batches": {
-			"batches", "/v1/messages/batches", false, mGetPost, "llm/v1/batches", catTextGen, false, false,
-		},
+		"generate": {"messages", "/v1/messages", false, mPost, "llm/v1/chat", catTextGen, true, extractBody},
+		"batches":  {"batches", "/v1/messages/batches", false, mGetPost, "llm/v1/batches", catTextGen, false, extractNone},
 	},
 	"bedrock": {
 		"generate": {
 			"converse", "model/(?<model_name>[^/]+)/converse(?:-stream)?",
-			true, mGetPost, "llm/v1/chat", catTextGen, false, true,
+			true, mGetPost, "llm/v1/chat", catTextGen, true, extractPathBedrockModel,
 		},
 		"agentic": {
 			"retrieve", "model/(?<model_name>[^/]+)/retrieveAndGenerate(?:Stream)?",
-			true, mGetPost, "llm/v1/chat", catTextGen, false, true,
+			true, mGetPost, "llm/v1/chat", catTextGen, true, extractPathBedrockModel,
 		},
 		"embeddings": {
 			"invoke", "model/(?<model_name>[^/]+)/invoke(?:-with-response-stream)?",
-			true, mGetPost, "llm/v1/embeddings", catEmbeddings, false, true,
+			true, mGetPost, "llm/v1/embeddings", catEmbeddings, true, extractPathBedrockModel,
 		},
 		"image": {
 			"invoke", "model/(?<model_name>[^/]+)/invoke(?:-with-response-stream)?",
-			true, mGetPost, "image/v1/images/generations", catImage, false, false,
+			true, mGetPost, "image/v1/images/generations", catImage, false, extractPathBedrockModel,
 		},
 		"audio/speech": {
 			"invoke", "model/(?<model_name>[^/]+)/invoke(?:-with-response-stream)?",
-			true, mGetPost, "llm/v1/chat", catTextGen, false, true,
+			true, mGetPost, "llm/v1/chat", catTextGen, true, extractPathBedrockModel,
 		},
 		"video": {
 			"invoke", "model/(?<model_name>[^/]+)/invoke(?:-with-response-stream)?",
-			true, mGetPost, "video/v1/videos/generations", catVideo, false, true,
+			true, mGetPost, "video/v1/videos/generations", catVideo, true, extractPathBedrockModel,
 		},
 		"rerank": {
 			"rerank", "model/(?<model_name>[^/]+)/rerank",
-			true, mGetPost, "llm/v1/chat", catTextGen, false, true,
+			true, mGetPost, "llm/v1/chat", catTextGen, true, extractPathBedrockModel,
 		},
 		"batches": {
 			"batches", "model/(?<model_name>[^/]+)/async-invoke",
-			true, mGetPost, "llm/v1/batches", catTextGen, false, true,
+			true, mGetPost, "llm/v1/batches", catTextGen, true, extractPathBedrockModel,
 		},
 	},
 	"gemini": {
 		"generate": {
 			"generate", "v1beta/models/(?<model_name>[^:/]+):(?:generateContent|streamGenerateContent)",
-			true, mGetPost, "llm/v1/chat", catTextGen, true, true,
+			true, mGetPost, "llm/v1/chat", catTextGen, true, extractPathModelsSegment,
 		},
 		"embeddings": {
 			"embeddings", "v1beta/models/(?<model_name>[^:/]+):(?:embedContent|batchEmbedContent)",
-			true, mGetPost, "llm/v1/embeddings", catEmbeddings, true, true,
+			true, mGetPost, "llm/v1/embeddings", catEmbeddings, true, extractPathModelsSegment,
 		},
-		"batches": {"batches", "v1beta/batches", false, mGetPost, "llm/v1/batches", catTextGen, false, true},
-		"files":   {"files", "(?:upload/)?v1beta/files", true, mGetPost, "llm/v1/chat", catTextGen, false, true},
+		"batches": {"batches", "v1beta/batches", false, mGetPost, "llm/v1/batches", catTextGen, false, extractNone},
+		"files":   {"files", "(?:upload/)?v1beta/files", true, mGetPost, "llm/v1/chat", catTextGen, true, extractNone},
 	},
 	"vertex": {
 		"generate": {
 			"generate",
 			"v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/google/models/" +
 				"(?<model_name>[^:/]+):(?:generateContent|streamGenerateContent)",
-			true, mGetPost, "llm/v1/chat", catTextGen, true, true,
+			true, mGetPost, "llm/v1/chat", catTextGen, true, extractPathModelsSegment,
 		},
 		"embeddings": {
 			"embeddings",
 			"v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/google/models/" +
 				"(?<model_name>[^:/]+):(?:embedContent|batchEmbedContent)",
-			true, mGetPost, "llm/v1/embeddings", catEmbeddings, true, true,
+			true, mGetPost, "llm/v1/embeddings", catEmbeddings, true, extractPathModelsSegment,
 		},
 		"image": {
 			"predict-long-running",
 			"v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/google/models/" +
 				"(?<model_name>[^:/]+):predictLongRunning",
-			true, mGetPost, "image/v1/images/generations", catImage, false, true,
+			true, mGetPost, "image/v1/images/generations", catImage, true, extractPathModelsSegment,
 		},
 		"video": {
 			"predict-long-running",
 			"v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/google/models/" +
 				"(?<model_name>[^:/]+):predictLongRunning",
-			true, mGetPost, "video/v1/videos/generations", catVideo, false, true,
+			true, mGetPost, "video/v1/videos/generations", catVideo, true, extractPathModelsSegment,
 		},
 		"rerank": {
 			"ranking",
 			"v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/rankingConfigs/" +
 				"(?<ranking_config>[^:/]+):rank",
-			true, mGetPost, "llm/v1/chat", catTextGen, false, true,
+			true, mGetPost, "llm/v1/chat", catTextGen, true, extractNone,
 		},
 		"batches": {
 			"batches",
 			"v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/batchPredictionJobs",
-			true, mGetPost, "llm/v1/batches", catTextGen, false, true,
+			true, mGetPost, "llm/v1/batches", catTextGen, true, extractNone,
 		},
 	},
 	"cohere": {
-		"rerank": {"rerank", "/v2/rerank", false, mPost, "llm/v1/chat", catTextGen, false, true},
+		"rerank": {"rerank", "/v2/rerank", false, mPost, "llm/v1/chat", catTextGen, true, extractNone},
 	},
 	"huggingface": {
-		"generate": {"generate", "/generate", false, mPost, "llm/v1/chat", catTextGen, true, true},
+		"generate": {"generate", "/generate", false, mPost, "llm/v1/chat", catTextGen, true, extractBody},
 	},
 }
 
