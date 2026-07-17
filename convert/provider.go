@@ -184,6 +184,92 @@ func nestAzureEmbeddingsOptions(options map[string]any) map[string]any {
 	return options
 }
 
+// lowerVectorDB lowers an AI Gateway vectordb entity block into the
+// ai-proxy-advanced plugin shape, inverting revert.vectorDBFromConfig. The
+// entity uses a `type` discriminator with the strategy's connection fields
+// hoisted to the top level (cluster/keepalive/sentinel/ssl grouped into
+// objects); the plugin uses a `strategy` discriminator with those fields inside
+// a `redis`/`pgvector` sub-block and the grouped families flattened back to
+// cluster_*/keepalive_*/sentinel_*/ssl_* keys.
+func lowerVectorDB(vd map[string]any) map[string]any {
+	strategy, _ := vd["type"].(string)
+	out := map[string]any{}
+	if strategy != "" {
+		out["strategy"] = strategy
+	}
+	sub := map[string]any{}
+	for k, v := range vd {
+		switch k {
+		case "type":
+			// discriminator becomes `strategy`, already set above.
+		case "dimensions", "distance_metric", "threshold":
+			out[k] = v
+		default:
+			sub[k] = v
+		}
+	}
+	switch strategy {
+	case "redis":
+		unnestVectorDB(sub, "cluster", map[string]string{"nodes": "cluster_nodes"})
+		unnestVectorDB(sub, "keepalive", nil)
+		unnestVectorDB(sub, "sentinel", map[string]string{"nodes": "sentinel_nodes"})
+	case "pgvector":
+		flattenPgvectorSSL(sub)
+	}
+	if strategy != "" && len(sub) > 0 {
+		out[strategy] = sub
+	}
+	return out
+}
+
+// unnestVectorDB expands sub[group] (a grouped object like cluster/keepalive/
+// sentinel) into flat `group_<field>` keys on sub, deleting the group. Fields
+// listed in rename get an explicit flat name (e.g. cluster.nodes ->
+// cluster_nodes rather than cluster_nodes via the default); others default to
+// `<group>_<field>`.
+func unnestVectorDB(sub map[string]any, group string, rename map[string]string) {
+	obj, ok := sub[group].(map[string]any)
+	if !ok {
+		return
+	}
+	delete(sub, group)
+	for k, v := range obj {
+		if name, ok := rename[k]; ok {
+			sub[name] = v
+			continue
+		}
+		sub[group+"_"+k] = v
+	}
+}
+
+// flattenPgvectorSSL rewrites the entity's pgvector `ssl` object into the
+// plugin's flat ssl_* keys, mapping ssl.enabled back to the `ssl` boolean.
+func flattenPgvectorSSL(sub map[string]any) {
+	ssl, ok := sub["ssl"].(map[string]any)
+	if !ok {
+		return
+	}
+	delete(sub, "ssl")
+	names := map[string]string{
+		"cert":     "ssl_cert",
+		"cert_key": "ssl_cert_key",
+		"required": "ssl_required",
+		"verify":   "ssl_verify",
+		"version":  "ssl_version",
+	}
+	for k, v := range ssl {
+		if k == "enabled" {
+			sub["ssl"] = v
+			continue
+		}
+		if name, ok := names[k]; ok {
+			sub[name] = v
+			continue
+		}
+		sub[k] = v
+	}
+}
+
 // mapOptions translates a target model's option map into an ai-proxy-advanced
 // model.options map. It renames/nests provider-specific keys per provider type
 // and folds in provider-level fields (azure instance, gemini project id, bedrock

@@ -12,6 +12,7 @@ consumers:
         name: greg-credential-1
         type: api-key
         ttl: 3600
+        api_key: '{vault://env/greg-key}'
     labels:
       team: ai-platform
 consumer_groups:

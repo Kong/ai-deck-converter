@@ -71,6 +71,6 @@ identity_providers:
     config:
       auth_methods:
         - bearer
-      consumer_claim:
-        - sub
+      consumer_claims:
+        - - sub
       issuer: https://konghq.okta.com/oauth2/default

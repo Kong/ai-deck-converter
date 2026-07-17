@@ -76,6 +76,7 @@ consumers:
         name: gregs-dev-credential-1
         type: api-key
         ttl: 3600
+        api_key: secret-abc
     labels:
       tier: gold
 consumer_groups:

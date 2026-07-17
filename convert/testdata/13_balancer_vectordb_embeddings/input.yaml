@@ -23,13 +23,12 @@ models:
         algorithm: semantic
         slots: 10000
         vectordb:
-          strategy: redis
+          type: redis
           distance_metric: cosine
           threshold: 0.7
           dimensions: 1024
-          redis:
-            host: redis.local
-            port: 6379
+          host: redis.local
+          port: 6379
         embeddings:
           auth:
             header_name: Authorization

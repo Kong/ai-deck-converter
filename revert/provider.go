@@ -154,10 +154,10 @@ func defoldTarget(target map[string]any, providerType string) defoldedTarget {
 // embeddingsFromConfig reverses convert.resolveEmbeddings: it de-folds an
 // ai-proxy-advanced config.balancer.embeddings block (auth + model.{provider,
 // name, options}) into the AI Gateway entity shape (allow_auth_override,
-// provider reference, name, config). The embeddings model is treated like a
-// target — auth becomes a synthesized model_provider, options become the
-// config block, and provider-level fields (azure instance) are hoisted onto
-// the provider.
+// provider reference, model.{name, config}). The embeddings model is treated
+// like a target — auth becomes a synthesized model_provider, options become the
+// model's config block, and provider-level fields (azure instance) are hoisted
+// onto the provider.
 func (r *Reverter) embeddingsFromConfig(emb map[string]any) map[string]any {
 	model := getMap(emb, "model")
 	providerType := detectProviderType(getStr(model, "provider"), "")
@@ -171,20 +171,12 @@ func (r *Reverter) embeddingsFromConfig(emb map[string]any) map[string]any {
 		config[k] = v
 	}
 
-	// Azure embeddings config requires upstream_url. When the source only
-	// carries the instance (upstream_url null), derive the canonical Azure
-	// OpenAI embeddings endpoint from it.
-	if providerType == "azure" && config["upstream_url"] == nil && d.instance != "" {
-		config["upstream_url"] = fmt.Sprintf(
-			"https://%s.openai.azure.com/openai/v1/embeddings", d.instance)
-		r.warn("embeddings model %q: azure upstream_url derived from instance %q",
-			getStr(model, "name"), d.instance) //nolint:errcheck
-	}
-
 	out := map[string]any{
 		"provider": r.providerFor(providerType, &d),
-		"name":     getStr(model, "name"),
-		"config":   config,
+		"model": map[string]any{
+			"name":   getStr(model, "name"),
+			"config": config,
+		},
 	}
 	if d.allowOverride != nil {
 		out["allow_auth_override"] = *d.allowOverride

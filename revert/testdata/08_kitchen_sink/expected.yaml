@@ -104,6 +104,7 @@ consumers:
         display_name: app-svc-credential-1
         name: app-svc-credential-1
         type: api-key
+        api_key: app-secret
 consumer_groups:
   - ref: premium
     display_name: premium

@@ -62,19 +62,13 @@ func (r *Reverter) revertConsumers() error {
 		}
 		for j := range c.KeyAuthCredentials {
 			cred := &c.KeyAuthCredentials[j]
-			// The AI Gateway declarative credential schema does not accept a key
-			// value (secrets are provisioned out-of-band), so the key is dropped
-			// on migration and must be recreated afterwards.
-			if cred.Key != "" {
-				if err := r.warn(
-					"consumer %q: api-key credential value is not migratable and was dropped; "+
-						"recreate the key after applying", name); err != nil {
-					return err
-				}
-			}
+			// The AI Gateway credential schema carries the key value in `api_key`
+			// (server-generated when omitted), so the decK key migrates through
+			// directly.
 			ac.Credentials = append(ac.Credentials, aigw.Credential{
-				Type: "api-key",
-				TTL:  cred.TTL,
+				Type:   "api-key",
+				TTL:    cred.TTL,
+				APIKey: cred.Key,
 			})
 		}
 		// The AI Gateway consumer schema requires a type (api-key | oauth).
