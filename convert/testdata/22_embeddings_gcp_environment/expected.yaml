@@ -46,6 +46,29 @@ plugins:
             name: gpt-4o
             provider: openai
           route_type: llm/v1/chat
+    route: openai-chat
+    model: semantic-lb
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: semantic
+        slots: 10000
+      embeddings:
+        auth:
+          gcp_service_account_json: '{vault://ai/gcp-service-account-json}'
+          gcp_use_service_account: true
+        model:
+          name: text-embedding-004
+          options:
+            gemini:
+              api_endpoint: us-central1-aiplatform.googleapis.com
+              location_id: us-central1
+              project_id: my-project-id
+            upstream_url: https://generativelanguage.googleapis.com
+          provider: gemini
+      genai_category: text/generation
+      llm_format: openai
+      targets:
         - description: gpt-4o
           logging:
             log_payloads: false
@@ -54,7 +77,6 @@ plugins:
             provider: openai
           route_type: llm/v1/chat
     route: openai-chat
-    model: semantic-lb
 ai_models:
   - name: semantic-lb
     alias: semantic-lb

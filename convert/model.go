@@ -22,6 +22,7 @@ type routeGroup struct {
 	bodySize       int
 	proxies        []*proxyGroup
 	proxyByOwner   map[string]*proxyGroup
+	wildcard       *proxyGroup
 }
 
 // proxyGroup accumulates one ai-proxy-advanced plugin: the targets owned by a
@@ -211,11 +212,29 @@ func (c *Converter) convertModels() error {
 					pg.seen[dedup] = true
 					pg.targets = append(pg.targets, target)
 				}
-				if wildcard := wildcardTarget(target); wildcard != nil {
+				if g.takesBodyModel {
+					wildcard := wildcardTarget(target)
+					if wildcard != nil {
+						if g.wildcard == nil {
+							g.wildcard = &proxyGroup{
+								routeName:         g.route.Name,
+								llmFormat:         pg.llmFormat,
+								genaiCategory:     pg.genaiCategory,
+								balancer:          pg.balancer,
+								vectordb:          pg.vectordb,
+								embeddings:        pg.embeddings,
+								responseStreaming: pg.responseStreaming,
+								modelNameHeader:   pg.modelNameHeader,
+								maxBodySize:       pg.maxBodySize,
+								proxy:             pg.proxy,
+								seen:              map[string]bool{},
+							}
+						}
 					wildcardDedup := dedup + "|any"
-					if !pg.seen[wildcardDedup] {
-						pg.seen[wildcardDedup] = true
-						pg.targets = append(pg.targets, wildcard)
+					if !g.wildcard.seen[wildcardDedup] {
+						g.wildcard.seen[wildcardDedup] = true
+						g.wildcard.targets = append(g.wildcard.targets, wildcard)
+					}
 					}
 				}
 				if bs := bodySizeOrDefault(m); bs > g.bodySize {
@@ -303,6 +322,13 @@ func (c *Converter) convertModels() error {
 				plugin.Model = kong.NewStringRef(pg.modelName)
 			}
 			c.out.Plugins = append(c.out.Plugins, plugin)
+		}
+		if g.wildcard != nil && len(g.wildcard.targets) > 0 {
+			c.out.Plugins = append(c.out.Plugins, kong.Plugin{
+				Name:   "ai-proxy-advanced",
+				Route:  kong.NewStringRef(g.wildcard.routeName),
+				Config: g.wildcard.proxyConfig(),
+			})
 		}
 	}
 	c.out.Services = append(c.out.Services, service)

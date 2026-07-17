@@ -73,6 +73,18 @@ plugins:
             name: gpt-5-mini
             provider: openai
           route_type: llm/v1/chat
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+    model:
+      id: f8ad1382-e6e4-5c95-86fd-ab9a0c84e2b4
+  - id: fe4129f3-2075-5492-8b59-90def2cf73ab
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
         - auth:
             header_name: Authorization
             header_value: '{vault://oidc-repro-secrets/openai-auth-token}'
@@ -85,9 +97,7 @@ plugins:
           route_type: llm/v1/chat
     route:
       id: 8ae36805-da7a-55b9-b056-72bde6bb937d
-    model:
-      id: f8ad1382-e6e4-5c95-86fd-ab9a0c84e2b4
-  - id: dcebfb31-cc0f-5469-b6d7-9d8807a4e8d2
+  - id: b7976da4-d8ec-5d03-8d6c-4e33dddb35db
     name: ai-model-selector
     config:
       body_path: model
@@ -95,7 +105,7 @@ plugins:
       source: body
     route:
       id: 2384fe9d-eacc-5ac2-ae4c-4752cc597f81
-  - id: 75ff22ed-6245-594b-895f-6a9fa36f4581
+  - id: 12106a5c-cbd2-5942-8432-ef9bc4adca1b
     name: ai-proxy-advanced
     config:
       balancer:
@@ -115,6 +125,18 @@ plugins:
             name: gpt-5-mini
             provider: openai
           route_type: llm/v1/chat
+    route:
+      id: 2384fe9d-eacc-5ac2-ae4c-4752cc597f81
+    model:
+      id: ef3104b8-4849-51ba-9ccb-7d66e827436a
+  - id: 628550fd-b362-5247-b3ba-f2f6fa95de13
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
         - auth:
             header_name: Authorization
             header_value: '{vault://oidc-repro-secrets/openai-auth-token}'
@@ -127,9 +149,7 @@ plugins:
           route_type: llm/v1/chat
     route:
       id: 2384fe9d-eacc-5ac2-ae4c-4752cc597f81
-    model:
-      id: ef3104b8-4849-51ba-9ccb-7d66e827436a
-  - id: bb79eabd-8d6e-57e1-9428-fd9dc2b9cbad
+  - id: bbefa2a8-2cc8-5081-91f2-2035dfc2b119
     name: openid-connect
     config:
       anonymous: anonymous

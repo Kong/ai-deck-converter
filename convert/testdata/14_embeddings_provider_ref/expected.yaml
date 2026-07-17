@@ -43,6 +43,23 @@ plugins:
             name: gpt-4o
             provider: openai
           route_type: llm/v1/chat
+    route: openai-chat
+    model: semantic-lb
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: semantic
+        slots: 10000
+      embeddings:
+        auth:
+          header_name: Authorization
+          header_value: '{vault://env/embed-key}'
+        model:
+          name: text-embedding-3-small
+          provider: openai
+      genai_category: text/generation
+      llm_format: openai
+      targets:
         - auth:
             header_name: Authorization
             header_value: '{vault://env/openai-key}'
@@ -54,7 +71,6 @@ plugins:
             provider: openai
           route_type: llm/v1/chat
     route: openai-chat
-    model: semantic-lb
 ai_models:
   - name: semantic-lb
     alias: semantic-lb

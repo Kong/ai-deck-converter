@@ -39,16 +39,6 @@ plugins:
             name: batch-api
             provider: openai
           route_type: llm/v1/batches
-        - auth:
-            header_name: Authorization
-            header_value: '{vault://env/openai-key}'
-          description: batch-api
-          logging:
-            log_payloads: false
-            log_statistics: true
-          model:
-            provider: openai
-          route_type: llm/v1/batches
     route: openai-batches
   - name: ai-proxy-advanced
     config:
@@ -69,16 +59,6 @@ plugins:
             log_statistics: true
           model:
             name: files-api
-            provider: openai
-          route_type: llm/v1/files
-        - auth:
-            header_name: Authorization
-            header_value: '{vault://env/openai-key}'
-          description: files-api
-          logging:
-            log_payloads: false
-            log_statistics: true
-          model:
             provider: openai
           route_type: llm/v1/files
     route: openai-files

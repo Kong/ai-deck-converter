@@ -44,6 +44,18 @@ plugins:
             name: gpt-4o
             provider: openai
           route_type: llm/v1/chat
+    route: openai-chat
+    model: full-model
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      max_request_body_size: 2097152
+      model_name_header: false
+      response_streaming: deny
+      targets:
         - auth:
             header_name: Authorization
             header_value: '{vault://ai/openai-token}'
@@ -55,7 +67,6 @@ plugins:
             provider: openai
           route_type: llm/v1/chat
     route: openai-chat
-    model: full-model
   - name: ai-model-selector
     config:
       body_path: model
@@ -81,6 +92,15 @@ plugins:
             name: text-embedding-3-small
             provider: openai
           route_type: llm/v1/embeddings
+    route: openai-embeddings
+    model: bare-model
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/embeddings
+      llm_format: openai
+      targets:
         - auth:
             header_name: Authorization
             header_value: '{vault://ai/openai-token}'
@@ -92,7 +112,6 @@ plugins:
             provider: openai
           route_type: llm/v1/embeddings
     route: openai-embeddings
-    model: bare-model
 ai_models:
   - name: full-model
     alias: full-model

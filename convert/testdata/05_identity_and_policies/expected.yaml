@@ -55,6 +55,15 @@ plugins:
             name: gpt-4o
             provider: openai
           route_type: llm/v1/chat
+    route: openai-chat
+    model: guarded-gpt
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
         - auth:
             header_name: Authorization
             header_value: '{vault://env/openai-key}'
@@ -66,7 +75,6 @@ plugins:
             provider: openai
           route_type: llm/v1/chat
     route: openai-chat
-    model: guarded-gpt
   - name: ai-prompt-guard
     config:
       allow_patterns:

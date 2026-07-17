@@ -136,6 +136,34 @@ plugins:
             name: gpt-4o
             provider: openai
           route_type: llm/v1/chat
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+    model:
+      id: aab20033-7c80-5942-aadc-52357371dbeb
+  - id: fe4129f3-2075-5492-8b59-90def2cf73ab
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: consistent-hashing
+        connect_timeout: 60000
+        fail_timeout: 10000
+        failover_criteria:
+          - error
+          - timeout
+          - http_429
+          - http_500
+        hash_on_header: X-Kong-LLM-Request-ID
+        max_fails: 0
+        read_timeout: 60000
+        retries: 5
+        slots: 10000
+        write_timeout: 60000
+      genai_category: text/generation
+      llm_format: openai
+      max_request_body_size: 8388608
+      model_name_header: true
+      response_streaming: allow
+      targets:
         - description: gpt-4o
           logging:
             log_payloads: false
@@ -145,9 +173,7 @@ plugins:
           route_type: llm/v1/chat
     route:
       id: 8ae36805-da7a-55b9-b056-72bde6bb937d
-    model:
-      id: aab20033-7c80-5942-aadc-52357371dbeb
-  - id: dcebfb31-cc0f-5469-b6d7-9d8807a4e8d2
+  - id: b7976da4-d8ec-5d03-8d6c-4e33dddb35db
     name: ai-model-selector
     config:
       body_path: model
@@ -155,7 +181,7 @@ plugins:
       source: body
     route:
       id: 0da1097c-6edc-5c9c-a032-cd042d0db5e4
-  - id: 75ff22ed-6245-594b-895f-6a9fa36f4581
+  - id: 12106a5c-cbd2-5942-8432-ef9bc4adca1b
     name: ai-proxy-advanced
     config:
       balancer:
@@ -188,6 +214,34 @@ plugins:
             name: gpt-4o
             provider: openai
           route_type: llm/v1/embeddings
+    route:
+      id: 0da1097c-6edc-5c9c-a032-cd042d0db5e4
+    model:
+      id: aab20033-7c80-5942-aadc-52357371dbeb
+  - id: 628550fd-b362-5247-b3ba-f2f6fa95de13
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: consistent-hashing
+        connect_timeout: 60000
+        fail_timeout: 10000
+        failover_criteria:
+          - error
+          - timeout
+          - http_429
+          - http_500
+        hash_on_header: X-Kong-LLM-Request-ID
+        max_fails: 0
+        read_timeout: 60000
+        retries: 5
+        slots: 10000
+        write_timeout: 60000
+      genai_category: text/embeddings
+      llm_format: openai
+      max_request_body_size: 8388608
+      model_name_header: true
+      response_streaming: allow
+      targets:
         - description: gpt-4o
           logging:
             log_payloads: false
@@ -197,9 +251,7 @@ plugins:
           route_type: llm/v1/embeddings
     route:
       id: 0da1097c-6edc-5c9c-a032-cd042d0db5e4
-    model:
-      id: aab20033-7c80-5942-aadc-52357371dbeb
-  - id: 2501ef6b-218c-5327-ad93-4df6a2133531
+  - id: 509b86a4-d650-5125-8f69-105b25bd0f9e
     name: acl
     config:
       allow:
@@ -210,7 +262,7 @@ plugins:
       id: 8ae36805-da7a-55b9-b056-72bde6bb937d
     model:
       id: aab20033-7c80-5942-aadc-52357371dbeb
-  - id: 686423ce-18e4-505b-8697-73b683a022da
+  - id: 3c4d0043-1d50-5c36-9c0b-86d4d6a8a73c
     name: acl
     config:
       allow:

@@ -71,6 +71,18 @@ plugins:
             name: gpt-5
             provider: openai
           route_type: llm/v1/responses
+    route:
+      id: 1a3f650c-2709-5e79-a792-7ffd18243fbf
+    model:
+      id: bbb56cd5-695a-5c11-815a-c5da6deceeca
+  - id: fe4129f3-2075-5492-8b59-90def2cf73ab
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
         - description: gpt-5
           logging:
             log_payloads: false
@@ -80,9 +92,7 @@ plugins:
           route_type: llm/v1/responses
     route:
       id: 1a3f650c-2709-5e79-a792-7ffd18243fbf
-    model:
-      id: bbb56cd5-695a-5c11-815a-c5da6deceeca
-  - id: dcebfb31-cc0f-5469-b6d7-9d8807a4e8d2
+  - id: b7976da4-d8ec-5d03-8d6c-4e33dddb35db
     name: ai-model-selector
     config:
       body_path: model
@@ -90,7 +100,7 @@ plugins:
       source: body
     route:
       id: 8ae36805-da7a-55b9-b056-72bde6bb937d
-  - id: 75ff22ed-6245-594b-895f-6a9fa36f4581
+  - id: 12106a5c-cbd2-5942-8432-ef9bc4adca1b
     name: ai-proxy-advanced
     enabled: false
     config:
@@ -108,6 +118,18 @@ plugins:
             name: gpt-5
             provider: openai
           route_type: llm/v1/chat
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+    model:
+      id: bbb56cd5-695a-5c11-815a-c5da6deceeca
+  - id: 628550fd-b362-5247-b3ba-f2f6fa95de13
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
         - description: gpt-5
           logging:
             log_payloads: false
@@ -117,9 +139,7 @@ plugins:
           route_type: llm/v1/chat
     route:
       id: 8ae36805-da7a-55b9-b056-72bde6bb937d
-    model:
-      id: bbb56cd5-695a-5c11-815a-c5da6deceeca
-  - id: 5477cac7-3c38-581b-899b-f9d520e9d5e4
+  - id: 3912bf60-1edb-5602-89ae-a8a2e41177f4
     name: ai-model-selector
     config:
       body_path: model
@@ -127,7 +147,7 @@ plugins:
       source: body
     route:
       id: 67276980-b7e0-58ee-8c51-bafe739db8f8
-  - id: 628550fd-b362-5247-b3ba-f2f6fa95de13
+  - id: ccc68bd9-2622-5864-b026-137e5c06c755
     name: ai-proxy-advanced
     enabled: false
     config:
@@ -145,6 +165,18 @@ plugins:
             name: gpt-5
             provider: openai
           route_type: image/v1/images/generations
+    route:
+      id: 67276980-b7e0-58ee-8c51-bafe739db8f8
+    model:
+      id: bbb56cd5-695a-5c11-815a-c5da6deceeca
+  - id: bcefe664-4bf5-5e5a-8fd0-386c330b967f
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: image/generation
+      llm_format: openai
+      targets:
         - description: gpt-5
           logging:
             log_payloads: false
@@ -154,8 +186,6 @@ plugins:
           route_type: image/v1/images/generations
     route:
       id: 67276980-b7e0-58ee-8c51-bafe739db8f8
-    model:
-      id: bbb56cd5-695a-5c11-815a-c5da6deceeca
 ai_models:
   - id: bbb56cd5-695a-5c11-815a-c5da6deceeca
     name: disabled-chat

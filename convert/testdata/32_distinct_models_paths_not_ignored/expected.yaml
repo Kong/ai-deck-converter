@@ -41,6 +41,15 @@ plugins:
             name: gpt-5.2-a
             provider: openai
           route_type: llm/v1/chat
+    route: openai-chat
+    model: gpt-5-2-a
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
         - auth:
             header_name: Authorization
             header_value: '{vault://ai/openai-token}'
@@ -52,7 +61,6 @@ plugins:
             provider: openai
           route_type: llm/v1/chat
     route: openai-chat
-    model: gpt-5-2-a
   - name: ai-model-selector
     config:
       body_path: model
@@ -78,6 +86,15 @@ plugins:
             name: gpt-5.2-b
             provider: openai
           route_type: llm/v1/chat
+    route: openai-chat-2
+    model: gpt-5-2-b
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
         - auth:
             header_name: Authorization
             header_value: '{vault://ai/openai-token}'
@@ -89,7 +106,6 @@ plugins:
             provider: openai
           route_type: llm/v1/chat
     route: openai-chat-2
-    model: gpt-5-2-b
 ai_models:
   - name: gpt-5-2-a
     alias: '@openai/gpt-5.2-a'

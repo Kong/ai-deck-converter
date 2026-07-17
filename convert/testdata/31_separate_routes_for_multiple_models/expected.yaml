@@ -45,6 +45,16 @@ plugins:
               temperature: 1
             provider: openai
           route_type: audio/v1/audio/transcriptions
+    route: openai-audio-transcribe
+    model: gpt-5-2
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: audio/transcription
+      llm_format: openai
+      response_streaming: allow
+      targets:
         - auth:
             header_name: Authorization
             header_value: '{vault://ai/openai-token}'
@@ -59,7 +69,6 @@ plugins:
             provider: openai
           route_type: audio/v1/audio/transcriptions
     route: openai-audio-transcribe
-    model: gpt-5-2
   - name: ai-model-selector
     config:
       body_path: model
@@ -89,6 +98,16 @@ plugins:
               temperature: 1
             provider: openai
           route_type: audio/v1/audio/transcriptions
+    route: openai-audio-transcribe-2
+    model: gpt-5-2.1
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: audio/transcription
+      llm_format: openai
+      response_streaming: allow
+      targets:
         - auth:
             header_name: Authorization
             header_value: '{vault://ai/openai-token}'
@@ -103,7 +122,6 @@ plugins:
             provider: openai
           route_type: audio/v1/audio/transcriptions
     route: openai-audio-transcribe-2
-    model: gpt-5-2.1
 ai_models:
   - name: gpt-5-2
     alias: '@openai/gpt-5.2'

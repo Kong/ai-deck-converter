@@ -59,6 +59,18 @@ plugins:
             name: gpt-4o
             provider: openai
           route_type: llm/v1/chat
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+    model:
+      id: 164a019e-95ff-5ec6-8ec4-4bd2315e999c
+  - id: fe4129f3-2075-5492-8b59-90def2cf73ab
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
         - auth:
             header_name: Authorization
             header_value: Bearer sk-test
@@ -71,8 +83,6 @@ plugins:
           route_type: llm/v1/chat
     route:
       id: 8ae36805-da7a-55b9-b056-72bde6bb937d
-    model:
-      id: 164a019e-95ff-5ec6-8ec4-4bd2315e999c
 ai_models:
   - id: 164a019e-95ff-5ec6-8ec4-4bd2315e999c
     name: my-model

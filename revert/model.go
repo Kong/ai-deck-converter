@@ -87,6 +87,12 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 			}
 			continue
 		}
+		if proxy.Model == nil && isWildcardOnlyTargets(targets) {
+			// Forward conversion may emit a dedicated route-scoped wildcard plugin
+			// (all targets omit both model.name and model_alias). It has no direct
+			// AI Gateway source equivalent, so keep only concrete targets.
+			continue
+		}
 		namedSignatures := map[string]bool{}
 		for _, raw := range targets {
 			target, ok := raw.(map[string]any)
@@ -185,6 +191,20 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 		}
 	}
 	return nil
+}
+
+func isWildcardOnlyTargets(targets []any) bool {
+	for _, raw := range targets {
+		target, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		model := getMap(target, "model")
+		if getStr(model, "name") != "" || getStr(model, "model_alias") != "" {
+			return false
+		}
+	}
+	return true
 }
 
 // modelGroupFor finds or creates the model group for a plugin's model FK (or,

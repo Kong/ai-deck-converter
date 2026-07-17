@@ -34,20 +34,6 @@ plugins:
                 embeddings_normalize: true
             provider: bedrock
           route_type: llm/v1/embeddings
-        - auth:
-            aws_access_key_id: '{vault://ai/aws-access-key-id}'
-            aws_secret_access_key: '{vault://ai/aws-secret-access-key}'
-          description: amazon.titan-embed-text-v2:0
-          logging:
-            log_payloads: false
-            log_statistics: true
-          model:
-            options:
-              bedrock:
-                aws_region: us-east-1
-                embeddings_normalize: true
-            provider: bedrock
-          route_type: llm/v1/embeddings
     route: bedrock-invoke
     model: titan-embed-text-v2
   - name: ai-proxy-advanced
@@ -67,19 +53,6 @@ plugins:
           model:
             model_alias: '@bedrock/nova-canvas'
             name: amazon.nova-canvas-v1:0
-            options:
-              bedrock:
-                aws_region: us-east-1
-            provider: bedrock
-          route_type: image/v1/images/generations
-        - auth:
-            aws_access_key_id: '{vault://ai/aws-access-key-id}'
-            aws_secret_access_key: '{vault://ai/aws-secret-access-key}'
-          description: amazon.nova-canvas-v1:0
-          logging:
-            log_payloads: false
-            log_statistics: true
-          model:
             options:
               bedrock:
                 aws_region: us-east-1
@@ -109,19 +82,6 @@ plugins:
                 aws_region: us-east-1
             provider: bedrock
           route_type: llm/v1/chat
-        - auth:
-            aws_access_key_id: '{vault://ai/aws-access-key-id}'
-            aws_secret_access_key: '{vault://ai/aws-secret-access-key}'
-          description: amazon.nova-sonic-v1:0
-          logging:
-            log_payloads: false
-            log_statistics: true
-          model:
-            options:
-              bedrock:
-                aws_region: us-east-1
-            provider: bedrock
-          route_type: llm/v1/chat
     route: bedrock-invoke
     model: nova-sonic-audio
   - name: ai-proxy-advanced
@@ -141,20 +101,6 @@ plugins:
           model:
             model_alias: '@bedrock/nova-reel'
             name: amazon.nova-reel-v1:1
-            options:
-              bedrock:
-                aws_region: us-east-1
-                video_output_s3_uri: s3://kong/nova-reel/
-            provider: bedrock
-          route_type: video/v1/videos/generations
-        - auth:
-            aws_access_key_id: '{vault://ai/aws-access-key-id}'
-            aws_secret_access_key: '{vault://ai/aws-secret-access-key}'
-          description: amazon.nova-reel-v1:1
-          logging:
-            log_payloads: false
-            log_statistics: true
-          model:
             options:
               bedrock:
                 aws_region: us-east-1

@@ -456,40 +456,34 @@ model_providers:
 	plugins, ok := got["plugins"].([]any)
 	require.True(t, ok, "expected plugins collection")
 
-	var proxy map[string]any
-	for _, raw := range plugins {
-		plugin, ok := raw.(map[string]any)
-		require.True(t, ok, "expected plugin entry")
-		if plugin["name"] == "ai-proxy-advanced" {
-			proxy = plugin
-			break
-		}
-	}
+	proxy, wildcardProxy := splitProxyPlugins(plugins)
 	require.NotNil(t, proxy, "expected ai-proxy-advanced plugin")
+	require.NotNil(t, wildcardProxy, "expected wildcard ai-proxy-advanced plugin")
 
 	cfg, ok := proxy["config"].(map[string]any)
 	require.True(t, ok, "expected ai-proxy-advanced config")
 	targets, ok := cfg["targets"].([]any)
 	require.True(t, ok, "expected ai-proxy-advanced targets")
-	require.Len(t, targets, 2)
+	require.Len(t, targets, 1)
+	target, ok := targets[0].(map[string]any)
+	require.True(t, ok, "expected ai-proxy-advanced target")
+	model, ok := target["model"].(map[string]any)
+	require.True(t, ok, "expected ai-proxy-advanced model")
+	require.Equal(t, "gpt-4o", model["name"])
+	require.Equal(t, "@openai/custom-m1", model["model_alias"], "target model_alias should match source model.alias")
 
-	var named, wildcard map[string]any
-	for _, raw := range targets {
-		target, ok := raw.(map[string]any)
-		require.True(t, ok, "expected ai-proxy-advanced target")
-		model, ok := target["model"].(map[string]any)
-		require.True(t, ok, "expected ai-proxy-advanced model")
-		if _, hasName := model["name"]; hasName {
-			named = model
-		} else {
-			wildcard = model
-		}
-	}
-	require.NotNil(t, named, "expected concrete target model")
-	require.NotNil(t, wildcard, "expected wildcard target model")
-	require.Equal(t, "gpt-4o", named["name"])
-	require.Equal(t, "@openai/custom-m1", named["model_alias"], "target model_alias should match source model.alias")
-	_, wildcardHasAlias := wildcard["model_alias"]
+	wildCfg, ok := wildcardProxy["config"].(map[string]any)
+	require.True(t, ok, "expected wildcard ai-proxy-advanced config")
+	wildTargets, ok := wildCfg["targets"].([]any)
+	require.True(t, ok, "expected wildcard ai-proxy-advanced targets")
+	require.Len(t, wildTargets, 1)
+	wildTarget, ok := wildTargets[0].(map[string]any)
+	require.True(t, ok, "expected wildcard ai-proxy-advanced target")
+	wildModel, ok := wildTarget["model"].(map[string]any)
+	require.True(t, ok, "expected wildcard ai-proxy-advanced model")
+	_, hasWildName := wildModel["name"]
+	require.False(t, hasWildName, "wildcard target should omit name")
+	_, wildcardHasAlias := wildModel["model_alias"]
 	require.False(t, wildcardHasAlias, "wildcard target should omit model_alias")
 }
 
@@ -536,40 +530,34 @@ model_providers:
 	plugins, ok := got["plugins"].([]any)
 	require.True(t, ok, "expected plugins collection")
 
-	var proxy map[string]any
-	for _, raw := range plugins {
-		plugin, ok := raw.(map[string]any)
-		require.True(t, ok, "expected plugin entry")
-		if plugin["name"] == "ai-proxy-advanced" {
-			proxy = plugin
-			break
-		}
-	}
+	proxy, wildcardProxy := splitProxyPlugins(plugins)
 	require.NotNil(t, proxy, "expected ai-proxy-advanced plugin")
+	require.NotNil(t, wildcardProxy, "expected wildcard ai-proxy-advanced plugin")
 
 	cfg, ok := proxy["config"].(map[string]any)
 	require.True(t, ok, "expected ai-proxy-advanced config")
 	targets, ok := cfg["targets"].([]any)
 	require.True(t, ok, "expected ai-proxy-advanced targets")
-	require.Len(t, targets, 2)
+	require.Len(t, targets, 1)
+	target, ok := targets[0].(map[string]any)
+	require.True(t, ok, "expected ai-proxy-advanced target")
+	model, ok := target["model"].(map[string]any)
+	require.True(t, ok, "expected ai-proxy-advanced model")
+	require.Equal(t, "gpt-4o", model["name"])
+	require.Equal(t, "m1", model["model_alias"], "type \"model\" target model_alias should default to the model name when source model.alias is unset")
 
-	var named, wildcard map[string]any
-	for _, raw := range targets {
-		target, ok := raw.(map[string]any)
-		require.True(t, ok, "expected ai-proxy-advanced target")
-		model, ok := target["model"].(map[string]any)
-		require.True(t, ok, "expected ai-proxy-advanced model")
-		if _, hasName := model["name"]; hasName {
-			named = model
-		} else {
-			wildcard = model
-		}
-	}
-	require.NotNil(t, named, "expected concrete target model")
-	require.NotNil(t, wildcard, "expected wildcard target model")
-	require.Equal(t, "gpt-4o", named["name"])
-	require.Equal(t, "m1", named["model_alias"], "type \"model\" target model_alias should default to the model name when source model.alias is unset")
-	_, wildcardHasAlias := wildcard["model_alias"]
+	wildCfg, ok := wildcardProxy["config"].(map[string]any)
+	require.True(t, ok, "expected wildcard ai-proxy-advanced config")
+	wildTargets, ok := wildCfg["targets"].([]any)
+	require.True(t, ok, "expected wildcard ai-proxy-advanced targets")
+	require.Len(t, wildTargets, 1)
+	wildTarget, ok := wildTargets[0].(map[string]any)
+	require.True(t, ok, "expected wildcard ai-proxy-advanced target")
+	wildModel, ok := wildTarget["model"].(map[string]any)
+	require.True(t, ok, "expected wildcard ai-proxy-advanced model")
+	_, hasWildName := wildModel["name"]
+	require.False(t, hasWildName, "wildcard target should omit name")
+	_, wildcardHasAlias := wildModel["model_alias"]
 	require.False(t, wildcardHasAlias, "wildcard target should omit model_alias")
 }
 
@@ -609,41 +597,23 @@ providers:
 	plugins, ok := got["plugins"].([]any)
 	require.True(t, ok, "expected plugins collection")
 
-	var proxy map[string]any
-	for _, raw := range plugins {
-		plugin, ok := raw.(map[string]any)
-		require.True(t, ok, "expected plugin entry")
-		if plugin["name"] == "ai-proxy-advanced" {
-			proxy = plugin
-			break
-		}
-	}
+	proxy, wildcardProxy := splitProxyPlugins(plugins)
 	require.NotNil(t, proxy, "expected ai-proxy-advanced plugin")
+	require.Nil(t, wildcardProxy, "did not expect wildcard ai-proxy-advanced plugin on native route")
 
 	cfg, ok := proxy["config"].(map[string]any)
 	require.True(t, ok, "expected ai-proxy-advanced config")
 	targets, ok := cfg["targets"].([]any)
 	require.True(t, ok, "expected ai-proxy-advanced targets")
-	require.Len(t, targets, 2)
-
-	var named, wildcard map[string]any
-	for _, raw := range targets {
-		target, ok := raw.(map[string]any)
-		require.True(t, ok, "expected ai-proxy-advanced target")
-		model, ok := target["model"].(map[string]any)
-		require.True(t, ok, "expected ai-proxy-advanced model")
-		if _, hasName := model["name"]; hasName {
-			named = model
-		} else {
-			wildcard = model
-		}
-	}
-	require.NotNil(t, named, "expected concrete target model")
-	require.NotNil(t, wildcard, "expected wildcard target model")
-	_, hasModelAlias := named["model_alias"]
+	require.Len(t, targets, 1)
+	target, ok := targets[0].(map[string]any)
+	require.True(t, ok, "expected ai-proxy-advanced target")
+	model, ok := target["model"].(map[string]any)
+	require.True(t, ok, "expected ai-proxy-advanced model")
+	_, hasModelAlias := model["model_alias"]
 	require.False(t, hasModelAlias, "native-route target model_alias should stay unset when source model.alias is unset, even for type \"model\"")
-	_, wildcardHasModelAlias := wildcard["model_alias"]
-	require.False(t, wildcardHasModelAlias, "wildcard native-route target should also keep model_alias unset")
+
+
 }
 
 func TestConvertDBLessSynthesizesAIModelAliasWhenUnset(t *testing.T) {
@@ -683,42 +653,63 @@ model_providers:
 	plugins, ok := got["plugins"].([]any)
 	require.True(t, ok, "expected plugins collection")
 
-	var proxy map[string]any
-	for _, raw := range plugins {
-		plugin, ok := raw.(map[string]any)
-		require.True(t, ok, "expected plugin entry")
-		if plugin["name"] == "ai-proxy-advanced" {
-			proxy = plugin
-			break
-		}
-	}
+	proxy, wildcardProxy := splitProxyPlugins(plugins)
 	require.NotNil(t, proxy, "expected ai-proxy-advanced plugin")
+	require.Nil(t, wildcardProxy, "did not expect wildcard ai-proxy-advanced plugin on non-body-model route")
 
 	cfg, ok := proxy["config"].(map[string]any)
 	require.True(t, ok, "expected ai-proxy-advanced config")
 	targets, ok := cfg["targets"].([]any)
 	require.True(t, ok, "expected ai-proxy-advanced targets")
-	require.Len(t, targets, 2)
+	require.Len(t, targets, 1)
+	target, ok := targets[0].(map[string]any)
+	require.True(t, ok, "expected ai-proxy-advanced target")
+	model, ok := target["model"].(map[string]any)
+	require.True(t, ok, "expected ai-proxy-advanced model")
+	require.Equal(t, "files", model["name"])
+	_, hasModelAlias := model["model_alias"]
+	require.False(t, hasModelAlias, "db-less target model_alias should still be omitted when source model.alias is unset")
 
-	var named, wildcard map[string]any
-	for _, raw := range targets {
-		target, ok := raw.(map[string]any)
-		require.True(t, ok, "expected ai-proxy-advanced target")
-		model, ok := target["model"].(map[string]any)
-		require.True(t, ok, "expected ai-proxy-advanced model")
-		if _, hasName := model["name"]; hasName {
-			named = model
+
+}
+
+func splitProxyPlugins(plugins []any) (map[string]any, map[string]any) {
+	var primary map[string]any
+	var wildcard map[string]any
+	for _, raw := range plugins {
+		plugin, ok := raw.(map[string]any)
+		if !ok || plugin["name"] != "ai-proxy-advanced" {
+			continue
+		}
+		if pluginHasConcreteTarget(plugin) {
+			primary = plugin
 		} else {
-			wildcard = model
+			wildcard = plugin
 		}
 	}
-	require.NotNil(t, named, "expected concrete target model")
-	require.NotNil(t, wildcard, "expected wildcard target model")
-	require.Equal(t, "files", named["name"])
-	_, hasModelAlias := named["model_alias"]
-	require.False(t, hasModelAlias, "db-less target model_alias should still be omitted when source model.alias is unset")
-	_, wildcardHasModelAlias := wildcard["model_alias"]
-	require.False(t, wildcardHasModelAlias, "wildcard target should keep model_alias omitted when source model.alias is unset")
+	return primary, wildcard
+}
+
+func pluginHasConcreteTarget(plugin map[string]any) bool {
+	cfg, _ := plugin["config"].(map[string]any)
+	targets, _ := cfg["targets"].([]any)
+	for _, raw := range targets {
+		target, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		model, _ := target["model"].(map[string]any)
+		if model == nil {
+			continue
+		}
+		if name, _ := model["name"].(string); name != "" {
+			return true
+		}
+		if alias, _ := model["model_alias"].(string); alias != "" {
+			return true
+		}
+	}
+	return false
 }
 
 func TestConvertStrictFailsUnknownProvider(t *testing.T) {
