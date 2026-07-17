@@ -34,7 +34,7 @@ plugins:
           description: batch-api
           logging:
             log_payloads: false
-            log_statistics: true
+            log_statistics: false
           model:
             name: batch-api
             provider: openai
