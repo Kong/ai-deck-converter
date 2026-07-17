@@ -14,13 +14,14 @@ import (
 // Routes are grouped by (section, RouteLabel); specs sharing a label collapse to
 // one route whose ai-proxy-advanced plugin carries one target per capability/model.
 type EndpointSpec struct {
-	RouteLabel     string   // route name suffix, e.g. "chat", "invoke"
-	PathSuffix     string   // appended after the base path (regex body when IsRegex)
-	IsRegex        bool     // emit a Kong regex route ("~" prefix)
-	Methods        []string // route methods
-	RouteType      string   // ai-proxy-advanced target route_type
-	GenaiCategory  string   // ai-proxy-advanced config.genai_category
-	TakesBodyModel bool     // whether requests carry a body `model` field (ai-model-selector)
+	RouteLabel            string   // route name suffix, e.g. "chat", "invoke"
+	PathSuffix            string   // appended after the base path (regex body when IsRegex)
+	IsRegex               bool     // emit a Kong regex route ("~" prefix)
+	Methods               []string // route methods
+	RouteType             string   // ai-proxy-advanced target route_type
+	GenaiCategory         string   // ai-proxy-advanced config.genai_category
+	TakesBodyModel        bool     // whether requests carry a body `model` field (ai-model-selector)
+	SupportsLogStatistics bool     // whether the endpoint supports log statistics
 }
 
 const (
@@ -147,118 +148,124 @@ func CapabilitiesFor(format, providerType string) []string {
 // ref/supported-endpoints.md and the reference kong.yaml examples.
 var EndpointTable = map[string]map[string]EndpointSpec{
 	"openai": {
-		"generate":     {"chat", "/chat/completions", false, mPost, "llm/v1/chat", catTextGen, true},
-		"agentic":      {"responses", "/responses", false, mPost, "llm/v1/responses", catTextGen, true},
-		"realtime":     {"realtime", "/realtime", false, mGetPost, "realtime/v1/realtime", catRealtime, true},
-		"embeddings":   {"embeddings", "/embeddings", false, mPost, "llm/v1/embeddings", catEmbeddings, true},
-		"image":        {"images", "/images/generations", false, mPost, "image/v1/images/generations", catImage, true},
-		"audio/speech": {"audio-speech", "/audio/speech", false, mPost, "audio/v1/audio/speech", catSpeech, true},
+		"generate":   {"chat", "/chat/completions", false, mPost, "llm/v1/chat", catTextGen, true, true},
+		"agentic":    {"responses", "/responses", false, mPost, "llm/v1/responses", catTextGen, true, true},
+		"realtime":   {"realtime", "/realtime", false, mGetPost, "realtime/v1/realtime", catRealtime, true, true},
+		"embeddings": {"embeddings", "/embeddings", false, mPost, "llm/v1/embeddings", catEmbeddings, true, true},
+		"image": {
+			"images", "/images/generations", false, mPost, "image/v1/images/generations", catImage, true, true,
+		},
+		"audio/speech": {
+			"audio-speech", "/audio/speech", false, mPost, "audio/v1/audio/speech", catSpeech, true, false,
+		},
 		"audio/transcription": {
 			"audio-transcribe", "/audio/transcriptions", false, mPost, "audio/v1/audio/transcriptions",
-			catTranscript, true,
+			catTranscript, true, false,
 		},
 		"audio/translation": {
 			"audio-translate", "/audio/translations", false, mPost, "audio/v1/audio/translations",
-			catTranscript, true,
+			catTranscript, true, false,
 		},
-		"video":   {"videos", "/videos/generations", false, mPost, "video/v1/videos/generations", catVideo, true},
-		"batches": {"batches", "/batches", false, mGetPost, "llm/v1/batches", catTextGen, false},
+		"video":   {"videos", "/videos/generations", false, mPost, "video/v1/videos/generations", catVideo, true, true},
+		"batches": {"batches", "/batches", false, mGetPost, "llm/v1/batches", catTextGen, false, true},
 		"files": {
-			"files", "/files", false, []string{"GET", "POST", "DELETE"}, "llm/v1/files", catTextGen, false,
+			"files", "/files", false, []string{"GET", "POST", "DELETE"}, "llm/v1/files", catTextGen, false, true,
 		},
 	},
 	"anthropic": {
-		"generate": {"messages", "/v1/messages", false, mPost, "llm/v1/chat", catTextGen, true},
-		"batches":  {"batches", "/v1/messages/batches", false, mGetPost, "llm/v1/batches", catTextGen, false},
+		"generate": {"messages", "/v1/messages", false, mPost, "llm/v1/chat", catTextGen, true, true},
+		"batches": {
+			"batches", "/v1/messages/batches", false, mGetPost, "llm/v1/batches", catTextGen, false, false,
+		},
 	},
 	"bedrock": {
 		"generate": {
 			"converse", "model/(?<model_name>[^/]+)/converse(?:-stream)?",
-			true, mGetPost, "llm/v1/chat", catTextGen, false,
+			true, mGetPost, "llm/v1/chat", catTextGen, false, true,
 		},
 		"agentic": {
 			"retrieve", "model/(?<model_name>[^/]+)/retrieveAndGenerate(?:Stream)?",
-			true, mGetPost, "llm/v1/chat", catTextGen, false,
+			true, mGetPost, "llm/v1/chat", catTextGen, false, true,
 		},
 		"embeddings": {
 			"invoke", "model/(?<model_name>[^/]+)/invoke(?:-with-response-stream)?",
-			true, mGetPost, "llm/v1/embeddings", catEmbeddings, false,
+			true, mGetPost, "llm/v1/embeddings", catEmbeddings, false, true,
 		},
 		"image": {
 			"invoke", "model/(?<model_name>[^/]+)/invoke(?:-with-response-stream)?",
-			true, mGetPost, "image/v1/images/generations", catImage, false,
+			true, mGetPost, "image/v1/images/generations", catImage, false, false,
 		},
 		"audio/speech": {
 			"invoke", "model/(?<model_name>[^/]+)/invoke(?:-with-response-stream)?",
-			true, mGetPost, "llm/v1/chat", catTextGen, false,
+			true, mGetPost, "llm/v1/chat", catTextGen, false, true,
 		},
 		"video": {
 			"invoke", "model/(?<model_name>[^/]+)/invoke(?:-with-response-stream)?",
-			true, mGetPost, "video/v1/videos/generations", catVideo, false,
+			true, mGetPost, "video/v1/videos/generations", catVideo, false, true,
 		},
 		"rerank": {
 			"rerank", "model/(?<model_name>[^/]+)/rerank",
-			true, mGetPost, "llm/v1/chat", catTextGen, false,
+			true, mGetPost, "llm/v1/chat", catTextGen, false, true,
 		},
 		"batches": {
 			"batches", "model/(?<model_name>[^/]+)/async-invoke",
-			true, mGetPost, "llm/v1/batches", catTextGen, false,
+			true, mGetPost, "llm/v1/batches", catTextGen, false, true,
 		},
 	},
 	"gemini": {
 		"generate": {
 			"generate", "v1beta/models/(?<model_name>[^:/]+):(?:generateContent|streamGenerateContent)",
-			true, mGetPost, "llm/v1/chat", catTextGen, true,
+			true, mGetPost, "llm/v1/chat", catTextGen, true, true,
 		},
 		"embeddings": {
 			"embeddings", "v1beta/models/(?<model_name>[^:/]+):(?:embedContent|batchEmbedContent)",
-			true, mGetPost, "llm/v1/embeddings", catEmbeddings, true,
+			true, mGetPost, "llm/v1/embeddings", catEmbeddings, true, true,
 		},
-		"batches": {"batches", "v1beta/batches", false, mGetPost, "llm/v1/batches", catTextGen, false},
-		"files":   {"files", "(?:upload/)?v1beta/files", true, mGetPost, "llm/v1/chat", catTextGen, false},
+		"batches": {"batches", "v1beta/batches", false, mGetPost, "llm/v1/batches", catTextGen, false, true},
+		"files":   {"files", "(?:upload/)?v1beta/files", true, mGetPost, "llm/v1/chat", catTextGen, false, true},
 	},
 	"vertex": {
 		"generate": {
 			"generate",
 			"v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/google/models/" +
 				"(?<model_name>[^:/]+):(?:generateContent|streamGenerateContent)",
-			true, mGetPost, "llm/v1/chat", catTextGen, true,
+			true, mGetPost, "llm/v1/chat", catTextGen, true, true,
 		},
 		"embeddings": {
 			"embeddings",
 			"v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/google/models/" +
 				"(?<model_name>[^:/]+):(?:embedContent|batchEmbedContent)",
-			true, mGetPost, "llm/v1/embeddings", catEmbeddings, true,
+			true, mGetPost, "llm/v1/embeddings", catEmbeddings, true, true,
 		},
 		"image": {
 			"predict-long-running",
 			"v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/google/models/" +
 				"(?<model_name>[^:/]+):predictLongRunning",
-			true, mGetPost, "image/v1/images/generations", catImage, false,
+			true, mGetPost, "image/v1/images/generations", catImage, false, true,
 		},
 		"video": {
 			"predict-long-running",
 			"v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/google/models/" +
 				"(?<model_name>[^:/]+):predictLongRunning",
-			true, mGetPost, "video/v1/videos/generations", catVideo, false,
+			true, mGetPost, "video/v1/videos/generations", catVideo, false, true,
 		},
 		"rerank": {
 			"ranking",
 			"v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/rankingConfigs/" +
 				"(?<ranking_config>[^:/]+):rank",
-			true, mGetPost, "llm/v1/chat", catTextGen, false,
+			true, mGetPost, "llm/v1/chat", catTextGen, false, true,
 		},
 		"batches": {
 			"batches",
 			"v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/batchPredictionJobs",
-			true, mGetPost, "llm/v1/batches", catTextGen, false,
+			true, mGetPost, "llm/v1/batches", catTextGen, false, true,
 		},
 	},
 	"cohere": {
-		"rerank": {"rerank", "/v2/rerank", false, mPost, "llm/v1/chat", catTextGen, false},
+		"rerank": {"rerank", "/v2/rerank", false, mPost, "llm/v1/chat", catTextGen, false, true},
 	},
 	"huggingface": {
-		"generate": {"generate", "/generate", false, mPost, "llm/v1/chat", catTextGen, true},
+		"generate": {"generate", "/generate", false, mPost, "llm/v1/chat", catTextGen, true, true},
 	},
 }
 

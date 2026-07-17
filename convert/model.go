@@ -61,7 +61,6 @@ func (c *Converter) convertModels() error {
 		m := &c.src.Models[i]
 		bases := basePaths(m)
 		caps := c.expandCapabilities(m)
-		logging := modelLoggingBlock(withLoggingDefaults(m.Config.Logging, false, false))
 
 		// Preserve the source model alias on ai-proxy-advanced targets exactly as
 		// authored so alias-less targets still participate in the DP's fallback
@@ -126,6 +125,7 @@ func (c *Converter) convertModels() error {
 					}
 					continue
 				}
+				logging := modelLoggingBlock(withLoggingDefaults(m.Config.Logging, false, false), spec.SupportsLogStatistics)
 				// Authentication plugins execute before the model selector. Models
 				// with different identity-provider sets therefore cannot share a
 				// route: a route-scoped auth plugin would otherwise protect every
@@ -368,10 +368,14 @@ func (g *proxyGroup) proxyConfig() map[string]any {
 // record accepted by the ai-proxy-advanced target schema, which only allows
 // log_statistics and log_payloads. Any extra keys loggingBlock may produce
 // (max_payload_size, log_audits) are dropped to avoid emitting unknown fields.
-func modelLoggingBlock(l *aigw.Logging) map[string]any {
+func modelLoggingBlock(l *aigw.Logging, supportsLogStatistics bool) map[string]any {
 	block := loggingBlock(l)
 	if block == nil {
 		return nil
+	}
+
+	if !supportsLogStatistics {
+		block["log_statistics"] = false
 	}
 	delete(block, "max_payload_size")
 	delete(block, "log_audits")
