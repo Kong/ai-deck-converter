@@ -49,7 +49,7 @@ plugins:
           description: amazon.nova-canvas-v1:0
           logging:
             log_payloads: false
-            log_statistics: true
+            log_statistics: false
           model:
             model_alias: '@bedrock/nova-canvas'
             name: amazon.nova-canvas-v1:0

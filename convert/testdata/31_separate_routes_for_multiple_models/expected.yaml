@@ -36,7 +36,7 @@ plugins:
           description: gpt-4o-transcribe
           logging:
             log_payloads: false
-            log_statistics: true
+            log_statistics: false
           model:
             model_alias: '@openai/gpt-5.2'
             name: gpt-4o-transcribe
@@ -67,7 +67,7 @@ plugins:
           description: gpt-4o-transcribe
           logging:
             log_payloads: false
-            log_statistics: true
+            log_statistics: false
           model:
             model_alias: '@openai/gpt-5.2'
             name: gpt-4o-transcribe
