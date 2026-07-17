@@ -40,6 +40,19 @@ plugins:
           route_type: llm/v1/chat
         - auth:
             header_name: Authorization
+            header_value: '{vault://env/llama2-key}'
+          description: llama-3
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            options:
+              llama2_format: ollama
+              temperature: 0.7
+            provider: llama2
+          route_type: llm/v1/chat
+        - auth:
+            header_name: Authorization
             header_value: '{vault://env/mistral-key}'
           description: mistral-large
           logging:
@@ -54,6 +67,18 @@ plugins:
           route_type: llm/v1/chat
         - auth:
             header_name: Authorization
+            header_value: '{vault://env/mistral-key}'
+          description: mistral-large
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            options:
+              mistral_format: openai
+            provider: mistral
+          route_type: llm/v1/chat
+        - auth:
+            header_name: Authorization
             header_value: '{vault://env/dashscope-key}'
           description: qwen-max
           logging:
@@ -62,6 +87,19 @@ plugins:
           model:
             model_alias: '@openai/provider-options-mix'
             name: qwen-max
+            options:
+              dashscope:
+                international: true
+            provider: dashscope
+          route_type: llm/v1/chat
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://env/dashscope-key}'
+          description: qwen-max
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
             options:
               dashscope:
                 international: true
@@ -84,6 +122,19 @@ plugins:
           route_type: llm/v1/chat
         - auth:
             header_name: Authorization
+            header_value: '{vault://env/kimi-key}'
+          description: kimi-k2
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            options:
+              kimi:
+                international: false
+            provider: kimi
+          route_type: llm/v1/chat
+        - auth:
+            header_name: Authorization
             header_value: '{vault://env/cohere-key}'
           description: command-r
           logging:
@@ -92,6 +143,21 @@ plugins:
           model:
             model_alias: '@openai/provider-options-mix'
             name: command-r
+            options:
+              cohere:
+                api_version: "2022-12-06"
+                embedding_input_type: search_document
+                wait_for_model: true
+            provider: cohere
+          route_type: llm/v1/chat
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://env/cohere-key}'
+          description: command-r
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
             options:
               cohere:
                 api_version: "2022-12-06"
@@ -117,6 +183,20 @@ plugins:
           route_type: llm/v1/chat
         - auth:
             header_name: Authorization
+            header_value: '{vault://env/hf-key}'
+          description: hf-zephyr
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            options:
+              huggingface:
+                use_cache: true
+                wait_for_model: false
+            provider: huggingface
+          route_type: llm/v1/chat
+        - auth:
+            header_name: Authorization
             header_value: '{vault://env/databricks-key}'
           description: dbrx-instruct
           logging:
@@ -125,6 +205,19 @@ plugins:
           model:
             model_alias: '@openai/provider-options-mix'
             name: dbrx-instruct
+            options:
+              databricks:
+                workspace_instance_id: dbc-a1b2c3d4
+            provider: databricks
+          route_type: llm/v1/chat
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://env/databricks-key}'
+          description: dbrx-instruct
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
             options:
               databricks:
                 workspace_instance_id: dbc-a1b2c3d4

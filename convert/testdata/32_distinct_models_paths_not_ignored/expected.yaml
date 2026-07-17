@@ -41,6 +41,16 @@ plugins:
             name: gpt-5.2-a
             provider: openai
           route_type: llm/v1/chat
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-5.2-a
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            provider: openai
+          route_type: llm/v1/chat
     route: openai-chat
     model: gpt-5-2-a
   - name: ai-model-selector
@@ -66,6 +76,16 @@ plugins:
           model:
             model_alias: '@openai/gpt-5.2-b'
             name: gpt-5.2-b
+            provider: openai
+          route_type: llm/v1/chat
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-5.2-b
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
             provider: openai
           route_type: llm/v1/chat
     route: openai-chat-2

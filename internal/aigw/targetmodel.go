@@ -6,6 +6,8 @@ import "gopkg.in/yaml.v3"
 // Provider by name (a bare string, per the Admin API); Config carries the
 // provider type plus model options.
 type TargetModel struct {
+	// Name is optional; when omitted, the converter can emit a wildcard target
+	// that matches requests regardless of the incoming model name.
 	Name              string            `yaml:"name,omitempty"`
 	Weight            *int              `yaml:"weight,omitempty"`
 	SemanticDesc      string            `yaml:"semantic_description,omitempty"`

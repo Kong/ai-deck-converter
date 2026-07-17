@@ -44,6 +44,16 @@ plugins:
             name: gpt-4o
             provider: openai
           route_type: llm/v1/chat
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-4o
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            provider: openai
+          route_type: llm/v1/chat
     route: openai-chat
     model: full-model
   - name: ai-model-selector
@@ -69,6 +79,16 @@ plugins:
           model:
             model_alias: bare-model
             name: text-embedding-3-small
+            provider: openai
+          route_type: llm/v1/embeddings
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: text-embedding-3-small
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
             provider: openai
           route_type: llm/v1/embeddings
     route: openai-embeddings

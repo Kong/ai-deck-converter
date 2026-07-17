@@ -73,6 +73,16 @@ plugins:
             name: gpt-5-mini
             provider: openai
           route_type: llm/v1/chat
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://oidc-repro-secrets/openai-auth-token}'
+          description: gpt-5-mini
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            provider: openai
+          route_type: llm/v1/chat
     route:
       id: 8ae36805-da7a-55b9-b056-72bde6bb937d
     model:
@@ -103,6 +113,16 @@ plugins:
           model:
             model_alias: '@oidc-repro/model-b'
             name: gpt-5-mini
+            provider: openai
+          route_type: llm/v1/chat
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://oidc-repro-secrets/openai-auth-token}'
+          description: gpt-5-mini
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
             provider: openai
           route_type: llm/v1/chat
     route:

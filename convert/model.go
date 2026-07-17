@@ -211,6 +211,13 @@ func (c *Converter) convertModels() error {
 					pg.seen[dedup] = true
 					pg.targets = append(pg.targets, target)
 				}
+				if wildcard := wildcardTarget(target); wildcard != nil {
+					wildcardDedup := dedup + "|any"
+					if !pg.seen[wildcardDedup] {
+						pg.seen[wildcardDedup] = true
+						pg.targets = append(pg.targets, wildcard)
+					}
+				}
 				if bs := bodySizeOrDefault(m); bs > g.bodySize {
 					g.bodySize = bs
 				}
@@ -406,7 +413,9 @@ func (c *Converter) buildTarget(
 ) map[string]any {
 	model := map[string]any{
 		"provider": aimap.PluginProvider(providerType),
-		"name":     tm.Name,
+	}
+	if tm.Name != "" {
+		model["name"] = tm.Name
 	}
 	if alias != "" {
 		model["model_alias"] = alias
@@ -427,13 +436,39 @@ func (c *Converter) buildTarget(
 	}
 	if tm.SemanticDesc != "" {
 		target["description"] = tm.SemanticDesc
-	} else {
+	} else if tm.Name != "" {
 		target["description"] = tm.Name // Use name as default description.
 	}
 	if logging != nil {
 		target["logging"] = logging
 	}
 	return target
+}
+
+// wildcardTarget duplicates a concrete target and removes model selectors from
+// target.model so Kong can fall back to it when incoming requests specify an
+// arbitrary model value.
+func wildcardTarget(target map[string]any) map[string]any {
+	model, _ := target["model"].(map[string]any)
+	if len(model) == 0 {
+		return nil
+	}
+	if _, ok := model["name"]; !ok {
+		return nil
+	}
+
+	dup := make(map[string]any, len(target))
+	for k, v := range target {
+		dup[k] = v
+	}
+	modelDup := make(map[string]any, len(model))
+	for k, v := range model {
+		modelDup[k] = v
+	}
+	delete(modelDup, "name")
+	delete(modelDup, "model_alias")
+	dup["model"] = modelDup
+	return dup
 }
 
 // expandCapabilities normalizes a model's capabilities into canonical keys.

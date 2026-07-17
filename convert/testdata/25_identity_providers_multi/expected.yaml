@@ -44,6 +44,16 @@ plugins:
             name: gpt-5.4
             provider: openai
           route_type: llm/v1/chat
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            provider: openai
+          route_type: llm/v1/chat
     route: openai-chat
     model: openai-gpt-5-4
   - name: openid-connect

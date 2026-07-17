@@ -1,6 +1,7 @@
 package revert
 
 import (
+	"encoding/json"
 	"sort"
 	"strings"
 
@@ -86,6 +87,20 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 			}
 			continue
 		}
+		namedSignatures := map[string]bool{}
+		for _, raw := range targets {
+			target, ok := raw.(map[string]any)
+			if !ok {
+				continue
+			}
+			modelMap := getMap(target, "model")
+			if getStr(modelMap, "name") == "" {
+				continue
+			}
+			if sig, ok := targetSignatureWithoutModelName(target); ok {
+				namedSignatures[sig] = true
+			}
+		}
 
 		for _, raw := range targets {
 			target, ok := raw.(map[string]any)
@@ -93,6 +108,13 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 				continue
 			}
 			modelMap := getMap(target, "model")
+			if getStr(modelMap, "name") == "" {
+				if sig, ok := targetSignatureWithoutModelName(target); ok && namedSignatures[sig] {
+					// Forward conversion emits this wildcard fallback alongside the
+					// named target; keep only the named source target in AI Gateway.
+					continue
+				}
+			}
 			alias := getStr(modelMap, "model_alias")
 			routeType := getStr(target, "route_type")
 			providerType := detectProviderType(getStr(modelMap, "provider"), path)
@@ -341,6 +363,32 @@ func (r *Reverter) nameAliaslessGroups(acc *modelAcc) error {
 		}
 	}
 	return nil
+}
+
+// targetSignatureWithoutModelName returns a deterministic representation of a
+// target with model selectors removed, used to detect forward-emitted wildcard
+// duplicates during revert.
+func targetSignatureWithoutModelName(target map[string]any) (string, bool) {
+	cpy := make(map[string]any, len(target))
+	for k, v := range target {
+		cpy[k] = v
+	}
+	model, _ := cpy["model"].(map[string]any)
+	if len(model) == 0 {
+		return "", false
+	}
+	modelCopy := make(map[string]any, len(model))
+	for k, v := range model {
+		modelCopy[k] = v
+	}
+	delete(modelCopy, "name")
+	delete(modelCopy, "model_alias")
+	cpy["model"] = modelCopy
+	b, err := json.Marshal(cpy)
+	if err != nil {
+		return "", false
+	}
+	return string(b), true
 }
 
 // hasAIModels reports whether the source document declares any ai-models

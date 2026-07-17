@@ -136,6 +136,13 @@ plugins:
             name: gpt-4o
             provider: openai
           route_type: llm/v1/chat
+        - description: gpt-4o
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            provider: openai
+          route_type: llm/v1/chat
     route:
       id: 8ae36805-da7a-55b9-b056-72bde6bb937d
     model:
@@ -179,6 +186,13 @@ plugins:
           model:
             model_alias: my-model-alias
             name: gpt-4o
+            provider: openai
+          route_type: llm/v1/embeddings
+        - description: gpt-4o
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
             provider: openai
           route_type: llm/v1/embeddings
     route:

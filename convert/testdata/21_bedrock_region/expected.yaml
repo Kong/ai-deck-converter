@@ -45,6 +45,20 @@ plugins:
                 embeddings_normalize: true
             provider: bedrock
           route_type: llm/v1/embeddings
+        - auth:
+            aws_access_key_id: '{vault://ai/aws-access-key-id}'
+            aws_secret_access_key: '{vault://ai/aws-secret-access-key}'
+          description: amazon.titan-embed-text-v2:0
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            options:
+              bedrock:
+                aws_region: us-east-1
+                embeddings_normalize: true
+            provider: bedrock
+          route_type: llm/v1/embeddings
     route: bedrock-invoke
     model: titan-embed-text-v2
 ai_models:

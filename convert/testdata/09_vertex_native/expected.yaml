@@ -53,6 +53,23 @@ plugins:
         - auth:
             gcp_service_account_json: '{vault://ai/gcp-service-account-json}'
             gcp_use_service_account: true
+          description: gemini-2.5-pro-with-gcp-env
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            options:
+              gemini:
+                api_endpoint: https://us-central1-aiplatform.googleapis.com
+                location_id: us-central1
+                project_id: kong-vertex-project
+              max_tokens: 4096
+              temperature: 1
+            provider: gemini
+          route_type: llm/v1/chat
+        - auth:
+            gcp_service_account_json: '{vault://ai/gcp-service-account-json}'
+            gcp_use_service_account: true
           description: gemini-2.6-pro-without-gcp-env
           logging:
             log_payloads: false
@@ -60,6 +77,19 @@ plugins:
           model:
             model_alias: '@vertex/gemini-2.5-pro'
             name: gemini-2.6-pro-without-gcp-env
+            options:
+              max_tokens: 4096
+              temperature: 1
+            provider: gemini
+          route_type: llm/v1/chat
+        - auth:
+            gcp_service_account_json: '{vault://ai/gcp-service-account-json}'
+            gcp_use_service_account: true
+          description: gemini-2.6-pro-without-gcp-env
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
             options:
               max_tokens: 4096
               temperature: 1
@@ -101,6 +131,21 @@ plugins:
         - auth:
             gcp_service_account_json: '{vault://ai/gcp-service-account-json}'
             gcp_use_service_account: true
+          description: text-embedding-005-with-gcp-env
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            options:
+              gemini:
+                api_endpoint: https://us-central2-aiplatform.googleapis.com
+                location_id: us-central2
+                project_id: other-vertex-project
+            provider: gemini
+          route_type: llm/v1/embeddings
+        - auth:
+            gcp_service_account_json: '{vault://ai/gcp-service-account-json}'
+            gcp_use_service_account: true
           description: text-embedding-006-without-gcp-env
           logging:
             log_payloads: false
@@ -108,6 +153,16 @@ plugins:
           model:
             model_alias: '@vertex/text-embedding-005'
             name: text-embedding-006-without-gcp-env
+            provider: gemini
+          route_type: llm/v1/embeddings
+        - auth:
+            gcp_service_account_json: '{vault://ai/gcp-service-account-json}'
+            gcp_use_service_account: true
+          description: text-embedding-006-without-gcp-env
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
             provider: gemini
           route_type: llm/v1/embeddings
     route: gemini-embeddings

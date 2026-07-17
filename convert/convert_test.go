@@ -471,13 +471,26 @@ model_providers:
 	require.True(t, ok, "expected ai-proxy-advanced config")
 	targets, ok := cfg["targets"].([]any)
 	require.True(t, ok, "expected ai-proxy-advanced targets")
-	require.Len(t, targets, 1)
-	target, ok := targets[0].(map[string]any)
-	require.True(t, ok, "expected ai-proxy-advanced target")
-	model, ok := target["model"].(map[string]any)
-	require.True(t, ok, "expected ai-proxy-advanced model")
-	require.Equal(t, "gpt-4o", model["name"])
-	require.Equal(t, "@openai/custom-m1", model["model_alias"], "target model_alias should match source model.alias")
+	require.Len(t, targets, 2)
+
+	var named, wildcard map[string]any
+	for _, raw := range targets {
+		target, ok := raw.(map[string]any)
+		require.True(t, ok, "expected ai-proxy-advanced target")
+		model, ok := target["model"].(map[string]any)
+		require.True(t, ok, "expected ai-proxy-advanced model")
+		if _, hasName := model["name"]; hasName {
+			named = model
+		} else {
+			wildcard = model
+		}
+	}
+	require.NotNil(t, named, "expected concrete target model")
+	require.NotNil(t, wildcard, "expected wildcard target model")
+	require.Equal(t, "gpt-4o", named["name"])
+	require.Equal(t, "@openai/custom-m1", named["model_alias"], "target model_alias should match source model.alias")
+	_, wildcardHasAlias := wildcard["model_alias"]
+	require.False(t, wildcardHasAlias, "wildcard target should omit model_alias")
 }
 
 // For type "model", the target model_alias defaults to the model name when
@@ -538,13 +551,26 @@ model_providers:
 	require.True(t, ok, "expected ai-proxy-advanced config")
 	targets, ok := cfg["targets"].([]any)
 	require.True(t, ok, "expected ai-proxy-advanced targets")
-	require.Len(t, targets, 1)
-	target, ok := targets[0].(map[string]any)
-	require.True(t, ok, "expected ai-proxy-advanced target")
-	model, ok := target["model"].(map[string]any)
-	require.True(t, ok, "expected ai-proxy-advanced model")
-	require.Equal(t, "gpt-4o", model["name"])
-	require.Equal(t, "m1", model["model_alias"], "type \"model\" target model_alias should default to the model name when source model.alias is unset")
+	require.Len(t, targets, 2)
+
+	var named, wildcard map[string]any
+	for _, raw := range targets {
+		target, ok := raw.(map[string]any)
+		require.True(t, ok, "expected ai-proxy-advanced target")
+		model, ok := target["model"].(map[string]any)
+		require.True(t, ok, "expected ai-proxy-advanced model")
+		if _, hasName := model["name"]; hasName {
+			named = model
+		} else {
+			wildcard = model
+		}
+	}
+	require.NotNil(t, named, "expected concrete target model")
+	require.NotNil(t, wildcard, "expected wildcard target model")
+	require.Equal(t, "gpt-4o", named["name"])
+	require.Equal(t, "m1", named["model_alias"], "type \"model\" target model_alias should default to the model name when source model.alias is unset")
+	_, wildcardHasAlias := wildcard["model_alias"]
+	require.False(t, wildcardHasAlias, "wildcard target should omit model_alias")
 }
 
 // On a native (path-model) route such as bedrock's, there is no companion
@@ -598,13 +624,26 @@ providers:
 	require.True(t, ok, "expected ai-proxy-advanced config")
 	targets, ok := cfg["targets"].([]any)
 	require.True(t, ok, "expected ai-proxy-advanced targets")
-	require.Len(t, targets, 1)
-	target, ok := targets[0].(map[string]any)
-	require.True(t, ok, "expected ai-proxy-advanced target")
-	model, ok := target["model"].(map[string]any)
-	require.True(t, ok, "expected ai-proxy-advanced model")
-	_, hasModelAlias := model["model_alias"]
+	require.Len(t, targets, 2)
+
+	var named, wildcard map[string]any
+	for _, raw := range targets {
+		target, ok := raw.(map[string]any)
+		require.True(t, ok, "expected ai-proxy-advanced target")
+		model, ok := target["model"].(map[string]any)
+		require.True(t, ok, "expected ai-proxy-advanced model")
+		if _, hasName := model["name"]; hasName {
+			named = model
+		} else {
+			wildcard = model
+		}
+	}
+	require.NotNil(t, named, "expected concrete target model")
+	require.NotNil(t, wildcard, "expected wildcard target model")
+	_, hasModelAlias := named["model_alias"]
 	require.False(t, hasModelAlias, "native-route target model_alias should stay unset when source model.alias is unset, even for type \"model\"")
+	_, wildcardHasModelAlias := wildcard["model_alias"]
+	require.False(t, wildcardHasModelAlias, "wildcard native-route target should also keep model_alias unset")
 }
 
 func TestConvertDBLessSynthesizesAIModelAliasWhenUnset(t *testing.T) {
@@ -659,14 +698,27 @@ model_providers:
 	require.True(t, ok, "expected ai-proxy-advanced config")
 	targets, ok := cfg["targets"].([]any)
 	require.True(t, ok, "expected ai-proxy-advanced targets")
-	require.Len(t, targets, 1)
-	target, ok := targets[0].(map[string]any)
-	require.True(t, ok, "expected ai-proxy-advanced target")
-	model, ok := target["model"].(map[string]any)
-	require.True(t, ok, "expected ai-proxy-advanced model")
-	require.Equal(t, "files", model["name"])
-	_, hasModelAlias := model["model_alias"]
+	require.Len(t, targets, 2)
+
+	var named, wildcard map[string]any
+	for _, raw := range targets {
+		target, ok := raw.(map[string]any)
+		require.True(t, ok, "expected ai-proxy-advanced target")
+		model, ok := target["model"].(map[string]any)
+		require.True(t, ok, "expected ai-proxy-advanced model")
+		if _, hasName := model["name"]; hasName {
+			named = model
+		} else {
+			wildcard = model
+		}
+	}
+	require.NotNil(t, named, "expected concrete target model")
+	require.NotNil(t, wildcard, "expected wildcard target model")
+	require.Equal(t, "files", named["name"])
+	_, hasModelAlias := named["model_alias"]
 	require.False(t, hasModelAlias, "db-less target model_alias should still be omitted when source model.alias is unset")
+	_, wildcardHasModelAlias := wildcard["model_alias"]
+	require.False(t, wildcardHasModelAlias, "wildcard target should keep model_alias omitted when source model.alias is unset")
 }
 
 func TestConvertStrictFailsUnknownProvider(t *testing.T) {

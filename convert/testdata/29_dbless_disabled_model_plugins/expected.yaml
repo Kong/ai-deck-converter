@@ -71,6 +71,13 @@ plugins:
             name: gpt-5
             provider: openai
           route_type: llm/v1/responses
+        - description: gpt-5
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            provider: openai
+          route_type: llm/v1/responses
     route:
       id: 1a3f650c-2709-5e79-a792-7ffd18243fbf
     model:
@@ -101,6 +108,13 @@ plugins:
             name: gpt-5
             provider: openai
           route_type: llm/v1/chat
+        - description: gpt-5
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            provider: openai
+          route_type: llm/v1/chat
     route:
       id: 8ae36805-da7a-55b9-b056-72bde6bb937d
     model:
@@ -129,6 +143,13 @@ plugins:
           model:
             model_alias: disabled-chat
             name: gpt-5
+            provider: openai
+          route_type: image/v1/images/generations
+        - description: gpt-5
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
             provider: openai
           route_type: image/v1/images/generations
     route:

@@ -76,6 +76,19 @@ plugins:
           route_type: llm/v1/chat
           weight: 80
         - auth:
+            header_name: Authorization
+            header_value: '{vault://env/openai-key}'
+          description: gpt-4o
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            options:
+              temperature: 0.6
+            provider: openai
+          route_type: llm/v1/chat
+          weight: 80
+        - auth:
             header_name: x-api-key
             header_value: '{vault://env/anthropic-key}'
           description: claude-3-5
@@ -93,6 +106,19 @@ plugins:
         - auth:
             header_name: x-api-key
             header_value: '{vault://env/anthropic-key}'
+          description: claude-3-5
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            options:
+              anthropic_version: "2023-06-01"
+            provider: anthropic
+          route_type: llm/v1/chat
+          weight: 10
+        - auth:
+            header_name: x-api-key
+            header_value: '{vault://env/anthropic-key}'
           description: claude-3-4
           logging:
             log_payloads: false
@@ -100,6 +126,19 @@ plugins:
           model:
             model_alias: '@prod/prod-chat'
             name: claude-3-4
+            options:
+              anthropic_version: "2023-06-01"
+            provider: anthropic
+          route_type: llm/v1/chat
+          weight: 10
+        - auth:
+            header_name: x-api-key
+            header_value: '{vault://env/anthropic-key}'
+          description: claude-3-4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
             options:
               anthropic_version: "2023-06-01"
             provider: anthropic

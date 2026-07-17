@@ -43,6 +43,16 @@ plugins:
             name: gpt-4o
             provider: openai
           route_type: llm/v1/chat
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://env/openai-key}'
+          description: gpt-4o
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            provider: openai
+          route_type: llm/v1/chat
     route: openai-chat
     model: semantic-lb
 ai_models:
