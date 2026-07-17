@@ -24,9 +24,14 @@ func LabelsToTags(labels map[string]string, prefix string) []string {
 	return tags
 }
 
+// managerNameTagKey is a Konnect-internal marker tag ("ai-manager-name: <cp>")
+// that is not an AI Gateway label; it is dropped entirely on reversal.
+const managerNameTagKey = "ai-manager-name"
+
 // TagsToLabels reverses LabelsToTags: tags of the form "<prefix><key>:<value>"
 // become label entries. Tags that lack the prefix or a ":" separator do not
-// look like converted labels and are returned in rest, in input order.
+// look like converted labels and are returned in rest, in input order. The
+// Konnect-internal "ai-manager-name" tag is dropped (neither a label nor rest).
 func TagsToLabels(tags []string, prefix string) (labels map[string]string, rest []string) {
 	for _, tag := range tags {
 		body, ok := strings.CutPrefix(tag, prefix)
@@ -37,6 +42,9 @@ func TagsToLabels(tags []string, prefix string) (labels map[string]string, rest 
 		key, value, ok := strings.Cut(body, ":")
 		if !ok || key == "" {
 			rest = append(rest, tag)
+			continue
+		}
+		if strings.TrimSpace(key) == managerNameTagKey {
 			continue
 		}
 		if labels == nil {

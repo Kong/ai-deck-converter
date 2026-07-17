@@ -1,0 +1,52 @@
+# A route-nested ai-rate-limiting-advanced using the API Gateway 3.15
+# llm_providers shape. On revert it must be reshaped into the AI Gateway 2.0
+# config.policies shape (match/limits), and the 1.x llm_providers/llm_format
+# fields dropped.
+_format_version: "3.0"
+services:
+  - name: aigw34-svc
+    host: httpbin.konghq.com
+    port: 443
+    protocol: https
+    routes:
+      - name: aigw34-route
+        paths:
+          - /aigw34/chat
+        strip_path: true
+        plugins:
+          - name: ai-proxy-advanced
+            enabled: true
+            config:
+              llm_format: openai
+              targets:
+                - auth:
+                    header_name: api-key
+                    header_value: '{vault://kv/azure-key}'
+                  model:
+                    name: gpt-4o
+                    options:
+                      azure_deployment_id: gpt-4o
+                      azure_instance: se-ai-gw-resource
+                      upstream_url: https://se-ai-gw-resource/openai/deployments/gpt-4o/chat/completions
+                    provider: azure
+                  route_type: llm/v1/chat
+                  weight: 100
+          - name: ai-rate-limiting-advanced
+            enabled: true
+            config:
+              identifier: consumer
+              llm_format: openai
+              llm_providers:
+                - name: bedrock
+                  limit:
+                    - 150
+                  window_size:
+                    - 60
+                - name: azure
+                  limit:
+                    - 0.0015
+                  window_size:
+                    - 3600
+              strategy: local
+              tokens_count_strategy: total_tokens
+              window_type: sliding

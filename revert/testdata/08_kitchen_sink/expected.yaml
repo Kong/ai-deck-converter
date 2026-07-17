@@ -1,5 +1,7 @@
 models:
-  - type: model
+  - ref: prod-chat
+    type: model
+    display_name: prod-chat
     name: prod-chat
     capabilities:
       - generate
@@ -33,7 +35,9 @@ models:
       balancer:
         algorithm: lowest-latency
 model_providers:
-  - type: openai
+  - ref: openai-env
+    type: openai
+    display_name: openai-env
     name: openai-env
     config:
       auth:
@@ -41,7 +45,9 @@ model_providers:
         headers:
           - name: Authorization
             value: '{vault://env/openai-key}'
-  - type: anthropic
+  - ref: anthropic-env
+    type: anthropic
+    display_name: anthropic-env
     name: anthropic-env
     config:
       auth:
@@ -50,7 +56,9 @@ model_providers:
           - name: x-api-key
             value: '{vault://env/anthropic-key}'
 mcp_servers:
-  - type: passthrough-listener
+  - ref: tools-mcp
+    type: passthrough-listener
+    display_name: tools-mcp
     name: tools-mcp
     config:
       route:
@@ -60,9 +68,11 @@ mcp_servers:
         payloads: false
         statistics: true
         audits: false
-    upstream_url: https://tools.internal/mcp
+      url: https://tools.internal/mcp
 agents:
-  - type: a2a
+  - ref: orchestrator
+    type: a2a
+    display_name: orchestrator
     name: orchestrator
     config:
       url: https://orchestrator.internal/a2a
@@ -75,23 +85,33 @@ agents:
         statistics: true
         max_payload_size: 1048576
 policies:
-  - type: ai-prompt-guard
+  - ref: ai-prompt-guard
+    type: ai-prompt-guard
+    display_name: ai-prompt-guard
     name: ai-prompt-guard
     config:
       allow_patterns:
         - ^safe
 consumers:
-  - name: app-svc
+  - ref: app-svc
+    display_name: app-svc
+    name: app-svc
     type: api-key
     consumer_groups:
       - premium
     credentials:
-      - type: api-key
+      - ref: app-svc-credential-1
+        display_name: app-svc-credential-1
+        name: app-svc-credential-1
+        type: api-key
         api_key: app-secret
 consumer_groups:
-  - name: premium
+  - ref: premium
+    display_name: premium
+    name: premium
 vaults:
-  - type: env
+  - ref: env-vault
+    type: env
     name: env-vault
     config:
       prefix: KONG_

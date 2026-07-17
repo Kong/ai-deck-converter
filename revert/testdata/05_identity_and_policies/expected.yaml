@@ -1,5 +1,7 @@
 models:
-  - type: model
+  - ref: guarded-gpt
+    type: model
+    display_name: guarded-gpt
     name: guarded-gpt
     capabilities:
       - generate
@@ -26,7 +28,9 @@ models:
       model:
         alias: '@openai/guarded-gpt'
 model_providers:
-  - type: openai
+  - ref: openai-env
+    type: openai
+    display_name: openai-env
     name: openai-env
     config:
       auth:
@@ -35,23 +39,31 @@ model_providers:
           - name: Authorization
             value: '{vault://env/openai-key}'
 policies:
-  - type: rate-limiting
+  - ref: rate-limiting
+    type: rate-limiting
+    display_name: rate-limiting
     name: rate-limiting
     global: true
     config:
       minute: 1000
       policy: local
-  - type: http-log
+  - ref: http-log
+    type: http-log
+    display_name: http-log
     name: http-log
     config:
       http_endpoint: https://logs.internal/ingest
-  - type: ai-prompt-guard
+  - ref: ai-prompt-guard
+    type: ai-prompt-guard
+    display_name: ai-prompt-guard
     name: ai-prompt-guard
     config:
       allow_patterns:
         - ^safe
 consumers:
-  - name: gregs-dev
+  - ref: gregs-dev
+    display_name: gregs-dev
+    name: gregs-dev
     type: api-key
     custom_id: dev-001
     consumer_groups:
@@ -59,15 +71,21 @@ consumers:
     policies:
       - http-log
     credentials:
-      - type: api-key
+      - ref: gregs-dev-credential-1
+        display_name: gregs-dev-credential-1
+        name: gregs-dev-credential-1
+        type: api-key
         ttl: 3600
         api_key: secret-abc
     labels:
       tier: gold
 consumer_groups:
-  - name: premium-users
+  - ref: premium-users
+    display_name: premium-users
+    name: premium-users
 vaults:
-  - type: env
+  - ref: env-vault
+    type: env
     name: env-vault
     description: Environment secrets
     config:

@@ -344,7 +344,11 @@ func (g *proxyGroup) proxyConfig() map[string]any {
 		"targets":        g.targets,
 	}
 	if g.vectordb != nil {
-		cfg["vectordb"] = g.vectordb
+		if vd, ok := g.vectordb.(map[string]any); ok {
+			cfg["vectordb"] = lowerVectorDB(vd)
+		} else {
+			cfg["vectordb"] = g.vectordb
+		}
 	}
 	if g.embeddings != nil {
 		cfg["embeddings"] = g.embeddings

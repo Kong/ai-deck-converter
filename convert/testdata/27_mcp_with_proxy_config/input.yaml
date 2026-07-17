@@ -41,7 +41,7 @@ mcp_servers:
     policies: []
     access:
       acls: {allow: [], deny: []}
-    upstream_url: https://vendor-mcp.example.com/mcp
     config:
+      url: https://vendor-mcp.example.com/mcp
       route: {name: vendor-mcp-route, paths: [/mcp/vendor]}
     tools: []

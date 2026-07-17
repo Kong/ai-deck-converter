@@ -1,0 +1,67 @@
+models:
+  - ref: aigw34-route
+    type: model
+    display_name: aigw34-route
+    name: aigw34-route
+    capabilities:
+      - generate
+    formats:
+      - type: openai
+    targets:
+      - name: gpt-4o
+        weight: 100
+        provider: azure-kv
+        config:
+          deployment_id: gpt-4o
+          type: azure
+          upstream_url: https://se-ai-gw-resource/openai/deployments/gpt-4o/chat/completions
+    policies:
+      - ai-rate-limiting-advanced
+    config:
+      route:
+        paths:
+          - /aigw34/chat
+        strip_path: true
+      logging:
+        payloads: false
+        statistics: true
+model_providers:
+  - ref: azure-kv
+    type: azure
+    display_name: azure-kv
+    name: azure-kv
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: api-key
+            value: '{vault://kv/azure-key}'
+      instance: se-ai-gw-resource
+policies:
+  - ref: ai-rate-limiting-advanced
+    type: ai-rate-limiting-advanced
+    display_name: ai-rate-limiting-advanced
+    name: ai-rate-limiting-advanced
+    enabled: true
+    config:
+      identifier: consumer
+      policies:
+        - limits:
+            - limit: 150
+              tokens_count_strategy: total_tokens
+              window_size: 60
+          match:
+            - type: provider
+              values:
+                - bedrock
+        - limits:
+            - limit: 0.0015
+              tokens_count_strategy: total_tokens
+              window_size: 3600
+          match:
+            - type: provider
+              values:
+                - azure
+      strategy: local
+      tokens_count_strategy: total_tokens
+      window_type: sliding

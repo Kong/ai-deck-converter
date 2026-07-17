@@ -3,6 +3,7 @@ package aigw
 // Agent is an AI Gateway agent. type is "a2a" (gets an ai-a2a-proxy plugin) or
 // "http" (plain proxy Service+Route). Both share the same config shape.
 type Agent struct {
+	Ref         string       `yaml:"ref,omitempty"`
 	Type        string       `yaml:"type,omitempty"`
 	DisplayName string       `yaml:"display_name,omitempty"`
 	Name        string       `yaml:"name,omitempty"`

@@ -78,7 +78,136 @@ func RevertDocument(doc *kong.Document, opts Options) (*aigw.Document, []string,
 	if err := r.run(); err != nil {
 		return nil, r.warnings, err
 	}
+	assignDisplayNames(r.out)
+	assignRefs(r.out)
 	return r.out, r.warnings, nil
+}
+
+// assignRefs fills in the `ref` identifier kongctl requires on every AI Gateway
+// entity. Kong has no ref concept, so reversal synthesizes it from the entity's
+// name (a consumer with no name falls back to its custom_id). The forward
+// converter never reads ref, so this does not affect round trips.
+func assignRefs(doc *aigw.Document) {
+	for i := range doc.Models {
+		if doc.Models[i].Ref == "" {
+			doc.Models[i].Ref = doc.Models[i].Name
+		}
+	}
+	for i := range doc.ModelProviders {
+		if doc.ModelProviders[i].Ref == "" {
+			doc.ModelProviders[i].Ref = doc.ModelProviders[i].Name
+		}
+	}
+	for i := range doc.Policies {
+		if doc.Policies[i].Ref == "" {
+			doc.Policies[i].Ref = doc.Policies[i].Name
+		}
+	}
+	for i := range doc.Agents {
+		if doc.Agents[i].Ref == "" {
+			doc.Agents[i].Ref = doc.Agents[i].Name
+		}
+	}
+	for i := range doc.ConsumerGroups {
+		if doc.ConsumerGroups[i].Ref == "" {
+			doc.ConsumerGroups[i].Ref = doc.ConsumerGroups[i].Name
+		}
+	}
+	for i := range doc.MCPServers {
+		if doc.MCPServers[i].Ref == "" {
+			doc.MCPServers[i].Ref = doc.MCPServers[i].Name
+		}
+	}
+	for i := range doc.IdentityProviders {
+		if doc.IdentityProviders[i].Ref == "" {
+			doc.IdentityProviders[i].Ref = doc.IdentityProviders[i].Name
+		}
+	}
+	for i := range doc.Vaults {
+		if doc.Vaults[i].Ref == "" {
+			doc.Vaults[i].Ref = doc.Vaults[i].Name
+		}
+	}
+	for i := range doc.Consumers {
+		c := &doc.Consumers[i]
+		if c.Ref != "" {
+			continue
+		}
+		if c.Name != "" {
+			c.Ref = c.Name
+		} else {
+			c.Ref = c.CustomID
+		}
+	}
+	for i := range doc.Consumers {
+		for j := range doc.Consumers[i].Credentials {
+			cred := &doc.Consumers[i].Credentials[j]
+			if cred.Ref == "" {
+				cred.Ref = cred.Name
+			}
+		}
+	}
+}
+
+// assignDisplayNames fills in the display_name required by the AI Gateway schema
+// on every entity that lacks one. Kong has no display-name concept, so the
+// forward direction drops it (lossy by design) and reversal must synthesize it:
+// display_name mirrors the entity's name. Consumer credentials additionally have
+// no name in decK (key-auth credentials carry only a key), so a deterministic
+// name is synthesized from the owning consumer. The forward converter never
+// reads display_name or a credential's name, so this does not affect round trips.
+// Vaults are Kong-core entities outside the AI Gateway schema and are skipped.
+func assignDisplayNames(doc *aigw.Document) {
+	for i := range doc.Models {
+		if doc.Models[i].DisplayName == "" {
+			doc.Models[i].DisplayName = doc.Models[i].Name
+		}
+	}
+	for i := range doc.ModelProviders {
+		if doc.ModelProviders[i].DisplayName == "" {
+			doc.ModelProviders[i].DisplayName = doc.ModelProviders[i].Name
+		}
+	}
+	for i := range doc.Policies {
+		if doc.Policies[i].DisplayName == "" {
+			doc.Policies[i].DisplayName = doc.Policies[i].Name
+		}
+	}
+	for i := range doc.Agents {
+		if doc.Agents[i].DisplayName == "" {
+			doc.Agents[i].DisplayName = doc.Agents[i].Name
+		}
+	}
+	for i := range doc.ConsumerGroups {
+		if doc.ConsumerGroups[i].DisplayName == "" {
+			doc.ConsumerGroups[i].DisplayName = doc.ConsumerGroups[i].Name
+		}
+	}
+	for i := range doc.MCPServers {
+		if doc.MCPServers[i].DisplayName == "" {
+			doc.MCPServers[i].DisplayName = doc.MCPServers[i].Name
+		}
+	}
+	for i := range doc.IdentityProviders {
+		if doc.IdentityProviders[i].DisplayName == "" {
+			doc.IdentityProviders[i].DisplayName = doc.IdentityProviders[i].Name
+		}
+	}
+	for i := range doc.Consumers {
+		c := &doc.Consumers[i]
+		if c.DisplayName == "" {
+			c.DisplayName = c.Name
+		}
+		for j := range c.Credentials {
+			cred := &c.Credentials[j]
+			if cred.Name == "" {
+				cred.Name = fmt.Sprintf("%s-credential-%d", c.Name, j+1)
+			}
+			if cred.DisplayName == "" {
+				cred.DisplayName = cred.Name
+			}
+		}
+	}
 }
 
 // Reverter holds reversal state: plugin/ai-model indexes built from the source
@@ -114,6 +243,17 @@ type Reverter struct {
 	identityProviderNames  map[string]bool
 	identityProviderCounts map[string]int // identity provider type -> running index
 
+	// MCP server names already emitted, to uniquify collisions when several
+	// routes of one service each become an MCP server.
+	mcpNames map[string]bool
+
+	// usedNames is the union of names assigned to synthesized entities
+	// (policies, identity providers, providers). kongctl requires refs to be
+	// globally unique across entity types, so these registries share it to
+	// avoid a policy and an identity provider both taking e.g.
+	// "openid-connect-2".
+	usedNames map[string]bool
+
 	warnings []string
 }
 
@@ -132,6 +272,8 @@ func newReverter(doc *kong.Document, opts Options) *Reverter {
 		identityProviderByFP:   map[string]string{},
 		identityProviderNames:  map[string]bool{},
 		identityProviderCounts: map[string]int{},
+		mcpNames:               map[string]bool{},
+		usedNames:              map[string]bool{},
 	}
 }
 

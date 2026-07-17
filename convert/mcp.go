@@ -34,13 +34,19 @@ func (c *Converter) convertMCPServers() error {
 			Routes: []kong.Route{route},
 			Tags:   c.labelsToTags(m.Labels),
 		}
-		if m.UpstreamURL != "" {
-			service.URL = m.UpstreamURL
+		// The upstream URL lives at config.url in the AI Gateway schema; accept the
+		// legacy top-level upstream_url as a fallback for older hand-written input.
+		upstreamURL := m.Config.URL
+		if upstreamURL == "" {
+			upstreamURL = m.UpstreamURL
+		}
+		if upstreamURL != "" {
+			service.URL = upstreamURL
 		} else {
 			service.Host = placeholderHost
 			if m.Type == "passthrough-listener" {
 				if err := c.warn(
-					"MCP server %q is passthrough-listener but has no upstream_url; using placeholder host %q",
+					"MCP server %q is passthrough-listener but has no config.url; using placeholder host %q",
 					m.Name, placeholderHost); err != nil {
 					return err
 				}

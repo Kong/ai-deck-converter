@@ -1,5 +1,7 @@
 models:
-  - type: model
+  - ref: vertex-gemini-2-5-pro
+    type: model
+    display_name: vertex-gemini-2-5-pro
     name: vertex-gemini-2-5-pro
     capabilities:
       - generate
@@ -21,7 +23,9 @@ models:
         statistics: true
       model:
         alias: '@vertex/gemini-2.5-pro'
-  - type: model
+  - ref: vertex-text-embedding-005
+    type: model
+    display_name: vertex-text-embedding-005
     name: vertex-text-embedding-005
     capabilities:
       - embeddings
@@ -42,7 +46,9 @@ models:
       model:
         alias: '@vertex/text-embedding-005'
 model_providers:
-  - type: gemini
+  - ref: gemini-ai
+    type: gemini
+    display_name: gemini-ai
     name: gemini-ai
     config:
       auth:

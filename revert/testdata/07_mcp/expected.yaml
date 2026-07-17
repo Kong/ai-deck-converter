@@ -1,5 +1,7 @@
 mcp_servers:
-  - type: conversion-listener
+  - ref: flights-mcp
+    type: conversion-listener
+    display_name: flights-mcp
     name: flights-mcp
     config:
       route:
@@ -32,7 +34,9 @@ mcp_servers:
           acls:
             allow:
               - agents
-  - type: passthrough-listener
+  - ref: vendor-mcp
+    type: passthrough-listener
+    display_name: vendor-mcp
     name: vendor-mcp
     config:
       route:
@@ -42,4 +46,4 @@ mcp_servers:
         payloads: false
         statistics: true
         audits: false
-    upstream_url: https://vendor-mcp.example.com/mcp
+      url: https://vendor-mcp.example.com/mcp

@@ -6,6 +6,7 @@ package aigw
 // Model's access.identity_providers list and instantiated as a scoped
 // authentication plugin on that model's route.
 type IdentityProvider struct {
+	Ref         string         `yaml:"ref,omitempty"`
 	ID          string         `yaml:"id,omitempty"`
 	Type        string         `yaml:"type,omitempty"`
 	DisplayName string         `yaml:"display_name,omitempty"`

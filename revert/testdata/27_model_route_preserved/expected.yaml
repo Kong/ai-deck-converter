@@ -1,0 +1,42 @@
+models:
+  - ref: aigw82-route
+    type: model
+    display_name: aigw82-route
+    name: aigw82-route
+    capabilities:
+      - generate
+    formats:
+      - type: anthropic
+    targets:
+      - name: claude-sonnet-4-6
+        weight: 100
+        provider: anthropic-ai
+        config:
+          type: anthropic
+          upstream_url: https://api.anthropic.com/v1/messages
+    config:
+      route:
+        paths:
+          - /aigw82/claude
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: true
+      logging:
+        payloads: false
+        statistics: true
+      response_streaming: allow
+      max_request_body_size: 10485760
+      model:
+        name_header: true
+model_providers:
+  - ref: anthropic-ai
+    type: anthropic
+    display_name: anthropic-ai
+    name: anthropic-ai
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: x-api-key
+            value: '{vault://ai/anthropic-key}'

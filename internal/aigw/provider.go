@@ -6,6 +6,7 @@ import "gopkg.in/yaml.v3"
 // not emitted as a standalone Kong entity; its type and auth are folded into each
 // ai-proxy-advanced target that references it by name.
 type Provider struct {
+	Ref         string         `yaml:"ref,omitempty"`
 	Type        string         `yaml:"type,omitempty"`
 	DisplayName string         `yaml:"display_name,omitempty"`
 	Name        string         `yaml:"name,omitempty"`

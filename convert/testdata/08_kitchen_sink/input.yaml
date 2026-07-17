@@ -33,8 +33,8 @@ mcp_servers:
     name: tools-mcp
     policies: []
     acls: {allow: [], deny: []}
-    upstream_url: https://tools.internal/mcp
     config:
+      url: https://tools.internal/mcp
       route: {name: tools-mcp-route, paths: [/mcp/tools]}
     tools: []
 model_providers:

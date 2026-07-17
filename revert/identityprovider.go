@@ -15,6 +15,9 @@ import (
 // unique name.
 func (r *Reverter) registerIdentityProvider(p kong.Plugin) *aigw.IdentityProvider {
 	cfg := stripAnonymous(p.Config)
+	if p.Name == "openid-connect" {
+		cfg = r.reshapeOpenIDConnect(cfg)
+	}
 
 	for i := range r.identityProviders {
 		existing := &r.identityProviders[i]
@@ -43,12 +46,13 @@ func (r *Reverter) uniqueIdentityProviderName(idpType string) string {
 	for {
 		r.identityProviderCounts[idpType]++
 		candidate := fmt.Sprintf("%s-%d", idpType, r.identityProviderCounts[idpType])
-		if !r.identityProviderNames[candidate] {
+		if !r.identityProviderNames[candidate] && !r.usedNames[candidate] {
 			name = candidate
 			break
 		}
 	}
 	r.identityProviderNames[name] = true
+	r.usedNames[name] = true
 	return name
 }
 

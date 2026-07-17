@@ -3,6 +3,7 @@ package aigw
 // Vault is an AI Gateway vault. type is the backend (konnect|env|aws|gcp|azure|
 // conjur|hcv); config is backend-specific and passed through.
 type Vault struct {
+	Ref         string         `yaml:"ref,omitempty"`
 	ID          string         `yaml:"id,omitempty"`
 	Type        string         `yaml:"type,omitempty"`
 	Name        string         `yaml:"name,omitempty"`

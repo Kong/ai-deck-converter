@@ -1,0 +1,65 @@
+# A hand-authored / Konnect-style decK config that attaches ai-proxy-advanced
+# (a guard plugin, and an auth plugin) at the SERVICE level rather than nesting
+# them under the route. The service's route must still be reconstructed as a
+# Model, with the service-level guard becoming a model policy and the
+# service-level openid-connect becoming a model identity provider.
+_format_version: "3.0"
+services:
+  - name: ai-gateway-unified
+    host: httpbin.konghq.com
+    port: 443
+    protocol: https
+    plugins:
+      - name: openid-connect
+        enabled: true
+        config:
+          issuer: https://konghq.okta.com/oauth2/default
+          auth_methods:
+            - bearer
+          consumer_claim:
+            - sub
+      - name: ai-prompt-guard
+        enabled: true
+        config:
+          deny_patterns:
+            - .*(W|w)ar.*
+          genai_category: text/generation
+          llm_format: openai
+          max_request_body_size: 8192
+      - name: ai-proxy-advanced
+        enabled: true
+        config:
+          balancer:
+            algorithm: round-robin
+          genai_category: text/generation
+          llm_format: openai
+          max_request_body_size: 8192
+          model_name_header: true
+          response_streaming: allow
+          targets:
+            - auth:
+                header_name: Authorization
+                header_value: '{vault://ai/azure-token}'
+              logging:
+                log_payloads: true
+                log_statistics: true
+              model:
+                model_alias: azure/gpt-5
+                name: gpt-5
+                options:
+                  azure_api_version: v1
+                  azure_deployment_id: gpt-5
+                  azure_instance: se-ai-gw-resource
+                  temperature: 1
+                  upstream_url: https://se-ai-gw-resource.openai.azure.com/openai/v1/chat/completions
+                provider: azure
+              route_type: llm/v1/chat
+              weight: 100
+    routes:
+      - name: ai-gateway-unified
+        methods:
+          - POST
+          - OPTIONS
+        paths:
+          - /ai
+        strip_path: true

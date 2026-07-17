@@ -15,7 +15,7 @@ func (r *Reverter) revertConsumerGroups() error {
 	for i := range r.src.ConsumerGroups {
 		g := &r.src.ConsumerGroups[i]
 		plugins := append(append([]kong.Plugin{}, g.Plugins...), r.idx.group[g.Name]...)
-		refs, acls := r.policyRefs(plugins)
+		refs, acls := r.policyRefs(plugins, "consumer-groups")
 		if !acls.IsEmpty() {
 			if err := r.warn("acl plugin on consumer group %q has no AI Gateway representation; dropped", g.Name); err != nil {
 				return err
@@ -43,7 +43,7 @@ func (r *Reverter) revertConsumers() error {
 			continue
 		}
 		plugins := append(append([]kong.Plugin{}, c.Plugins...), r.idx.consumer[c.Username]...)
-		refs, acls := r.policyRefs(plugins)
+		refs, acls := r.policyRefs(plugins, "consumers")
 		if !acls.IsEmpty() {
 			if err := r.warn("acl plugin on consumer %q has no AI Gateway representation; dropped", name); err != nil {
 				return err
@@ -62,14 +62,22 @@ func (r *Reverter) revertConsumers() error {
 		}
 		for j := range c.KeyAuthCredentials {
 			cred := &c.KeyAuthCredentials[j]
+			// The AI Gateway credential schema carries the key value in `api_key`
+			// (server-generated when omitted), so the decK key migrates through
+			// directly.
 			ac.Credentials = append(ac.Credentials, aigw.Credential{
 				Type:   "api-key",
-				APIKey: cred.Key,
 				TTL:    cred.TTL,
+				APIKey: cred.Key,
 			})
 		}
+		// The AI Gateway consumer schema requires a type (api-key | oauth).
+		// Credentials imply api-key; a credential-less consumer is an
+		// identity-provider (OIDC) user, so default it to oauth.
 		if len(ac.Credentials) > 0 {
 			ac.Type = "api-key"
+		} else {
+			ac.Type = "oauth"
 		}
 		r.out.Consumers = append(r.out.Consumers, ac)
 	}

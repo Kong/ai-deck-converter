@@ -1,5 +1,7 @@
 models:
-  - type: model
+  - ref: claude-bedrock
+    type: model
+    display_name: claude-bedrock
     name: claude-bedrock
     capabilities:
       - generate
@@ -19,7 +21,9 @@ models:
       model:
         alias: '@bedrock/claude-3-5-sonnet'
 model_providers:
-  - type: bedrock
+  - ref: bedrock-env
+    type: bedrock
+    display_name: bedrock-env
     name: bedrock-env
     config:
       auth:

@@ -1,5 +1,7 @@
 models:
-  - type: model
+  - ref: openai-gpt-5-4
+    type: model
+    display_name: openai-gpt-5-4
     name: openai-gpt-5-4
     capabilities:
       - generate
@@ -21,7 +23,9 @@ models:
       model:
         alias: '@openai/gpt-5.4'
 model_providers:
-  - type: openai
+  - ref: openai-ai
+    type: openai
+    display_name: openai-ai
     name: openai-ai
     config:
       auth:
@@ -30,11 +34,15 @@ model_providers:
           - name: Authorization
             value: '{vault://ai/openai-token}'
 identity_providers:
-  - type: openid-connect
+  - ref: openid-connect-1
+    type: openid-connect
+    display_name: openid-connect-1
     name: openid-connect-1
     config:
       issuer: https://dev-123456.okta.com/oauth2/default
-  - type: key-auth
+  - ref: key-auth-1
+    type: key-auth
+    display_name: key-auth-1
     name: key-auth-1
     config:
       key_names:

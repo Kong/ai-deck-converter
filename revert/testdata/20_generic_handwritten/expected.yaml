@@ -1,5 +1,7 @@
 models:
-  - type: model
+  - ref: chat-v1
+    type: model
+    display_name: chat-v1
     name: chat-v1
     capabilities:
       - generate
@@ -21,7 +23,9 @@ models:
         payloads: false
         statistics: true
 model_providers:
-  - type: openai
+  - ref: openai-secrets
+    type: openai
+    display_name: openai-secrets
     name: openai-secrets
     config:
       auth:
@@ -30,7 +34,9 @@ model_providers:
           - name: Authorization
             value: '{vault://secrets/openai-key}'
 agents:
-  - type: http
+  - ref: billing-api
+    type: http
+    display_name: billing-api
     name: billing-api
     config:
       url: https://billing.internal:8443/v1
@@ -39,18 +45,23 @@ agents:
         paths:
           - /billing
 policies:
-  - type: http-log
+  - ref: http-log
+    type: http-log
+    display_name: http-log
     name: http-log
     global: true
     config:
       http_endpoint: https://logs.internal/ingest
-  - type: rate-limiting
+  - ref: rate-limiting
+    type: rate-limiting
+    display_name: rate-limiting
     name: rate-limiting
     config:
       minute: 60
       policy: local
 vaults:
-  - type: env
+  - ref: secrets
+    type: env
     name: secrets
     config:
       prefix: SECRET_
