@@ -1,0 +1,40 @@
+models:
+  - type: model
+    display_name: Semantic LB
+    name: semantic-lb
+    capabilities: [generate]
+    formats:
+      - type: openai
+    targets:
+      - name: gpt-4o
+        provider: openai-main
+        config:
+          type: openai
+    policies: []
+    access:
+      acls: {allow: [], deny: []}
+    config:
+      route:
+        paths: [/ai]
+      balancer:
+        algorithm: semantic
+        slots: 10000
+        embeddings:
+          provider: vertex-prod
+          model:
+            name: text-embedding-004
+            config:
+              type: vertex
+              gcp_environment:
+                api_endpoint: us-central1-aiplatform.googleapis.com
+                location_id: us-central1
+                project_id: my-project-id
+              upstream_url: https://generativelanguage.googleapis.com
+model_providers:
+  - name: vertex-prod
+    type: vertex
+    display_name: Google Vertex AI (Prod)
+    config:
+      auth:
+        type: gcp
+        service_account_json: "{vault://ai/gcp-service-account-json}"

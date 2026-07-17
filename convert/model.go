@@ -111,9 +111,12 @@ func (c *Converter) convertModels() error {
 					return err
 				}
 			}
-			sec := aimap.SectionFor(llmFormat(m), providerType)
-
 			for _, capability := range caps {
+				// The section is resolved per capability: gemini-format traffic
+				// served by Vertex renders as gemini for shared capabilities
+				// (generate/embeddings) but keeps the Vertex section for the
+				// Vertex-only image/video/rerank endpoints.
+				sec := aimap.EndpointSectionFor(llmFormat(m), providerType, capability)
 				spec, ok := aimap.LookupEndpoint(sec, capability)
 				if !ok {
 					if err := c.warn(

@@ -146,7 +146,9 @@ func lowerEmbeddingsModel(emb map[string]any, provider *aigw.Provider) {
 	if providerType == "" && provider != nil {
 		providerType = provider.Type
 	}
-	model["provider"] = providerType
+	// Emit the ai-proxy-advanced provider enum (e.g. vertex -> gemini), matching
+	// the target path (convert/model.go), rather than the raw AI Gateway type.
+	model["provider"] = aimap.PluginProvider(providerType)
 
 	opts := map[string]any{}
 	for k, v := range config {
