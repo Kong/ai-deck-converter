@@ -88,6 +88,10 @@ func TestEndpointLookupAndNormalization(t *testing.T) {
 	require.Len(t, NormalizeCapability("audio"), 3, "NormalizeCapability(audio)")
 	// batch alias.
 	require.Equal(t, []string{"batches"}, NormalizeCapability("batch"), "NormalizeCapability(batch)")
+	video, videoOK := LookupEndpoint("openai", "video")
+	require.True(t, videoOK, "openai video lookup ok")
+	require.Equal(t, "/videos", video.PathSuffix, "openai video path suffix")
+	require.Equal(t, []string{"GET", "POST", "DELETE"}, video.Methods, "openai video methods")
 	// unsupported (section,capability) returns not-ok.
 	_, ok := LookupEndpoint("anthropic", "image")
 	require.False(t, ok, "expected anthropic image to be unsupported")
