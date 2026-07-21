@@ -55,9 +55,11 @@ services:
       strip_path: false
     - name: openai-videos
       paths:
-        - /ai/videos/generations
+        - /ai/videos
       methods:
+        - GET
         - POST
+        - DELETE
       strip_path: false
     - name: openai-batches
       paths:
@@ -413,6 +415,7 @@ plugins:
             azure_instance: kong-az-east
             azure_api_version: "2024-10-01-preview"
 
+
 # ---- files (upload/list/download referenced by batches & other async ops) --
 - name: ai-proxy-advanced
   route:
@@ -434,4 +437,3 @@ plugins:
           options:
             azure_instance: kong-az-east
             azure_api_version: "2024-10-01-preview"
-
