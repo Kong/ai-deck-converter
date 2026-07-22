@@ -503,7 +503,7 @@ func disabledModelPluginEnabled(enabled *bool) *bool {
 
 func llmFormat(m *aigw.Model) string {
 	if len(m.Formats) > 0 && m.Formats[0].Type != "" {
-		return m.Formats[0].Type
+		return aimap.NormalizeFormat(m.Formats[0].Type)
 	}
 	return aimap.DefaultLLMFormat
 }

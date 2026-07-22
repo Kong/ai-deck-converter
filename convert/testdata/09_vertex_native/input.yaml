@@ -12,7 +12,7 @@ models:
     type: model
     capabilities: [generate]
     formats:
-      - type: gemini
+      - type: vertex
     config:
       route:
         paths: [/ai]
@@ -43,7 +43,7 @@ models:
     type: model
     capabilities: [embeddings]
     formats:
-      - type: gemini
+      - type: vertex
     config:
       route:
         paths: [/ai]

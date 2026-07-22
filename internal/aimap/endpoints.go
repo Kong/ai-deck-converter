@@ -58,11 +58,25 @@ var (
 // where the provider type matters is gemini-format traffic served by Vertex,
 // which uses Vertex's project/location URL templates instead of Gemini's.
 func SectionFor(format, providerType string) string {
+	format = NormalizeFormat(format)
 	if format == "" {
 		format = DefaultLLMFormat
 	}
 	if format == "gemini" && providerType == "vertex" {
 		return "vertex"
+	}
+	return format
+}
+
+// NormalizeFormat maps a provider-rendering section named directly as a
+// model's format (e.g. "vertex") to its base client-facing wire format
+// ("gemini"). Vertex serves the same Gemini request/response shape, so a
+// model that names its format "vertex" is equivalent to one that names
+// "gemini" and is served by a vertex provider; keeping both spellings
+// working here means llm_format/routing never fork on which one was used.
+func NormalizeFormat(format string) string {
+	if base, ok := renderingSections[format]; ok {
+		return base
 	}
 	return format
 }
