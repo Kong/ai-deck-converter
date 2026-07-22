@@ -1,0 +1,38 @@
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: bedrock-invoke
+        paths:
+          - ~/ai/model/(?<model_name>[^/]+)/invoke(?:-with-response-stream)?
+        methods:
+          - GET
+          - POST
+        strip_path: false
+plugins:
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/embeddings
+      llm_format: bedrock
+      targets:
+        - auth:
+            aws_access_key_id: '{vault://ai/aws-access-key-id}'
+            aws_secret_access_key: '{vault://ai/aws-secret-access-key}'
+          description: amazon.nova-omni-v1:0
+          model:
+            model_alias: '@bedrock/nova-omni'
+            name: amazon.nova-omni-v1:0
+            options:
+              anthropic_version: bedrock-2023-05-31
+              bedrock:
+                aws_region: us-east-1
+            provider: bedrock
+          route_type: llm/v1/embeddings
+    route: bedrock-invoke
+    model: nova-omni
+ai_models:
+  - name: nova-omni
+    alias: '@bedrock/nova-omni'

@@ -1,0 +1,30 @@
+# A single multimodal Bedrock model whose capabilities all resolve to the shared
+# /invoke endpoint but carry different genai_categories. Only one category can be
+# served by the single ai-proxy-advanced on that route, so the converter keeps the
+# first capability (embeddings) and warns/skips image and video. Under -strict the
+# collision is fatal instead. See convertModels in convert/model.go.
+model_providers:
+  - name: bedrock-prod
+    type: bedrock
+    display_name: Bedrock Prod
+    config:
+      auth:
+        type: aws
+        access_key_id: "{vault://ai/aws-access-key-id}"
+        secret_access_key: "{vault://ai/aws-secret-access-key}"
+models:
+  - display_name: Nova Omni
+    name: nova-omni
+    type: model
+    capabilities: [embeddings, image, video]
+    formats: [{type: bedrock}]
+    config:
+      route: {paths: [/ai]}
+      model: {alias: "@bedrock/nova-omni"}
+    targets:
+      - name: amazon.nova-omni-v1:0
+        provider: bedrock-prod
+        config: {type: bedrock, region: us-east-1}
+    policies: []
+    access:
+      acls: {allow: [], deny: []}
