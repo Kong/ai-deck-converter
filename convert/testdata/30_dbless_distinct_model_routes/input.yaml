@@ -19,8 +19,8 @@ models:
       route:
         paths:
           - /xai-chat
-      model:
-        alias: xai-chat
+        model:
+          path_aliases: [xai-chat]
   - type: model
     name: openai-chat
     capabilities:
@@ -36,5 +36,5 @@ models:
       route:
         paths:
           - /openai-chat
-      model:
-        alias: openai-chat
+        model:
+          path_aliases: [openai-chat]

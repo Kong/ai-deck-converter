@@ -8,8 +8,7 @@ models:
         provider: openai-main
         config: {type: openai}
     config:
-      route: {paths: [/v1]}
-      model: {alias: my-alias}
+      route: {paths: [/v1], model: {path_aliases: [my-alias]}}
 model_providers:
   - type: openai
     name: openai-main

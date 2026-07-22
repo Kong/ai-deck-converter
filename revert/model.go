@@ -228,7 +228,9 @@ func (r *Reverter) modelGroupFor(
 			Access:   aigw.ModelAccess{ACLs: acls, IdentityProviders: idpRefs},
 		},
 	}
-	g.model.Config.Model.Alias = alias
+	if alias != "" {
+		g.model.Config.Route.Model.PathAliases = []string{alias}
+	}
 	g.model.Config.Model.NameHeader = getBool(cfg, "model_name_header")
 	g.model.Config.ResponseStreaming = getStr(cfg, "response_streaming")
 	g.model.Config.Proxy = proxyFromConfig(getMap(cfg, "proxy_config"))
@@ -282,7 +284,9 @@ func (r *Reverter) finalizeModels(acc *modelAcc) error {
 			return err
 		}
 		model := aigw.Model{Type: "model", Name: m.Name}
-		model.Config.Model.Alias = m.Alias
+		if m.Alias != "" {
+			model.Config.Route.Model.PathAliases = []string{m.Alias}
+		}
 		model.Labels = r.tagsToLabels(m.Tags)
 		built[m.Name] = true
 		r.out.Models = append(r.out.Models, model)

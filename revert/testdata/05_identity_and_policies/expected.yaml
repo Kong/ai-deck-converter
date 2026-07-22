@@ -20,11 +20,13 @@ models:
         deny:
           - banned
     config:
+      route:
+        model:
+          path_aliases:
+            - '@openai/guarded-gpt'
       logging:
         payloads: false
         statistics: true
-      model:
-        alias: '@openai/guarded-gpt'
 model_providers:
   - type: openai
     name: openai-env

@@ -432,8 +432,7 @@ models:
         provider: p1
         config: {type: openai}
     config:
-      route: {paths: [/v1]}
-      model: {alias: "@openai/custom-m1"}
+      route: {paths: [/v1], model: {path_aliases: ["@openai/custom-m1"]}}
 model_providers:
   - name: p1
     type: openai

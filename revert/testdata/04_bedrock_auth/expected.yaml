@@ -13,11 +13,13 @@ models:
           region: us-east-1
           type: bedrock
     config:
+      route:
+        model:
+          path_aliases:
+            - '@bedrock/claude-3-5-sonnet'
       logging:
         payloads: false
         statistics: true
-      model:
-        alias: '@bedrock/claude-3-5-sonnet'
 model_providers:
   - type: bedrock
     name: bedrock-env

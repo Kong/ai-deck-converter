@@ -18,8 +18,8 @@ models:
     config:
       route:
         paths: [/ai]
-      model:
-        alias: "@bedrock/claude-3-5-sonnet"
+        model:
+          path_aliases: ["@bedrock/claude-3-5-sonnet"]
 model_providers:
   - type: bedrock
     display_name: Bedrock Prod
