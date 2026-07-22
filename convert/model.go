@@ -2,6 +2,7 @@ package convert
 
 import (
 	"encoding/json"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -44,6 +45,20 @@ type proxyGroup struct {
 	seen              map[string]bool
 }
 
+type videoLifecycleTarget struct {
+	target       *aigw.TargetModel
+	provider     *aigw.Provider
+	providerType string
+}
+
+// videoLifecycleCandidate owns an OpenAI-format video route. Its lifecycle
+// proxy is static (not model-scoped) but retains every creation target.
+type videoLifecycleCandidate struct {
+	model   *aigw.Model
+	targets []videoLifecycleTarget
+	spec    aimap.EndpointSpec
+}
+
 // convertModels groups all (model, target, capability) tuples into routes under
 // a single shared ai-gateway Service, emitting a route-scoped ai-model-selector
 // and one ai-proxy-advanced per owning model (type "model") or per route (type
@@ -56,6 +71,10 @@ func (c *Converter) convertModels() error {
 	var guardPlugins []kong.Plugin
 	usedRouteNames := map[string]bool{}
 	identityPluginSeen := map[string]bool{}
+	lifecycleCandidates, err := c.videoLifecycleCandidates()
+	if err != nil {
+		return err
+	}
 
 	for i := range c.src.Models {
 		m := &c.src.Models[i]
@@ -286,6 +305,66 @@ func (c *Converter) convertModels() error {
 			c.out.Plugins = append(c.out.Plugins, plugin)
 		}
 	}
+	for _, candidate := range lifecycleCandidates {
+		routeName := uniqueModelRouteName("openai-videos-lifecycle", usedRouteNames)
+		route := buildVideoLifecycleRoute(candidate.model.Config.Route, routeName, basePaths(candidate.model))
+		service.Routes = append(service.Routes, route)
+
+		logging := modelLoggingBlock(
+			withLoggingDefaults(candidate.model.Config.Logging, false, false),
+			candidate.spec.SupportsLogStatistics,
+		)
+		targets := make([]map[string]any, 0, len(candidate.targets))
+		for _, lifecycleTarget := range candidate.targets {
+			targets = append(targets, c.buildTarget(
+				lifecycleTarget.target,
+				lifecycleTarget.provider,
+				lifecycleTarget.providerType,
+				modelAlias(candidate.model),
+				candidate.spec.RouteType,
+				logging,
+			))
+		}
+		pg := &proxyGroup{
+			routeName:         routeName,
+			enabled:           disabledModelPluginEnabled(candidate.model.Enabled),
+			llmFormat:         llmFormat(candidate.model),
+			genaiCategory:     candidate.spec.GenaiCategory,
+			balancer:          balancerConfig(candidate.model.Config.Balancer),
+			vectordb:          balancerExtra(candidate.model.Config.Balancer, "vectordb"),
+			responseStreaming: candidate.model.Config.ResponseStreaming,
+			modelNameHeader:   boolPtr(false),
+			maxBodySize:       candidate.model.Config.MaxRequestBodySize,
+			proxy:             proxyConfigBlock(candidate.model.Config.Proxy),
+			targets:           targets,
+		}
+		c.out.Plugins = append(c.out.Plugins, kong.Plugin{
+			Name:    "ai-proxy-advanced",
+			Enabled: pg.enabled,
+			Route:   kong.NewStringRef(routeName),
+			Config:  pg.proxyConfig(),
+		})
+
+		plugins, err := c.scopedPlugins(entityModel, candidate.model.Policies, candidate.model.Access.ACLs)
+		if err != nil {
+			return err
+		}
+		for i := range plugins {
+			plugins[i].Route = kong.NewStringRef(routeName)
+			c.out.Plugins = append(c.out.Plugins, plugins[i])
+		}
+		idpPlugins, err := c.scopedIdentityProviderPlugins(candidate.model.Access.IdentityProviders)
+		if err != nil {
+			return err
+		}
+		if len(idpPlugins) > 0 {
+			c.ensureAnonymousConsumer()
+		}
+		for i := range idpPlugins {
+			idpPlugins[i].Route = kong.NewStringRef(routeName)
+			c.out.Plugins = append(c.out.Plugins, idpPlugins[i])
+		}
+	}
 	c.out.Services = append(c.out.Services, service)
 	c.out.Plugins = append(c.out.Plugins, guardPlugins...)
 	return nil
@@ -305,6 +384,95 @@ func identityProviderKey(refs []string) string {
 	}
 	sort.Strings(unique)
 	return strings.Join(unique, "\x00")
+}
+
+// videoLifecycleCandidates returns video routes that can serve requests with no
+// model alias. Multiple targets are retained and reported as a warning: the
+// route remains usable, but video_id alone cannot identify the credentials that
+// created the job. Shared model routes are also retained, with a warning, so
+// users with distinct route matchers still receive every lifecycle route.
+func (c *Converter) videoLifecycleCandidates() ([]videoLifecycleCandidate, error) {
+	var candidates []videoLifecycleCandidate
+	sharedRoutes := map[string][]string{}
+
+	for i := range c.src.Models {
+		m := &c.src.Models[i]
+		if !slices.Contains(c.expandCapabilities(m), "video") {
+			continue
+		}
+		if len(m.TargetModels) == 0 {
+			warning := "model %q: video lifecycle routes require at least one target; " +
+				"skipping them"
+			if err := c.warn(warning, m.Name); err != nil {
+				return nil, err
+			}
+			continue
+		}
+
+		section := aimap.SectionFor(llmFormat(m), "")
+		if section != "openai" {
+			continue
+		}
+		spec, ok := aimap.LookupEndpoint(section, "video")
+		if !ok {
+			continue
+		}
+		if len(m.TargetModels) > 1 {
+			warning := "model %q: video lifecycle route has multiple targets; " +
+				"requests without a model alias may reach a different target than creation"
+			if err := c.warn(warning, m.Name); err != nil {
+				return nil, err
+			}
+		}
+		lifecycleTargets := make([]videoLifecycleTarget, 0, len(m.TargetModels))
+		for j := range m.TargetModels {
+			tm := &m.TargetModels[j]
+			provider := c.providers[tm.Provider]
+			providerType := tm.Config.Type
+			if providerType == "" && provider != nil {
+				providerType = provider.Type
+			}
+			lifecycleTargets = append(lifecycleTargets, videoLifecycleTarget{
+				target: tm, provider: provider, providerType: providerType,
+			})
+		}
+
+		routeConfig := m.Config.Route
+		routeConfig.Name = ""
+		routeConfig.Methods = nil
+		key, err := modelRouteConfigKey(routeConfig)
+		if err != nil {
+			return nil, err
+		}
+		key = section + "|" + key
+		sharedRoutes[key] = append(sharedRoutes[key], m.Name)
+		candidates = append(candidates, videoLifecycleCandidate{
+			model: m, targets: lifecycleTargets, spec: spec,
+		})
+	}
+
+	for _, models := range sharedRoutes {
+		if len(models) > 1 {
+			warning := "video lifecycle routes for models %s: route is shared by multiple " +
+				"video models; emitting overlapping lifecycle routes"
+			if err := c.warn(warning, strings.Join(models, ", ")); err != nil {
+				return nil, err
+			}
+		}
+	}
+	return candidates, nil
+}
+
+func buildVideoLifecycleRoute(rc aigw.ModelRouteConfig, routeName string, bases []string) kong.Route {
+	rc.Methods = nil
+	paths := make([]string, 0, len(bases)*2) //nolint:mnd
+	for _, base := range bases {
+		base = strings.TrimRight(base, "/")
+		paths = append(paths, base+"/videos", "~"+base+"/videos/.+")
+	}
+	route := buildModelRoute(rc, routeName, paths, []string{"GET", "DELETE"})
+	route.Tags = append(route.Tags, aimap.VideoLifecycleRouteTag)
+	return route
 }
 
 // modelRouteConfigKey returns a stable representation of the client-facing

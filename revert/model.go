@@ -32,6 +32,9 @@ type modelAcc struct {
 // in the group keyed by the plugin's model FK (or, FK-less, by model_alias or
 // route). Mirrors (in reverse) the per-model proxy split in convert.convertModels.
 func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins []kong.Plugin) error {
+	if hasTag(rt.Tags, aimap.VideoLifecycleRouteTag) {
+		return nil
+	}
 	var path string
 	if len(rt.Paths) > 0 {
 		path = rt.Paths[0]
@@ -163,6 +166,15 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 		}
 	}
 	return nil
+}
+
+func hasTag(tags []string, want string) bool {
+	for _, tag := range tags {
+		if tag == want {
+			return true
+		}
+	}
+	return false
 }
 
 // modelGroupFor finds or creates the model group for a plugin's model FK (or,

@@ -91,7 +91,7 @@ func TestEndpointLookupAndNormalization(t *testing.T) {
 	video, videoOK := LookupEndpoint("openai", "video")
 	require.True(t, videoOK, "openai video lookup ok")
 	require.Equal(t, "/videos", video.PathSuffix, "openai video path suffix")
-	require.Equal(t, []string{"GET", "POST", "DELETE"}, video.Methods, "openai video methods")
+	require.Equal(t, []string{"POST"}, video.Methods, "openai video create method")
 	// unsupported (section,capability) returns not-ok.
 	_, ok := LookupEndpoint("anthropic", "image")
 	require.False(t, ok, "expected anthropic image to be unsupported")

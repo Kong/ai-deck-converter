@@ -46,6 +46,10 @@ const (
 
 	GatewayServiceName = "ai-gateway"
 	GatewayServiceURL  = "http://ai-gateway.upstream.local"
+	// VideoLifecycleRouteTag marks the generated companion route for ID-only
+	// video operations. It is not a source AI Gateway route and is ignored by
+	// the reverse converter.
+	VideoLifecycleRouteTag = "aigw:video-lifecycle"
 )
 
 var (
@@ -181,10 +185,7 @@ var EndpointTable = map[string]map[string]EndpointSpec{
 			catTranscript, true, false,
 		},
 		"video": {
-			"videos", "/videos", false,
-			[]string{"GET", "POST", "DELETE"},
-			"video/v1/videos/generations",
-			catVideo, true, true,
+			"videos", "/videos", false, mPost, "video/v1/videos/generations", catVideo, true, true,
 		},
 		"batches": {"batches", "/batches", false, mGetPost, "llm/v1/batches", catTextGen, false, false},
 		"files": {

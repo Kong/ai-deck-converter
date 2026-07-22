@@ -34,6 +34,99 @@ models:
 		"expected unknown-provider warning")
 }
 
+func TestConvertWarnsAndEmitsMultiTargetVideoLifecycleRoutes(t *testing.T) {
+	src := []byte(`
+model_providers:
+  - name: primary
+    type: openai
+  - name: fallback
+    type: openai
+models:
+  - type: model
+    name: sora
+    capabilities: [video]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/ai]}
+      model: {alias: sora}
+    targets:
+      - name: sora-2
+        provider: primary
+        config: {type: openai}
+      - name: sora-2-pro
+        provider: fallback
+        config: {type: openai}
+`)
+
+	out, warnings, err := Convert(src, Options{})
+	require.NoError(t, err, "convert")
+	require.Contains(t, strings.Join(warnings, "\n"), "multiple targets")
+
+	var deck struct {
+		Plugins []struct {
+			Name   string `yaml:"name"`
+			Route  string `yaml:"route"`
+			Model  string `yaml:"model"`
+			Config struct {
+				Targets []struct {
+					Description string `yaml:"description"`
+				} `yaml:"targets"`
+			} `yaml:"config"`
+		} `yaml:"plugins"`
+	}
+	require.NoError(t, yaml.Unmarshal(out, &deck), "parse generated decK config")
+	for _, plugin := range deck.Plugins {
+		if plugin.Name != "ai-proxy-advanced" || plugin.Route != "openai-videos-lifecycle" {
+			continue
+		}
+		require.Empty(t, plugin.Model, "lifecycle plugin must not require a model alias")
+		require.Len(t, plugin.Config.Targets, 2)
+		require.ElementsMatch(t, []string{"sora-2", "sora-2-pro"}, []string{
+			plugin.Config.Targets[0].Description,
+			plugin.Config.Targets[1].Description,
+		})
+		return
+	}
+	t.Fatal("expected route-scoped OpenAI video lifecycle plugin")
+}
+
+func TestConvertWarnsAndEmitsSharedVideoLifecycleRoutes(t *testing.T) {
+	src := []byte(`
+model_providers:
+  - name: primary
+    type: openai
+models:
+  - type: model
+    name: sora-a
+    capabilities: [video]
+    formats: [{type: openai}]
+    config:
+      route: {name: first, paths: [/ai]}
+      model: {alias: sora-a}
+    targets:
+      - name: sora-2
+        provider: primary
+        config: {type: openai}
+  - type: model
+    name: sora-b
+    capabilities: [video]
+    formats: [{type: openai}]
+    config:
+      route: {name: second, paths: [/ai]}
+      model: {alias: sora-b}
+    targets:
+      - name: sora-2-pro
+        provider: primary
+        config: {type: openai}
+`)
+
+	out, warnings, err := Convert(src, Options{})
+	require.NoError(t, err, "convert")
+	require.Contains(t, strings.Join(warnings, "\n"), "shared by multiple video models")
+	require.Contains(t, string(out), "openai-videos-lifecycle")
+	require.Contains(t, string(out), "openai-videos-lifecycle-2")
+}
+
 // A Kong acl plugin permits exactly one of config.allow / config.deny
 // (only_one_of in its schema). An AI Gateway acl that sets both is not
 // representable as a single valid acl plugin, so the converter must reject it
