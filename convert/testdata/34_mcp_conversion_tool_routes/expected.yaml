@@ -1,0 +1,40 @@
+_format_version: "3.0"
+services:
+  - name: orders-mcp
+    host: localhost
+    routes:
+      - name: orders-mcp-route
+        paths:
+          - /mcp/orders
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              include_consumer_groups: true
+              logging:
+                log_audits: false
+                log_payloads: false
+                log_statistics: true
+              mode: conversion-listener
+              tools:
+                - description: Get an order
+                  method: GET
+                  name: getOrder
+                  path: /orders/{orderId}
+                - description: List items in an order
+                  method: GET
+                  name: listItems
+                  path: /orders/{orderId}/items
+                - description: Create a user
+                  method: POST
+                  name: createUser
+                  path: /users
+                - description: Get a flight
+                  method: GET
+                  name: getFlight
+                  path: /flights
+      - name: orders-mcp-tools-route
+        paths:
+          - /flights
+          - /orders
+          - /users
+        strip_path: false

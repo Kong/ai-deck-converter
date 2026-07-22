@@ -29,6 +29,10 @@ services:
                   name: searchFlights
                   path: /flights
                   scheme: https
+      - name: secure-flights-mcp-oauth-tools-route
+        paths:
+          - /flights
+        strip_path: false
   - name: secure-flights-mcp-consumer
     host: localhost
     routes:
@@ -56,6 +60,10 @@ services:
                   name: searchFlights
                   path: /flights
                   scheme: https
+      - name: secure-flights-mcp-consumer-tools-route
+        paths:
+          - /flights
+        strip_path: false
   - name: vendor-proxy-mcp
     url: https://vendor.example.com/mcp
     routes:

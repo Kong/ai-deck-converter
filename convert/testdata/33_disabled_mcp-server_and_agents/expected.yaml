@@ -45,6 +45,11 @@ services:
                   method: POST
                   name: bookFlight
                   path: /flights/book
+      - name: flights-mcp-tools-route
+        paths:
+          - /flights
+          - /flights/book
+        strip_path: false
   - name: booking-agent
     url: https://booking-agent.internal:8443/a2a
     enabled: false

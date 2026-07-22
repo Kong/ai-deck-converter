@@ -1,0 +1,26 @@
+mcp_servers:
+  # conversion-listener exercising companion tool-route synthesis: templated
+  # paths truncate to their static prefix, the two /orders/... tools de-duplicate
+  # to a single /orders prefix, and the resulting paths are sorted.
+  - type: conversion-listener
+    display_name: Orders MCP
+    name: orders-mcp
+    config:
+      route: {name: orders-mcp-route, paths: [/mcp/orders]}
+    tools:
+      - name: getOrder
+        description: Get an order
+        method: GET
+        path: /orders/{orderId}
+      - name: listItems
+        description: List items in an order
+        method: GET
+        path: /orders/{orderId}/items
+      - name: createUser
+        description: Create a user
+        method: POST
+        path: /users
+      - name: getFlight
+        description: Get a flight
+        method: GET
+        path: /flights

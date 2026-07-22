@@ -1,6 +1,9 @@
 package convert
 
 import (
+	"sort"
+	"strings"
+
 	"github.com/Kong/ai-deck-converter/internal/aigw"
 	"github.com/Kong/ai-deck-converter/internal/kong"
 )
@@ -29,9 +32,21 @@ func (c *Converter) convertMCPServers() error {
 		}
 		route.Plugins = append(route.Plugins, guard...)
 
+		// In conversion modes, ai-mcp-proxy runs a tools/call by re-dispatching the
+		// tool's REST request back through Kong's router; without a route matching
+		// the tool path that dispatch 404s. Emit a companion route so it resolves.
+		routes := []kong.Route{route}
+		companion, err := c.mcpToolsRoute(m)
+		if err != nil {
+			return err
+		}
+		if companion != nil {
+			routes = append(routes, *companion)
+		}
+
 		service := kong.Service{
 			Name:   m.Name,
-			Routes: []kong.Route{route},
+			Routes: routes,
 			Tags:   c.labelsToTags(m.Labels),
 		}
 		if m.UpstreamURL != "" {
@@ -149,6 +164,87 @@ func (c *Converter) mcpTools(serverName string, tools []aigw.MCPTool) ([]map[str
 		out = append(out, tool)
 	}
 	return out, nil
+}
+
+// mcpToolsRoute synthesizes the "companion" route backing a server's tool REST
+// paths so ai-mcp-proxy's runtime tools/call re-dispatch resolves against a real
+// route instead of 404ing. Only conversion-only / conversion-listener translate
+// tools into REST calls that re-enter Kong's router; the other modes proxy to an
+// upstream MCP server, so they need no companion route. Returns nil when the
+// server yields no usable tool paths.
+//
+// A single route carrying every distinct static tool-path prefix is emitted
+// (one deterministic, collision-free name; all tools on a server share the same
+// service/upstream). It is left unscoped on methods/hosts/protocols so it matches
+// every tool's resolved request, and strip_path is false so the full REST path
+// reaches the upstream.
+func (c *Converter) mcpToolsRoute(m *aigw.MCPServer) (*kong.Route, error) {
+	if m.Type != "conversion-only" && m.Type != "conversion-listener" {
+		return nil, nil
+	}
+	paths, err := c.toolRoutePaths(m)
+	if err != nil {
+		return nil, err
+	}
+	if len(paths) == 0 {
+		return nil, nil
+	}
+	return &kong.Route{
+		Name:      m.Name + "-tools-route",
+		Paths:     paths,
+		StripPath: boolPtr(false),
+	}, nil
+}
+
+// toolRoutePaths returns the sorted, de-duplicated static path prefixes for a
+// server's tools. Empty and relative paths are skipped silently: a relative tool
+// path is a legitimate ai-mcp-proxy feature (the plugin prepends the route path),
+// not a REST path that needs its own route. An absolute path whose leading
+// segment is templated would collapse to "/" (matching everything), so it is
+// warned about and skipped instead.
+func (c *Converter) toolRoutePaths(m *aigw.MCPServer) ([]string, error) {
+	seen := map[string]bool{}
+	var paths []string
+	for i := range m.Tools {
+		t := &m.Tools[i]
+		if t.Path == "" || !strings.HasPrefix(t.Path, "/") {
+			continue
+		}
+		prefix, ok := staticPathPrefix(t.Path)
+		if !ok {
+			if err := c.warn(
+				"MCP server %q tool %q path %q begins with a template segment; "+
+					"no companion route synthesized (the tool call may 404)",
+				m.Name, t.Name, t.Path); err != nil {
+				return nil, err
+			}
+			continue
+		}
+		if !seen[prefix] {
+			seen[prefix] = true
+			paths = append(paths, prefix)
+		}
+	}
+	sort.Strings(paths)
+	return paths, nil
+}
+
+// staticPathPrefix reduces a tool REST path to the leading run of static
+// segments, stopping at the first templated ("{...}") or empty segment, since
+// Kong route paths cannot express path templates. It returns ok=false when the
+// path yields no static segment (e.g. "/" or "/{version}/x").
+func staticPathPrefix(p string) (string, bool) {
+	var static []string
+	for _, seg := range strings.Split(strings.Trim(p, "/"), "/") {
+		if seg == "" || strings.ContainsAny(seg, "{}") {
+			break
+		}
+		static = append(static, seg)
+	}
+	if len(static) == 0 {
+		return "", false
+	}
+	return "/" + strings.Join(static, "/"), true
 }
 
 func setIfNotEmpty(m map[string]any, key, val string) {

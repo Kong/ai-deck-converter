@@ -62,6 +62,25 @@ func (r *Reverter) revertServices() error {
 		}
 
 		for _, rt := range plainRoutes {
+			if hasMCPRoute {
+				// The forward converter appends a companion "<server>-tools-route"
+				// to a conversion-mode MCP service so ai-mcp-proxy's tool dispatch
+				// resolves. It carries no AI Gateway state (tool paths live in the
+				// ai-mcp-proxy plugin config, from which the forward converter
+				// re-synthesizes this route), so drop it silently to keep the round
+				// trip byte-identical and warning-free.
+				if rt.Name == svc.Name+"-tools-route" {
+					continue
+				}
+				// Any other plain route on an MCP service has no AI Gateway home;
+				// dropping it (with a warning) is safer than emitting a spurious Agent.
+				if err := r.warn(
+					"service %q: plain route %q on an MCP service has no AI Gateway representation; dropped",
+					svc.Name, rt.Name); err != nil {
+					return err
+				}
+				continue
+			}
 			name := svc.Name
 			if len(svc.Routes) > 1 {
 				name = rt.Name
