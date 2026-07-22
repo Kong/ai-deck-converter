@@ -1,0 +1,21 @@
+models:
+  - type: model
+    name: mixed-realtime
+    capabilities: [generate, realtime]
+    formats:
+      - type: openai
+    targets:
+      - name: gpt-realtime
+        provider: openai
+        config:
+          type: openai
+    config:
+      # This is one shared Model route config. The converter derives separate
+      # HTTP and WebSocket transports for its capabilities.
+      route:
+        paths: [/mixed]
+        model:
+          path_aliases: [mixed-realtime]
+model_providers:
+  - name: openai
+    type: openai

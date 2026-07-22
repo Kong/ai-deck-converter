@@ -6,6 +6,8 @@ import (
 
 	publicaigw "github.com/Kong/ai-deck-converter/aigw"
 	"github.com/Kong/ai-deck-converter/internal/aigw"
+	"github.com/Kong/ai-deck-converter/internal/aimap"
+	"github.com/Kong/ai-deck-converter/internal/kong"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 )
@@ -125,6 +127,71 @@ models:
 	require.Contains(t, strings.Join(warnings, "\n"), "shared by multiple video models")
 	require.Contains(t, string(out), "openai-videos-lifecycle")
 	require.Contains(t, string(out), "openai-videos-lifecycle-2")
+}
+
+func TestConvertModelWithRealtimeUsesWebSocketTransport(t *testing.T) {
+	src := []byte(`
+models:
+  - type: model
+    name: mixed
+    capabilities: [generate, realtime]
+    formats: [{type: openai}]
+    targets:
+      - name: gpt-realtime
+        provider: openai
+        config: {type: openai}
+    config:
+      route:
+        paths: [/ai]
+        methods: [GET, POST]
+        protocols: [ws, wss]
+      model: {alias: mixed}
+model_providers:
+  - name: openai
+    type: openai
+`)
+
+	input, err := aigw.Parse(src)
+	require.NoError(t, err)
+	doc, _, err := ConvertDocument(input, Options{})
+	require.NoError(t, err)
+	require.Len(t, doc.Services, 2)
+
+	var httpService, websocketService *kong.Service
+	for i := range doc.Services {
+		switch doc.Services[i].Name {
+		case aimap.GatewayServiceName:
+			httpService = &doc.Services[i]
+		case aimap.GatewayWebSocketServiceName:
+			websocketService = &doc.Services[i]
+		}
+	}
+	require.NotNil(t, httpService)
+	require.NotNil(t, websocketService)
+	require.Equal(t, aimap.GatewayWebSocketServiceURL, websocketService.URL)
+	require.Len(t, httpService.Routes, 1)
+	require.Len(t, websocketService.Routes, 1)
+	require.Equal(t, []string{"http", "https"}, httpService.Routes[0].Protocols)
+	require.Equal(t, []string{"ws", "wss"}, websocketService.Routes[0].Protocols)
+	require.Empty(t, websocketService.Routes[0].Methods)
+
+	var realtimeProxy *kong.Plugin
+	for i := range doc.Plugins {
+		plugin := &doc.Plugins[i]
+		if plugin.Name == "ai-model-selector" &&
+			plugin.Route != nil &&
+			string(*plugin.Route) == websocketService.Routes[0].Name {
+			t.Fatal("realtime route must not use ai-model-selector")
+		}
+		if plugin.Name == "ai-proxy-advanced" &&
+			plugin.Route != nil &&
+			string(*plugin.Route) == websocketService.Routes[0].Name {
+			realtimeProxy = plugin
+		}
+	}
+	require.NotNil(t, realtimeProxy)
+	require.Equal(t, []string{"ws", "wss"}, realtimeProxy.Protocols)
+	require.Nil(t, realtimeProxy.Model)
 }
 
 // A Kong acl plugin permits exactly one of config.allow / config.deny

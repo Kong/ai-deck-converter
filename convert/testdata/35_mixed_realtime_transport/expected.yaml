@@ -1,0 +1,69 @@
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: openai-chat
+        paths:
+          - /mixed/chat/completions
+        methods:
+          - POST
+        strip_path: false
+  - name: ai-gateway-websocket
+    url: ws://ai-gateway.upstream.local
+    routes:
+      - name: openai-realtime
+        paths:
+          - /mixed/realtime
+        protocols:
+          - ws
+          - wss
+        strip_path: false
+plugins:
+  - name: ai-model-selector
+    config:
+      body_path: model
+      max_request_body_size: 8388608
+      source: body
+    route: openai-chat
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - description: gpt-realtime
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: mixed-realtime
+            name: gpt-realtime
+            provider: openai
+          route_type: llm/v1/chat
+    route: openai-chat
+    model: mixed-realtime
+  - name: ai-proxy-advanced
+    protocols:
+      - ws
+      - wss
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: realtime/generation
+      llm_format: openai
+      targets:
+        - description: gpt-realtime
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: mixed-realtime
+            name: gpt-realtime
+            provider: openai
+          route_type: realtime/v1/realtime
+    route: openai-realtime
+ai_models:
+  - name: mixed-realtime
+    alias: mixed-realtime

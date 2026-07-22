@@ -181,7 +181,9 @@ func buildRoute(rc aigw.RouteConfig, entityName string) kong.Route {
 	}
 }
 
-func buildModelRoute(rc aigw.ModelRouteConfig, routeName string, paths []string, defaultMethods []string) kong.Route {
+func buildModelRoute(
+	rc aigw.ModelRouteConfig, routeName string, paths []string, defaultMethods []string, realtime bool,
+) kong.Route {
 	route := buildRoute(aigw.RouteConfig{
 		Name:                    rc.Name,
 		Paths:                   rc.Paths,
@@ -203,13 +205,37 @@ func buildModelRoute(rc aigw.ModelRouteConfig, routeName string, paths []string,
 	}, routeName)
 	route.Name = routeName
 	route.Paths = paths
-	if len(route.Methods) == 0 {
-		route.Methods = defaultMethods
+	if realtime {
+		// Kong WebSocket routes reject methods and must match a WebSocket
+		// Service. The transport is dictated by the capability, rather than
+		// the model's shared, client-facing route settings.
+		route.Methods = nil
+		route.Protocols = []string{"ws", "wss"}
+	} else {
+		// A model can expose both HTTP and realtime capabilities through one
+		// shared route config. Normal capability routes must stay on the HTTP
+		// Service when that config contains realtime protocol values. Preserve
+		// the existing omitted/default HTTP protocol behavior otherwise.
+		if hasWebSocketProtocol(route.Protocols) {
+			route.Protocols = []string{"http", "https"}
+		}
+		if len(route.Methods) == 0 {
+			route.Methods = defaultMethods
+		}
 	}
 	if route.StripPath == nil {
 		route.StripPath = boolPtr(false)
 	}
 	return route
+}
+
+func hasWebSocketProtocol(protocols []string) bool {
+	for _, protocol := range protocols {
+		if protocol == "ws" || protocol == "wss" {
+			return true
+		}
+	}
+	return false
 }
 
 func toKongCIDRPorts(in []aigw.CIDRPort) []kong.CIDRPort {
