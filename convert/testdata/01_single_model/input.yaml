@@ -9,8 +9,8 @@ models:
     config:
       route:
         paths: [/ai]
-      model:
-        alias: "@openai/gpt-5.2"
+        model:
+          path_aliases: ["@openai/gpt-5.2"]
       response_streaming: allow
     targets:
       - name: gpt-5.2

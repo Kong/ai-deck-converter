@@ -13,12 +13,14 @@ models:
           temperature: 1
           type: openai
     config:
+      route:
+        model:
+          path_aliases:
+            - '@openai/gpt-5.2'
       logging:
         payloads: false
         statistics: true
       response_streaming: allow
-      model:
-        alias: '@openai/gpt-5.2'
   - type: model
     name: openai-embeddings
     capabilities:

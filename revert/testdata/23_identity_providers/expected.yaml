@@ -14,11 +14,13 @@ models:
       identity_providers:
         - openid-connect-1
     config:
+      route:
+        model:
+          path_aliases:
+            - '@openai/gpt-5.4'
       logging:
         payloads: false
         statistics: true
-      model:
-        alias: '@openai/gpt-5.4'
 model_providers:
   - type: openai
     name: openai-ai

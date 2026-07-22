@@ -67,7 +67,7 @@ func (c *Converter) convertModels() error {
 		// behavior. The ai-models entity, however, still requires an alias in both
 		// decK and db-less payloads, so synthesize it from the model name when the
 		// source omitted one.
-		targetAlias := m.Config.Model.Alias
+		targetAlias := modelAlias(m)
 		aiModelAlias := targetAlias
 		if aiModelAlias == "" {
 			aiModelAlias = m.Name
@@ -310,8 +310,11 @@ func identityProviderKey(refs []string) string {
 // modelRouteConfigKey returns a stable representation of the client-facing
 // route configuration. Endpoint paths are derived separately, but the base
 // paths and every other route matcher must agree before models can share a
-// route.
-func modelRouteConfigKey(route aigw.RouteConfig) (string, error) {
+// route. The path alias is per-model, not per-route, so it is excluded:
+// models with distinct aliases still share a route (and its ai-model-selector)
+// when every other matcher agrees.
+func modelRouteConfigKey(route aigw.ModelRouteConfig) (string, error) {
+	route.Model = aigw.ModelAliasConfig{}
 	b, err := json.Marshal(route)
 	if err != nil {
 		return "", err
@@ -499,6 +502,16 @@ func disabledModelPluginEnabled(enabled *bool) *bool {
 		return enabled
 	}
 	return nil
+}
+
+// modelAlias returns the source model's alias
+func modelAlias(m *aigw.Model) string {
+	// TODO: KOKO-3978 support setting the alias value from Route.Model.Body and/or Route.Model.Headers
+	if len(m.Config.Route.Model.PathAliases) > 0 {
+		return m.Config.Route.Model.PathAliases[0]
+	}
+
+	return ""
 }
 
 func llmFormat(m *aigw.Model) string {

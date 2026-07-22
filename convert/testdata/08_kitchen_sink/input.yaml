@@ -13,8 +13,7 @@ models:
     access:
       acls: {allow: [premium], deny: []}
     config:
-      route: {paths: [/ai]}
-      model: {alias: "@prod/prod-chat"}
+      route: {paths: [/ai], model: {path_aliases: ["@prod/prod-chat"]}}
       balancer: {algorithm: lowest-latency}
 agents:
   - type: a2a

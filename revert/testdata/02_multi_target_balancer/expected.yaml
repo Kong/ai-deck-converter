@@ -20,11 +20,13 @@ models:
           deployment_id: gpt4o-dep
           type: azure
     config:
+      route:
+        model:
+          path_aliases:
+            - '@openai/chat-lb'
       logging:
         payloads: false
         statistics: true
-      model:
-        alias: '@openai/chat-lb'
       balancer:
         algorithm: round-robin
         slots: 10000

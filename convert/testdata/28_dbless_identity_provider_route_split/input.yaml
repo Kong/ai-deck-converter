@@ -9,8 +9,8 @@ models:
     config:
       route:
         paths: [/oidc-repro/model-a]
-      model:
-        alias: "@oidc-repro/model-a"
+        model:
+          path_aliases: ["@oidc-repro/model-a"]
     targets:
       - name: gpt-5-mini
         provider: oidc-repro-openai
@@ -26,8 +26,8 @@ models:
     config:
       route:
         paths: [/oidc-repro/model-b]
-      model:
-        alias: "@oidc-repro/model-b"
+        model:
+          path_aliases: ["@oidc-repro/model-b"]
     targets:
       - name: gpt-5-mini
         provider: oidc-repro-openai

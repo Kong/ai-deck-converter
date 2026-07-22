@@ -34,19 +34,46 @@ type Format struct {
 
 // ModelConfig holds routing, logging, and load-balancing configuration.
 type ModelConfig struct {
-	Route              RouteConfig   `yaml:"route,omitempty"`
-	Logging            *Logging      `yaml:"logging,omitempty"`
-	ResponseStreaming  string        `yaml:"response_streaming,omitempty"`
-	MaxRequestBodySize *int          `yaml:"max_request_body_size,omitempty"`
-	Model              ModelSelector `yaml:"model,omitempty"`
-	Proxy              *ProxyConfig  `yaml:"proxy,omitempty"`
-	Balancer           *Balancer     `yaml:"balancer,omitempty"`
+	Route              ModelRouteConfig `yaml:"route,omitempty"`
+	Logging            *Logging         `yaml:"logging,omitempty"`
+	ResponseStreaming  string           `yaml:"response_streaming,omitempty"`
+	MaxRequestBodySize *int             `yaml:"max_request_body_size,omitempty"`
+	Model              ModelNameConfig  `yaml:"model,omitempty"`
+	Proxy              *ProxyConfig     `yaml:"proxy,omitempty"`
+	Balancer           *Balancer        `yaml:"balancer,omitempty"`
 }
 
-// ModelSelector configures how the request model name is interpreted.
-type ModelSelector struct {
-	Alias      string `yaml:"alias,omitempty"`
-	NameHeader *bool  `yaml:"name_header,omitempty"`
+// ModelNameConfig configures how the request model name is interpreted.
+type ModelNameConfig struct {
+	NameHeader *bool `yaml:"name_header,omitempty"`
+}
+
+// ModelAliasConfig is the model aliasing configuration.
+type ModelAliasConfig struct {
+	Body        map[string][]string `yaml:"body,omitempty"`
+	Headers     map[string][]string `yaml:"headers,omitempty"`
+	PathAliases []string            `yaml:"path_aliases,omitempty"`
+}
+
+type ModelRouteConfig struct {
+	Name                    string              `yaml:"name,omitempty"`
+	Paths                   []string            `yaml:"paths,omitempty"`
+	Hosts                   []string            `yaml:"hosts,omitempty"`
+	Methods                 []string            `yaml:"methods,omitempty"`
+	Model                   ModelAliasConfig    `yaml:"model,omitempty"`
+	Protocols               []string            `yaml:"protocols,omitempty"`
+	Headers                 map[string][]string `yaml:"headers,omitempty"`
+	SNIs                    []string            `yaml:"snis,omitempty"`
+	Sources                 []CIDRPort          `yaml:"sources,omitempty"`
+	Destinations            []CIDRPort          `yaml:"destinations,omitempty"`
+	StripPath               *bool               `yaml:"strip_path,omitempty"`
+	PreserveHost            *bool               `yaml:"preserve_host,omitempty"`
+	HTTPSRedirectStatusCode *int                `yaml:"https_redirect_status_code,omitempty"`
+	RegexPriority           *int                `yaml:"regex_priority,omitempty"`
+	PathHandling            string              `yaml:"path_handling,omitempty"`
+	RequestBuffering        *bool               `yaml:"request_buffering,omitempty"`
+	ResponseBuffering       *bool               `yaml:"response_buffering,omitempty"`
+	Tags                    []string            `yaml:"tags,omitempty"`
 }
 
 // Balancer is the model load-balancer config, discriminated by `algorithm`.

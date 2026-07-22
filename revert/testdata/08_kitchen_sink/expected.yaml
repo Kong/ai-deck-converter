@@ -25,11 +25,13 @@ models:
         allow:
           - premium
     config:
+      route:
+        model:
+          path_aliases:
+            - '@prod/prod-chat'
       logging:
         payloads: false
         statistics: true
-      model:
-        alias: '@prod/prod-chat'
       balancer:
         algorithm: lowest-latency
 model_providers:

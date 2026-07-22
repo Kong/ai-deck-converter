@@ -13,8 +13,7 @@ models:
     capabilities: [video]
     formats: [{type: openai}]
     config:
-      route: {paths: [/ai]}
-      model: {alias: sora}
+      route: {paths: [/ai], model: {path_aliases: [sora]}}
     targets:
       - name: sora-2
         provider: openai-prod
