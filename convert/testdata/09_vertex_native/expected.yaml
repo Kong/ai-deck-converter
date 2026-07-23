@@ -12,7 +12,7 @@ services:
         strip_path: false
       - name: gemini-embeddings
         paths:
-          - ~/ai/v1beta/models/(?<model_name>[^:/]+):(?:embedContent|batchEmbedContent)
+          - ~/ai/v1beta/models/(?<model_name>[^:/]+):(?:embedContent|batchEmbedContents)
         methods:
           - GET
           - POST
