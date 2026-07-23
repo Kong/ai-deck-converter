@@ -147,7 +147,7 @@ Below is a mapping of supported Capabilities to LLM Formats.
 | generate | `~/v1beta/models/(?<model_name>[^:/]+):(?:generateContent\|streamGenerateContent)` | `llm/v1/chat` | `text/generation` |
 | agentic | — | - | - |
 | realtime | — | - | - |
-| embeddings | `~/v1beta/models/(?<model_name>[^:/]+):(?:embedContent\|batchEmbedContent)` | `llm/v1/embeddings` | `text/embeddings` |
+| embeddings | `~/v1beta/models/(?<model_name>[^:/]+):(?:embedContent\|batchEmbedContents)` | `llm/v1/embeddings` | `text/embeddings` |
 | image | — | - | - |
 | audio | — | - | - |
 | video | — | - | - |
@@ -172,7 +172,7 @@ Below is a mapping of supported Capabilities to LLM Formats.
 | generate | `~/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/google/models/(?<model_name>[^:/]+):(?:generateContent\|streamGenerateContent)`, `~/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/google/models/(?<model_name>[^:/]+):predictLongRunning` | `llm/v1/chat` | `text/generation` |
 | agentic | — | - | - |
 | realtime | — | - | - |
-| embeddings | `~/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/google/models/(?<model_name>[^:/]+):(?:embedContent\|batchEmbedContent)` | `llm/v1/embeddings` | `text/embeddings` |
+| embeddings | `~/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/google/models/(?<model_name>[^:/]+):(?:embedContent\|batchEmbedContents)` | `llm/v1/embeddings` | `text/embeddings` |
 | image | `~/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/google/models/(?<model_name>[^:/]+):predictLongRunning` | `image/v1/images/generations` | `image/generation` |
 | audio | — | - | - |
 | video | `~/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/google/models/(?<model_name>[^:/]+):predictLongRunning` | `video/v1/videos/generations` | `video/generation` |

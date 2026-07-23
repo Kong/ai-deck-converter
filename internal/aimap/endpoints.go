@@ -238,7 +238,7 @@ var EndpointTable = map[string]map[string]EndpointSpec{
 			true, mGetPost, "llm/v1/chat", catTextGen, true, true,
 		},
 		"embeddings": {
-			"embeddings", "v1beta/models/(?<model_name>[^:/]+):(?:embedContent|batchEmbedContent)",
+			"embeddings", "v1beta/models/(?<model_name>[^:/]+):(?:embedContent|batchEmbedContents)",
 			true, mGetPost, "llm/v1/embeddings", catEmbeddings, true, true,
 		},
 		"batches": {"batches", "v1beta/batches", false, mGetPost, "llm/v1/batches", catTextGen, false, true},
@@ -254,7 +254,7 @@ var EndpointTable = map[string]map[string]EndpointSpec{
 		"embeddings": {
 			"embeddings",
 			"v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/google/models/" +
-				"(?<model_name>[^:/]+):(?:embedContent|batchEmbedContent)",
+				"(?<model_name>[^:/]+):(?:embedContent|batchEmbedContents)",
 			true, mGetPost, "llm/v1/embeddings", catEmbeddings, true, true,
 		},
 		"image": {
