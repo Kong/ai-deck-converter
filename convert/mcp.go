@@ -66,7 +66,7 @@ func (c *Converter) mcpPlugin(m *aigw.MCPServer) (kong.Plugin, error) {
 		cfg["logging"] = logging
 	}
 	if len(m.Config.Server) > 0 {
-		cfg["server"] = m.Config.Server
+		cfg["server"] = mcpServerConfigForPlugin(m.Config.Server)
 	}
 	// proxy_config is honored by the plugin only in passthrough-listener mode,
 	// but we pass it through whenever set and let the plugin validate.
@@ -114,6 +114,20 @@ func (c *Converter) mcpPlugin(m *aigw.MCPServer) (kong.Plugin, error) {
 		Config: cfg,
 		Tags:   c.labelsToTags(m.Labels),
 	}, nil
+}
+
+// mcpServerConfigForPlugin maps the AI Gateway API's server.label to the
+// ai-mcp-proxy plugin's server.tag without mutating the source document.
+func mcpServerConfigForPlugin(server map[string]any) map[string]any {
+	config := make(map[string]any, len(server))
+	for key, value := range server {
+		config[key] = value
+	}
+	if label, ok := config["label"]; ok {
+		delete(config, "label")
+		config["tag"] = label
+	}
+	return config
 }
 
 func (c *Converter) mcpTools(serverName string, tools []aigw.MCPTool) ([]map[string]any, error) {
