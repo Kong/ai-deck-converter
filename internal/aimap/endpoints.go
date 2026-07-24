@@ -50,6 +50,12 @@ const (
 	// video operations. It is not a source AI Gateway route and is ignored by
 	// the reverse converter.
 	VideoLifecycleRouteTag = "aigw:video-lifecycle"
+
+	// GatewayWebSocketServiceName and GatewayWebSocketServiceURL back realtime
+	// routes. Kong selects its WebSocket proxy path from the Service protocol,
+	// so realtime routes cannot share the HTTP placeholder Service.
+	GatewayWebSocketServiceName = "ai-gateway-websocket"
+	GatewayWebSocketServiceURL  = "ws://ai-gateway.upstream.local"
 )
 
 var (

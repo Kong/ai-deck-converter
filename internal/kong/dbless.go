@@ -70,6 +70,7 @@ type DBLessPlugin struct {
 	ID            string            `yaml:"id"`
 	Name          string            `yaml:"name"`
 	Enabled       *bool             `yaml:"enabled,omitempty"`
+	Protocols     []string          `yaml:"protocols,omitempty"`
 	Config        map[string]any    `yaml:"config,omitempty"`
 	Service       map[string]string `yaml:"service,omitempty"`
 	Route         map[string]string `yaml:"route,omitempty"`

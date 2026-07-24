@@ -19,6 +19,7 @@ import (
 // ai-proxy-advanced plugin (a proxyGroup).
 type routeGroup struct {
 	route          kong.Route
+	realtime       bool
 	takesBodyModel bool
 	bodySize       int
 	proxies        []*proxyGroup
@@ -102,12 +103,7 @@ func (c *Converter) convertModels() error {
 		if !modelScoped && m.Enabled != nil && !*m.Enabled {
 			continue
 		}
-		ownerKey := ""
-		if modelScoped {
-			ownerKey = m.Name
-		}
-
-		var routeNames []string
+		var routeGroups []*routeGroup
 		routeSeen := map[string]bool{}
 
 		for j := range m.TargetModels {
@@ -130,6 +126,7 @@ func (c *Converter) convertModels() error {
 				}
 			}
 			for _, capability := range caps {
+				realtime := capability == "realtime"
 				// The section is resolved per capability: gemini-format traffic
 				// served by Vertex renders as gemini for shared capabilities
 				// (generate/embeddings) but keeps the Vertex section for the
@@ -155,6 +152,12 @@ func (c *Converter) convertModels() error {
 					return err
 				}
 				key := sec + "|" + spec.RouteLabel + "|" + identityKey + "|" + routeConfigKey
+				// Realtime routes need a WebSocket Service and a concrete,
+				// route-scoped ai-proxy-advanced plugin. They therefore cannot
+				// share a route with another model.
+				if realtime {
+					key += "|" + m.Name
+				}
 				g := groups[key]
 				if g == nil {
 					paths := make([]string, len(bases))
@@ -164,9 +167,9 @@ func (c *Converter) convertModels() error {
 					routeName := uniqueModelRouteName(sec+"-"+spec.RouteLabel, usedRouteNames)
 					g = &routeGroup{
 						route: buildModelRoute(
-							m.Config.Route, routeName,
-							paths, spec.Methods),
-						takesBodyModel: spec.TakesBodyModel,
+							m.Config.Route, routeName, paths, spec.Methods, realtime),
+						realtime:       realtime,
+						takesBodyModel: spec.TakesBodyModel && !realtime,
 						bodySize:       aimap.DefaultMaxBodySize,
 						proxyByOwner:   map[string]*proxyGroup{},
 					}
@@ -175,9 +178,13 @@ func (c *Converter) convertModels() error {
 				}
 				if !routeSeen[g.route.Name] {
 					routeSeen[g.route.Name] = true
-					routeNames = append(routeNames, g.route.Name)
+					routeGroups = append(routeGroups, g)
 				}
 
+				ownerKey := ""
+				if modelScoped && !realtime {
+					ownerKey = m.Name
+				}
 				pg := g.proxyByOwner[ownerKey]
 				if pg == nil {
 					embeddings, err := c.resolveEmbeddings(balancerExtra(m.Config.Balancer, "embeddings"))
@@ -185,7 +192,7 @@ func (c *Converter) convertModels() error {
 						return err
 					}
 					modelName := ""
-					if modelScoped {
+					if modelScoped && !realtime {
 						modelName = m.Name
 					}
 
@@ -238,12 +245,15 @@ func (c *Converter) convertModels() error {
 		if err != nil {
 			return err
 		}
-		for _, routeName := range routeNames {
+		for _, g := range routeGroups {
 			for k := range plugins {
 				p := plugins[k]
-				p.Route = kong.NewStringRef(routeName)
-				if modelScoped {
+				p.Route = kong.NewStringRef(g.route.Name)
+				if modelScoped && !g.realtime {
 					p.Model = kong.NewStringRef(m.Name)
+				}
+				if g.realtime {
+					p.Protocols = []string{"ws", "wss"}
 				}
 				guardPlugins = append(guardPlugins, p)
 			}
@@ -258,15 +268,18 @@ func (c *Converter) convertModels() error {
 		if len(idpPlugins) > 0 {
 			c.ensureAnonymousConsumer()
 		}
-		for _, routeName := range routeNames {
-			key := routeName + "\x00" + identityProviderKey(m.Access.IdentityProviders)
+		for _, g := range routeGroups {
+			key := g.route.Name + "\x00" + identityProviderKey(m.Access.IdentityProviders)
 			if identityPluginSeen[key] {
 				continue
 			}
 			identityPluginSeen[key] = true
 			for k := range idpPlugins {
 				p := idpPlugins[k]
-				p.Route = kong.NewStringRef(routeName)
+				p.Route = kong.NewStringRef(g.route.Name)
+				if g.realtime {
+					p.Protocols = []string{"ws", "wss"}
+				}
 				guardPlugins = append(guardPlugins, p)
 			}
 		}
@@ -277,10 +290,22 @@ func (c *Converter) convertModels() error {
 		return nil
 	}
 
-	service := kong.Service{Name: aimap.GatewayServiceName, URL: aimap.GatewayServiceURL}
+	services := map[bool]*kong.Service{}
+	serviceFor := func(realtime bool) *kong.Service {
+		if service := services[realtime]; service != nil {
+			return service
+		}
+		service := &kong.Service{Name: aimap.GatewayServiceName, URL: aimap.GatewayServiceURL}
+		if realtime {
+			service.Name = aimap.GatewayWebSocketServiceName
+			service.URL = aimap.GatewayWebSocketServiceURL
+		}
+		services[realtime] = service
+		return service
+	}
 	for _, key := range order {
 		g := groups[key]
-		service.Routes = append(service.Routes, g.route)
+		serviceFor(g.realtime).Routes = append(serviceFor(g.realtime).Routes, g.route)
 		if g.takesBodyModel {
 			c.out.Plugins = append(c.out.Plugins, kong.Plugin{
 				Name:  "ai-model-selector",
@@ -299,6 +324,9 @@ func (c *Converter) convertModels() error {
 				Route:   kong.NewStringRef(pg.routeName),
 				Config:  pg.proxyConfig(),
 			}
+			if g.realtime {
+				plugin.Protocols = []string{"ws", "wss"}
+			}
 			if pg.modelName != "" {
 				plugin.Model = kong.NewStringRef(pg.modelName)
 			}
@@ -308,7 +336,7 @@ func (c *Converter) convertModels() error {
 	for _, candidate := range lifecycleCandidates {
 		routeName := uniqueModelRouteName("openai-videos-lifecycle", usedRouteNames)
 		route := buildVideoLifecycleRoute(candidate.model.Config.Route, routeName, basePaths(candidate.model))
-		service.Routes = append(service.Routes, route)
+		serviceFor(false).Routes = append(serviceFor(false).Routes, route)
 
 		logging := modelLoggingBlock(
 			withLoggingDefaults(candidate.model.Config.Logging, false, false),
@@ -367,7 +395,12 @@ func (c *Converter) convertModels() error {
 			c.out.Plugins = append(c.out.Plugins, idpPlugins[i])
 		}
 	}
-	c.out.Services = append(c.out.Services, service)
+	if service := services[false]; service != nil {
+		c.out.Services = append(c.out.Services, *service)
+	}
+	if service := services[true]; service != nil {
+		c.out.Services = append(c.out.Services, *service)
+	}
 	c.out.Plugins = append(c.out.Plugins, guardPlugins...)
 	return nil
 }
@@ -472,7 +505,7 @@ func buildVideoLifecycleRoute(rc aigw.ModelRouteConfig, routeName string, bases 
 		base = strings.TrimRight(base, "/")
 		paths = append(paths, base+"/videos", "~"+base+"/videos/.+")
 	}
-	route := buildModelRoute(rc, routeName, paths, []string{"GET", "DELETE"})
+	route := buildModelRoute(rc, routeName, paths, []string{"GET", "DELETE"}, false)
 	route.Tags = append(route.Tags, aimap.VideoLifecycleRouteTag)
 	return route
 }
