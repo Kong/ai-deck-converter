@@ -70,6 +70,9 @@ models:
 			Config struct {
 				Targets []struct {
 					Description string `yaml:"description"`
+					Model       struct {
+						ModelAlias string `yaml:"model_alias"`
+					} `yaml:"model"`
 				} `yaml:"targets"`
 			} `yaml:"config"`
 		} `yaml:"plugins"`
@@ -81,6 +84,10 @@ models:
 		}
 		require.Empty(t, plugin.Model, "lifecycle plugin must not require a model alias")
 		require.Len(t, plugin.Config.Targets, 2)
+		for _, target := range plugin.Config.Targets {
+			require.Empty(t, target.Model.ModelAlias,
+				"lifecycle target must use the default balancer pool")
+		}
 		require.ElementsMatch(t, []string{"sora-2", "sora-2-pro"}, []string{
 			plugin.Config.Targets[0].Description,
 			plugin.Config.Targets[1].Description,
