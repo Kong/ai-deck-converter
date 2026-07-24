@@ -7148,10 +7148,10 @@ components:
                   enum:
                     - client
                     - redis
-            tag:
+            label:
               description: >-
-                The tag of the MCP server. This is used to filter the exported
-                MCP tools. The field should contain exactly one tag.
+                The label of the MCP server. This is used to filter the exported
+                MCP tools.
               type: string
             timeout:
               description: The timeout for calling the tools in milliseconds.

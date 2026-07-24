@@ -1333,7 +1333,7 @@ mcp_servers:
     config:
       route: {paths: [/mcp/aggregate]}
       server:
-        tag: aigw610:tools
+        label: aigw610:tools
 `)
 
 	out, _, err := Convert(src, Options{OutputMode: "db-less"})

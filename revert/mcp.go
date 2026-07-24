@@ -47,7 +47,7 @@ func (r *Reverter) revertMCPServer(svc *kong.Service, rt *kong.Route, plugins, s
 	m.Config.Route = routeConfig(rt, svc.Name)
 	m.Config.MaxRequestBodySize = getInt(cfg, "max_request_body_size")
 	m.Config.Logging = loggingFromBlockWithDefaults(getMap(cfg, "logging"), true, false)
-	m.Config.Server = getMap(cfg, "server")
+	m.Config.Server = mcpServerConfigForAIGateway(getMap(cfg, "server"))
 	m.Config.Proxy = proxyFromConfig(getMap(cfg, "proxy_config"))
 	m.Config.ToolsCacheTTLSeconds = getInt(cfg, "tools_cache_ttl_seconds")
 
@@ -90,6 +90,23 @@ func (r *Reverter) revertMCPServer(svc *kong.Service, rt *kong.Route, plugins, s
 
 	r.out.MCPServers = append(r.out.MCPServers, m)
 	return nil
+}
+
+// mcpServerConfigForAIGateway maps the ai-mcp-proxy plugin's server.tag to
+// the AI Gateway API's server.label without mutating the parsed decK config.
+func mcpServerConfigForAIGateway(server map[string]any) map[string]any {
+	if server == nil {
+		return nil
+	}
+	config := make(map[string]any, len(server))
+	for key, value := range server {
+		config[key] = value
+	}
+	if tag, ok := config["tag"]; ok {
+		delete(config, "tag")
+		config["label"] = tag
+	}
+	return config
 }
 
 // mcpTool reverses one ai-mcp-proxy config.tools[] entry.
