@@ -102,3 +102,7 @@ services:
                   output_schema:
                     type: object
               tools_cache_ttl_seconds: 300
+            tags:
+              - mcp-group:upstream
+    tags:
+      - mcp-group:upstream

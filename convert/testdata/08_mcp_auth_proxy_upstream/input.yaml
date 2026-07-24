@@ -62,9 +62,13 @@ mcp_servers:
       - name: vendorTool
         description: A vendor tool
   # upstream-server carrying tools_cache_ttl_seconds (required by the plugin in
-  # this mode) and per-tool input/output schema.
+  # this mode) and per-tool input/output schema. Carries labels so its tools
+  # are actually discoverable by a listener-mode MCP server elsewhere (an
+  # upstream-server entry with no labels can never be aggregated/called).
   - type: upstream-server
     name: upstream-mcp
+    labels:
+      mcp-group: upstream
     upstream_url: https://upstream.example.com/mcp
     config:
       route:
