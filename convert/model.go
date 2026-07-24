@@ -277,7 +277,11 @@ func (c *Converter) convertModels() error {
 		return nil
 	}
 
-	service := kong.Service{Name: aimap.GatewayServiceName, URL: aimap.GatewayServiceURL}
+	serviceName, err := c.uniqueServiceName("model_gateway", aimap.GatewayServiceName, aimap.GatewayServiceName)
+	if err != nil {
+		return err
+	}
+	service := kong.Service{Name: serviceName, URL: aimap.GatewayServiceURL}
 	for _, key := range order {
 		g := groups[key]
 		service.Routes = append(service.Routes, g.route)
