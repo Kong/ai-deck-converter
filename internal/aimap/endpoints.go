@@ -46,6 +46,10 @@ const (
 
 	GatewayServiceName = "ai-gateway"
 	GatewayServiceURL  = "http://ai-gateway.upstream.local"
+	// VideoLifecycleRouteTag marks the generated companion route for ID-only
+	// video operations. It is not a source AI Gateway route and is ignored by
+	// the reverse converter.
+	VideoLifecycleRouteTag = "aigw:video-lifecycle"
 )
 
 var (
@@ -58,11 +62,25 @@ var (
 // where the provider type matters is gemini-format traffic served by Vertex,
 // which uses Vertex's project/location URL templates instead of Gemini's.
 func SectionFor(format, providerType string) string {
+	format = NormalizeFormat(format)
 	if format == "" {
 		format = DefaultLLMFormat
 	}
 	if format == "gemini" && providerType == "vertex" {
 		return "vertex"
+	}
+	return format
+}
+
+// NormalizeFormat maps a provider-rendering section named directly as a
+// model's format (e.g. "vertex") to its base client-facing wire format
+// ("gemini"). Vertex serves the same Gemini request/response shape, so a
+// model that names its format "vertex" is equivalent to one that names
+// "gemini" and is served by a vertex provider; keeping both spellings
+// working here means llm_format/routing never fork on which one was used.
+func NormalizeFormat(format string) string {
+	if base, ok := renderingSections[format]; ok {
+		return base
 	}
 	return format
 }
@@ -166,7 +184,9 @@ var EndpointTable = map[string]map[string]EndpointSpec{
 			"audio-translate", "/audio/translations", false, mPost, "audio/v1/audio/translations",
 			catTranscript, true, false,
 		},
-		"video":   {"videos", "/videos/generations", false, mPost, "video/v1/videos/generations", catVideo, true, true},
+		"video": {
+			"videos", "/videos", false, mPost, "video/v1/videos/generations", catVideo, true, true,
+		},
 		"batches": {"batches", "/batches", false, mGetPost, "llm/v1/batches", catTextGen, false, false},
 		"files": {
 			"files", "/files", false, []string{"GET", "POST", "DELETE"}, "llm/v1/files", catTextGen, false, true,
@@ -218,7 +238,7 @@ var EndpointTable = map[string]map[string]EndpointSpec{
 			true, mGetPost, "llm/v1/chat", catTextGen, true, true,
 		},
 		"embeddings": {
-			"embeddings", "v1beta/models/(?<model_name>[^:/]+):(?:embedContent|batchEmbedContent)",
+			"embeddings", "v1beta/models/(?<model_name>[^:/]+):(?:embedContent|batchEmbedContents)",
 			true, mGetPost, "llm/v1/embeddings", catEmbeddings, true, true,
 		},
 		"batches": {"batches", "v1beta/batches", false, mGetPost, "llm/v1/batches", catTextGen, false, true},
@@ -234,7 +254,7 @@ var EndpointTable = map[string]map[string]EndpointSpec{
 		"embeddings": {
 			"embeddings",
 			"v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/google/models/" +
-				"(?<model_name>[^:/]+):(?:embedContent|batchEmbedContent)",
+				"(?<model_name>[^:/]+):(?:embedContent|batchEmbedContents)",
 			true, mGetPost, "llm/v1/embeddings", catEmbeddings, true, true,
 		},
 		"image": {

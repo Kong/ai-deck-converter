@@ -20,5 +20,5 @@ models:
       route:
         paths:
           - /disabled-chat
-      model:
-        alias: disabled-chat
+        model:
+          path_aliases: [disabled-chat]

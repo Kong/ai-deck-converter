@@ -181,8 +181,26 @@ func buildRoute(rc aigw.RouteConfig, entityName string) kong.Route {
 	}
 }
 
-func buildModelRoute(rc aigw.RouteConfig, routeName string, paths []string, defaultMethods []string) kong.Route {
-	route := buildRoute(rc, routeName)
+func buildModelRoute(rc aigw.ModelRouteConfig, routeName string, paths []string, defaultMethods []string) kong.Route {
+	route := buildRoute(aigw.RouteConfig{
+		Name:                    rc.Name,
+		Paths:                   rc.Paths,
+		Hosts:                   rc.Hosts,
+		Methods:                 rc.Methods,
+		Protocols:               rc.Protocols,
+		Headers:                 rc.Headers,
+		SNIs:                    rc.SNIs,
+		Sources:                 rc.Sources,
+		Destinations:            rc.Destinations,
+		StripPath:               rc.StripPath,
+		PreserveHost:            rc.PreserveHost,
+		HTTPSRedirectStatusCode: rc.HTTPSRedirectStatusCode,
+		RegexPriority:           rc.RegexPriority,
+		PathHandling:            rc.PathHandling,
+		RequestBuffering:        rc.RequestBuffering,
+		ResponseBuffering:       rc.ResponseBuffering,
+		Tags:                    rc.Tags,
+	}, routeName)
 	route.Name = routeName
 	route.Paths = paths
 	if len(route.Methods) == 0 {

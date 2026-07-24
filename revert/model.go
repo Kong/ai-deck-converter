@@ -32,6 +32,9 @@ type modelAcc struct {
 // in the group keyed by the plugin's model FK (or, FK-less, by model_alias or
 // route). Mirrors (in reverse) the per-model proxy split in convert.convertModels.
 func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins []kong.Plugin) error {
+	if hasTag(rt.Tags, aimap.VideoLifecycleRouteTag) {
+		return nil
+	}
 	var path string
 	if len(rt.Paths) > 0 {
 		path = rt.Paths[0]
@@ -165,6 +168,15 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 	return nil
 }
 
+func hasTag(tags []string, want string) bool {
+	for _, tag := range tags {
+		if tag == want {
+			return true
+		}
+	}
+	return false
+}
+
 // modelGroupFor finds or creates the model group for a plugin's model FK (or,
 // FK-less, for an alias or the route), seeding model-level config from the
 // plugin config. A non-empty fkName names the group directly (the type "model"
@@ -228,7 +240,9 @@ func (r *Reverter) modelGroupFor(
 			Access:   aigw.ModelAccess{ACLs: acls, IdentityProviders: idpRefs},
 		},
 	}
-	g.model.Config.Model.Alias = alias
+	if alias != "" {
+		g.model.Config.Route.Model.PathAliases = []string{alias}
+	}
 	g.model.Config.Model.NameHeader = getBool(cfg, "model_name_header")
 	g.model.Config.ResponseStreaming = getStr(cfg, "response_streaming")
 	g.model.Config.Proxy = proxyFromConfig(getMap(cfg, "proxy_config"))
@@ -282,7 +296,9 @@ func (r *Reverter) finalizeModels(acc *modelAcc) error {
 			return err
 		}
 		model := aigw.Model{Type: "model", Name: m.Name}
-		model.Config.Model.Alias = m.Alias
+		if m.Alias != "" {
+			model.Config.Route.Model.PathAliases = []string{m.Alias}
+		}
 		model.Labels = r.tagsToLabels(m.Tags)
 		built[m.Name] = true
 		r.out.Models = append(r.out.Models, model)

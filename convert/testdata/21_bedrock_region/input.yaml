@@ -16,8 +16,7 @@ models:
     capabilities: [embeddings]
     formats: [{type: bedrock}]
     config:
-      route: {paths: [/ai]}
-      model: {alias: "@bedrock/titan-embed-text-v2"}
+      route: {paths: [/ai], model: {path_aliases: ["@bedrock/titan-embed-text-v2"]}}
       balancer:
         algorithm: semantic
         slots: 10000

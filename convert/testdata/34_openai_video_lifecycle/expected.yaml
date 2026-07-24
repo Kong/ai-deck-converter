@@ -1,0 +1,73 @@
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: openai-videos
+        paths:
+          - /ai/videos
+        methods:
+          - POST
+        strip_path: false
+      - name: openai-videos-lifecycle
+        paths:
+          - /ai/videos
+          - ~/ai/videos/.+
+        methods:
+          - GET
+          - DELETE
+        strip_path: false
+        tags:
+          - aigw:video-lifecycle
+plugins:
+  - name: ai-model-selector
+    config:
+      body_path: model
+      max_request_body_size: 8388608
+      source: body
+    route: openai-videos
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: video/generation
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: Bearer ${OPENAI_API_KEY}
+          description: sora-2
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: sora
+            name: sora-2
+            provider: openai
+          route_type: video/v1/videos/generations
+    route: openai-videos
+    model: sora
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: video/generation
+      llm_format: openai
+      model_name_header: false
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: Bearer ${OPENAI_API_KEY}
+          description: sora-2
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: sora
+            name: sora-2
+            provider: openai
+          route_type: video/v1/videos/generations
+    route: openai-videos-lifecycle
+ai_models:
+  - name: sora
+    alias: sora

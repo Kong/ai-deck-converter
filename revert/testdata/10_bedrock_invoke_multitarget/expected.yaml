@@ -13,11 +13,13 @@ models:
           region: us-east-1
           type: bedrock
     config:
+      route:
+        model:
+          path_aliases:
+            - '@bedrock/titan-embed-text-v2'
       logging:
         payloads: false
         statistics: true
-      model:
-        alias: '@bedrock/titan-embed-text-v2'
   - type: model
     name: nova-canvas-image
     capabilities:
@@ -31,11 +33,13 @@ models:
           region: us-east-1
           type: bedrock
     config:
+      route:
+        model:
+          path_aliases:
+            - '@bedrock/nova-canvas'
       logging:
         payloads: false
         statistics: true
-      model:
-        alias: '@bedrock/nova-canvas'
   - type: model
     name: nova-sonic-audio
     capabilities:
@@ -49,11 +53,13 @@ models:
           region: us-east-1
           type: bedrock
     config:
+      route:
+        model:
+          path_aliases:
+            - '@bedrock/nova-sonic'
       logging:
         payloads: false
         statistics: true
-      model:
-        alias: '@bedrock/nova-sonic'
   - type: model
     name: nova-reel-video
     capabilities:
@@ -68,11 +74,13 @@ models:
           type: bedrock
           video_output_s3_uri: s3://kong/nova-reel/
     config:
+      route:
+        model:
+          path_aliases:
+            - '@bedrock/nova-reel'
       logging:
         payloads: false
         statistics: true
-      model:
-        alias: '@bedrock/nova-reel'
 model_providers:
   - type: bedrock
     name: bedrock-ai

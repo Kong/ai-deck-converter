@@ -11,11 +11,13 @@ models:
         config:
           type: openai
     config:
+      route:
+        model:
+          path_aliases:
+            - '@openai/gpt-5.2'
       logging:
         payloads: false
         statistics: true
-      model:
-        alias: '@openai/gpt-5.2'
   - type: model
     name: gpt-5-2-mini
     capabilities:
@@ -28,11 +30,13 @@ models:
         config:
           type: openai
     config:
+      route:
+        model:
+          path_aliases:
+            - '@openai/gpt-5.2-mini'
       logging:
         payloads: false
         statistics: true
-      model:
-        alias: '@openai/gpt-5.2-mini'
 model_providers:
   - type: openai
     name: openai-ai

@@ -54,13 +54,14 @@ models:
         tags:
           - team-ai
           - env-production
+        model:
+          path_aliases: [my-model-alias]
       logging:
         payloads: false
         statistics: true
       response_streaming: allow
       max_request_body_size: 8388608
       model:
-        alias: my-model-alias
         name_header: true
       balancer:
         algorithm: consistent-hashing

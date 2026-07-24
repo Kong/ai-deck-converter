@@ -1,0 +1,20 @@
+model_providers:
+  - name: openai-prod
+    type: openai
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: Bearer ${OPENAI_API_KEY}
+models:
+  - type: model
+    name: sora
+    capabilities: [video]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/ai], model: {path_aliases: [sora]}}
+    targets:
+      - name: sora-2
+        provider: openai-prod
+        config: {type: openai}

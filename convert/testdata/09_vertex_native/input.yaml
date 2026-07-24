@@ -12,12 +12,12 @@ models:
     type: model
     capabilities: [generate]
     formats:
-      - type: gemini
+      - type: vertex
     config:
       route:
         paths: [/ai]
-      model:
-        alias: "@vertex/gemini-2.5-pro"
+        model:
+          path_aliases: ["@vertex/gemini-2.5-pro"]
     targets:
       - name: gemini-2.5-pro-with-gcp-env
         provider: vertex-prod
@@ -43,12 +43,12 @@ models:
     type: model
     capabilities: [embeddings]
     formats:
-      - type: gemini
+      - type: vertex
     config:
       route:
         paths: [/ai]
-      model:
-        alias: "@vertex/text-embedding-005"
+        model:
+          path_aliases: ["@vertex/text-embedding-005"]
     targets:
       - name: text-embedding-005-with-gcp-env
         provider: vertex-prod
