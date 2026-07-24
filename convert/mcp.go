@@ -62,7 +62,8 @@ func (c *Converter) mcpPlugin(m *aigw.MCPServer) (kong.Plugin, error) {
 	if m.Config.MaxRequestBodySize != nil {
 		cfg["max_request_body_size"] = *m.Config.MaxRequestBodySize
 	}
-	if logging := loggingBlock(withLoggingDefaults(m.Config.Logging, true, false)); logging != nil {
+	l := withLoggingDefaults(m.Config.Logging, true, false)
+	if logging := (mcpLogging{Statistics: l.Statistics, Payloads: l.Payloads, Audits: l.Audits}).toMap(); logging != nil {
 		cfg["logging"] = logging
 	}
 	if len(m.Config.Server) > 0 {
@@ -114,6 +115,31 @@ func (c *Converter) mcpPlugin(m *aigw.MCPServer) (kong.Plugin, error) {
 		Config: cfg,
 		Tags:   c.labelsToTags(m.Labels),
 	}, nil
+}
+
+// mcpLogging is the {log_statistics, log_payloads, log_audits} record accepted
+// by the ai-mcp-proxy plugin schema.
+type mcpLogging struct {
+	Statistics *bool
+	Payloads   *bool
+	Audits     *bool
+}
+
+func (l mcpLogging) toMap() map[string]any {
+	m := map[string]any{}
+	if l.Statistics != nil {
+		m["log_statistics"] = *l.Statistics
+	}
+	if l.Payloads != nil {
+		m["log_payloads"] = *l.Payloads
+	}
+	if l.Audits != nil {
+		m["log_audits"] = *l.Audits
+	}
+	if len(m) == 0 {
+		return nil
+	}
+	return m
 }
 
 func (c *Converter) mcpTools(serverName string, tools []aigw.MCPTool) ([]map[string]any, error) {
