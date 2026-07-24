@@ -320,7 +320,9 @@ func (c *Converter) convertModels() error {
 				lifecycleTarget.target,
 				lifecycleTarget.provider,
 				lifecycleTarget.providerType,
-				modelAlias(candidate.model),
+				// Lifecycle requests identify a video by ID and do not carry a
+				// model alias. Keep these targets in the balancer's default pool.
+				"",
 				candidate.spec.RouteType,
 				logging,
 			))
