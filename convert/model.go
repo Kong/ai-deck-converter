@@ -674,9 +674,8 @@ func disabledModelPluginEnabled(enabled *bool) *bool {
 	return nil
 }
 
-// modelAlias returns the source model's alias
+// modelAlias returns the source model's path alias.
 func modelAlias(m *aigw.Model) string {
-	// TODO: KOKO-3978 support setting the alias value from Route.Model.Body and/or Route.Model.Headers
 	if len(m.Config.Route.Model.PathAliases) > 0 {
 		return m.Config.Route.Model.PathAliases[0]
 	}
