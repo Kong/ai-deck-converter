@@ -1,0 +1,47 @@
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: cohere-rerank
+        paths:
+          - /cohere/v2/rerank
+        methods:
+          - POST
+        strip_path: false
+plugins:
+  - name: ai-model-selector
+    config:
+      body_path: model
+      max_request_body_size: 8388608
+      source: body
+    route: cohere-rerank
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: cohere
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: Bearer ${COHERE_API_KEY}
+          description: command-a-plus-05-2026
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: cohere
+            name: command-a-plus-05-2026
+            options:
+              cohere:
+                api_version: v2
+                embedding_input_type: classification
+                wait_for_model: false
+            provider: cohere
+          route_type: llm/v1/chat
+    route: cohere-rerank
+    model: cohere
+ai_models:
+  - name: cohere
+    alias: cohere

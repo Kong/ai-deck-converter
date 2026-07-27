@@ -282,7 +282,7 @@ var EndpointTable = map[string]map[string]EndpointSpec{
 		},
 	},
 	"cohere": {
-		"rerank": {"rerank", "/v2/rerank", false, mPost, "llm/v1/chat", catTextGen, false, true},
+		"rerank": {"rerank", "/v2/rerank", false, mPost, "llm/v1/chat", catTextGen, true, true},
 	},
 	"huggingface": {
 		"generate": {"generate", "/generate", false, mPost, "llm/v1/chat", catTextGen, true, true},
