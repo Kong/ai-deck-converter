@@ -138,4 +138,3 @@ plugins:
 ai_models:
   - id: bbb56cd5-695a-5c11-815a-c5da6deceeca
     name: disabled-chat
-    alias: disabled-chat

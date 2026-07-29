@@ -50,7 +50,9 @@ type ModelNameConfig struct {
 
 // ModelAliasConfig is the model aliasing configuration.
 type ModelAliasConfig struct {
-	PathAliases []string `yaml:"path_aliases,omitempty"`
+	Body        map[string][]string `yaml:"body,omitempty"`
+	Headers     map[string][]string `yaml:"headers,omitempty"`
+	PathAliases []string            `yaml:"path_aliases,omitempty"`
 }
 
 type ModelRouteConfig struct {

@@ -55,8 +55,6 @@ models:
     config:
       route:
         paths: [/ai]
-        model:
-          path_aliases: ["@openai/provider-options-mix"]
 model_providers:
   - type: llama2
     display_name: Llama2 Prov

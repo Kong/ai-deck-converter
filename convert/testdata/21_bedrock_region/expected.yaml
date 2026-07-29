@@ -37,7 +37,7 @@ plugins:
             log_payloads: false
             log_statistics: true
           model:
-            model_alias: '@bedrock/titan-embed-text-v2'
+            model_alias: titan-embed-text-v2
             name: amazon.titan-embed-text-v2:0
             options:
               bedrock:
@@ -49,4 +49,3 @@ plugins:
     model: titan-embed-text-v2
 ai_models:
   - name: titan-embed-text-v2
-    alias: '@bedrock/titan-embed-text-v2'

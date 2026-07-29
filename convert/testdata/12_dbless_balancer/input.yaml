@@ -54,8 +54,6 @@ models:
         tags:
           - team-ai
           - env-production
-        model:
-          path_aliases: [my-model-alias]
       logging:
         payloads: false
         statistics: true

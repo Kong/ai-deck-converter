@@ -56,6 +56,13 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 	}
 	routeRefs, routeACLs, routeIDPRefs := r.modelPolicyRefs(routeGuards)
 
+	// The route's ai-model-selector (if any) determines which Route.Model field
+	// an alias round-trips into: source body/header carry the field name the
+	// selector reads; source path (or no selector at all, e.g. Bedrock's
+	// URI-capture routes) falls back to path_aliases, mirroring the forward
+	// converter's default.
+	selector := findPlugin(plugins, "ai-model-selector")
+
 	for _, proxy := range findPlugins(plugins, "ai-proxy-advanced") {
 		cfg := proxy.Config
 		llmFormat := getStr(cfg, "llm_format")
@@ -126,7 +133,7 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 				continue
 			}
 
-			g, err := r.modelGroupFor(acc, rt, fkName, alias, llmFormat, bases, cfg, refs, acls, idpRefs)
+			g, err := r.modelGroupFor(acc, rt, fkName, alias, llmFormat, bases, cfg, selector, refs, acls, idpRefs)
 			if err != nil {
 				return err
 			}
@@ -183,7 +190,7 @@ func hasTag(tags []string, want string) bool {
 // case where ai-proxy-advanced carries an ai-model FK).
 func (r *Reverter) modelGroupFor(
 	acc *modelAcc, rt *kong.Route, fkName, alias, llmFormat string, bases []string,
-	cfg map[string]any, refs []string, acls aigw.ACLs, idpRefs []string,
+	cfg map[string]any, selector *kong.Plugin, refs []string, acls aigw.ACLs, idpRefs []string,
 ) (*modelGroup, error) {
 	var key string
 	switch {
@@ -241,7 +248,7 @@ func (r *Reverter) modelGroupFor(
 		},
 	}
 	if alias != "" {
-		g.model.Config.Route.Model.PathAliases = []string{alias}
+		setAliasField(&g.model.Config.Route.Model, alias, name, selector)
 	}
 	g.model.Config.Model.NameHeader = getBool(cfg, "model_name_header")
 	g.model.Config.ResponseStreaming = getStr(cfg, "response_streaming")
@@ -254,6 +261,42 @@ func (r *Reverter) modelGroupFor(
 	acc.groups[key] = g
 	acc.order = append(acc.order, key)
 	return g, nil
+}
+
+// setAliasField reconstructs the Route.Model field an alias round-trips into,
+// mirroring convert.convertModels' choice of source: body/header selectors
+// carry the field name to restore Body/Headers into; a path selector restores
+// PathAliases.
+//
+// When the route has no ai-model-selector at all, the endpoint is one that
+// does not select by request (Bedrock's URI-capture routes, OpenAI
+// batches/files) — a body-model endpoint always emits a selector. There, the
+// forward converter derives the target model_alias from the model name alone
+// (extractModelAlias's fallback), so an empty Route.Model already round-trips
+// the alias. Only materialize PathAliases when the alias differs from the
+// name; otherwise leaving it empty avoids provoking a spurious selector when
+// the config is converted again (buildModelSelectorConfig emits one for any
+// non-empty Route.Model, even on these non-selector endpoints).
+func setAliasField(model *aigw.ModelAliasConfig, alias, name string, selector *kong.Plugin) {
+	if selector != nil {
+		switch getStr(selector.Config, "source") {
+		case "body":
+			if bodyPath := getStr(selector.Config, "body_path"); bodyPath != "" {
+				model.Body = map[string][]string{bodyPath: {alias}}
+				return
+			}
+		case "header":
+			if headerName := getStr(selector.Config, "header_name"); headerName != "" {
+				model.Headers = map[string][]string{headerName: {alias}}
+				return
+			}
+		}
+		model.PathAliases = []string{alias}
+		return
+	}
+	if alias != name {
+		model.PathAliases = []string{alias}
+	}
 }
 
 // finalizeModels applies model-scoped (ai-models FK) plugins, classifies the
@@ -285,9 +328,13 @@ func (r *Reverter) finalizeModels(acc *modelAcc) error {
 		r.out.Models = append(r.out.Models, g.model)
 	}
 
-	// ai-models entries that no target references: emit a minimal model.
+	// ai-models entries that no target references: emit a minimal model. An
+	// entry is referenced when a target consumed its effective alias (its
+	// explicit alias, or its name under the AI Gateway 2.0 convention where
+	// the name carries the alias) — the built model may be named after the
+	// source model (a plugin's model FK), not the alias, so match on usage.
 	for _, m := range r.src.AIModels {
-		if built[m.Name] || (m.Alias != "" && r.aiModelUsed[m.Alias]) {
+		if built[m.Name] || r.aiModelUsed[aiModelAlias(m)] {
 			continue
 		}
 		if err := r.warn(
@@ -357,6 +404,18 @@ func (r *Reverter) nameAliaslessGroups(acc *modelAcc) error {
 		}
 	}
 	return nil
+}
+
+// aiModelAlias returns the alias a target's model_alias references for an
+// ai-models entry: its explicit alias when set, otherwise the entry name.
+// AI Gateway 2.0 stores the alias as the ai-models name and leaves alias
+// unset (see convert.convertModels), so the name is the effective alias
+// there; older/hand-written configs set alias explicitly.
+func aiModelAlias(m kong.AIModel) string {
+	if m.Alias != "" {
+		return m.Alias
+	}
+	return m.Name
 }
 
 // hasAIModels reports whether the source document declares any ai-models

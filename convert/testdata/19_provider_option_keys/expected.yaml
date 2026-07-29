@@ -31,7 +31,7 @@ plugins:
             log_payloads: false
             log_statistics: true
           model:
-            model_alias: '@openai/provider-options-mix'
+            model_alias: provider-options-mix
             name: llama-3
             options:
               llama2_format: ollama
@@ -46,7 +46,7 @@ plugins:
             log_payloads: false
             log_statistics: true
           model:
-            model_alias: '@openai/provider-options-mix'
+            model_alias: provider-options-mix
             name: mistral-large
             options:
               mistral_format: openai
@@ -60,7 +60,7 @@ plugins:
             log_payloads: false
             log_statistics: true
           model:
-            model_alias: '@openai/provider-options-mix'
+            model_alias: provider-options-mix
             name: qwen-max
             options:
               dashscope:
@@ -75,7 +75,7 @@ plugins:
             log_payloads: false
             log_statistics: true
           model:
-            model_alias: '@openai/provider-options-mix'
+            model_alias: provider-options-mix
             name: kimi-k2
             options:
               kimi:
@@ -90,7 +90,7 @@ plugins:
             log_payloads: false
             log_statistics: true
           model:
-            model_alias: '@openai/provider-options-mix'
+            model_alias: provider-options-mix
             name: command-r
             options:
               cohere:
@@ -107,7 +107,7 @@ plugins:
             log_payloads: false
             log_statistics: true
           model:
-            model_alias: '@openai/provider-options-mix'
+            model_alias: provider-options-mix
             name: hf-zephyr
             options:
               huggingface:
@@ -123,7 +123,7 @@ plugins:
             log_payloads: false
             log_statistics: true
           model:
-            model_alias: '@openai/provider-options-mix'
+            model_alias: provider-options-mix
             name: dbrx-instruct
             options:
               databricks:
@@ -134,4 +134,3 @@ plugins:
     model: provider-options-mix
 ai_models:
   - name: provider-options-mix
-    alias: '@openai/provider-options-mix'

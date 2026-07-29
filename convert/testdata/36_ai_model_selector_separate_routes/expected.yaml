@@ -1,0 +1,157 @@
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: openai-chat
+        paths:
+          - /ai-default-alias/chat/completions
+        methods:
+          - POST
+        strip_path: false
+      - name: openai-chat-2
+        paths:
+          - /ai-body-alias/chat/completions
+        methods:
+          - POST
+        strip_path: false
+      - name: openai-chat-3
+        paths:
+          - /ai-headers-alias/chat/completions
+        methods:
+          - POST
+        strip_path: false
+      - name: openai-chat-4
+        paths:
+          - /ai-path-alias/chat/completions
+        methods:
+          - POST
+        strip_path: false
+plugins:
+  - name: ai-model-selector
+    config:
+      body_path: model
+      max_request_body_size: 8388608
+      source: body
+    route: openai-chat
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      response_streaming: allow
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-5.2
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: gpt-5-2-default-alias-config
+            name: gpt-5.2
+            options:
+              max_tokens: 1024
+              temperature: 1
+            provider: openai
+          route_type: llm/v1/chat
+    route: openai-chat
+    model: gpt-5-2-default-alias-config
+  - name: ai-model-selector
+    config:
+      body_path: my-model-alias
+      max_request_body_size: 8388608
+      source: body
+    route: openai-chat-2
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      response_streaming: allow
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-5.2
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: my-body-alias-value
+            name: gpt-5.2
+            options:
+              max_tokens: 1024
+              temperature: 1
+            provider: openai
+          route_type: llm/v1/chat
+    route: openai-chat-2
+    model: gpt-5-2-body-alias-config
+  - name: ai-model-selector
+    config:
+      header_name: my-model-alias
+      source: header
+    route: openai-chat-3
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      response_streaming: allow
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-5.2
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: my-model-alias-header-value
+            name: gpt-5.2
+            options:
+              max_tokens: 1024
+              temperature: 1
+            provider: openai
+          route_type: llm/v1/chat
+    route: openai-chat-3
+    model: gpt-5-2-headers-alias-config
+  - name: ai-model-selector
+    config:
+      path_pattern: my-model-path-alias-value
+      source: path
+    route: openai-chat-4
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      response_streaming: allow
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-5.2
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: my-model-path-alias-value
+            name: gpt-5.2
+            options:
+              max_tokens: 1024
+              temperature: 1
+            provider: openai
+          route_type: llm/v1/chat
+    route: openai-chat-4
+    model: gpt-5-2-path-alias-config
+ai_models:
+  - name: gpt-5-2-default-alias-config
+  - name: my-body-alias-value
+  - name: my-model-alias-header-value
+  - name: my-model-path-alias-value

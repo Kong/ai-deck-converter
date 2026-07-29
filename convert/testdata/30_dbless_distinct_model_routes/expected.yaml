@@ -94,7 +94,5 @@ plugins:
 ai_models:
   - id: 7e73ac51-6578-51cd-b62d-e00779580f2b
     name: xai-chat
-    alias: xai-chat
   - id: 1eabdb41-bfad-51da-9ce5-6c2683bbb5f5
     name: openai-chat
-    alias: openai-chat

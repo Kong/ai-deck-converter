@@ -132,7 +132,7 @@ plugins:
             log_payloads: false
             log_statistics: true
           model:
-            model_alias: my-model-alias
+            model_alias: my-balancer-ch-model
             name: gpt-4o
             provider: openai
           route_type: llm/v1/chat
@@ -177,7 +177,7 @@ plugins:
             log_payloads: false
             log_statistics: true
           model:
-            model_alias: my-model-alias
+            model_alias: my-balancer-ch-model
             name: gpt-4o
             provider: openai
           route_type: llm/v1/embeddings
@@ -210,6 +210,5 @@ plugins:
 ai_models:
   - id: aab20033-7c80-5942-aadc-52357371dbeb
     name: my-balancer-ch-model
-    alias: my-model-alias
     tags:
       - env:production

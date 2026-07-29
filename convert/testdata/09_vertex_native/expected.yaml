@@ -39,7 +39,7 @@ plugins:
             log_payloads: false
             log_statistics: true
           model:
-            model_alias: '@vertex/gemini-2.5-pro'
+            model_alias: vertex-gemini-2-5-pro
             name: gemini-2.5-pro-with-gcp-env
             options:
               gemini:
@@ -58,7 +58,7 @@ plugins:
             log_payloads: false
             log_statistics: true
           model:
-            model_alias: '@vertex/gemini-2.5-pro'
+            model_alias: vertex-gemini-2-5-pro
             name: gemini-2.6-pro-without-gcp-env
             options:
               max_tokens: 4096
@@ -88,7 +88,7 @@ plugins:
             log_payloads: false
             log_statistics: true
           model:
-            model_alias: '@vertex/text-embedding-005'
+            model_alias: vertex-text-embedding-005
             name: text-embedding-005-with-gcp-env
             options:
               gemini:
@@ -106,7 +106,7 @@ plugins:
             log_payloads: false
             log_statistics: true
           model:
-            model_alias: '@vertex/text-embedding-005'
+            model_alias: vertex-text-embedding-005
             name: text-embedding-006-without-gcp-env
             provider: gemini
           route_type: llm/v1/embeddings
@@ -114,6 +114,4 @@ plugins:
     model: vertex-text-embedding-005
 ai_models:
   - name: vertex-gemini-2-5-pro
-    alias: '@vertex/gemini-2.5-pro'
   - name: vertex-text-embedding-005
-    alias: '@vertex/text-embedding-005'

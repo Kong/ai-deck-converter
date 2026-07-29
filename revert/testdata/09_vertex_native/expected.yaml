@@ -18,8 +18,9 @@ models:
     config:
       route:
         model:
-          path_aliases:
-            - '@vertex/gemini-2.5-pro'
+          body:
+            model:
+              - '@vertex/gemini-2.5-pro'
       logging:
         payloads: false
         statistics: true
@@ -40,8 +41,9 @@ models:
     config:
       route:
         model:
-          path_aliases:
-            - '@vertex/text-embedding-005'
+          body:
+            model:
+              - '@vertex/text-embedding-005'
       logging:
         payloads: false
         statistics: true

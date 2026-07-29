@@ -11,6 +11,11 @@ services:
           - POST
         strip_path: false
 plugins:
+  - name: ai-model-selector
+    config:
+      path_pattern: '@sagemaker/claude-3-5-sonnet'
+      source: path
+    route: sagemaker-converse
   - name: ai-proxy-advanced
     config:
       balancer:
@@ -43,5 +48,4 @@ plugins:
     route: sagemaker-converse
     model: claude-sagemaker
 ai_models:
-  - name: claude-sagemaker
-    alias: '@sagemaker/claude-3-5-sonnet'
+  - name: '@sagemaker/claude-3-5-sonnet'

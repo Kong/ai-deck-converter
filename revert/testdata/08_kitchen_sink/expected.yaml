@@ -27,8 +27,9 @@ models:
     config:
       route:
         model:
-          path_aliases:
-            - '@prod/prod-chat'
+          body:
+            model:
+              - '@prod/prod-chat'
       logging:
         payloads: false
         statistics: true
