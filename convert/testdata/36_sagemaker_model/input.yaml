@@ -1,0 +1,36 @@
+models:
+  - type: model
+    display_name: Claude on Sagemaker
+    name: claude-sagemaker
+    capabilities: [generate]
+    formats:
+      - type: sagemaker
+    targets:
+      - name: anthropic.claude-3-5-sonnet
+        provider: sagemaker-prod
+        config:
+          type: sagemaker
+          aws:
+            region: us-east-1
+            assume_role_arn: "arn:aws:iam::123:role/sagemaker"
+            role_session_name: kong-session
+            sts_endpoint_url: sts.example.test
+          target:
+            model: model-1
+            variant: variant-1
+            container_hostname: container-1
+    policies: []
+    access:
+      acls: {allow: [], deny: []}
+    config:
+      route: {paths: [/ai], model: {path_aliases: ["@sagemaker/claude-3-5-sonnet"]}}
+model_providers:
+  - type: sagemaker
+    display_name: Sagemaker Prod
+    name: sagemaker-prod
+    config:
+      auth:
+        type: sagemaker
+        access_key_id: "{vault://env/aws-key-id}"
+        secret_access_key: "{vault://env/aws-secret}"
+        session_token: "{vault://env/aws-session-token}"

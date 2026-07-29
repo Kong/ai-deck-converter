@@ -287,6 +287,12 @@ var EndpointTable = map[string]map[string]EndpointSpec{
 	"huggingface": {
 		"generate": {"generate", "/generate", false, mPost, "llm/v1/chat", catTextGen, true, true},
 	},
+	"sagemaker": {
+		"generate": {
+			"converse", "model/(?<model_name>[^/]+)/converse(?:-stream)?",
+			true, mGetPost, "llm/v1/chat", catTextGen, false, true,
+		},
+	},
 }
 
 // CapabilityAliases maps loose capability spellings to canonical keys.
