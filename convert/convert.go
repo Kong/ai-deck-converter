@@ -6,6 +6,7 @@ package convert
 import (
 	"bytes"
 	"fmt"
+	"strings"
 
 	publicaigw "github.com/Kong/ai-deck-converter/aigw"
 	"github.com/Kong/ai-deck-converter/internal/aigw"
@@ -125,6 +126,7 @@ type Converter struct {
 	policies          map[string]*aigw.Policy
 	identityProviders map[string]*aigw.IdentityProvider
 	consumerGroups    map[string]*aigw.ConsumerGroup
+	serviceNames      map[string]bool
 
 	warnings []string
 }
@@ -138,6 +140,7 @@ func newConverter(doc *aigw.Document, opts Options) *Converter {
 		policies:          map[string]*aigw.Policy{},
 		identityProviders: map[string]*aigw.IdentityProvider{},
 		consumerGroups:    map[string]*aigw.ConsumerGroup{},
+		serviceNames:      map[string]bool{},
 	}
 }
 
@@ -151,6 +154,25 @@ func (c *Converter) warn(format string, args ...any) error {
 	}
 	c.warnings = append(c.warnings, msg)
 	return nil
+}
+
+func (c *Converter) uniqueServiceName(entityKind, entityName, desired string) (string, error) {
+	if !c.serviceNames[desired] {
+		c.serviceNames[desired] = true
+		return desired, nil
+	}
+
+	stem := desired + "-" + strings.ReplaceAll(entityKind, "_", "-")
+	candidate := stem
+	for i := 2; c.serviceNames[candidate]; i++ {
+		candidate = fmt.Sprintf("%s-%d", stem, i)
+	}
+	c.serviceNames[candidate] = true
+	if err := c.warn("service name collision for %s %q: %q is already used; using %q",
+		entityKind, entityName, desired, candidate); err != nil {
+		return "", err
+	}
+	return candidate, nil
 }
 
 // buildRoute converts an AI Gateway route config into a Kong Route (used by MCP

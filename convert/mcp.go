@@ -29,8 +29,12 @@ func (c *Converter) convertMCPServers() error {
 		}
 		route.Plugins = append(route.Plugins, guard...)
 
+		serviceName, err := c.uniqueServiceName(entityMCPServer, m.Name, m.Name)
+		if err != nil {
+			return err
+		}
 		service := kong.Service{
-			Name:   m.Name,
+			Name:   serviceName,
 			Routes: []kong.Route{route},
 			Tags:   c.labelsToTags(m.Labels),
 		}
