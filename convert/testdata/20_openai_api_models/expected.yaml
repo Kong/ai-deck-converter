@@ -36,6 +36,7 @@ plugins:
             log_payloads: false
             log_statistics: false
           model:
+            model_alias: openai-batch-api
             name: batch-api
             provider: openai
           route_type: llm/v1/batches
@@ -58,12 +59,11 @@ plugins:
             log_payloads: false
             log_statistics: true
           model:
+            model_alias: openai-files-api
             name: files-api
             provider: openai
           route_type: llm/v1/files
     route: openai-files
 ai_models:
   - name: openai-batch-api
-    alias: openai-batch-api
   - name: openai-files-api
-    alias: openai-files-api

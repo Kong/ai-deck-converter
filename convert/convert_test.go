@@ -520,7 +520,7 @@ policies:
 	require.NotEqual(t, "provided-policy-id", keyAuthID)
 }
 
-func TestConvertMapsConfiguredModelAlias(t *testing.T) {
+func TestConvertMapsConfiguredModelName(t *testing.T) {
 	src := []byte(`
 models:
   - type: model
@@ -549,8 +549,9 @@ model_providers:
 	require.Len(t, aiModels, 1)
 	aiModel, ok := aiModels[0].(map[string]any)
 	require.True(t, ok, "expected ai_models entry")
-	require.Equal(t, "m1", aiModel["name"])
-	require.Equal(t, "@openai/custom-m1", aiModel["alias"], "ai-models alias should match source model.alias")
+	require.Equal(t, "@openai/custom-m1", aiModel["name"])
+	_, hasAIModelAlias := aiModel["alias"]
+	require.False(t, hasAIModelAlias, "ai-model alias should be unset")
 
 	plugins, ok := got["plugins"].([]any)
 	require.True(t, ok, "expected plugins collection")
@@ -579,7 +580,7 @@ model_providers:
 	require.Equal(t, "@openai/custom-m1", model["model_alias"], "target model_alias should match source model.alias")
 }
 
-func TestConvertOmitsSyntheticModelAliasWhenUnset(t *testing.T) {
+func TestConvertSynthesizesAIModelNameWhenUnset(t *testing.T) {
 	src := []byte(`
 models:
   - type: model
@@ -610,8 +611,8 @@ model_providers:
 	aiModel, ok := aiModels[0].(map[string]any)
 	require.True(t, ok, "expected ai_models entry")
 	require.Equal(t, "m1", aiModel["name"])
-	require.Equal(t, "m1", aiModel["alias"],
-		"ai-models alias should fall back to the model name when source model.alias is unset")
+	_, hasAIModelAlias := aiModel["alias"]
+	require.False(t, hasAIModelAlias, "ai-model alias should be unset")
 
 	plugins, ok := got["plugins"].([]any)
 	require.True(t, ok, "expected plugins collection")
@@ -637,11 +638,12 @@ model_providers:
 	model, ok := target["model"].(map[string]any)
 	require.True(t, ok, "expected ai-proxy-advanced model")
 	require.Equal(t, "gpt-4o", model["name"])
-	_, hasModelAlias := model["model_alias"]
-	require.False(t, hasModelAlias, "target model_alias should be omitted when source model.alias is unset")
+	modelAlias, ok := model["model_alias"]
+	require.True(t, ok, "expected ai-proxy-advanced model_alias")
+	require.Equal(t, "m1", modelAlias)
 }
 
-func TestConvertDBLessSynthesizesAIModelAliasWhenUnset(t *testing.T) {
+func TestConvertDBLessSynthesizesAIModelNameWhenUnset(t *testing.T) {
 	src := []byte(`
 models:
   - type: api
@@ -672,8 +674,8 @@ model_providers:
 	aiModel, ok := aiModels[0].(map[string]any)
 	require.True(t, ok, "expected ai_models entry")
 	require.Equal(t, "files-api", aiModel["name"])
-	require.Equal(t, "files-api", aiModel["alias"],
-		"db-less ai_models alias should fall back to the model name when source model.alias is unset")
+	_, hasAIModelAlias := aiModel["alias"]
+	require.False(t, hasAIModelAlias, "ai-model alias should be unset")
 
 	plugins, ok := got["plugins"].([]any)
 	require.True(t, ok, "expected plugins collection")
@@ -699,8 +701,9 @@ model_providers:
 	model, ok := target["model"].(map[string]any)
 	require.True(t, ok, "expected ai-proxy-advanced model")
 	require.Equal(t, "files", model["name"])
-	_, hasModelAlias := model["model_alias"]
-	require.False(t, hasModelAlias, "db-less target model_alias should still be omitted when source model.alias is unset")
+	modelAlias, ok := model["model_alias"]
+	require.True(t, ok, "expected ai-proxy-advanced model_alias")
+	require.Equal(t, "files-api", modelAlias)
 }
 
 func TestConvertStrictFailsUnknownProvider(t *testing.T) {

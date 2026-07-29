@@ -18,11 +18,10 @@ import (
 // client-facing route configuration; each owning model contributes its own
 // ai-proxy-advanced plugin (a proxyGroup).
 type routeGroup struct {
-	route          kong.Route
-	takesBodyModel bool
-	bodySize       int
-	proxies        []*proxyGroup
-	proxyByOwner   map[string]*proxyGroup
+	route               kong.Route
+	modelSelectorConfig map[string]any
+	proxies             []*proxyGroup
+	proxyByOwner        map[string]*proxyGroup
 }
 
 // proxyGroup accumulates one ai-proxy-advanced plugin: the targets owned by a
@@ -86,11 +85,8 @@ func (c *Converter) convertModels() error {
 		// behavior. The ai-models entity, however, still requires an alias in both
 		// decK and db-less payloads, so synthesize it from the model name when the
 		// source omitted one.
-		targetAlias := modelAlias(m)
+		targetAlias := extractModelAlias(m)
 		aiModelAlias := targetAlias
-		if aiModelAlias == "" {
-			aiModelAlias = m.Name
-		}
 
 		// ownerKey groups targets into ai-proxy-advanced plugins: per source model
 		// for type "model" (each carries its own ai-model FK), shared for type
@@ -154,7 +150,17 @@ func (c *Converter) convertModels() error {
 				if err != nil {
 					return err
 				}
-				key := sec + "|" + spec.RouteLabel + "|" + identityKey + "|" + routeConfigKey
+				selectorCfg := buildModelSelectorConfig(m, spec)
+				// The alias *value* is per-model and deliberately excluded from
+				// routeConfigKey, but the selector *shape* (which source/field an
+				// ai-model-selector reads) is a route-level concern like identity
+				// providers: a shared route has one ai-model-selector, so models
+				// wanting incompatible shapes cannot share a route either.
+				key := sec + "|" +
+					spec.RouteLabel +
+					"|" + identityKey +
+					"|" + routeConfigKey +
+					"|" + modelSelectorShapeKey(selectorCfg)
 				g := groups[key]
 				if g == nil {
 					paths := make([]string, len(bases))
@@ -166,12 +172,17 @@ func (c *Converter) convertModels() error {
 						route: buildModelRoute(
 							m.Config.Route, routeName,
 							paths, spec.Methods),
-						takesBodyModel: spec.TakesBodyModel,
-						bodySize:       aimap.DefaultMaxBodySize,
-						proxyByOwner:   map[string]*proxyGroup{},
+						modelSelectorConfig: selectorCfg,
+						proxyByOwner:        map[string]*proxyGroup{},
 					}
 					groups[key] = g
 					order = append(order, key)
+				} else if curSize, ok := g.modelSelectorConfig["max_request_body_size"].(int); ok {
+					// Same shape (guaranteed by key), but a later model may need a
+					// larger body-read ceiling than the model that created the group.
+					if newSize, ok := selectorCfg["max_request_body_size"].(int); ok && newSize > curSize {
+						g.modelSelectorConfig["max_request_body_size"] = newSize
+					}
 				}
 				if !routeSeen[g.route.Name] {
 					routeSeen[g.route.Name] = true
@@ -218,18 +229,18 @@ func (c *Converter) convertModels() error {
 					pg.seen[dedup] = true
 					pg.targets = append(pg.targets, target)
 				}
-				if bs := bodySizeOrDefault(m); bs > g.bodySize {
-					g.bodySize = bs
-				}
 			}
 		}
 
 		// ai-models entry (one per source model).
 		c.out.AIModels = append(c.out.AIModels, kong.AIModel{
-			ID:    m.ID,
-			Name:  m.Name,
-			Alias: aiModelAlias,
-			Tags:  c.labelsToTags(m.Labels),
+			ID: m.ID,
+			// note: name is set to alias and alias is intentionally unset to be compatible with
+			// the AI Gateway 2.0.0 dataplane behavior. By setting name to alias, the AI Gateway will
+			// route requests to the alias that is set in the Model's config.route.model.* properties.
+			// If config.route.model.* properties are not set then aiModelAlias defaults to the model name.
+			Name: aiModelAlias,
+			Tags: c.labelsToTags(m.Labels),
 		})
 
 		// Model policy and ACL plugins scope to each route the model produces, plus
@@ -281,15 +292,12 @@ func (c *Converter) convertModels() error {
 	for _, key := range order {
 		g := groups[key]
 		service.Routes = append(service.Routes, g.route)
-		if g.takesBodyModel {
+
+		if g.modelSelectorConfig != nil {
 			c.out.Plugins = append(c.out.Plugins, kong.Plugin{
-				Name:  "ai-model-selector",
-				Route: kong.NewStringRef(g.route.Name),
-				Config: map[string]any{
-					"source":                "body",
-					"body_path":             "model",
-					"max_request_body_size": g.bodySize,
-				},
+				Name:   "ai-model-selector",
+				Route:  kong.NewStringRef(g.route.Name),
+				Config: g.modelSelectorConfig,
 			})
 		}
 		for _, pg := range g.proxies {
@@ -674,13 +682,35 @@ func disabledModelPluginEnabled(enabled *bool) *bool {
 	return nil
 }
 
-// modelAlias returns the source model's path alias.
-func modelAlias(m *aigw.Model) string {
+// extractModelAlias returns the source model's alias
+// It first attempts to read the alias from the path alias, then body alias, and lastly the headers alias.
+// API validation restricts the model Route.Model config to being a oneOf with only one alias value set.
+func extractModelAlias(m *aigw.Model) string {
+	// First attempt to read the alias from the path alias
 	if len(m.Config.Route.Model.PathAliases) > 0 {
 		return m.Config.Route.Model.PathAliases[0]
 	}
 
-	return ""
+	// Second attempt to read the alias from the body alias
+	if len(m.Config.Route.Model.Body) > 0 {
+		for _, values := range m.Config.Route.Model.Body {
+			if len(values) > 0 {
+				return values[0]
+			}
+		}
+	}
+
+	// Third attempt to read the alias from the header alias
+	if len(m.Config.Route.Model.Headers) > 0 {
+		for _, values := range m.Config.Route.Model.Headers {
+			if len(values) > 0 {
+				return values[0]
+			}
+		}
+	}
+
+	// Fall back to returning the empty name when there is no alias
+	return m.Name
 }
 
 func llmFormat(m *aigw.Model) string {
@@ -690,11 +720,80 @@ func llmFormat(m *aigw.Model) string {
 	return aimap.DefaultLLMFormat
 }
 
+// bodySizeOrDefault returns the ai-model-selector's max_request_body_size: at
+// least aimap.DefaultMaxBodySize, raised to the model's own
+// max_request_body_size (destined for ai-proxy-advanced) only if that value
+// is larger, so the selector never reads less of the body than the proxy
+// itself is configured to accept.
 func bodySizeOrDefault(m *aigw.Model) int {
-	if m.Config.MaxRequestBodySize != nil {
+	if m.Config.MaxRequestBodySize != nil && *m.Config.MaxRequestBodySize > aimap.DefaultMaxBodySize {
 		return *m.Config.MaxRequestBodySize
 	}
 	return aimap.DefaultMaxBodySize
+}
+
+// buildModelSelectorConfig returns the ai-model-selector config a model wants
+// for its route, or nil if the endpoint needs no selector at all (e.g.
+// Bedrock's URI-capture routes). Route.Model picks the source explicitly
+// (path/body/header); absent that, capabilities that carry a body `model`
+// field by default (spec.TakesBodyModel) fall back to reading it there.
+func buildModelSelectorConfig(m *aigw.Model, spec aimap.EndpointSpec) map[string]any {
+	switch {
+	case len(m.Config.Route.Model.PathAliases) > 0:
+		return map[string]any{
+			"source":       "path",
+			"path_pattern": m.Config.Route.Model.PathAliases[0],
+		}
+	case len(m.Config.Route.Model.Body) > 0:
+		var bodyPath string
+		for k := range m.Config.Route.Model.Body {
+			bodyPath = k
+			break
+		}
+		return map[string]any{
+			"source":                "body",
+			"body_path":             bodyPath,
+			"max_request_body_size": bodySizeOrDefault(m),
+		}
+	case len(m.Config.Route.Model.Headers) > 0:
+		var headerName string
+		for k := range m.Config.Route.Model.Headers {
+			headerName = k
+			break
+		}
+		return map[string]any{
+			"source":      "header",
+			"header_name": headerName,
+		}
+	case spec.TakesBodyModel:
+		return map[string]any{
+			"source":                "body",
+			"body_path":             "model",
+			"max_request_body_size": bodySizeOrDefault(m),
+		}
+	}
+	return nil
+}
+
+// modelSelectorShapeKey canonicalizes an ai-model-selector config's shape
+// (source plus field name) for route grouping, deliberately dropping
+// max_request_body_size and any alias value: two models wanting the same
+// shape can still share a route even if their alias values or body-size
+// ceilings differ (the latter merges to the max across contributors), but
+// models wanting different shapes need their own ai-model-selector/route,
+// the same way models with different identity-provider sets do.
+func modelSelectorShapeKey(cfg map[string]any) string {
+	switch v, _ := cfg["source"].(string); v {
+	case "body":
+		bodyPath, _ := cfg["body_path"].(string)
+		return "body:" + bodyPath
+	case "header":
+		headerName, _ := cfg["header_name"].(string)
+		return "header:" + headerName
+	case "path":
+		return "path"
+	}
+	return ""
 }
 
 func boolPtr(b bool) *bool { return &b }

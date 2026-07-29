@@ -1,0 +1,104 @@
+models:
+  - display_name: GPT-5.2-default-alias-config
+    name: gpt-5-2-default-alias-config
+    type: model
+    enabled: true
+    capabilities: [generate]
+    formats:
+      - type: openai
+    config:
+      route:
+        paths: [/ai]
+      response_streaming: allow
+    targets:
+      - name: gpt-5.2
+        provider: openai-prod
+        config:
+          type: openai
+          temperature: 1.0
+          max_tokens: 1024
+    policies: []
+    access:
+      acls: {allow: [], deny: []}
+  - display_name: GPT-5.2-body-alias-config
+    name: gpt-5-2-body-alias-config
+    type: model
+    enabled: true
+    capabilities: [ generate ]
+    formats:
+      - type: openai
+    config:
+      route:
+        paths: [/ai]
+        model:
+          body:
+            my-model-alias: [my-body-alias-value]
+      response_streaming: allow
+    targets:
+      - name: gpt-5.2
+        provider: openai-prod
+        config:
+          type: openai
+          temperature: 1.0
+          max_tokens: 1024
+    policies: [ ]
+    access:
+      acls: { allow: [ ], deny: [ ] }
+  - display_name: GPT-5.2-headers-alias-config
+    name: gpt-5-2-headers-alias-config
+    type: model
+    enabled: true
+    capabilities: [ generate ]
+    formats:
+      - type: openai
+    config:
+      route:
+        paths: [/ai]
+        model:
+          headers:
+            my-model-alias: [my-model-alias-header-value]
+      response_streaming: allow
+    targets:
+      - name: gpt-5.2
+        provider: openai-prod
+        config:
+          type: openai
+          temperature: 1.0
+          max_tokens: 1024
+    policies: [ ]
+    access:
+      acls: { allow: [ ], deny: [ ] }
+  - display_name: GPT-5.2-path-alias-config
+    name: gpt-5-2-path-alias-config
+    type: model
+    enabled: true
+    capabilities: [ generate ]
+    formats:
+      - type: openai
+    config:
+      route:
+        paths: [/ai]
+        model:
+          path_aliases:
+            - my-model-path-alias-value
+      response_streaming: allow
+    targets:
+      - name: gpt-5.2
+        provider: openai-prod
+        config:
+          type: openai
+          temperature: 1.0
+          max_tokens: 1024
+    policies: [ ]
+    access:
+      acls: { allow: [ ], deny: [ ] }
+model_providers:
+  - name: openai-prod
+    type: openai
+    display_name: OpenAI Prod
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://ai/openai-token}"

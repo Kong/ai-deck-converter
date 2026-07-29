@@ -26,7 +26,7 @@ plugins:
             log_payloads: false
             log_statistics: true
           model:
-            model_alias: '@bedrock/titan-embed-text-v2'
+            model_alias: titan-embed-text-v2
             name: amazon.titan-embed-text-v2:0
             options:
               bedrock:
@@ -51,7 +51,7 @@ plugins:
             log_payloads: false
             log_statistics: false
           model:
-            model_alias: '@bedrock/nova-canvas'
+            model_alias: nova-canvas-image
             name: amazon.nova-canvas-v1:0
             options:
               bedrock:
@@ -75,7 +75,7 @@ plugins:
             log_payloads: false
             log_statistics: true
           model:
-            model_alias: '@bedrock/nova-sonic'
+            model_alias: nova-sonic-audio
             name: amazon.nova-sonic-v1:0
             options:
               bedrock:
@@ -99,7 +99,7 @@ plugins:
             log_payloads: false
             log_statistics: true
           model:
-            model_alias: '@bedrock/nova-reel'
+            model_alias: nova-reel-video
             name: amazon.nova-reel-v1:1
             options:
               bedrock:
@@ -111,10 +111,6 @@ plugins:
     model: nova-reel-video
 ai_models:
   - name: titan-embed-text-v2
-    alias: '@bedrock/titan-embed-text-v2'
   - name: nova-canvas-image
-    alias: '@bedrock/nova-canvas'
   - name: nova-sonic-audio
-    alias: '@bedrock/nova-sonic'
   - name: nova-reel-video
-    alias: '@bedrock/nova-reel'

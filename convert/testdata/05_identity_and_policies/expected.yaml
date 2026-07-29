@@ -51,7 +51,7 @@ plugins:
             log_payloads: false
             log_statistics: true
           model:
-            model_alias: '@openai/guarded-gpt'
+            model_alias: guarded-gpt
             name: gpt-4o
             provider: openai
           route_type: llm/v1/chat
@@ -83,7 +83,6 @@ vaults:
       prefix: KONG_
 ai_models:
   - name: guarded-gpt
-    alias: '@openai/guarded-gpt'
     tags:
       - env:prod
       - team:ai-platform

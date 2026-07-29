@@ -69,7 +69,7 @@ plugins:
             log_payloads: false
             log_statistics: true
           model:
-            model_alias: '@oidc-repro/model-a'
+            model_alias: oidc-repro-model-a
             name: gpt-5-mini
             provider: openai
           route_type: llm/v1/chat
@@ -101,7 +101,7 @@ plugins:
             log_payloads: false
             log_statistics: true
           model:
-            model_alias: '@oidc-repro/model-b'
+            model_alias: oidc-repro-model-b
             name: gpt-5-mini
             provider: openai
           route_type: llm/v1/chat
@@ -126,7 +126,5 @@ plugins:
 ai_models:
   - id: f8ad1382-e6e4-5c95-86fd-ab9a0c84e2b4
     name: oidc-repro-model-a
-    alias: '@oidc-repro/model-a'
   - id: ef3104b8-4849-51ba-9ccb-7d66e827436a
     name: oidc-repro-model-b
-    alias: '@oidc-repro/model-b'

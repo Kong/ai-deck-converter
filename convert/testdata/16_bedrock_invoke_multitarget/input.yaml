@@ -16,7 +16,7 @@ models:
     capabilities: [embeddings]
     formats: [{type: bedrock}]
     config:
-      route: {paths: [/ai], model: {path_aliases: ["@bedrock/titan-embed-text-v2"]}}
+      route: {paths: [/ai]}
     targets:
       - name: amazon.titan-embed-text-v2:0
         provider: bedrock-prod
@@ -30,7 +30,7 @@ models:
     capabilities: [image]
     formats: [{type: bedrock}]
     config:
-      route: {paths: [/ai], model: {path_aliases: ["@bedrock/nova-canvas"]}}
+      route: {paths: [/ai]}
     targets:
       - name: amazon.nova-canvas-v1:0
         provider: bedrock-prod
@@ -44,7 +44,7 @@ models:
     capabilities: [audio/speech]
     formats: [{type: bedrock}]
     config:
-      route: {paths: [/ai], model: {path_aliases: ["@bedrock/nova-sonic"]}}
+      route: {paths: [/ai]}
     targets:
       - name: amazon.nova-sonic-v1:0
         provider: bedrock-prod
@@ -58,7 +58,7 @@ models:
     capabilities: [video]
     formats: [{type: bedrock}]
     config:
-      route: {paths: [/ai], model: {path_aliases: ["@bedrock/nova-reel"]}}
+      route: {paths: [/ai]}
     targets:
       - name: amazon.nova-reel-v1:1
         provider: bedrock-prod

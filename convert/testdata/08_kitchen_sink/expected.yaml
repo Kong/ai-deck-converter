@@ -68,7 +68,7 @@ plugins:
             log_payloads: false
             log_statistics: true
           model:
-            model_alias: '@prod/prod-chat'
+            model_alias: prod-chat
             name: gpt-4o
             options:
               temperature: 0.6
@@ -83,7 +83,7 @@ plugins:
             log_payloads: false
             log_statistics: true
           model:
-            model_alias: '@prod/prod-chat'
+            model_alias: prod-chat
             name: claude-3-5
             options:
               anthropic_version: "2023-06-01"
@@ -98,7 +98,7 @@ plugins:
             log_payloads: false
             log_statistics: true
           model:
-            model_alias: '@prod/prod-chat'
+            model_alias: prod-chat
             name: claude-3-4
             options:
               anthropic_version: "2023-06-01"
@@ -127,6 +127,5 @@ vaults:
       prefix: KONG_
 ai_models:
   - name: prod-chat
-    alias: '@prod/prod-chat'
     tags:
       - env:prod
