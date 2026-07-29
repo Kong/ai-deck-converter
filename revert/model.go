@@ -190,7 +190,14 @@ func (r *Reverter) modelGroupFor(
 	case fkName != "":
 		key = "model:" + fkName
 	case alias != "":
-		key = "alias:" + alias
+		// Realtime plugins are deliberately route-scoped (WebSocket routes do
+		// not use ai-model-selector), but their target alias still identifies
+		// the same ai-model as companion HTTP routes.
+		if name, ok := r.aiModelByAlias[alias]; ok {
+			key = "model:" + name
+		} else {
+			key = "alias:" + alias
+		}
 	default:
 		key = "route:" + rt.Name
 	}
