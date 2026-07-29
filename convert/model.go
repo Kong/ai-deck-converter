@@ -477,12 +477,21 @@ func (c *Converter) videoLifecycleCandidates() ([]videoLifecycleCandidate, error
 	return candidates, nil
 }
 
+// buildVideoLifecycleRoute matches the base path itself (a bare GET/DELETE
+// lists) plus any sub-path (a regex catching "/{video_id}" and
+// "/{video_id}/content") — never a literal "/videos" segment. The creation
+// route lives at the same base path (see aimap.EndpointTable's video entry),
+// so status/download/delete share it rather than a distinct "/videos" prefix:
+// the ai-proxy-advanced plugin builds the upstream OpenAI /v1/videos... call
+// itself from route_type + method, and a literal "/videos" segment on the
+// client-facing path breaks its response transformation (confirmed against a
+// real gateway: 500 "malformed video/v1/videos/generations response").
 func buildVideoLifecycleRoute(rc aigw.ModelRouteConfig, routeName string, bases []string) kong.Route {
 	rc.Methods = nil
 	paths := make([]string, 0, len(bases)*2) //nolint:mnd
 	for _, base := range bases {
 		base = strings.TrimRight(base, "/")
-		paths = append(paths, base+"/videos", "~"+base+"/videos/.+")
+		paths = append(paths, base, "~"+base+"/.+")
 	}
 	route := buildModelRoute(rc, routeName, paths, []string{"GET", "DELETE"})
 	route.Tags = append(route.Tags, aimap.VideoLifecycleRouteTag)

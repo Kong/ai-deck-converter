@@ -12,14 +12,14 @@ services:
         strip_path: false
       - name: bedrock-videos
         paths:
-          - /ai/videos
+          - /ai
         methods:
           - POST
         strip_path: false
       - name: bedrock-videos-lifecycle
         paths:
-          - /ai/videos
-          - ~/ai/videos/.+
+          - /ai
+          - ~/ai/.+
         methods:
           - GET
           - DELETE

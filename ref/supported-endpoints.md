@@ -84,7 +84,7 @@ Below is a mapping of supported Capabilities to LLM Formats.
 | audio/speech | `/audio/speech` | `audio/v1/audio/speech` | `audio/speech` |
 | audio/transcription | `/audio/transcriptions` | `audio/v1/audio/transcriptions` | `audio/transcription` |
 | audio/translation | `/audio/translations` | `audio/v1/audio/translations` | `audio/transcription` |
-| video | `/videos` | `video/v1/videos/generations` | `video/generation` |
+| video | base path itself (no `/videos` suffix); generate is `POST`, status/download/delete are `GET`/`DELETE <job_id>[/content]` | `video/v1/videos/generations` | `video/generation` |
 | rerank | — | - | - |
 | batch | `/batches` | `llm/v1/batches` | `text/generation` |
 | files | `/files` | `llm/v1/files` | `text/generation` |
@@ -129,7 +129,7 @@ Below is a mapping of supported Capabilities to LLM Formats.
 | embeddings | `~/model/(?<model_name>[^/]+)/invoke` | `llm/v1/embeddings` | `text/embeddings` |
 | image | `~/model/(?<model_name>[^/]+)/invoke` | `image/v1/images/generations` | `image/generation` |
 | audio | `~/model/(?<model_name>[^/]+)/invoke` | `llm/v1/chat` | `text/generation` |
-| video | `/videos` (not the native invoke endpoint above) | `video/v1/videos/generations` | `video/generation` |
+| video | base path itself (not the native invoke endpoint above, no `/videos` suffix either) | `video/v1/videos/generations` | `video/generation` |
 | rerank | `~/model/(?<model_name>[^/]+)/rerank` | `llm/v1/chat` | `text/generation` |
 | batch | `~/model/(?<model_name>[^/]+)/async-invoke`, `/model-invocations` | `llm/v1/batches` | `text/generation` |
 | files | — | - | - |
@@ -176,7 +176,7 @@ Below is a mapping of supported Capabilities to LLM Formats.
 | embeddings | `~/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/google/models/(?<model_name>[^:/]+):(?:embedContent\|batchEmbedContents)` | `llm/v1/embeddings` | `text/embeddings` |
 | image | `~/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/google/models/(?<model_name>[^:/]+):predictLongRunning` | `image/v1/images/generations` | `image/generation` |
 | audio | — | - | - |
-| video | `/videos` (not the predictLongRunning path above) | `video/v1/videos/generations` | `video/generation` |
+| video | base path itself (not the predictLongRunning path above, no `/videos` suffix either) | `video/v1/videos/generations` | `video/generation` |
 | rerank | `~/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/rankingConfigs/(?<ranking_config>[^:/]+):rank` | `llm/v1/chat` | `text/generation` |
 | batch | `~/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/batchPredictionJobs` | `llm/v1/batches` | `text/generation` |
 | files | — | - | - |

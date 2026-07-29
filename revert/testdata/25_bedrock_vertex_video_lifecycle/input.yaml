@@ -5,20 +5,20 @@ services:
     routes:
       - name: bedrock-videos
         paths:
-          - /ai-bedrock/videos
+          - /ai-bedrock
         methods:
           - POST
         strip_path: false
       - name: vertex-videos
         paths:
-          - /ai-vertex/videos
+          - /ai-vertex
         methods:
           - POST
         strip_path: false
       - name: bedrock-videos-lifecycle
         paths:
-          - /ai-bedrock/videos
-          - ~/ai-bedrock/videos/.+
+          - /ai-bedrock
+          - ~/ai-bedrock/.+
         methods:
           - GET
           - DELETE
@@ -27,8 +27,8 @@ services:
           - aigw:video-lifecycle
       - name: vertex-videos-lifecycle
         paths:
-          - /ai-vertex/videos
-          - ~/ai-vertex/videos/.+
+          - /ai-vertex
+          - ~/ai-vertex/.+
         methods:
           - GET
           - DELETE
