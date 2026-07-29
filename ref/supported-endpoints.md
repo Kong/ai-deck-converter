@@ -118,6 +118,7 @@ Below is a mapping of supported Capabilities to LLM Formats.
 - `generate` (converse): Standardized chat format. Primary generate endpoints.
 - `generate` (invoke): Native provider format. Used for text generation when converse isn't suitable or provider-specific params are needed.
 - `agentic`: Server-side RAG: retrieves from Knowledge Bases, then generates. Orchestration is opaque to the caller.
+- `video`: Not the native invoke endpoint — same provider-agnostic openai video contract as the OpenAI section (create/query/download by opaque job id), and `llm_format` is forced to `openai` regardless.
 
 | Capability | Supported Endpoint(s) | route_type | genai_category |
 |---|---|---|---|
@@ -128,7 +129,7 @@ Below is a mapping of supported Capabilities to LLM Formats.
 | embeddings | `~/model/(?<model_name>[^/]+)/invoke` | `llm/v1/embeddings` | `text/embeddings` |
 | image | `~/model/(?<model_name>[^/]+)/invoke` | `image/v1/images/generations` | `image/generation` |
 | audio | `~/model/(?<model_name>[^/]+)/invoke` | `llm/v1/chat` | `text/generation` |
-| video | `~/model/(?<model_name>[^/]+)/invoke` | `video/v1/videos/generations` | `video/generation` |
+| video | `/videos` (not the native invoke endpoint above) | `video/v1/videos/generations` | `video/generation` |
 | rerank | `~/model/(?<model_name>[^/]+)/rerank` | `llm/v1/chat` | `text/generation` |
 | batch | `~/model/(?<model_name>[^/]+)/async-invoke`, `/model-invocations` | `llm/v1/batches` | `text/generation` |
 | files | — | - | - |
@@ -162,7 +163,7 @@ Below is a mapping of supported Capabilities to LLM Formats.
 **Notes:**
 - `generate`: Same contract as Gemini but within the Vertex project/location namespace.
 - `image`: Async generation for Imagen and similar models. Long-running operation pattern (poll for completion).
-- `video`: Same async endpoint used for video generation models (e.g. Veo). Model ID determines modality.
+- `video`: Not the predictLongRunning operation path used by `image` above — Veo proxies through the same provider-agnostic openai video contract as the OpenAI section (create/query/download by opaque job id), and `llm_format` is forced to `openai` regardless.
 - `rerank`: Dedicated ranking endpoint. Separate resource path from model endpoints.
 - `batch`: Batch prediction job management. Submit, list, and poll batch inference jobs.
 - `files`: Not listed. Files are managed through GCS.
@@ -175,7 +176,7 @@ Below is a mapping of supported Capabilities to LLM Formats.
 | embeddings | `~/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/google/models/(?<model_name>[^:/]+):(?:embedContent\|batchEmbedContents)` | `llm/v1/embeddings` | `text/embeddings` |
 | image | `~/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/google/models/(?<model_name>[^:/]+):predictLongRunning` | `image/v1/images/generations` | `image/generation` |
 | audio | — | - | - |
-| video | `~/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/google/models/(?<model_name>[^:/]+):predictLongRunning` | `video/v1/videos/generations` | `video/generation` |
+| video | `/videos` (not the predictLongRunning path above) | `video/v1/videos/generations` | `video/generation` |
 | rerank | `~/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/rankingConfigs/(?<ranking_config>[^:/]+):rank` | `llm/v1/chat` | `text/generation` |
 | batch | `~/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/batchPredictionJobs` | `llm/v1/batches` | `text/generation` |
 | files | — | - | - |

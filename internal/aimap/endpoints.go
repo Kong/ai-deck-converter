@@ -164,6 +164,15 @@ func CapabilitiesFor(format, providerType string) []string {
 
 // EndpointTable maps section -> capability -> endpoint spec, derived from
 // ref/supported-endpoints.md and the reference kong.yaml examples.
+//
+// "video" is identical in every section: the async generate/query/download
+// lifecycle (create a job, poll it by an opaque id/ARN/operation name, fetch
+// the result) is proxied through one provider-agnostic openai-shaped contract
+// regardless of the backing provider (Sora, Veo, Nova Reel all share it), so
+// convert.convertModels always forces llm_format to "openai" for video
+// regardless of the model's declared format. The per-section duplicates exist
+// so introspection (CapabilitiesFor/EndpointSectionFor) still reports video as
+// a capability of bedrock/vertex models.
 var EndpointTable = map[string]map[string]EndpointSpec{
 	"openai": {
 		"generate":   {"chat", "/chat/completions", false, mPost, "llm/v1/chat", catTextGen, true, true},
@@ -219,9 +228,14 @@ var EndpointTable = map[string]map[string]EndpointSpec{
 			"invoke", "model/(?<model_name>[^/]+)/invoke(?:-with-response-stream)?",
 			true, mGetPost, "llm/v1/chat", catTextGen, false, true,
 		},
+		// video is not served through the native invoke endpoint above: it always
+		// proxies through the provider-agnostic openai video contract (see the
+		// doc comment on EndpointTable), so this entry mirrors "openai"'s exactly.
+		// It stays here (rather than only under "openai") so introspection
+		// (CapabilitiesFor/EndpointSectionFor) still reports video as a bedrock
+		// capability.
 		"video": {
-			"invoke", "model/(?<model_name>[^/]+)/invoke(?:-with-response-stream)?",
-			true, mGetPost, "video/v1/videos/generations", catVideo, false, true,
+			"videos", "/videos", false, mPost, "video/v1/videos/generations", catVideo, true, true,
 		},
 		"rerank": {
 			"rerank", "model/(?<model_name>[^/]+)/rerank",
@@ -263,11 +277,14 @@ var EndpointTable = map[string]map[string]EndpointSpec{
 				"(?<model_name>[^:/]+):predictLongRunning",
 			true, mGetPost, "image/v1/images/generations", catImage, false, true,
 		},
+		// video (Veo) is not served through the predictLongRunning operation path
+		// above: it always proxies through the provider-agnostic openai video
+		// contract (see the doc comment on EndpointTable), so this entry mirrors
+		// "openai"'s exactly. It stays here (rather than only under "openai") so
+		// introspection (CapabilitiesFor/EndpointSectionFor) still reports video
+		// as a Vertex-exclusive capability.
 		"video": {
-			"predict-long-running",
-			"v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/google/models/" +
-				"(?<model_name>[^:/]+):predictLongRunning",
-			true, mGetPost, "video/v1/videos/generations", catVideo, false, true,
+			"videos", "/videos", false, mPost, "video/v1/videos/generations", catVideo, true, true,
 		},
 		"rerank": {
 			"ranking",

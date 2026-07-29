@@ -51,12 +51,14 @@ type videoLifecycleTarget struct {
 	providerType string
 }
 
-// videoLifecycleCandidate owns an OpenAI-format video route. Its lifecycle
-// proxy is static (not model-scoped) but retains every creation target.
+// videoLifecycleCandidate owns a video creation route (openai, bedrock, or
+// vertex). Its lifecycle proxy is static (not model-scoped) but retains every
+// creation target.
 type videoLifecycleCandidate struct {
 	model   *aigw.Model
 	targets []videoLifecycleTarget
 	spec    aimap.EndpointSpec
+	section string // creation route's section, for the lifecycle route name
 }
 
 // convertModels groups all (model, target, capability) tuples into routes under
@@ -133,8 +135,15 @@ func (c *Converter) convertModels() error {
 				// The section is resolved per capability: gemini-format traffic
 				// served by Vertex renders as gemini for shared capabilities
 				// (generate/embeddings) but keeps the Vertex section for the
-				// Vertex-only image/video/rerank endpoints.
-				sec := aimap.EndpointSectionFor(llmFormat(m), providerType, capability)
+				// Vertex-only image/video/rerank endpoints. video is a special
+				// case: it always resolves by provider type alone, never by the
+				// model's declared format (see videoSection).
+				var sec string
+				if capability == "video" {
+					sec = videoSection(providerType)
+				} else {
+					sec = aimap.EndpointSectionFor(llmFormat(m), providerType, capability)
+				}
 				spec, ok := aimap.LookupEndpoint(sec, capability)
 				if !ok {
 					if err := c.warn(
@@ -198,7 +207,7 @@ func (c *Converter) convertModels() error {
 						routeName:         g.route.Name,
 						modelName:         modelName,
 						enabled:           disabledModelPluginEnabled(m.Enabled),
-						llmFormat:         llmFormat(m),
+						llmFormat:         videoLLMFormat(capability, llmFormat(m)),
 						genaiCategory:     spec.GenaiCategory,
 						balancer:          balancerConfig(m.Config.Balancer),
 						vectordb:          balancerExtra(m.Config.Balancer, "vectordb"),
@@ -306,7 +315,7 @@ func (c *Converter) convertModels() error {
 		}
 	}
 	for _, candidate := range lifecycleCandidates {
-		routeName := uniqueModelRouteName("openai-videos-lifecycle", usedRouteNames)
+		routeName := uniqueModelRouteName(candidate.section+"-"+candidate.spec.RouteLabel+"-lifecycle", usedRouteNames)
 		route := buildVideoLifecycleRoute(candidate.model.Config.Route, routeName, basePaths(candidate.model))
 		service.Routes = append(service.Routes, route)
 
@@ -330,7 +339,7 @@ func (c *Converter) convertModels() error {
 		pg := &proxyGroup{
 			routeName:         routeName,
 			enabled:           disabledModelPluginEnabled(candidate.model.Enabled),
-			llmFormat:         llmFormat(candidate.model),
+			llmFormat:         aimap.DefaultLLMFormat,
 			genaiCategory:     candidate.spec.GenaiCategory,
 			balancer:          balancerConfig(candidate.model.Config.Balancer),
 			vectordb:          balancerExtra(candidate.model.Config.Balancer, "vectordb"),
@@ -397,6 +406,14 @@ func (c *Converter) videoLifecycleCandidates() ([]videoLifecycleCandidate, error
 	var candidates []videoLifecycleCandidate
 	sharedRoutes := map[string][]string{}
 
+	// video is identical in every section (see the doc comment on
+	// aimap.EndpointTable), so the spec used to build every lifecycle route is
+	// the same regardless of which section the owning model resolves to.
+	spec, ok := aimap.LookupEndpoint(aimap.DefaultLLMFormat, "video")
+	if !ok {
+		return nil, nil
+	}
+
 	for i := range c.src.Models {
 		m := &c.src.Models[i]
 		if !slices.Contains(c.expandCapabilities(m), "video") {
@@ -408,15 +425,6 @@ func (c *Converter) videoLifecycleCandidates() ([]videoLifecycleCandidate, error
 			if err := c.warn(warning, m.Name); err != nil {
 				return nil, err
 			}
-			continue
-		}
-
-		section := aimap.SectionFor(llmFormat(m), "")
-		if section != "openai" {
-			continue
-		}
-		spec, ok := aimap.LookupEndpoint(section, "video")
-		if !ok {
 			continue
 		}
 		if len(m.TargetModels) > 1 {
@@ -438,6 +446,10 @@ func (c *Converter) videoLifecycleCandidates() ([]videoLifecycleCandidate, error
 				target: tm, provider: provider, providerType: providerType,
 			})
 		}
+		// Matches the section the creation route resolves to (videoSection in
+		// the main loop above), so the lifecycle route name pairs with it (e.g.
+		// "bedrock-videos" + "bedrock-videos-lifecycle").
+		section := videoSection(lifecycleTargets[0].providerType)
 
 		routeConfig := m.Config.Route
 		routeConfig.Name = ""
@@ -449,7 +461,7 @@ func (c *Converter) videoLifecycleCandidates() ([]videoLifecycleCandidate, error
 		key = section + "|" + key
 		sharedRoutes[key] = append(sharedRoutes[key], m.Name)
 		candidates = append(candidates, videoLifecycleCandidate{
-			model: m, targets: lifecycleTargets, spec: spec,
+			model: m, targets: lifecycleTargets, spec: spec, section: section,
 		})
 	}
 
@@ -688,6 +700,46 @@ func llmFormat(m *aigw.Model) string {
 		return aimap.NormalizeFormat(m.Formats[0].Type)
 	}
 	return aimap.DefaultLLMFormat
+}
+
+// videoLLMFormat forces llm_format to openai for the video capability
+// regardless of the model's declared format or backing provider: video always
+// proxies through the provider-agnostic openai video contract (see the doc
+// comment on aimap.EndpointTable).
+func videoLLMFormat(capability, format string) string {
+	if capability == "video" {
+		return aimap.DefaultLLMFormat
+	}
+	return format
+}
+
+// videoSection resolves the section that names and groups a model's video
+// route, from the target's provider type alone — never from the model's
+// declared format, unlike every other capability. Forcing llm_format to
+// openai on the way out (videoLLMFormat) makes a reverted video model's
+// format come back as "openai" regardless of what backs it; naming the route
+// from format would then rename it on re-conversion (e.g. "bedrock-videos" ->
+// "openai-videos") and break round trips. Provider type is round-trip-stable
+// instead: it comes from the target's own model.provider enum, which forward
+// conversion never touches.
+//
+// "gemini" is folded in with "vertex": the ai-proxy-advanced provider enum
+// collapses vertex targets to "gemini" (aimap.PluginProvider), and the route
+// path a reverted video target carries no longer distinguishes them (unlike
+// generate/embeddings, video has no /projects/.../locations/... segment to
+// detect vertex from — see revert.detectProviderType), so a reverted video
+// target always reports "gemini" even when it was originally Vertex-backed.
+// That's safe here because plain Gemini has no video capability at all (see
+// ref/supported-endpoints.md): a "gemini" video target is always Vertex.
+func videoSection(providerType string) string {
+	switch providerType {
+	case "bedrock":
+		return providerType
+	case "vertex", "gemini":
+		return "vertex"
+	default:
+		return aimap.DefaultLLMFormat
+	}
 }
 
 func bodySizeOrDefault(m *aigw.Model) int {
