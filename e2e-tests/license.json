@@ -1,0 +1,17 @@
+{
+  "license": {
+    "payload": {
+      "admin_seats": "5",
+      "customer": "automation",
+      "dataplanes": "100",
+      "license_creation_date": "2026-07-24",
+      "license_expiration_date": "2026-08-20",
+      "license_key": "<SECRET>",
+      "model_hours": "9999",
+      "product_subscription": "Konnect Enterprise",
+      "support_plan": "None"
+    },
+    "signature": "<SECRET>",
+    "version": "1"
+  }
+}
