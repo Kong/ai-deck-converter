@@ -31,7 +31,7 @@ plugins:
             log_payloads: false
             log_statistics: true
           model:
-            model_alias: '@openai/gpt-5.2'
+            model_alias: gpt-5-2
             name: gpt-5.2
             provider: openai
           route_type: llm/v1/chat
@@ -52,7 +52,7 @@ plugins:
             log_payloads: false
             log_statistics: true
           model:
-            model_alias: '@openai/gpt-5.2-mini'
+            model_alias: gpt-5-2-mini
             name: gpt-5.2-mini
             provider: openai
           route_type: llm/v1/chat
@@ -60,6 +60,4 @@ plugins:
     model: gpt-5-2-mini
 ai_models:
   - name: gpt-5-2
-    alias: '@openai/gpt-5.2'
   - name: gpt-5-2-mini
-    alias: '@openai/gpt-5.2-mini'

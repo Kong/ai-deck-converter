@@ -3,7 +3,7 @@ services:
   - name: ai-gateway
     url: http://ai-gateway.upstream.local
     routes:
-      - name: bedrock-converse
+      - name: sagemaker-converse
         paths:
           - ~/ai/model/(?<model_name>[^/]+)/converse(?:-stream)?
         methods:
@@ -11,33 +11,41 @@ services:
           - POST
         strip_path: false
 plugins:
+  - name: ai-model-selector
+    config:
+      path_pattern: '@sagemaker/claude-3-5-sonnet'
+      source: path
+    route: sagemaker-converse
   - name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
       genai_category: text/generation
-      llm_format: bedrock
+      llm_format: sagemaker
       targets:
         - auth:
             aws_access_key_id: '{vault://env/aws-key-id}'
             aws_secret_access_key: '{vault://env/aws-secret}'
+            aws_session_token: '{vault://env/aws-session-token}'
           description: anthropic.claude-3-5-sonnet
           logging:
             log_payloads: false
             log_statistics: true
           model:
-            model_alias: claude-bedrock
+            model_alias: '@sagemaker/claude-3-5-sonnet'
             name: anthropic.claude-3-5-sonnet
             options:
-              anthropic_version: bedrock-2023-05-31
-              bedrock:
-                aws_assume_role_arn: arn:aws:iam::123:role/bedrock
+              sagemaker:
+                aws_assume_role_arn: arn:aws:iam::123:role/sagemaker
                 aws_region: us-east-1
                 aws_role_session_name: kong-session
-              max_tokens: 1024
-            provider: bedrock
+                aws_sts_endpoint_url: sts.example.test
+                target_container_hostname: container-1
+                target_model: model-1
+                target_variant: variant-1
+            provider: sagemaker
           route_type: llm/v1/chat
-    route: bedrock-converse
-    model: claude-bedrock
+    route: sagemaker-converse
+    model: claude-sagemaker
 ai_models:
-  - name: claude-bedrock
+  - name: '@sagemaker/claude-3-5-sonnet'

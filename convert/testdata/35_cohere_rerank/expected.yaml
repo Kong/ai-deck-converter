@@ -44,4 +44,3 @@ plugins:
     model: cohere
 ai_models:
   - name: cohere
-    alias: cohere

@@ -13,8 +13,9 @@ models:
     config:
       route:
         model:
-          path_aliases:
-            - '@openai/gpt-5.2'
+          body:
+            model:
+              - '@openai/gpt-5.2'
       logging:
         payloads: false
         statistics: true
@@ -32,8 +33,9 @@ models:
     config:
       route:
         model:
-          path_aliases:
-            - '@openai/gpt-5.2-mini'
+          body:
+            model:
+              - '@openai/gpt-5.2-mini'
       logging:
         payloads: false
         statistics: true

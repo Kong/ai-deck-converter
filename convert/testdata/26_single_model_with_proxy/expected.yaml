@@ -40,7 +40,7 @@ plugins:
             log_payloads: false
             log_statistics: true
           model:
-            model_alias: '@openai/gpt-5.2'
+            model_alias: gpt-5-2
             name: gpt-5.2
             options:
               max_tokens: 1024
@@ -51,4 +51,3 @@ plugins:
     model: gpt-5-2
 ai_models:
   - name: gpt-5-2
-    alias: '@openai/gpt-5.2'

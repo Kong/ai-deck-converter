@@ -13,7 +13,7 @@ models:
     capabilities: [rerank]
     formats: [{type: cohere}]
     config:
-      route: {paths: [/cohere], model: {path_aliases: [cohere]}}
+      route: {paths: [/cohere]}
     targets:
       - name: command-a-plus-05-2026
         provider: cohere-prod

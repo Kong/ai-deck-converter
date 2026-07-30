@@ -40,7 +40,7 @@ plugins:
             log_payloads: false
             log_statistics: true
           model:
-            model_alias: '@openai/gpt-5.4'
+            model_alias: openai-gpt-5-4
             name: gpt-5.4
             provider: openai
           route_type: llm/v1/chat
@@ -53,4 +53,3 @@ plugins:
     route: openai-chat
 ai_models:
   - name: openai-gpt-5-4
-    alias: '@openai/gpt-5.4'

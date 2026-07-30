@@ -45,9 +45,12 @@ func (r *Reverter) buildIndexes() {
 	}
 	for _, m := range r.src.AIModels {
 		r.aiModelByName[m.Name] = m
-		if m.Alias != "" {
-			r.aiModelByAlias[m.Alias] = m.Name
-		}
+		// The alias a target's model_alias references is the entry's explicit
+		// alias when set, otherwise the entry name itself: AI Gateway 2.0
+		// stores the alias as the ai-models name and leaves alias unset (see
+		// convert.convertModels). Index both conventions by that effective
+		// alias so target lookups resolve to the model name either way.
+		r.aiModelByAlias[aiModelAlias(m)] = m.Name
 	}
 }
 

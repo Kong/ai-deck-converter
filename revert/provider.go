@@ -50,6 +50,7 @@ func defoldAuth(auth map[string]any) (aigw.ProviderAuth, *bool) {
 	}
 	a.AccessKeyID = getStr(auth, "aws_access_key_id")
 	a.SecretAccessKey = getStr(auth, "aws_secret_access_key")
+	a.SessionToken = getStr(auth, "aws_session_token")
 	a.ClientID = getStr(auth, "azure_client_id")
 	a.ClientSecret = getStr(auth, "azure_client_secret")
 	a.TenantID = getStr(auth, "azure_tenant_id")
@@ -117,6 +118,26 @@ func defoldOptions(options map[string]any, providerType string, d *defoldedTarge
 				case aimap.BedrockOptionKeys[bk]:
 					// Target-level option (batch_role_arn, ...).
 					out[bk] = bv
+				default:
+					out[bk] = bv
+				}
+			}
+		case providerType == "sagemaker" && k == "sagemaker":
+			block, _ := v.(map[string]any)
+			getOrCreate := func(key string) map[string]any {
+				sub, _ := out[key].(map[string]any)
+				if sub == nil {
+					sub = map[string]any{}
+					out[key] = sub
+				}
+				return sub
+			}
+			for bk, bv := range block {
+				switch {
+				case strings.HasPrefix(bk, "aws_"):
+					getOrCreate("aws")[strings.TrimPrefix(bk, "aws_")] = bv
+				case strings.HasPrefix(bk, "target_"):
+					getOrCreate("target")[strings.TrimPrefix(bk, "target_")] = bv
 				default:
 					out[bk] = bv
 				}

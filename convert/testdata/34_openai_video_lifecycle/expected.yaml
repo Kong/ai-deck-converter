@@ -69,4 +69,3 @@ plugins:
     route: openai-videos-lifecycle
 ai_models:
   - name: sora
-    alias: sora

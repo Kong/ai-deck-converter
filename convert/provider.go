@@ -67,6 +67,10 @@ func resolveAuth(p *aigw.Provider, allowOverride *bool) map[string]any {
 		if a.OAuthTokenURL != "" {
 			auth["gcp_oauth_token_url"] = a.OAuthTokenURL
 		}
+		// sagemaker
+		if a.SessionToken != "" {
+			auth["aws_session_token"] = a.SessionToken
+		}
 	}
 	if allowOverride != nil {
 		auth["allow_override"] = *allowOverride
@@ -199,6 +203,14 @@ func mapOptions(opts map[string]any, providerType, modelName string, provider *a
 		}
 		nested[prov][key] = val
 	}
+	appendNested := func(prov, key string, val any) {
+		if nested[prov] == nil {
+			nested[prov] = map[string]any{}
+		}
+		for k, v := range val.(map[string]any) {
+			nested[prov][key+"_"+k] = v
+		}
+	}
 
 	for k, v := range opts {
 		switch {
@@ -239,6 +251,8 @@ func mapOptions(opts map[string]any, providerType, modelName string, provider *a
 			addNested("huggingface", k, v)
 		case providerType == "databricks" && k == "workspace_instance_id":
 			addNested("databricks", k, v)
+		case providerType == "sagemaker":
+			appendNested("sagemaker", k, v)
 		default:
 			out[k] = v
 		}

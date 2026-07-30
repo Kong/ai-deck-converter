@@ -16,7 +16,7 @@ models:
     capabilities: [generate]
     formats: [{type: openai}]
     config:
-      route: {paths: [/ai/a], model: {path_aliases: ["@openai/gpt-5.2-a"]}}
+      route: {paths: [/ai/a]}
     targets:
       - name: gpt-5.2-a
         provider: openai-prod
@@ -30,7 +30,7 @@ models:
     capabilities: [generate]
     formats: [{type: openai}]
     config:
-      route: {paths: [/ai/b], model: {path_aliases: ["@openai/gpt-5.2-b"]}}
+      route: {paths: [/ai/b]}
     targets:
       - name: gpt-5.2-b
         provider: openai-prod

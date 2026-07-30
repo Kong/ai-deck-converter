@@ -17,8 +17,9 @@ models:
         paths:
           - /ai-bedrock
         model:
-          path_aliases:
-            - '@bedrock/nova-reel'
+          body:
+            model:
+              - '@bedrock/nova-reel'
       logging:
         payloads: false
         statistics: true
@@ -41,8 +42,9 @@ models:
         paths:
           - /ai-vertex
         model:
-          path_aliases:
-            - '@vertex/veo'
+          body:
+            model:
+              - '@vertex/veo'
       logging:
         payloads: false
         statistics: true
