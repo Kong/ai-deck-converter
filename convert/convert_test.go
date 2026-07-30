@@ -701,9 +701,11 @@ model_providers:
 	model, ok := target["model"].(map[string]any)
 	require.True(t, ok, "expected ai-proxy-advanced model")
 	require.Equal(t, "files", model["name"])
-	modelAlias, ok := model["model_alias"]
-	require.True(t, ok, "expected ai-proxy-advanced model_alias")
-	require.Equal(t, "files-api", modelAlias)
+	// type:api (files/batches) requests carry no body model, so the target must
+	// stay alias-less to remain in the balancer's "<default>" pool the request
+	// falls back to; an alias would strand it (500 "failed to get balancer instance").
+	_, hasModelAlias := model["model_alias"]
+	require.False(t, hasModelAlias, "type:api target must be alias-less")
 }
 
 func TestConvertStrictFailsUnknownProvider(t *testing.T) {
