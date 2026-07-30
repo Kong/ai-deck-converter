@@ -5,14 +5,14 @@ services:
     routes:
       - name: openai-videos
         paths:
-          - /ai/videos
+          - /ai
         methods:
           - POST
         strip_path: false
       - name: openai-videos-lifecycle
         paths:
-          - /ai/videos
-          - ~/ai/videos/.+
+          - /ai
+          - ~/ai/.+
         methods:
           - GET
           - DELETE

@@ -1,0 +1,44 @@
+# Nova Reel (bedrock) and Veo (vertex) video models each get the same
+# openai-shaped creation + lifecycle route pair as Sora in
+# 34_openai_video_lifecycle, since video always proxies through the
+# provider-agnostic openai video contract regardless of the model's declared
+# format or backing provider.
+model_providers:
+  - name: bedrock-prod
+    type: bedrock
+    config:
+      auth:
+        type: aws
+        access_key_id: "{vault://ai/aws-access-key-id}"
+        secret_access_key: "{vault://ai/aws-secret-access-key}"
+  - name: vertex-prod
+    type: vertex
+    config:
+      auth:
+        type: gcp
+        service_account_json: "{vault://ai/gcp-service-account-json}"
+models:
+  - type: model
+    name: nova-reel-video
+    capabilities: [video]
+    formats: [{type: bedrock}]
+    config:
+      route: {paths: [/ai-bedrock], model: {path_aliases: ["@bedrock/nova-reel"]}}
+    targets:
+      - name: amazon.nova-reel-v1:1
+        provider: bedrock-prod
+        config: {type: bedrock, region: us-east-1, video_output_s3_uri: "s3://kong/nova-reel/"}
+  - type: model
+    name: veo-video
+    capabilities: [video]
+    formats: [{type: vertex}]
+    config:
+      route: {paths: [/ai-vertex], model: {path_aliases: ["@vertex/veo"]}}
+    targets:
+      - name: veo-3.1-generate-001
+        provider: vertex-prod
+        config:
+          type: vertex
+          gcp_environment:
+            location_id: us-central1
+            project_id: gcp-sdet-test

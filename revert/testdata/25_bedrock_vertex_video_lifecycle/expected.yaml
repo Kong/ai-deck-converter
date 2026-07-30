@@ -1,0 +1,64 @@
+models:
+  - type: model
+    name: nova-reel-video
+    capabilities:
+      - video
+    formats:
+      - type: openai
+    targets:
+      - name: amazon.nova-reel-v1:1
+        provider: bedrock-ai
+        config:
+          region: us-east-1
+          type: bedrock
+          video_output_s3_uri: s3://kong/nova-reel/
+    config:
+      route:
+        paths:
+          - /ai-bedrock
+        model:
+          body:
+            model:
+              - '@bedrock/nova-reel'
+      logging:
+        payloads: false
+        statistics: true
+  - type: model
+    name: veo-video
+    capabilities:
+      - video
+    formats:
+      - type: openai
+    targets:
+      - name: veo-3.1-generate-001
+        provider: gemini-ai
+        config:
+          gcp_environment:
+            location_id: us-central1
+            project_id: gcp-sdet-test
+          type: gemini
+    config:
+      route:
+        paths:
+          - /ai-vertex
+        model:
+          body:
+            model:
+              - '@vertex/veo'
+      logging:
+        payloads: false
+        statistics: true
+model_providers:
+  - type: bedrock
+    name: bedrock-ai
+    config:
+      auth:
+        type: aws
+        access_key_id: '{vault://ai/aws-access-key-id}'
+        secret_access_key: '{vault://ai/aws-secret-access-key}'
+  - type: gemini
+    name: gemini-ai
+    config:
+      auth:
+        type: gcp
+        service_account_json: '{vault://ai/gcp-service-account-json}'

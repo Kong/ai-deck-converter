@@ -1,0 +1,149 @@
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: bedrock-videos
+        paths:
+          - /ai-bedrock
+        methods:
+          - POST
+        strip_path: false
+      - name: vertex-videos
+        paths:
+          - /ai-vertex
+        methods:
+          - POST
+        strip_path: false
+      - name: bedrock-videos-lifecycle
+        paths:
+          - /ai-bedrock
+          - ~/ai-bedrock/.+
+        methods:
+          - GET
+          - DELETE
+        strip_path: false
+        tags:
+          - aigw:video-lifecycle
+      - name: vertex-videos-lifecycle
+        paths:
+          - /ai-vertex
+          - ~/ai-vertex/.+
+        methods:
+          - GET
+          - DELETE
+        strip_path: false
+        tags:
+          - aigw:video-lifecycle
+plugins:
+  - name: ai-model-selector
+    config:
+      path_pattern: '@bedrock/nova-reel'
+      source: path
+    route: bedrock-videos
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: video/generation
+      llm_format: openai
+      targets:
+        - auth:
+            aws_access_key_id: '{vault://ai/aws-access-key-id}'
+            aws_secret_access_key: '{vault://ai/aws-secret-access-key}'
+          description: amazon.nova-reel-v1:1
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: '@bedrock/nova-reel'
+            name: amazon.nova-reel-v1:1
+            options:
+              bedrock:
+                aws_region: us-east-1
+                video_output_s3_uri: s3://kong/nova-reel/
+            provider: bedrock
+          route_type: video/v1/videos/generations
+    route: bedrock-videos
+    model: nova-reel-video
+  - name: ai-model-selector
+    config:
+      path_pattern: '@vertex/veo'
+      source: path
+    route: vertex-videos
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: video/generation
+      llm_format: openai
+      targets:
+        - auth:
+            gcp_service_account_json: '{vault://ai/gcp-service-account-json}'
+            gcp_use_service_account: true
+          description: veo-3.1-generate-001
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: '@vertex/veo'
+            name: veo-3.1-generate-001
+            options:
+              gemini:
+                location_id: us-central1
+                project_id: gcp-sdet-test
+            provider: gemini
+          route_type: video/v1/videos/generations
+    route: vertex-videos
+    model: veo-video
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: video/generation
+      llm_format: openai
+      model_name_header: false
+      targets:
+        - auth:
+            aws_access_key_id: '{vault://ai/aws-access-key-id}'
+            aws_secret_access_key: '{vault://ai/aws-secret-access-key}'
+          description: amazon.nova-reel-v1:1
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: amazon.nova-reel-v1:1
+            options:
+              bedrock:
+                aws_region: us-east-1
+                video_output_s3_uri: s3://kong/nova-reel/
+            provider: bedrock
+          route_type: video/v1/videos/generations
+    route: bedrock-videos-lifecycle
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: video/generation
+      llm_format: openai
+      model_name_header: false
+      targets:
+        - auth:
+            gcp_service_account_json: '{vault://ai/gcp-service-account-json}'
+            gcp_use_service_account: true
+          description: veo-3.1-generate-001
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: veo-3.1-generate-001
+            options:
+              gemini:
+                location_id: us-central1
+                project_id: gcp-sdet-test
+            provider: gemini
+          route_type: video/v1/videos/generations
+    route: vertex-videos-lifecycle
+ai_models:
+  - name: '@bedrock/nova-reel'
+  - name: '@vertex/veo'
