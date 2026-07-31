@@ -1,0 +1,28 @@
+_format_version: "3.0"
+services:
+  - name: protected-agent
+    url: https://agent.internal/api
+    routes:
+      - name: protected-agent-route
+        paths:
+          - /protected-agent
+        plugins:
+          - name: acl
+            config:
+              allow:
+                - allowed-group
+              include_consumer_groups: true
+          - name: key-auth
+            config:
+              anonymous: anonymous
+              key_names:
+                - apikey
+consumers:
+  - username: anonymous
+    custom_id: anonymous
+    plugins:
+      - name: request-termination
+        enabled: true
+        config:
+          message: Unauthorized
+          status_code: 401

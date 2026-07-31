@@ -827,6 +827,44 @@ agents:
 	require.Nil(t, byName["on-agent"], "enabled agent should not emit the flag")
 }
 
+func TestConvertAgentIdentityProvidersBecomeRoutePlugins(t *testing.T) {
+	src := []byte(`
+identity_providers:
+  - name: agent-key-auth
+    type: key-auth
+    config:
+      key_names: [apikey]
+agents:
+  - type: http
+    name: protected-agent
+    access:
+      acls: {allow: [allowed-group]}
+      identity_providers: [agent-key-auth]
+    config:
+      url: https://example.test
+      route: {paths: [/protected-agent]}
+`)
+
+	out, _, err := Convert(src, Options{OutputMode: "db-less"})
+	require.NoError(t, err)
+
+	var got struct {
+		Plugins []struct {
+			Name   string         `yaml:"name"`
+			Config map[string]any `yaml:"config"`
+		} `yaml:"plugins"`
+	}
+	require.NoError(t, yaml.Unmarshal(out, &got))
+	pluginsByName := make(map[string]map[string]any, len(got.Plugins))
+	for _, plugin := range got.Plugins {
+		pluginsByName[plugin.Name] = plugin.Config
+	}
+	require.Contains(t, pluginsByName, "acl")
+	require.Contains(t, pluginsByName, "key-auth")
+	require.Equal(t, "anonymous", pluginsByName["key-auth"]["anonymous"])
+	require.Contains(t, pluginsByName, "request-termination")
+}
+
 func TestConvertDisabledMCPServerDisablesService(t *testing.T) {
 	src := []byte(`
 mcp_servers:
