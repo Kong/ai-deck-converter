@@ -29,6 +29,18 @@ func (c *Converter) convertMCPServers() error {
 		}
 		route.Plugins = append(route.Plugins, guard...)
 
+		// upstream-server's tools (manually declared and/or fetched from its own upstream_url) are only
+		// ever surfaced through a listener-mode MCP server whose config.server.tag matches a Kong tag
+		// derived from this server's labels (ai-mcp-proxy tools.lua: tag-bucketing in
+		// merge_all_remote_tools, then get_tools_list's listener-only lookup). With no labels at all,
+		// this entry can never be tagged, so no listener can ever discover or call its tools — the
+		// server loads and deploys cleanly but is permanently unreachable by any client.
+		if m.Type == "upstream-server" && len(m.Labels) == 0 {
+			if err := c.warn("MCP server %q is upstream-server but has no labels; without a matching tag on a listener-mode MCP server, its tools can never be discovered or called", m.Name); err != nil {
+				return err
+			}
+		}
+
 		service := kong.Service{
 			Name:   m.Name,
 			Routes: []kong.Route{route},
