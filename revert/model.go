@@ -258,6 +258,7 @@ func (r *Reverter) modelGroupFor(
 	if len(bases) > 1 || (len(bases) == 1 && bases[0] != aimap.DefaultBasePath) {
 		g.model.Config.Route.Paths = bases
 	}
+	g.model.Config.Route.Protocols = rt.Protocols
 	acc.groups[key] = g
 	acc.order = append(acc.order, key)
 	return g, nil

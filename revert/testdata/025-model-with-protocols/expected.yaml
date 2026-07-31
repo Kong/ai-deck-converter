@@ -15,8 +15,8 @@ models:
     config:
       route:
         protocols:
-        - http
-        - https
+          - http
+          - https
         model:
           body:
             model:
