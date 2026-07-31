@@ -14,14 +14,14 @@ import (
 // Routes are grouped by (section, RouteLabel); specs sharing a label collapse to
 // one route whose ai-proxy-advanced plugin carries one target per capability/model.
 type EndpointSpec struct {
-	RouteLabel            string   // route name suffix, e.g. "chat", "invoke"
-	PathSuffix            string   // appended after the base path (regex body when IsRegex)
-	IsRegex               bool     // emit a Kong regex route ("~" prefix)
-	Methods               []string // route methods
-	RouteType             string   // ai-proxy-advanced target route_type
-	GenaiCategory         string   // ai-proxy-advanced config.genai_category
-	TakesBodyModel        bool     // whether requests carry a body `model` field (ai-model-selector)
-	SupportsLogStatistics bool     // whether the endpoint supports log statistics
+	RouteLabel                 string          // route name suffix, e.g. "chat", "invoke"
+	PathSuffix                 string          // appended after the base path (regex body when IsRegex)
+	IsRegex                    bool            // emit a Kong regex route ("~" prefix)
+	Methods                    []string        // route methods
+	RouteType                  string          // ai-proxy-advanced target route_type
+	GenaiCategory              string          // ai-proxy-advanced config.genai_category
+	DefaultModelSelectorConfig *map[string]any // optional default configuration for the ai-model-selector plugin
+	SupportsLogStatistics      bool            // whether the endpoint supports log statistics
 }
 
 const (
@@ -162,135 +162,164 @@ func CapabilitiesFor(format, providerType string) []string {
 	return append(out, rest...)
 }
 
+var defaultBodyModelSelectorConfig = map[string]any{
+	"source":    "body",
+	"body_path": "model",
+}
+
+const DefaultPathPattern = "models/([%w%.%-]+):"
+
+var defaultPathModelSelectorConfig = map[string]any{
+	"source":       "path",
+	"path_pattern": DefaultPathPattern,
+}
+
 // EndpointTable maps section -> capability -> endpoint spec, derived from
 // ref/supported-endpoints.md and the reference kong.yaml examples.
 var EndpointTable = map[string]map[string]EndpointSpec{
 	"openai": {
-		"generate":   {"chat", "/chat/completions", false, mPost, "llm/v1/chat", catTextGen, true, true},
-		"agentic":    {"responses", "/responses", false, mPost, "llm/v1/responses", catTextGen, true, true},
-		"realtime":   {"realtime", "/realtime", false, mGetPost, "realtime/v1/realtime", catRealtime, true, true},
-		"embeddings": {"embeddings", "/embeddings", false, mPost, "llm/v1/embeddings", catEmbeddings, true, true},
+		"generate": {
+			"chat", "/chat/completions", false, mPost, "llm/v1/chat", catTextGen,
+			&defaultBodyModelSelectorConfig, true,
+		},
+		"agentic": {
+			"responses", "/responses", false, mPost, "llm/v1/responses", catTextGen,
+			&defaultBodyModelSelectorConfig, true,
+		},
+		"realtime": {
+			"realtime", "/realtime", false, mGetPost, "realtime/v1/realtime", catRealtime,
+			&defaultBodyModelSelectorConfig, true,
+		},
+		"embeddings": {
+			"embeddings", "/embeddings", false, mPost, "llm/v1/embeddings", catEmbeddings,
+			&defaultBodyModelSelectorConfig, true,
+		},
 		"image": {
-			"images", "/images/generations", false, mPost, "image/v1/images/generations", catImage, true, true,
+			"images", "/images/generations", false, mPost, "image/v1/images/generations", catImage,
+			&defaultBodyModelSelectorConfig, true,
 		},
 		"audio/speech": {
-			"audio-speech", "/audio/speech", false, mPost, "audio/v1/audio/speech", catSpeech, true, false,
+			"audio-speech", "/audio/speech", false, mPost, "audio/v1/audio/speech", catSpeech,
+			&defaultBodyModelSelectorConfig, false,
 		},
 		"audio/transcription": {
 			"audio-transcribe", "/audio/transcriptions", false, mPost, "audio/v1/audio/transcriptions",
-			catTranscript, true, false,
+			catTranscript, &defaultBodyModelSelectorConfig, false,
 		},
 		"audio/translation": {
 			"audio-translate", "/audio/translations", false, mPost, "audio/v1/audio/translations",
-			catTranscript, true, false,
+			catTranscript, &defaultBodyModelSelectorConfig, false,
 		},
 		"video": {
-			"videos", "/videos", false, mPost, "video/v1/videos/generations", catVideo, true, true,
+			"videos", "/videos", false, mPost, "video/v1/videos/generations", catVideo, &defaultBodyModelSelectorConfig, true,
 		},
-		"batches": {"batches", "/batches", false, mGetPost, "llm/v1/batches", catTextGen, false, false},
+		"batches": {"batches", "/batches", false, mGetPost, "llm/v1/batches", catTextGen, nil, false},
 		"files": {
-			"files", "/files", false, []string{"GET", "POST", "DELETE"}, "llm/v1/files", catTextGen, false, true,
+			"files", "/files", false, []string{"GET", "POST", "DELETE"}, "llm/v1/files", catTextGen, nil, true,
 		},
 	},
 	"anthropic": {
-		"generate": {"messages", "/v1/messages", false, mPost, "llm/v1/chat", catTextGen, true, true},
+		"generate": {
+			"messages", "/v1/messages", false, mPost, "llm/v1/chat", catTextGen,
+			&defaultBodyModelSelectorConfig, true,
+		},
 		"batches": {
-			"batches", "/v1/messages/batches", false, mGetPost, "llm/v1/batches", catTextGen, false, false,
+			"batches", "/v1/messages/batches", false, mGetPost, "llm/v1/batches", catTextGen, nil, false,
 		},
 	},
 	"bedrock": {
 		"generate": {
 			"converse", "model/(?<model_name>[^/]+)/converse(?:-stream)?",
-			true, mGetPost, "llm/v1/chat", catTextGen, false, true,
+			true, mGetPost, "llm/v1/chat", catTextGen, nil, true,
 		},
 		"agentic": {
 			"retrieve", "model/(?<model_name>[^/]+)/retrieveAndGenerate(?:Stream)?",
-			true, mGetPost, "llm/v1/chat", catTextGen, false, true,
+			true, mGetPost, "llm/v1/chat", catTextGen, nil, true,
 		},
 		"embeddings": {
 			"invoke", "model/(?<model_name>[^/]+)/invoke(?:-with-response-stream)?",
-			true, mGetPost, "llm/v1/embeddings", catEmbeddings, false, true,
+			true, mGetPost, "llm/v1/embeddings", catEmbeddings, nil, true,
 		},
 		"image": {
 			"invoke", "model/(?<model_name>[^/]+)/invoke(?:-with-response-stream)?",
-			true, mGetPost, "image/v1/images/generations", catImage, false, false,
+			true, mGetPost, "image/v1/images/generations", catImage, nil, false,
 		},
 		"audio/speech": {
 			"invoke", "model/(?<model_name>[^/]+)/invoke(?:-with-response-stream)?",
-			true, mGetPost, "llm/v1/chat", catTextGen, false, true,
+			true, mGetPost, "llm/v1/chat", catTextGen, nil, true,
 		},
 		"video": {
 			"invoke", "model/(?<model_name>[^/]+)/invoke(?:-with-response-stream)?",
-			true, mGetPost, "video/v1/videos/generations", catVideo, false, true,
+			true, mGetPost, "video/v1/videos/generations", catVideo, nil, true,
 		},
 		"rerank": {
 			"rerank", "model/(?<model_name>[^/]+)/rerank",
-			true, mGetPost, "llm/v1/chat", catTextGen, false, true,
+			true, mGetPost, "llm/v1/chat", catTextGen, nil, true,
 		},
 		"batches": {
 			"batches", "model/(?<model_name>[^/]+)/async-invoke",
-			true, mGetPost, "llm/v1/batches", catTextGen, false, true,
+			true, mGetPost, "llm/v1/batches", catTextGen, nil, true,
 		},
 	},
 	"gemini": {
 		"generate": {
 			"generate", "v1beta/models/(?<model_name>[^:/]+):(?:generateContent|streamGenerateContent)",
-			true, mGetPost, "llm/v1/chat", catTextGen, true, true,
+			true, mGetPost, "llm/v1/chat", catTextGen, &defaultPathModelSelectorConfig, true,
 		},
 		"embeddings": {
 			"embeddings", "v1beta/models/(?<model_name>[^:/]+):(?:embedContent|batchEmbedContents)",
-			true, mGetPost, "llm/v1/embeddings", catEmbeddings, true, true,
+			true, mGetPost, "llm/v1/embeddings", catEmbeddings, &defaultPathModelSelectorConfig, true,
 		},
-		"batches": {"batches", "v1beta/batches", false, mGetPost, "llm/v1/batches", catTextGen, false, true},
-		"files":   {"files", "(?:upload/)?v1beta/files", true, mGetPost, "llm/v1/chat", catTextGen, false, true},
+		"batches": {"batches", "v1beta/batches", false, mGetPost, "llm/v1/batches", catTextGen, nil, true},
+		"files":   {"files", "(?:upload/)?v1beta/files", true, mGetPost, "llm/v1/chat", catTextGen, nil, true},
 	},
 	"vertex": {
 		"generate": {
 			"generate",
 			"v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/google/models/" +
 				"(?<model_name>[^:/]+):(?:generateContent|streamGenerateContent)",
-			true, mGetPost, "llm/v1/chat", catTextGen, true, true,
+			true, mGetPost, "llm/v1/chat", catTextGen, &defaultPathModelSelectorConfig, true,
 		},
 		"embeddings": {
 			"embeddings",
 			"v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/google/models/" +
 				"(?<model_name>[^:/]+):(?:embedContent|batchEmbedContents)",
-			true, mGetPost, "llm/v1/embeddings", catEmbeddings, true, true,
+			true, mGetPost, "llm/v1/embeddings", catEmbeddings, &defaultPathModelSelectorConfig, true,
 		},
 		"image": {
 			"predict-long-running",
 			"v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/google/models/" +
 				"(?<model_name>[^:/]+):predictLongRunning",
-			true, mGetPost, "image/v1/images/generations", catImage, false, true,
+			true, mGetPost, "image/v1/images/generations", catImage, nil, true,
 		},
 		"video": {
 			"predict-long-running",
 			"v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/google/models/" +
 				"(?<model_name>[^:/]+):predictLongRunning",
-			true, mGetPost, "video/v1/videos/generations", catVideo, false, true,
+			true, mGetPost, "video/v1/videos/generations", catVideo, nil, true,
 		},
 		"rerank": {
 			"ranking",
 			"v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/rankingConfigs/" +
 				"(?<ranking_config>[^:/]+):rank",
-			true, mGetPost, "llm/v1/chat", catTextGen, false, true,
+			true, mGetPost, "llm/v1/chat", catTextGen, nil, true,
 		},
 		"batches": {
 			"batches",
 			"v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/batchPredictionJobs",
-			true, mGetPost, "llm/v1/batches", catTextGen, false, true,
+			true, mGetPost, "llm/v1/batches", catTextGen, nil, true,
 		},
 	},
 	"cohere": {
-		"rerank": {"rerank", "/v2/rerank", false, mPost, "llm/v1/chat", catTextGen, true, true},
+		"rerank": {"rerank", "/v2/rerank", false, mPost, "llm/v1/chat", catTextGen, &defaultBodyModelSelectorConfig, true},
 	},
 	"huggingface": {
-		"generate": {"generate", "/generate", false, mPost, "llm/v1/chat", catTextGen, true, true},
+		"generate": {"generate", "/generate", false, mPost, "llm/v1/chat", catTextGen, &defaultBodyModelSelectorConfig, true},
 	},
 	"sagemaker": {
 		"generate": {
 			"converse", "model/(?<model_name>[^/]+)/converse(?:-stream)?",
-			true, mGetPost, "llm/v1/chat", catTextGen, false, true,
+			true, mGetPost, "llm/v1/chat", catTextGen, nil, true,
 		},
 	},
 }

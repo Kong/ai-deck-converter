@@ -290,6 +290,13 @@ func setAliasField(model *aigw.ModelAliasConfig, alias, name string, selector *k
 				model.Headers = map[string][]string{headerName: {alias}}
 				return
 			}
+		case "path":
+			if pattern := getStr(selector.Config, "path_pattern"); pattern != "" && pattern != aimap.DefaultPathPattern {
+				model.PathAliases = []string{alias}
+			} else if alias != name {
+				model.PathAliases = []string{alias}
+			}
+			return
 		}
 		model.PathAliases = []string{alias}
 		return
