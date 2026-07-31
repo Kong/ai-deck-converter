@@ -214,7 +214,7 @@ func (c *Converter) convertModels() error {
 						routeName:         g.route.Name,
 						modelName:         modelName,
 						enabled:           disabledModelPluginEnabled(m.Enabled),
-						llmFormat:         llmFormat(m),
+						llmFormat:         aimap.WireLLMFormat(llmFormat(m)),
 						genaiCategory:     spec.GenaiCategory,
 						balancer:          balancerConfig(m.Config.Balancer),
 						vectordb:          balancerExtra(m.Config.Balancer, "vectordb"),
@@ -359,7 +359,7 @@ func (c *Converter) convertModels() error {
 		pg := &proxyGroup{
 			routeName:         routeName,
 			enabled:           disabledModelPluginEnabled(candidate.model.Enabled),
-			llmFormat:         llmFormat(candidate.model),
+			llmFormat:         aimap.WireLLMFormat(llmFormat(candidate.model)),
 			genaiCategory:     candidate.spec.GenaiCategory,
 			balancer:          balancerConfig(candidate.model.Config.Balancer),
 			vectordb:          balancerExtra(candidate.model.Config.Balancer, "vectordb"),

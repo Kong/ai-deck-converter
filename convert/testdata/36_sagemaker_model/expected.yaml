@@ -21,7 +21,7 @@ plugins:
       balancer:
         algorithm: round-robin
       genai_category: text/generation
-      llm_format: sagemaker
+      llm_format: openai
       targets:
         - auth:
             aws_access_key_id: '{vault://env/aws-key-id}'
