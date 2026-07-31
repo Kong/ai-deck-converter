@@ -80,11 +80,11 @@ func (c *Converter) convertModels() error {
 		bases := basePaths(m)
 		caps := c.expandCapabilities(m)
 
-		// Preserve the source model alias on ai-proxy-advanced targets exactly as
-		// authored so alias-less targets still participate in the DP's fallback
-		// behavior. The ai-models entity, however, still requires an alias in both
-		// decK and db-less payloads, so synthesize it from the model name when the
-		// source omitted one.
+		// extractModelAlias yields the name a client uses to select this model: an
+		// authored alias, or the model name when none is authored. It seeds both the
+		// ai-models entity identity (aiModelAlias) and each type:model target's
+		// model_alias (targetAlias); type:api targets stay alias-less — see the gate
+		// at the buildTarget call below.
 		targetAlias := extractModelAlias(m)
 		aiModelAlias := targetAlias
 
@@ -195,9 +195,14 @@ func (c *Converter) convertModels() error {
 					if err != nil {
 						return err
 					}
+					// The plugin's model FK must equal ai_models.name — the string a
+					// client sends, which ai-model-selector matches on to activate this
+					// model-scoped plugin. That identity is aiModelAlias (the authored
+					// alias, or the model name when none is set), not m.Name; using
+					// m.Name would dangle the FK whenever an alias is authored.
 					modelName := ""
 					if modelScoped {
-						modelName = m.Name
+						modelName = aiModelAlias
 					}
 
 					modelNameHeader := boolPtr(false)
@@ -223,7 +228,21 @@ func (c *Converter) convertModels() error {
 					g.proxyByOwner[ownerKey] = pg
 					g.proxies = append(g.proxies, pg)
 				}
-				target := c.buildTarget(tm, provider, providerType, targetAlias, spec.RouteType, logging)
+				// A target's model_alias decides which balancer pool it joins: the DP
+				// keys pools by model_alias and puts alias-less targets in the shared
+				// "<default>" pool, routing a request to an alias pool only when the
+				// request presents that alias (its body model, or the model segment of
+				// a native URL). type:model requests always carry the model, so their
+				// targets must be aliased or a request lands in an empty "<default>"
+				// pool (404 "no model matched this request"). type:api (files/batches)
+				// requests carry no model, so their targets must stay alias-less to
+				// remain in the "<default>" pool they fall back to (else the balancer
+				// has no pool for the request: 500 "failed to get balancer instance").
+				targetModelAlias := ""
+				if modelScoped {
+					targetModelAlias = targetAlias
+				}
+				target := c.buildTarget(tm, provider, providerType, targetModelAlias, spec.RouteType, logging)
 				dedup := tm.Name + "|" + spec.RouteType
 				if !pg.seen[dedup] {
 					pg.seen[dedup] = true
@@ -254,7 +273,9 @@ func (c *Converter) convertModels() error {
 				p := plugins[k]
 				p.Route = kong.NewStringRef(routeName)
 				if modelScoped {
-					p.Model = kong.NewStringRef(m.Name)
+					// Same ai-model identity as the ai-proxy-advanced FK (aiModelAlias),
+					// so policy/ACL plugins scope to the entity the selector resolves.
+					p.Model = kong.NewStringRef(aiModelAlias)
 				}
 				guardPlugins = append(guardPlugins, p)
 			}

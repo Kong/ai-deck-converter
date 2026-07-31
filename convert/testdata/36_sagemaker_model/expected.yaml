@@ -46,6 +46,6 @@ plugins:
             provider: sagemaker
           route_type: llm/v1/chat
     route: sagemaker-converse
-    model: claude-sagemaker
+    model: '@sagemaker/claude-3-5-sonnet'
 ai_models:
   - name: '@sagemaker/claude-3-5-sonnet'
