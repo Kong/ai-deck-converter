@@ -89,7 +89,7 @@ plugins:
             provider: openai
           route_type: llm/v1/chat
     route: openai-chat-2
-    model: gpt-5-2-body-alias-config
+    model: my-body-alias-value
   - name: ai-model-selector
     config:
       header_name: my-model-alias
@@ -119,7 +119,7 @@ plugins:
             provider: openai
           route_type: llm/v1/chat
     route: openai-chat-3
-    model: gpt-5-2-headers-alias-config
+    model: my-model-alias-header-value
   - name: ai-model-selector
     config:
       path_pattern: my-model-path-alias-value
@@ -149,7 +149,7 @@ plugins:
             provider: openai
           route_type: llm/v1/chat
     route: openai-chat-4
-    model: gpt-5-2-path-alias-config
+    model: my-model-path-alias-value
 ai_models:
   - name: gpt-5-2-default-alias-config
   - name: my-body-alias-value

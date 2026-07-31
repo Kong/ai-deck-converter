@@ -195,9 +195,14 @@ func (c *Converter) convertModels() error {
 					if err != nil {
 						return err
 					}
+					// The plugin's model FK must equal ai_models.name — the string a
+					// client sends, which ai-model-selector matches on to activate this
+					// model-scoped plugin. That identity is aiModelAlias (the authored
+					// alias, or the model name when none is set), not m.Name; using
+					// m.Name would dangle the FK whenever an alias is authored.
 					modelName := ""
 					if modelScoped {
-						modelName = m.Name
+						modelName = aiModelAlias
 					}
 
 					modelNameHeader := boolPtr(false)
@@ -268,7 +273,9 @@ func (c *Converter) convertModels() error {
 				p := plugins[k]
 				p.Route = kong.NewStringRef(routeName)
 				if modelScoped {
-					p.Model = kong.NewStringRef(m.Name)
+					// Same ai-model identity as the ai-proxy-advanced FK (aiModelAlias),
+					// so policy/ACL plugins scope to the entity the selector resolves.
+					p.Model = kong.NewStringRef(aiModelAlias)
 				}
 				guardPlugins = append(guardPlugins, p)
 			}
