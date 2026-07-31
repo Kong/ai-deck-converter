@@ -20,9 +20,9 @@ services:
 plugins:
   - name: ai-model-selector
     config:
-      body_path: model
       max_request_body_size: 8388608
-      source: body
+      path_pattern: 'models/([%w%.%-]+):'
+      source: path
     route: gemini-generate
   - name: ai-proxy-advanced
     config:
@@ -69,9 +69,9 @@ plugins:
     model: vertex-gemini-2-5-pro
   - name: ai-model-selector
     config:
-      body_path: model
       max_request_body_size: 8388608
-      source: body
+      path_pattern: 'models/([%w%.%-]+):'
+      source: path
     route: gemini-embeddings
   - name: ai-proxy-advanced
     config:

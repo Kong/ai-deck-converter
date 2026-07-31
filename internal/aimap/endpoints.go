@@ -163,24 +163,44 @@ func CapabilitiesFor(format, providerType string) []string {
 }
 
 var defaultBodyModelSelectorConfig = map[string]any{
-	"source":                "body",
-	"body_path":             "model",
-	"max_request_body_size": DefaultMaxBodySize,
+	"source":    "body",
+	"body_path": "model",
+}
+
+const DefaultPathPattern = "models/([%w%.%-]+):"
+
+var defaultPathModelSelectorConfig = map[string]any{
+	"source":       "path",
+	"path_pattern": DefaultPathPattern,
 }
 
 // EndpointTable maps section -> capability -> endpoint spec, derived from
 // ref/supported-endpoints.md and the reference kong.yaml examples.
 var EndpointTable = map[string]map[string]EndpointSpec{
 	"openai": {
-		"generate":   {"chat", "/chat/completions", false, mPost, "llm/v1/chat", catTextGen, &defaultBodyModelSelectorConfig, true},
-		"agentic":    {"responses", "/responses", false, mPost, "llm/v1/responses", catTextGen, &defaultBodyModelSelectorConfig, true},
-		"realtime":   {"realtime", "/realtime", false, mGetPost, "realtime/v1/realtime", catRealtime, &defaultBodyModelSelectorConfig, true},
-		"embeddings": {"embeddings", "/embeddings", false, mPost, "llm/v1/embeddings", catEmbeddings, &defaultBodyModelSelectorConfig, true},
+		"generate": {
+			"chat", "/chat/completions", false, mPost, "llm/v1/chat", catTextGen,
+			&defaultBodyModelSelectorConfig, true,
+		},
+		"agentic": {
+			"responses", "/responses", false, mPost, "llm/v1/responses", catTextGen,
+			&defaultBodyModelSelectorConfig, true,
+		},
+		"realtime": {
+			"realtime", "/realtime", false, mGetPost, "realtime/v1/realtime", catRealtime,
+			&defaultBodyModelSelectorConfig, true,
+		},
+		"embeddings": {
+			"embeddings", "/embeddings", false, mPost, "llm/v1/embeddings", catEmbeddings,
+			&defaultBodyModelSelectorConfig, true,
+		},
 		"image": {
-			"images", "/images/generations", false, mPost, "image/v1/images/generations", catImage, &defaultBodyModelSelectorConfig, true,
+			"images", "/images/generations", false, mPost, "image/v1/images/generations", catImage,
+			&defaultBodyModelSelectorConfig, true,
 		},
 		"audio/speech": {
-			"audio-speech", "/audio/speech", false, mPost, "audio/v1/audio/speech", catSpeech, &defaultBodyModelSelectorConfig, false,
+			"audio-speech", "/audio/speech", false, mPost, "audio/v1/audio/speech", catSpeech,
+			&defaultBodyModelSelectorConfig, false,
 		},
 		"audio/transcription": {
 			"audio-transcribe", "/audio/transcriptions", false, mPost, "audio/v1/audio/transcriptions",
@@ -199,7 +219,10 @@ var EndpointTable = map[string]map[string]EndpointSpec{
 		},
 	},
 	"anthropic": {
-		"generate": {"messages", "/v1/messages", false, mPost, "llm/v1/chat", catTextGen, &defaultBodyModelSelectorConfig, true},
+		"generate": {
+			"messages", "/v1/messages", false, mPost, "llm/v1/chat", catTextGen,
+			&defaultBodyModelSelectorConfig, true,
+		},
 		"batches": {
 			"batches", "/v1/messages/batches", false, mGetPost, "llm/v1/batches", catTextGen, nil, false,
 		},
@@ -241,11 +264,11 @@ var EndpointTable = map[string]map[string]EndpointSpec{
 	"gemini": {
 		"generate": {
 			"generate", "v1beta/models/(?<model_name>[^:/]+):(?:generateContent|streamGenerateContent)",
-			true, mGetPost, "llm/v1/chat", catTextGen, &defaultBodyModelSelectorConfig, true,
+			true, mGetPost, "llm/v1/chat", catTextGen, &defaultPathModelSelectorConfig, true,
 		},
 		"embeddings": {
 			"embeddings", "v1beta/models/(?<model_name>[^:/]+):(?:embedContent|batchEmbedContents)",
-			true, mGetPost, "llm/v1/embeddings", catEmbeddings, &defaultBodyModelSelectorConfig, true,
+			true, mGetPost, "llm/v1/embeddings", catEmbeddings, &defaultPathModelSelectorConfig, true,
 		},
 		"batches": {"batches", "v1beta/batches", false, mGetPost, "llm/v1/batches", catTextGen, nil, true},
 		"files":   {"files", "(?:upload/)?v1beta/files", true, mGetPost, "llm/v1/chat", catTextGen, nil, true},
@@ -255,13 +278,13 @@ var EndpointTable = map[string]map[string]EndpointSpec{
 			"generate",
 			"v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/google/models/" +
 				"(?<model_name>[^:/]+):(?:generateContent|streamGenerateContent)",
-			true, mGetPost, "llm/v1/chat", catTextGen, &defaultBodyModelSelectorConfig, true,
+			true, mGetPost, "llm/v1/chat", catTextGen, &defaultPathModelSelectorConfig, true,
 		},
 		"embeddings": {
 			"embeddings",
 			"v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/google/models/" +
 				"(?<model_name>[^:/]+):(?:embedContent|batchEmbedContents)",
-			true, mGetPost, "llm/v1/embeddings", catEmbeddings, &defaultBodyModelSelectorConfig, true,
+			true, mGetPost, "llm/v1/embeddings", catEmbeddings, &defaultPathModelSelectorConfig, true,
 		},
 		"image": {
 			"predict-long-running",
