@@ -786,12 +786,12 @@ func buildModelSelectorConfig(m *aigw.Model, spec aimap.EndpointSpec) map[string
 			"source":      "header",
 			"header_name": headerName,
 		}
-	case spec.TakesBodyModel:
-		return map[string]any{
-			"source":                "body",
-			"body_path":             "model",
-			"max_request_body_size": bodySizeOrDefault(m),
-		}
+	case spec.DefaultModelSelectorConfig != nil:
+
+		config := *spec.DefaultModelSelectorConfig
+		config["max_request_body_size"] = bodySizeOrDefault(m)
+
+		return config
 	}
 	return nil
 }
