@@ -92,6 +92,34 @@ func TestDeriveModelName(t *testing.T) {
 	}
 }
 
+func TestRevertAgentIdentityProviderPlugin(t *testing.T) {
+	src := []byte(`
+_format_version: "3.0"
+services:
+  - name: protected-agent
+    url: https://example.test
+    routes:
+      - name: protected-agent-route
+        paths: [/protected-agent]
+        plugins:
+          - name: key-auth
+            config:
+              anonymous: anonymous
+              key_names: [apikey]
+          - name: acl
+            config:
+              allow: [allowed-group]
+              include_consumer_groups: true
+`)
+
+	out, _, err := Revert(src, Options{})
+	require.NoError(t, err)
+	require.Contains(t, string(out), "identity_providers:")
+	require.Contains(t, string(out), "- key-auth-1")
+	require.Contains(t, string(out), "identity_providers:\n  - type: key-auth")
+	require.NotContains(t, string(out), "policies:\n")
+}
+
 func TestProviderDedupAndNaming(t *testing.T) {
 	in := []byte(`
 _format_version: "3.0"

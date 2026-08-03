@@ -27,10 +27,8 @@ func (r *Reverter) revertGlobalPolicies() {
 }
 
 // authPluginNames are authentication plugins reconstructed into identity
-// providers (with a model's access.identity_providers reference) rather than
-// plain policies, but only when found on a model's route — see
-// modelPolicyRefs. On every other entity they remain plain policies, since
-// only models support identity providers.
+// providers (with an entity's access.identity_providers reference) rather than
+// plain policies when found on a Model or Agent route.
 var authPluginNames = map[string]bool{
 	"key-auth":       true,
 	"openid-connect": true,
@@ -55,16 +53,17 @@ func (r *Reverter) policyRefs(plugins []kong.Plugin) ([]string, aigw.ACLs) {
 	return refs, acls
 }
 
-// modelPolicyRefs is policyRefs plus identity-provider recovery: it pulls
-// key-auth/openid-connect plugins out into identity provider references
-// before delegating the remaining plugins to policyRefs. Used only for a
-// model's route/model-scoped guard plugins, since only models support
-// identity providers.
-func (r *Reverter) modelPolicyRefs(plugins []kong.Plugin) ([]string, aigw.ACLs, []string) {
+// identityProviderPolicyRefs is policyRefs plus identity-provider recovery: it
+// pulls key-auth/openid-connect plugins out into identity provider references
+// before delegating the remaining plugins to policyRefs.
+func (r *Reverter) identityProviderPolicyRefs(plugins []kong.Plugin) ([]string, aigw.ACLs, []string) {
 	var rest []kong.Plugin
 	var idpRefs []string
 	for _, p := range plugins {
-		if authPluginNames[p.Name] {
+		// The anonymous fallback is the forward converter's marker that an auth
+		// plugin originated from an identity provider. A bare key-auth/OIDC
+		// plugin remains a regular policy for backwards-compatible reversals.
+		if authPluginNames[p.Name] && p.Config["anonymous"] == anonymousConsumerName {
 			idpRefs = append(idpRefs, r.registerIdentityProvider(p).Name)
 			continue
 		}
@@ -72,6 +71,10 @@ func (r *Reverter) modelPolicyRefs(plugins []kong.Plugin) ([]string, aigw.ACLs, 
 	}
 	refs, acls := r.policyRefs(rest)
 	return refs, acls, idpRefs
+}
+
+func (r *Reverter) modelPolicyRefs(plugins []kong.Plugin) ([]string, aigw.ACLs, []string) {
+	return r.identityProviderPolicyRefs(plugins)
 }
 
 // registerPolicy dedupes a plugin into the policy registry: a plugin with the

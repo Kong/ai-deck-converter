@@ -1,0 +1,18 @@
+identity_providers:
+  - display_name: Agent Key Auth
+    name: agent-key-auth
+    type: key-auth
+    config:
+      key_names: [apikey]
+agents:
+  - display_name: Protected Agent
+    name: protected-agent
+    type: http
+    access:
+      acls:
+        allow: [allowed-group]
+      identity_providers: [agent-key-auth]
+    config:
+      url: https://agent.internal/api
+      route:
+        paths: [/protected-agent]

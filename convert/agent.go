@@ -20,6 +20,15 @@ func (c *Converter) convertAgents() error {
 		}
 		route.Plugins = append(route.Plugins, guard...)
 
+		identityProviderPlugins, err := c.scopedIdentityProviderPlugins(a.Access.IdentityProviders)
+		if err != nil {
+			return err
+		}
+		route.Plugins = append(route.Plugins, identityProviderPlugins...)
+		if len(identityProviderPlugins) > 0 {
+			c.ensureAnonymousConsumer()
+		}
+
 		switch a.Type {
 		case "a2a":
 			route.Plugins = append(route.Plugins, a2aPlugin(a))
