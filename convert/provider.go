@@ -251,7 +251,7 @@ func mapOptions(opts map[string]any, providerType, modelName string, provider *a
 			addNested("huggingface", k, v)
 		case providerType == "databricks" && k == "workspace_instance_id":
 			addNested("databricks", k, v)
-		case providerType == "sagemaker":
+		case providerType == "sagemaker" && (k == "aws" || k == "target"):
 			appendNested("sagemaker", k, v)
 		default:
 			out[k] = v
