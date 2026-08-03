@@ -14,7 +14,7 @@ plugins:
   - name: ai-model-selector
     config:
       max_request_body_size: 8388608
-      path_pattern: model/([%w%.%-]+)/
+      path_pattern: model/([^/]+)/
       source: path
     route: bedrock-invoke
   - name: ai-proxy-advanced

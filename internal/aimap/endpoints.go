@@ -198,7 +198,7 @@ var defaultBodyModelSelectorConfig = map[string]any{
 // any other pattern is a custom alias that must be materialized.
 const (
 	GeminiDefaultPathPattern  = "models/([%w%.%-]+):"
-	BedrockDefaultPathPattern = "model/([%w%.%-]+)/"
+	BedrockDefaultPathPattern = "model/([^/]+)/"
 )
 
 // IsDefaultPathPattern reports whether pattern is one of the path-selector
