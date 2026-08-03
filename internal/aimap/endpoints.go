@@ -192,11 +192,14 @@ var defaultBodyModelSelectorConfig = map[string]any{
 	"body_path": "model",
 }
 
-const DefaultPathPattern = "models/([%w%.%-]+):"
-
-var defaultPathModelSelectorConfig = map[string]any{
+var geminiPathModelSelectorConfig = map[string]any{
 	"source":       "path",
-	"path_pattern": DefaultPathPattern,
+	"path_pattern": "models/([%w%.%-]+):",
+}
+
+var bedrockPathModelSelectorConfig = map[string]any{
+	"source":       "path",
+	"path_pattern": "model/([%w%.%-]+)/",
 }
 
 // EndpointTable maps section -> capability -> endpoint spec, derived from
@@ -255,45 +258,45 @@ var EndpointTable = map[string]map[string]EndpointSpec{
 	"bedrock": {
 		"generate": {
 			"converse", "model/(?<model_name>[^/]+)/converse(?:-stream)?",
-			true, mGetPost, "llm/v1/chat", catTextGen, nil, true,
+			true, mGetPost, "llm/v1/chat", catTextGen, &bedrockPathModelSelectorConfig, true,
 		},
 		"agentic": {
 			"retrieve", "model/(?<model_name>[^/]+)/retrieveAndGenerate(?:Stream)?",
-			true, mGetPost, "llm/v1/chat", catTextGen, nil, true,
+			true, mGetPost, "llm/v1/chat", catTextGen, &bedrockPathModelSelectorConfig, true,
 		},
 		"embeddings": {
 			"invoke", "model/(?<model_name>[^/]+)/invoke(?:-with-response-stream)?",
-			true, mGetPost, "llm/v1/embeddings", catEmbeddings, nil, true,
+			true, mGetPost, "llm/v1/embeddings", catEmbeddings, &bedrockPathModelSelectorConfig, true,
 		},
 		"image": {
 			"invoke", "model/(?<model_name>[^/]+)/invoke(?:-with-response-stream)?",
-			true, mGetPost, "image/v1/images/generations", catImage, nil, false,
+			true, mGetPost, "image/v1/images/generations", catImage, &bedrockPathModelSelectorConfig, false,
 		},
 		"audio/speech": {
 			"invoke", "model/(?<model_name>[^/]+)/invoke(?:-with-response-stream)?",
-			true, mGetPost, "llm/v1/chat", catTextGen, nil, true,
+			true, mGetPost, "llm/v1/chat", catTextGen, &bedrockPathModelSelectorConfig, true,
 		},
 		"video": {
 			"invoke", "model/(?<model_name>[^/]+)/invoke(?:-with-response-stream)?",
-			true, mGetPost, "video/v1/videos/generations", catVideo, nil, true,
+			true, mGetPost, "video/v1/videos/generations", catVideo, &bedrockPathModelSelectorConfig, true,
 		},
 		"rerank": {
 			"rerank", "model/(?<model_name>[^/]+)/rerank",
-			true, mGetPost, "llm/v1/chat", catTextGen, nil, true,
+			true, mGetPost, "llm/v1/chat", catTextGen, &bedrockPathModelSelectorConfig, true,
 		},
 		"batches": {
 			"batches", "model/(?<model_name>[^/]+)/async-invoke",
-			true, mGetPost, "llm/v1/batches", catTextGen, nil, true,
+			true, mGetPost, "llm/v1/batches", catTextGen, &bedrockPathModelSelectorConfig, true,
 		},
 	},
 	"gemini": {
 		"generate": {
 			"generate", "v1beta/models/(?<model_name>[^:/]+):(?:generateContent|streamGenerateContent)",
-			true, mGetPost, "llm/v1/chat", catTextGen, &defaultPathModelSelectorConfig, true,
+			true, mGetPost, "llm/v1/chat", catTextGen, &geminiPathModelSelectorConfig, true,
 		},
 		"embeddings": {
 			"embeddings", "v1beta/models/(?<model_name>[^:/]+):(?:embedContent|batchEmbedContents)",
-			true, mGetPost, "llm/v1/embeddings", catEmbeddings, &defaultPathModelSelectorConfig, true,
+			true, mGetPost, "llm/v1/embeddings", catEmbeddings, &geminiPathModelSelectorConfig, true,
 		},
 		"batches": {"batches", "v1beta/batches", false, mGetPost, "llm/v1/batches", catTextGen, nil, true},
 		"files":   {"files", "(?:upload/)?v1beta/files", true, mGetPost, "llm/v1/chat", catTextGen, nil, true},
@@ -303,25 +306,25 @@ var EndpointTable = map[string]map[string]EndpointSpec{
 			"generate",
 			"v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/google/models/" +
 				"(?<model_name>[^:/]+):(?:generateContent|streamGenerateContent)",
-			true, mGetPost, "llm/v1/chat", catTextGen, &defaultPathModelSelectorConfig, true,
+			true, mGetPost, "llm/v1/chat", catTextGen, &geminiPathModelSelectorConfig, true,
 		},
 		"embeddings": {
 			"embeddings",
 			"v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/google/models/" +
 				"(?<model_name>[^:/]+):(?:embedContent|batchEmbedContents)",
-			true, mGetPost, "llm/v1/embeddings", catEmbeddings, &defaultPathModelSelectorConfig, true,
+			true, mGetPost, "llm/v1/embeddings", catEmbeddings, &geminiPathModelSelectorConfig, true,
 		},
 		"image": {
 			"predict-long-running",
 			"v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/google/models/" +
 				"(?<model_name>[^:/]+):predictLongRunning",
-			true, mGetPost, "image/v1/images/generations", catImage, nil, true,
+			true, mGetPost, "image/v1/images/generations", catImage, &geminiPathModelSelectorConfig, true,
 		},
 		"video": {
 			"predict-long-running",
 			"v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/google/models/" +
 				"(?<model_name>[^:/]+):predictLongRunning",
-			true, mGetPost, "video/v1/videos/generations", catVideo, nil, true,
+			true, mGetPost, "video/v1/videos/generations", catVideo, &geminiPathModelSelectorConfig, true,
 		},
 		"rerank": {
 			"ranking",
