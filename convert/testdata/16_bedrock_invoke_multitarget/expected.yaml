@@ -11,6 +11,12 @@ services:
           - POST
         strip_path: false
 plugins:
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      path_pattern: model/([%w%.%-]+)/
+      source: path
+    route: bedrock-invoke
   - name: ai-proxy-advanced
     config:
       balancer:
