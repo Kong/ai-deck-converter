@@ -1,0 +1,36 @@
+models:
+  - type: model
+    name: gpt-5-2
+    capabilities:
+      - generate
+    formats:
+      - type: openai
+    targets:
+      - name: gpt-5.2
+        provider: openai-ai
+        config:
+          max_tokens: 1024
+          temperature: 1
+          type: openai
+    config:
+      route:
+        protocols:
+          - http
+          - https
+        model:
+          body:
+            model:
+              - '@openai/gpt-5.2'
+      logging:
+        payloads: false
+        statistics: true
+      response_streaming: allow
+model_providers:
+  - type: openai
+    name: openai-ai
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: '{vault://ai/openai-token}'

@@ -60,8 +60,8 @@ type ModelRouteConfig struct {
 	Paths                   []string            `yaml:"paths,omitempty"`
 	Hosts                   []string            `yaml:"hosts,omitempty"`
 	Methods                 []string            `yaml:"methods,omitempty"`
-	Model                   ModelAliasConfig    `yaml:"model,omitempty"`
 	Protocols               []string            `yaml:"protocols,omitempty"`
+	Model                   ModelAliasConfig    `yaml:"model,omitempty"`
 	Headers                 map[string][]string `yaml:"headers,omitempty"`
 	SNIs                    []string            `yaml:"snis,omitempty"`
 	Sources                 []CIDRPort          `yaml:"sources,omitempty"`
