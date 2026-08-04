@@ -8,7 +8,7 @@ type (
 	Format            = internal.Format
 	ModelConfig       = internal.ModelConfig
 	ModelNameConfig   = internal.ModelNameConfig
-	ModelAliasConfig  = internal.ModelAliasConfig
+	ModelAliasConfig  = internal.ModelSelectorConfig
 	ModelRouteConfig  = internal.ModelRouteConfig
 	Balancer          = internal.Balancer
 	TargetModel       = internal.TargetModel

@@ -277,32 +277,32 @@ func (r *Reverter) modelGroupFor(
 // name; otherwise leaving it empty avoids provoking a spurious selector when
 // the config is converted again (buildModelSelectorConfig emits one for any
 // non-empty Route.Model, even on these non-selector endpoints).
-func setAliasField(model *aigw.ModelAliasConfig, alias, name string, selector *kong.Plugin) {
+func setAliasField(model *aigw.ModelSelectorConfig, alias, name string, selector *kong.Plugin) {
 	if selector != nil {
 		switch getStr(selector.Config, "source") {
 		case "body":
 			if bodyPath := getStr(selector.Config, "body_path"); bodyPath != "" {
-				model.Body = map[string][]string{bodyPath: {alias}}
+				model.Body = aigw.ModelBodySelectorConfig{BodyParam: bodyPath, Values: []string{alias}}
 				return
 			}
 		case "header":
 			if headerName := getStr(selector.Config, "header_name"); headerName != "" {
-				model.Headers = map[string][]string{headerName: {alias}}
+				model.Header = aigw.ModelHeaderSelectorConfig{HeaderParam: headerName, Values: []string{alias}}
 				return
 			}
 		case "path":
 			if pattern := getStr(selector.Config, "path_pattern"); pattern != "" && !aimap.IsDefaultPathPattern(pattern) {
-				model.PathAliases = []string{alias}
+				model.Path.Values = []string{alias}
 			} else if alias != name {
-				model.PathAliases = []string{alias}
+				model.Path.Values = []string{alias}
 			}
 			return
 		}
-		model.PathAliases = []string{alias}
+		model.Path.Values = []string{alias}
 		return
 	}
 	if alias != name {
-		model.PathAliases = []string{alias}
+		model.Path.Values = []string{alias}
 	}
 }
 
@@ -351,7 +351,7 @@ func (r *Reverter) finalizeModels(acc *modelAcc) error {
 		}
 		model := aigw.Model{Type: "model", Name: m.Name}
 		if m.Alias != "" {
-			model.Config.Route.Model.PathAliases = []string{m.Alias}
+			model.Config.Route.Model.Path.Values = []string{m.Alias}
 		}
 		model.Labels = r.tagsToLabels(m.Tags)
 		built[m.Name] = true

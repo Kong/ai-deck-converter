@@ -28,7 +28,8 @@ models:
       route:
         model:
           body:
-            model:
+            body_param: model
+            values:
               - '@prod/prod-chat'
       logging:
         payloads: false

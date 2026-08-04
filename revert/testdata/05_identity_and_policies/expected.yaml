@@ -23,7 +23,8 @@ models:
       route:
         model:
           body:
-            model:
+            body_param: model
+            values:
               - '@openai/guarded-gpt'
       logging:
         payloads: false
