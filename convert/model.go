@@ -496,7 +496,7 @@ func (c *Converter) videoLifecycleCandidates() ([]videoLifecycleCandidate, error
 
 func buildVideoLifecycleRoute(rc aigw.ModelRouteConfig, routeName string, bases []string) kong.Route {
 	rc.Methods = nil
-	paths := make([]string, 0, len(bases)*2) //nolint:mnd
+	paths := make([]string, 0, len(bases))
 	for _, base := range bases {
 		base = strings.TrimRight(base, "/")
 		paths = append(paths, base+"/videos")
