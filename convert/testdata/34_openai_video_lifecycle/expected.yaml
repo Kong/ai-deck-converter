@@ -12,7 +12,6 @@ services:
       - name: openai-videos-lifecycle
         paths:
           - /ai/videos
-          - ~/ai/videos/.+
         methods:
           - GET
           - DELETE
