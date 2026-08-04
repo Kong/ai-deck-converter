@@ -32,7 +32,8 @@ models:
         paths: [ /ai-body-alias ]
         model:
           body:
-            my-model-alias: [my-body-alias-value]
+            body_param: my-model-alias
+            values: [my-body-alias-value]
       response_streaming: allow
     targets:
       - name: gpt-5.2
@@ -55,8 +56,9 @@ models:
       route:
         paths: [ /ai-headers-alias ]
         model:
-          headers:
-            my-model-alias: [my-model-alias-header-value]
+          header:
+            header_param: my-model-alias
+            values: [my-model-alias-header-value]
       response_streaming: allow
     targets:
       - name: gpt-5.2
@@ -79,8 +81,10 @@ models:
       route:
         paths: [ /ai-path-alias ]
         model:
-          path_aliases:
-            - my-model-path-alias-value
+          path:
+            path_param: model-capture-group
+            values:
+              - my-model-path-alias-value
       response_streaming: allow
     targets:
       - name: gpt-5.2

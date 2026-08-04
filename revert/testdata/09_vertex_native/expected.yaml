@@ -19,7 +19,8 @@ models:
       route:
         model:
           body:
-            model:
+            body_param: model
+            values:
               - '@vertex/gemini-2.5-pro'
       logging:
         payloads: false
@@ -42,7 +43,8 @@ models:
       route:
         model:
           body:
-            model:
+            body_param: model
+            values:
               - '@vertex/text-embedding-005'
       logging:
         payloads: false

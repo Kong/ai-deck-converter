@@ -48,11 +48,26 @@ type ModelNameConfig struct {
 	NameHeader *bool `yaml:"name_header,omitempty"`
 }
 
-// ModelAliasConfig is the model aliasing configuration.
-type ModelAliasConfig struct {
-	Body        map[string][]string `yaml:"body,omitempty"`
-	Headers     map[string][]string `yaml:"headers,omitempty"`
-	PathAliases []string            `yaml:"path_aliases,omitempty"`
+// ModelSelectorConfig is the model selector configuration.
+type ModelSelectorConfig struct {
+	Body   ModelBodySelectorConfig   `yaml:"body,omitempty"`
+	Header ModelHeaderSelectorConfig `yaml:"header,omitempty"`
+	Path   ModelPathSelectorConfig   `yaml:"path,omitempty"`
+}
+
+type ModelBodySelectorConfig struct {
+	BodyParam string   `yaml:"body_param,omitempty"`
+	Values    []string `yaml:"values,omitempty"`
+}
+
+type ModelHeaderSelectorConfig struct {
+	HeaderParam string   `yaml:"header_param,omitempty"`
+	Values      []string `yaml:"values,omitempty"`
+}
+
+type ModelPathSelectorConfig struct {
+	PathParam string   `yaml:"path_param,omitempty"`
+	Values    []string `yaml:"values,omitempty"`
 }
 
 type ModelRouteConfig struct {
@@ -60,7 +75,7 @@ type ModelRouteConfig struct {
 	Paths                   []string            `yaml:"paths,omitempty"`
 	Hosts                   []string            `yaml:"hosts,omitempty"`
 	Methods                 []string            `yaml:"methods,omitempty"`
-	Model                   ModelAliasConfig    `yaml:"model,omitempty"`
+	Model                   ModelSelectorConfig `yaml:"model,omitempty"`
 	Protocols               []string            `yaml:"protocols,omitempty"`
 	Headers                 map[string][]string `yaml:"headers,omitempty"`
 	SNIs                    []string            `yaml:"snis,omitempty"`

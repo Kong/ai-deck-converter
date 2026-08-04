@@ -513,7 +513,7 @@ func buildVideoLifecycleRoute(rc aigw.ModelRouteConfig, routeName string, bases 
 // models with distinct aliases still share a route (and its ai-model-selector)
 // when every other matcher agrees.
 func modelRouteConfigKey(route aigw.ModelRouteConfig) (string, error) {
-	route.Model = aigw.ModelAliasConfig{}
+	route.Model = aigw.ModelSelectorConfig{}
 	b, err := json.Marshal(route)
 	if err != nil {
 		return "", err
@@ -707,27 +707,19 @@ func disabledModelPluginEnabled(enabled *bool) *bool {
 // It first attempts to read the alias from the path alias, then body alias, and lastly the headers alias.
 // API validation restricts the model Route.Model config to being a oneOf with only one alias value set.
 func extractModelAlias(m *aigw.Model) string {
-	// First attempt to read the alias from the path alias
-	if len(m.Config.Route.Model.PathAliases) > 0 {
-		return m.Config.Route.Model.PathAliases[0]
+	// First attempt to read the alias from the path selector
+	if len(m.Config.Route.Model.Path.Values) > 0 {
+		return m.Config.Route.Model.Path.Values[0]
 	}
 
-	// Second attempt to read the alias from the body alias
-	if len(m.Config.Route.Model.Body) > 0 {
-		for _, values := range m.Config.Route.Model.Body {
-			if len(values) > 0 {
-				return values[0]
-			}
-		}
+	// Second attempt to read the alias from the body selector
+	if len(m.Config.Route.Model.Body.Values) > 0 {
+		return m.Config.Route.Model.Body.Values[0]
 	}
 
-	// Third attempt to read the alias from the header alias
-	if len(m.Config.Route.Model.Headers) > 0 {
-		for _, values := range m.Config.Route.Model.Headers {
-			if len(values) > 0 {
-				return values[0]
-			}
-		}
+	// Third attempt to read the alias from the header selector
+	if len(m.Config.Route.Model.Header.Values) > 0 {
+		return m.Config.Route.Model.Header.Values[0]
 	}
 
 	// Fall back to returning the empty name when there is no alias
@@ -760,31 +752,21 @@ func bodySizeOrDefault(m *aigw.Model) int {
 // field by default (spec.TakesBodyModel) fall back to reading it there.
 func buildModelSelectorConfig(m *aigw.Model, spec aimap.EndpointSpec) map[string]any {
 	switch {
-	case len(m.Config.Route.Model.PathAliases) > 0:
+	case len(m.Config.Route.Model.Path.Values) > 0:
 		return map[string]any{
 			"source":       "path",
-			"path_pattern": m.Config.Route.Model.PathAliases[0],
+			"path_pattern": m.Config.Route.Model.Path.Values[0],
 		}
-	case len(m.Config.Route.Model.Body) > 0:
-		var bodyPath string
-		for k := range m.Config.Route.Model.Body {
-			bodyPath = k
-			break
-		}
+	case m.Config.Route.Model.Body.BodyParam != "":
 		return map[string]any{
 			"source":                "body",
-			"body_path":             bodyPath,
+			"body_path":             m.Config.Route.Model.Body.BodyParam,
 			"max_request_body_size": bodySizeOrDefault(m),
 		}
-	case len(m.Config.Route.Model.Headers) > 0:
-		var headerName string
-		for k := range m.Config.Route.Model.Headers {
-			headerName = k
-			break
-		}
+	case m.Config.Route.Model.Header.HeaderParam != "":
 		return map[string]any{
 			"source":      "header",
-			"header_name": headerName,
+			"header_name": m.Config.Route.Model.Header.HeaderParam,
 		}
 	case spec.DefaultModelSelectorConfig != nil:
 		// make a copy of default model selector config
