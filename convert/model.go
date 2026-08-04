@@ -499,7 +499,7 @@ func buildVideoLifecycleRoute(rc aigw.ModelRouteConfig, routeName string, bases 
 	paths := make([]string, 0, len(bases)*2) //nolint:mnd
 	for _, base := range bases {
 		base = strings.TrimRight(base, "/")
-		paths = append(paths, base+"/videos", "~"+base+"/videos/.+")
+		paths = append(paths, base+"/videos")
 	}
 	route := buildModelRoute(rc, routeName, paths, []string{"GET", "DELETE"})
 	route.Tags = append(route.Tags, aimap.VideoLifecycleRouteTag)
