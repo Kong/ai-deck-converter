@@ -1,0 +1,91 @@
+mcp_servers:
+  - type: conversion-listener
+    name: secure-flights-mcp
+    config:
+      route:
+        paths:
+          - /mcp/secure-flights
+      logging:
+        payloads: false
+        statistics: true
+        audits: false
+    tools:
+      - name: searchFlights
+        description: Search available flights
+        method: GET
+        path: /flights
+        scheme: https
+        host: flights.internal
+    access:
+      identity_providers:
+        - openid-connect-1
+      metadata:
+        endpoint: /mcp/secure-flights/.well-known/oauth-protected-resource
+        authorization_servers:
+          - https://dev-123456.okta.com/oauth2/default
+        resource: https://api.example.com/mcp/secure-flights
+        scopes_supported:
+          - openid
+          - flights:read
+  - type: listener
+    name: keyed-mcp
+    config:
+      route:
+        paths:
+          - /mcp/keyed
+      logging:
+        payloads: false
+        statistics: true
+        audits: false
+    tools:
+      - name: ping
+        description: Ping the server
+        method: GET
+        path: /ping
+        scheme: https
+        host: keyed.internal
+    access:
+      identity_providers:
+        - key-auth-1
+  - type: passthrough-listener
+    name: vendor-proxy-mcp
+    config:
+      route:
+        paths:
+          - /mcp/vendor-proxy
+      logging:
+        payloads: false
+        statistics: true
+        audits: false
+    tools:
+      - name: vendorTool
+        description: A vendor tool
+        method: GET
+        path: /vendor
+        scheme: https
+        host: vendor.internal
+    access:
+      identity_providers:
+        - openid-connect-1
+      metadata:
+        endpoint: /mcp/vendor-proxy/.well-known/oauth-protected-resource
+        authorization_servers:
+          - https://dev-123456.okta.com/oauth2/default
+        resource: https://api.example.com/mcp/vendor-proxy
+        scopes_supported:
+          - openid
+          - profile
+    upstream_url: https://vendor.example.com/mcp
+identity_providers:
+  - type: openid-connect
+    name: openid-connect-1
+    config:
+      client_id:
+        - mcp-client
+      client_secret:
+        - '{vault://ai-vault/okta-client-secret}'
+  - type: key-auth
+    name: key-auth-1
+    config:
+      key_names:
+        - apikey

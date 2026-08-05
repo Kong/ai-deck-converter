@@ -10,6 +10,11 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// roundTripSkip lists forward golden cases whose reverse direction is not (yet)
+// implemented, so the round-trip gate skips them instead of failing. The
+// forward golden itself is still asserted by convert's TestGolden.
+var roundTripSkip = map[string]string{}
+
 // TestRoundTrip verifies that reverting the forward converter's output and
 // converting it again reproduces the original decK config byte-for-byte, for
 // every forward golden case. Source-only metadata (display_name, enabled, the
@@ -26,6 +31,9 @@ func TestRoundTrip(t *testing.T) {
 		}
 		dir := dir
 		t.Run(filepath.Base(dir), func(t *testing.T) {
+			if reason, ok := roundTripSkip[filepath.Base(dir)]; ok {
+				t.Skip(reason)
+			}
 			opts := loadForwardOptions(t, dir)
 			if opts.OutputMode == "db-less" {
 				t.Skip("db-less forward cases are not revertible decK fixtures")

@@ -96,7 +96,7 @@ See `convert/testdata/*/input.yaml` for worked examples.
 |---|---|
 | Model | One **route per (provider endpoint, capability)** under a single shared `ai-gateway` Service, with the path derived from the model's `formats[0].type` (llm_format) + capability via the endpoint table. Each route gets an `ai-proxy-advanced` plugin (`route:` FK) — models that resolve to the same endpoint share one route, contributing one `targets[]` entry each. Body-model routes also get an `ai-model-selector` plugin. One `ai-models` entry (`name` + `alias`) is emitted per model. |
 | Provider | Not a standalone entity. Its `type` and `config.auth` populate each referencing target's `model.provider`, `model.options`, and `auth`. |
-| MCP Server | Service + Route + `ai-mcp-proxy` (`config.mode` = source type). Server ACLs / per-tool ACLs are written into the plugin config (`default_acl`, `tools[].acl`), not Kong `acl` plugins. |
+| MCP Server | Service + Route + `ai-mcp-proxy` (`config.mode` = source type). Server ACLs / per-tool ACLs are written into the plugin config (`default_acl`, `tools[].acl`), not Kong `acl` plugins. `access.identity_providers` + `access.metadata` (openid-connect) add an `ai-mcp-oauth2` plugin and append `metadata.endpoint` to the route (listener / conversion-listener / passthrough-listener only); a `key-auth` provider adds a `key-auth` plugin (and is rejected if `metadata` is set). |
 | Agent (`a2a`) | Service (`config.url`) + Route + `ai-a2a-proxy` plugin (logging). |
 | Agent (`http`) | Service (`config.url`) + Route, no AI plugin. |
 | Policy | Kong plugin (`name` = policy `type`, config passed through). `global: true` -> one top-level plugin; otherwise instantiated per referencing entity. |
@@ -140,7 +140,10 @@ How Kong entities come back:
   fingerprint) since Kong has no standalone provider entity. Names derive from
   the vault prefix in the credential (`openai-env`) or a per-type counter.
 - **ai-mcp-proxy → MCP Servers**, **ai-a2a-proxy → a2a Agents**, plain
-  services with routes → **http Agents**.
+  services with routes → **http Agents**. On an MCP route, an `ai-mcp-oauth2`
+  plugin → `access.metadata` + a synthesized openid-connect provider (the
+  `.well-known` path is stripped back off the route), and `key-auth` /
+  `openid-connect` → `access.identity_providers`.
 - **Unknown plugins → Policies** (global when top-level and unscoped, otherwise
   referenced from the owning entity); `acl` plugins → `acls`.
 - **Anything unconvertible is warned about and dropped**; `-strict` makes those
@@ -168,6 +171,12 @@ Lossy by design (the forward direction never emits them): `display_name`,
   credential types are warned about and skipped.
 - **MCP upstream.** Passthrough MCP servers without an `upstream_url` get a
   placeholder host and a warning.
+- **MCP OAuth2.** MCP `access.identity_providers` / `access.metadata` round-trips
+  in both directions, but the reverse synthesizes a **minimal** openid-connect
+  identity provider (client credentials only) from an `ai-mcp-oauth2` plugin —
+  provider config the plugin doesn't carry (e.g. `cache_tokens_salt`,
+  `auth_methods`) is not recovered, and `authorization_servers`/`scopes_supported`
+  are always attributed to the metadata rather than the provider's issuer/scopes.
 - **Labels** are lossy as tags when a value contains `:`.
 
 ## Community

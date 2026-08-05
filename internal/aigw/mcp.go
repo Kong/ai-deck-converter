@@ -21,10 +21,32 @@ type MCPServer struct {
 }
 
 // MCPAccess is the access-control configuration for an MCP Server: consumer/
-// group ACLs plus the default ACL applied to every tool.
+// group ACLs plus the default ACL applied to every tool. It also carries the
+// identity-provider reference and OAuth 2.0 Protected Resource Metadata used to
+// protect the MCP server (lowered into an ai-mcp-oauth2 plugin).
 type MCPAccess struct {
 	ACLs            ACLs `yaml:"acls,omitempty"`
 	DefaultToolACLs ACLs `yaml:"default_tool_acls,omitempty"`
+	// IdentityProviders references an identity provider (at most one) by name.
+	// A key-auth provider becomes a key-auth plugin; an openid-connect provider
+	// combined with Metadata becomes an ai-mcp-oauth2 plugin.
+	IdentityProviders []string `yaml:"identity_providers,omitempty"`
+	// Metadata is the OAuth 2.0 Protected Resource Metadata advertised for this
+	// MCP server. When set (with an openid-connect provider), it lowers into an
+	// ai-mcp-oauth2 plugin.
+	Metadata *MCPProtectedResourceMetadata `yaml:"metadata,omitempty"`
+}
+
+// MCPProtectedResourceMetadata is the OAuth 2.0 Protected Resource Metadata
+// (RFC 9728) advertised for an MCP server, allowing clients to discover the
+// authorization servers that protect it. It maps to the ai-mcp-oauth2 plugin's
+// resource / authorization_servers / scopes_supported / metadata_endpoint.
+type MCPProtectedResourceMetadata struct {
+	DiscoveryEndpoint    string   `yaml:"discovery_endpoint,omitempty"`
+	Endpoint             string   `yaml:"endpoint,omitempty"`
+	AuthorizationServers []string `yaml:"authorization_servers,omitempty"`
+	Resource             string   `yaml:"resource,omitempty"`
+	ScopesSupported      []string `yaml:"scopes_supported,omitempty"`
 }
 
 // MCPServerConfig holds routing, logging, access, proxy, and server configuration.
