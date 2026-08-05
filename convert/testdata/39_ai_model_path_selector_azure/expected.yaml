@@ -5,14 +5,14 @@ services:
     routes:
       - name: openai-chat
         paths:
-          - ~/azure/(?<my_cool_model>)/chat/completions
+          - ~/azure/path/prefix/(?<my_cool_model>)/pathsuffix/chat/completions
         methods:
           - POST
         strip_path: false
 plugins:
   - name: ai-model-selector
     config:
-      path_pattern: ~/azure/gpt-5.5/chat/completions # or should this be '/azure/([%w%.%-:]+)/'
+      path_pattern: /azure/path/prefix/([%w%.%-:]+)/pathsuffix/chat/completions
       source: path
     route: openai-chat
   - name: ai-proxy-advanced

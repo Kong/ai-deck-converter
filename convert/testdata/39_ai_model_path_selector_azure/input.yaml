@@ -7,10 +7,11 @@ models:
       - type: openai
     config:
       route:
-        paths: [ '~/azure/(?<my_cool_model>)' ]
+        paths: [ '~/azure/path/prefix/(?<my_cool_model>)/pathsuffix' ]
         model:
           path_param: my_cool_model
-          value: gpt-5.5
+          values:
+            - gpt-5.5
     targets:
       - name: gpt-4o-azure
         weight: 30
