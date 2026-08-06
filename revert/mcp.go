@@ -84,7 +84,13 @@ func (r *Reverter) revertMCPServer(svc *kong.Service, rt *kong.Route, plugins, s
 		m.Tools = append(m.Tools, mcpTool(tool))
 	}
 
-	refs, acls := r.policyRefs(append(append([]kong.Plugin{}, plugins...), svcPlugins...))
+	// Pull identity-provider / OAuth 2.0 Protected Resource Metadata access out
+	// of the route plugins (into access.identity_providers/metadata) before the
+	// remaining plugins are reconstructed as policies.
+	allPlugins := append(append([]kong.Plugin{}, plugins...), svcPlugins...)
+	rest := r.revertMCPAccess(&m, allPlugins)
+
+	refs, acls := r.policyRefs(rest)
 	m.Policies = refs
 	m.Access.ACLs = acls
 
