@@ -137,7 +137,7 @@ func (c *Converter) mcpOAuth2Plugin(
 	}
 
 	setIfNotEmpty(cfg, "metadata_endpoint", meta.Endpoint)
-
+	setIfNotEmpty(cfg, "metadata_discovery_endpoint", meta.DiscoveryEndpoint)
 	if idp != nil {
 		setIfNotEmpty(cfg, "client_id", firstConfigString(idp.Config, "client_id"))
 		setIfNotEmpty(cfg, "client_secret", firstConfigString(idp.Config, "client_secret"))
