@@ -3,11 +3,10 @@ services:
   - name: ai-gateway
     url: http://ai-gateway.upstream.local
     routes:
-      - name: sagemaker-converse
+      - name: openai-chat
         paths:
-          - ~/ai/model/(?<model_name>[^/]+)/converse(?:-stream)?
+          - /ai/chat/completions
         methods:
-          - GET
           - POST
         strip_path: false
 plugins:
@@ -15,7 +14,7 @@ plugins:
     config:
       path_pattern: '@sagemaker/claude-3-5-sonnet'
       source: path
-    route: sagemaker-converse
+    route: openai-chat
   - name: ai-proxy-advanced
     config:
       balancer:
@@ -45,7 +44,7 @@ plugins:
                 target_variant: variant-1
             provider: sagemaker
           route_type: llm/v1/chat
-    route: sagemaker-converse
+    route: openai-chat
     model: '@sagemaker/claude-3-5-sonnet'
 ai_models:
   - name: '@sagemaker/claude-3-5-sonnet'

@@ -69,32 +69,8 @@ func SectionFor(format, providerType string) string {
 	if format == "gemini" && providerType == "vertex" {
 		return "vertex"
 	}
-	// SageMaker presents an OpenAI-compatible wire format (see WireLLMFormat) but
-	// serves its own converse endpoints, so a SageMaker provider always routes to
-	// the SageMaker section regardless of the client format label.
-	if providerType == "sagemaker" {
-		return "sagemaker"
-	}
-	return format
-}
 
-// WireLLMFormat returns the llm_format label the ai-proxy-advanced plugin should
-// carry for a model of the given client format. Most formats emit their own
-// name; SageMaker is served over an OpenAI-compatible request/response shape, so
-// its traffic is labelled "openai" on the wire even though it routes through the
-// SageMaker section's own converse endpoints (SectionFor keeps that routing
-// distinct). Keep the map in step with SectionFor's provider-driven overrides so
-// forward and reverse never drift.
-func WireLLMFormat(format string) string {
-	format = NormalizeFormat(format)
-	if wire, ok := wireLLMFormats[format]; ok {
-		return wire
-	}
 	return format
-}
-
-var wireLLMFormats = map[string]string{
-	"sagemaker": "openai",
 }
 
 // NormalizeFormat maps a provider-rendering section named directly as a
@@ -364,12 +340,6 @@ var EndpointTable = map[string]map[string]EndpointSpec{
 	},
 	"huggingface": {
 		"generate": {"generate", "/generate", false, mPost, "llm/v1/chat", catTextGen, &defaultBodyModelSelectorConfig, true},
-	},
-	"sagemaker": {
-		"generate": {
-			"converse", "model/(?<model_name>[^/]+)/converse(?:-stream)?",
-			true, mGetPost, "llm/v1/chat", catTextGen, nil, true,
-		},
 	},
 }
 
