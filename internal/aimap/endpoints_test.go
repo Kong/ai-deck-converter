@@ -9,7 +9,7 @@ import (
 func TestFormats(t *testing.T) {
 	got := Formats()
 	// The valid Format.Type values, i.e. EndpointTable sections minus provider renderings.
-	want := []string{"anthropic", "bedrock", "cohere", "gemini", "huggingface", "openai", "sagemaker"}
+	want := []string{"anthropic", "bedrock", "cohere", "gemini", "huggingface", "openai"}
 	require.Equal(t, want, got)
 	require.NotContains(t, got, "vertex", "vertex is a rendering of gemini, not a client format")
 }
