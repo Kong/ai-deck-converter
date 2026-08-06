@@ -1,0 +1,37 @@
+models:
+  - type: model
+    display_name: gpt-4o
+    name: gpt-4o
+    capabilities: [generate]
+    formats:
+      - type: openai
+    config:
+      route:
+        paths: [ '~/azure/path/prefix/(?<my_cool_model>)/pathsuffix' ]
+        model:
+          path_param: my_cool_model
+          values:
+            - gpt-5.5
+    targets:
+      - name: gpt-4o-azure
+        weight: 30
+        provider: azure-east
+        config:
+          type: azure
+          deployment_id: gpt4o-dep
+          api_version: "2024-02-01"
+    policies: []
+    access:
+      acls: {allow: [], deny: []}
+model_providers:
+  - type: azure
+    display_name: Azure East
+    name: azure-east
+    config:
+      instance: kong-az-east
+      auth:
+        type: basic
+        params:
+          - name: api-key
+            value: "{vault://env/azure-key}"
+            location: query
