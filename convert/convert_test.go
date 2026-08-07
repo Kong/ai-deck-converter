@@ -408,13 +408,13 @@ mcp_servers:
       - {name: t, description: a tool, method: GET, path: /t, scheme: https, host: x.internal}
   - type: conversion-listener
     name: oauth-mcp
+    access:
+      acl_attribute_type: oauth_access_token
+      access_token_claim_field: .user.email
+      default_tool_acls:
+        allow: [premium-users]
     config:
       route: {paths: [/mcp/oauth]}
-      access:
-        acl_attribute_type: oauth_access_token
-        access_token_claim_field: .user.email
-        default_tool_acls:
-          allow: [premium-users]
     tools:
       - {name: t, description: a tool, method: GET, path: /t, scheme: https, host: x.internal}
 `)

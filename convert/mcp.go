@@ -88,18 +88,12 @@ func (c *Converter) mcpPlugin(m *aigw.MCPServer) (kong.Plugin, error) {
 	if m.Config.ToolsCacheTTLSeconds != nil {
 		cfg["tools_cache_ttl_seconds"] = *m.Config.ToolsCacheTTLSeconds
 	}
-	// Access: emit the ACL attribute config and default_acl. Prefer the
-	// structured config.access block; fall back to the server-level access
-	// block. default_acl prefers default_tool_acls over acls. Merges the server-wide acls with
-	// default_tool_acls (acls first) so both apply rather than one shadowing the
-	// other.
-	if a := m.Config.Access; a != nil {
-		setIfNotEmpty(cfg, "acl_attribute_type", a.ACLAttributeType)
-		setIfNotEmpty(cfg, "access_token_claim_field", a.AccessTokenClaimField)
-		if acl := defaultACLBlock(mergeACLs(a.ACLs, a.DefaultToolACLs)); acl != nil {
-			cfg["default_acl"] = acl
-		}
-	} else if acl := defaultACLBlock(mergeACLs(m.Access.ACLs, m.Access.DefaultToolACLs)); acl != nil {
+	// Access: emit the ACL attribute config and default_acl. Merges the
+	// server-wide acls with default_tool_acls (acls first) so both apply rather
+	// than one shadowing the other.
+	setIfNotEmpty(cfg, "acl_attribute_type", m.Access.ACLAttributeType)
+	setIfNotEmpty(cfg, "access_token_claim_field", m.Access.AccessTokenClaimField)
+	if acl := defaultACLBlock(mergeACLs(m.Access.ACLs, m.Access.DefaultToolACLs)); acl != nil {
 		cfg["default_acl"] = acl
 	}
 	// include_consumer_groups is set by default, mirroring aclPlugin() in convert/acl.go: AI Gateway's
@@ -110,7 +104,7 @@ func (c *Converter) mcpPlugin(m *aigw.MCPServer) (kong.Plugin, error) {
 	// when acl_attribute_type is oauth_access_token, the plugin's schema hard-rejects
 	// include_consumer_groups being set (and subjects.lua ignores it in that mode regardless), so
 	// leave it unset there.
-	if m.Config.Access == nil || m.Config.Access.ACLAttributeType != "oauth_access_token" {
+	if m.Access.ACLAttributeType != "oauth_access_token" {
 		cfg["include_consumer_groups"] = true
 	}
 	tools, err := c.mcpTools(m.Name, m.Tools)
