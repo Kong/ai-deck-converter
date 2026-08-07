@@ -1,21 +1,21 @@
 mcp_servers:
   # conversion-listener carrying OAuth ACL config (acl_attribute_type +
-  # access_token_claim_field + default_tool_acls) under config.access.
+  # access_token_claim_field + default_tool_acls) under access.
   - type: conversion-listener
     display_name: Secure Flights MCP OAUTH
     name: secure-flights-mcp-oauth
     enabled: true
+    access:
+      acl_attribute_type: oauth_access_token
+      access_token_claim_field: .user.email
+      acls: {allow: [gold], deny: [platinum]}
+      default_tool_acls:
+        allow:
+          - premium
     config:
       route:
         paths:
           - /mcp/secure-flights
-      access:
-        acl_attribute_type: oauth_access_token
-        access_token_claim_field: .user.email
-        acls: {allow: [gold], deny: [platinum]}
-        default_tool_acls:
-          allow:
-            - premium
     tools:
       - name: searchFlights
         description: Search available flights
@@ -23,22 +23,22 @@ mcp_servers:
         path: /flights
         scheme: https
         host: flights.internal
-  # conversion-listener carrying OAuth ACL config (acl_attribute_type +
-  # access_token_claim_field + default_tool_acls) under config.access.
+  # conversion-listener carrying consumer ACL config (acl_attribute_type +
+  # default_tool_acls) under access.
   - type: conversion-listener
     display_name: Secure Flights MCP Consumer
     name: secure-flights-mcp-consumer
     enabled: true
+    access:
+      acl_attribute_type: consumer
+      acls: {allow: [agents], deny: []}
+      default_tool_acls:
+        allow:
+          - premium
     config:
       route:
         paths:
           - /mcp/secure-flights
-      access:
-        acl_attribute_type: consumer
-        acls: {allow: [agents], deny: []}
-        default_tool_acls:
-          allow:
-            - premium
     tools:
       - name: searchFlights
         description: Search available flights

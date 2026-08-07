@@ -8,8 +8,8 @@ import (
 // revertMCPServer lifts a service route carrying ai-mcp-proxy back into an AI
 // Gateway MCP Server: config.mode becomes the type, the plugin's embedded tools
 // come back out as Tools, the ACL config (acl_attribute_type /
-// access_token_claim_field / default_acl) becomes config.access, and any other
-// route- or service-level plugins become policies.
+// access_token_claim_field / default_acl) becomes the server-level access
+// block, and any other route- or service-level plugins become policies.
 func (r *Reverter) revertMCPServer(svc *kong.Service, rt *kong.Route, plugins, svcPlugins []kong.Plugin) error {
 	mcpPlugin := findPlugin(plugins, "ai-mcp-proxy")
 	cfg := mcpPlugin.Config
@@ -52,13 +52,12 @@ func (r *Reverter) revertMCPServer(svc *kong.Service, rt *kong.Route, plugins, s
 	m.Config.ToolsCacheTTLSeconds = getInt(cfg, "tools_cache_ttl_seconds")
 
 	// Access: the ACL attribute config and default_acl live in the plugin
-	// config; lift them back into the structured config.access block.
-	attrType := getStr(cfg, "acl_attribute_type")
-	claimField := getStr(cfg, "access_token_claim_field")
-	var defaultToolACLs aigw.ACLs
+	// config; lift them back into the server-level access block.
+	m.Access.ACLAttributeType = getStr(cfg, "acl_attribute_type")
+	m.Access.AccessTokenClaimField = getStr(cfg, "access_token_claim_field")
 	if dacl := getSlice(cfg, "default_acl"); len(dacl) > 0 {
 		if block, ok := dacl[0].(map[string]any); ok {
-			defaultToolACLs = aclsFromBlock(block)
+			m.Access.DefaultToolACLs = aclsFromBlock(block)
 		}
 		if len(dacl) > 1 {
 			if err := r.warn(
@@ -66,13 +65,6 @@ func (r *Reverter) revertMCPServer(svc *kong.Service, rt *kong.Route, plugins, s
 				svc.Name, len(dacl)-1); err != nil {
 				return err
 			}
-		}
-	}
-	if attrType != "" || claimField != "" || !defaultToolACLs.IsEmpty() {
-		m.Config.Access = &aigw.MCPConfigAccess{
-			ACLAttributeType:      attrType,
-			AccessTokenClaimField: claimField,
-			DefaultToolACLs:       defaultToolACLs,
 		}
 	}
 
