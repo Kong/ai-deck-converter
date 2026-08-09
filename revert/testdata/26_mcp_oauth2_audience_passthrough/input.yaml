@@ -1,0 +1,35 @@
+_format_version: "3.0"
+services:
+  - name: secure-mcp
+    host: localhost
+    routes:
+      - name: secure-mcp-route
+        paths:
+          - /mcp/secure
+          - /mcp/secure/.well-known/oauth-protected-resource
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              include_consumer_groups: true
+              logging:
+                log_audits: false
+                log_payloads: false
+                log_statistics: true
+              mode: listener
+              tools:
+                - description: Ping the server
+                  host: secure.internal
+                  method: GET
+                  name: ping
+                  path: /ping
+                  scheme: https
+          - name: ai-mcp-oauth2
+            config:
+              authorization_servers:
+                - https://dev-123456.okta.com/oauth2/default
+              client_id: mcp-client
+              client_secret: '{vault://ai-vault/okta-client-secret}'
+              insecure_relaxed_audience_validation: false
+              metadata_endpoint: /mcp/secure/.well-known/oauth-protected-resource
+              passthrough_credentials: true
+              resource: https://api.example.com/mcp/secure

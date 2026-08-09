@@ -2,6 +2,7 @@ package revert
 
 import (
 	"github.com/Kong/ai-deck-converter/internal/aigw"
+	"github.com/Kong/ai-deck-converter/internal/aimap"
 	"github.com/Kong/ai-deck-converter/internal/kong"
 )
 
@@ -59,23 +60,56 @@ func (r *Reverter) applyMCPOAuth2(m *aigw.MCPServer, p kong.Plugin) {
 		m.Config.Route.Paths = removeFirst(m.Config.Route.Paths, meta.Endpoint)
 	}
 
-	oidcCfg := map[string]any{}
-	if id := getStr(cfg, "client_id"); id != "" {
-		oidcCfg["client_id"] = []any{id}
-	}
-	if secret := getStr(cfg, "client_secret"); secret != "" {
-		oidcCfg["client_secret"] = []any{secret}
-	}
-	if v := getBool(cfg, "ssl_verify"); v != nil {
-		oidcCfg["ssl_verify"] = *v
-	}
+	oidcCfg := oidcConfigFromOAuth2(cfg)
 	if len(oidcCfg) == 0 {
-		// Metadata-only (no client credentials): no identity provider to
+		// Metadata-only (no identity-provider fields): no identity provider to
 		// reconstruct.
 		return
 	}
 	idp := r.registerIdentityProvider(kong.Plugin{Name: "openid-connect", Config: oidcCfg})
 	m.Access.IdentityProviders = append(m.Access.IdentityProviders, idp.Name)
+}
+
+// oidcConfigFromOAuth2 lifts an ai-mcp-oauth2 plugin config back into an
+// openid-connect identity provider config, inverting
+// convert's applyOIDCFieldsToOAuth2 via aimap's shared field table. The array-
+// first kinds re-wrap the plugin's scalar/path into the one-element array the
+// forward converter collapses; this is lossy for multi-element sources but
+// re-converts to the same plugin (see revert/roundtrip_test.go).
+func oidcConfigFromOAuth2(cfg map[string]any) map[string]any {
+	oidcCfg := map[string]any{}
+	for _, f := range aimap.OIDCToMCPOAuth2Fields {
+		switch f.Kind {
+		case aimap.OAuth2Passthrough:
+			if v, ok := cfg[f.OAuth2Key]; ok {
+				oidcCfg[f.OIDCKey] = v
+			}
+		case aimap.OAuth2FirstOfArray:
+			if s := getStr(cfg, f.OAuth2Key); s != "" {
+				oidcCfg[f.OIDCKey] = []any{s}
+			}
+		case aimap.OAuth2FirstOfPaths:
+			if p := getSlice(cfg, f.OAuth2Key); len(p) > 0 {
+				oidcCfg[f.OIDCKey] = []any{p}
+			}
+		}
+	}
+
+	// passthrough_credentials: true <=> the provider disabled hide_credentials.
+	if p := getBool(cfg, "passthrough_credentials"); p != nil && *p {
+		oidcCfg["hide_credentials"] = false
+	}
+	// insecure_relaxed_audience_validation: false <=> the provider required an
+	// audience; reconstruct audience_required from the resource (its RFC 8707
+	// audience). The concrete audience list is lossy but re-converts to the
+	// same plugin flag. The relaxed default (true) leaves audience_required off.
+	if v := getBool(cfg, "insecure_relaxed_audience_validation"); v != nil && !*v {
+		if resource := getStr(cfg, "resource"); resource != "" {
+			oidcCfg["audience_required"] = []any{resource}
+		}
+	}
+
+	return oidcCfg
 }
 
 // removeFirst returns paths with the first occurrence of target removed.

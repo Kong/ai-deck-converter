@@ -27,13 +27,29 @@ services:
             config:
               authorization_servers:
                 - https://dev-123456.okta.com/oauth2/default
+              cache_introspection: true
+              client_alg: RS256
+              client_auth: client_secret_post
               client_id: mcp-client
               client_secret: '{vault://ai-vault/okta-client-secret}'
+              consumer_by:
+                - username
+              consumer_claim:
+                - sub
+              consumer_optional: true
+              credential_claim:
+                - sub
+              http_version: 1.1
+              insecure_relaxed_audience_validation: true
+              introspection_endpoint: https://dev-123456.okta.com/oauth2/default/v1/introspect
+              jwt_claims_leeway: 30
+              keepalive: false
               metadata_endpoint: /mcp/secure-flights/.well-known/oauth-protected-resource
               resource: https://api.example.com/mcp/secure-flights
               scopes_supported:
                 - openid
                 - flights:read
+              timeout: 5000
   - name: keyed-mcp
     host: localhost
     routes:
@@ -87,10 +103,26 @@ services:
             config:
               authorization_servers:
                 - https://dev-123456.okta.com/oauth2/default
+              cache_introspection: true
+              client_alg: RS256
+              client_auth: client_secret_post
               client_id: mcp-client
               client_secret: '{vault://ai-vault/okta-client-secret}'
+              consumer_by:
+                - username
+              consumer_claim:
+                - sub
+              consumer_optional: true
+              credential_claim:
+                - sub
+              http_version: 1.1
+              insecure_relaxed_audience_validation: true
+              introspection_endpoint: https://dev-123456.okta.com/oauth2/default/v1/introspect
+              jwt_claims_leeway: 30
+              keepalive: false
               metadata_endpoint: /mcp/vendor-proxy/.well-known/oauth-protected-resource
               resource: https://api.example.com/mcp/vendor-proxy
               scopes_supported:
                 - openid
                 - profile
+              timeout: 5000

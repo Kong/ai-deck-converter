@@ -172,11 +172,38 @@ Lossy by design (the forward direction never emits them): `display_name`,
 - **MCP upstream.** Passthrough MCP servers without an `upstream_url` get a
   placeholder host and a warning.
 - **MCP OAuth2.** MCP `access.identity_providers` / `access.metadata` round-trips
-  in both directions, but the reverse synthesizes a **minimal** openid-connect
-  identity provider (client credentials only) from an `ai-mcp-oauth2` plugin —
-  provider config the plugin doesn't carry (e.g. `cache_tokens_salt`,
-  `auth_methods`) is not recovered, and `authorization_servers`/`scopes_supported`
-  are always attributed to the metadata rather than the provider's issuer/scopes.
+  in both directions. An openid-connect provider lowers its client credentials
+  plus the identically-typed / unambiguous fields onto the `ai-mcp-oauth2`
+  plugin: `client_alg`, `client_auth`, `introspection_endpoint`,
+  `mtls_introspection_endpoint`, `cache_introspection`, `jwks_endpoint`,
+  `leeway` (→ `jwt_claims_leeway`), `ssl_verify`, `consumer_by`,
+  `consumer_claims` (→ `consumer_claim`), `consumer_optional`,
+  `consumer_groups_claim`, `consumer_groups_optional`, `credential_claim`,
+  `keepalive`, `timeout`, `http_version`, and the `http(s)_proxy*` / `no_proxy`
+  fields (see `internal/aimap/mcp_oauth2.go` — the shared table both directions
+  use). The reverse synthesizes an openid-connect provider carrying exactly
+  those fields; array-valued OIDC fields collapsed to a plugin scalar
+  (`client_id`, `client_secret`, `client_alg`, `client_auth`) or single path
+  (`consumer_claim`) are re-wrapped into a one-element array, so a multi-element
+  source is lossy in the intermediate model but re-converts byte-identically.
+  Two further fields map by semantic derivation rather than a plain copy:
+  the provider's `hide_credentials: false` becomes the plugin's
+  `passthrough_credentials: true` (logical inverse; defaults agree, so only the
+  non-default is emitted), and `insecure_relaxed_audience_validation` is
+  **always** emitted to mirror OIDC audience enforcement — `false` when the
+  provider's `audience_required` is set, `true` otherwise (the reverse
+  reconstructs `audience_required` from the metadata `resource`, its RFC 8707
+  audience, when the flag is `false`). Deliberately **not** mapped (documented
+  non-conversions): `token_exchange`
+  (a false friend — OIDC's legacy grant vs the plugin's RFC-8693 upstream
+  exchange object), `client_jwk` (OIDC JWK object array vs plugin serialized
+  string), `introspection_endpoint_auth_method` (would collide with
+  `client_auth`), the downstream/upstream header-mapping fields,
+  `tls_client_auth_cert_id` (cert-entity UUID vs inline PEM), and
+  `extra_jwks_uris` (no plugin target). Provider config the plugin doesn't carry
+  (e.g. `cache_tokens_salt`, `auth_methods`) is not recovered, and
+  `authorization_servers`/`scopes_supported` are always attributed to the
+  metadata rather than the provider's issuer/scopes.
 - **Labels** are lossy as tags when a value contains `:`.
 
 ## Community
