@@ -163,6 +163,18 @@ func CapabilitiesFor(format, providerType string) []string {
 	return append(out, rest...)
 }
 
+// CapabilityLabel returns the user-facing name for a canonical capability.
+func CapabilityLabel(capability string) string {
+	switch capability {
+	case "agentic":
+		return "Responses"
+	case "generate":
+		return "Chat completions"
+	default:
+		return capability
+	}
+}
+
 var defaultBodyModelSelectorConfig = map[string]any{
 	"source":    "body",
 	"body_path": "model",

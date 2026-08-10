@@ -43,6 +43,9 @@ func TestMCPKeyAuthWithMetadataIsHardError(t *testing.T) {
 		_, _, err := Convert([]byte(keyAuthWithMetadata), Options{Strict: strict})
 		require.Error(t, err, "strict=%v", strict)
 		require.Contains(t, err.Error(), "OAuth Protected Resource Metadata is not supported for key-auth")
+		conversionErr, ok := AsConversionError(err)
+		require.True(t, ok, "strict=%v", strict)
+		require.Equal(t, "access.metadata", conversionErr.Diagnostics[0].Field)
 	}
 }
 

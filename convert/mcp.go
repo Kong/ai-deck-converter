@@ -15,10 +15,23 @@ func (c *Converter) convertMCPServers() error {
 	for i := range c.src.MCPServers {
 		m := &c.src.MCPServers[i]
 		route := buildRoute(m.Config.Route, m.Name)
+		route.Source = source("mcp_server", m.Name, "config.route")
 		plugin, err := c.mcpPlugin(m)
 		if err != nil {
 			return err
 		}
+		plugin.Source = source("mcp_server", m.Name, "config",
+			kong.FieldMapping{GeneratedPrefix: "config.mode", SourcePrefix: "type"},
+			kong.FieldMapping{GeneratedPrefix: "config.tools", SourcePrefix: "tools"},
+			kong.FieldMapping{GeneratedPrefix: "config.proxy_config", SourcePrefix: "config.proxy"},
+			kong.FieldMapping{GeneratedPrefix: "config.default_acl", SourcePrefix: "access"},
+			kong.FieldMapping{GeneratedPrefix: "config.acl_attribute_type", SourcePrefix: "access.acl_attribute_type"},
+			kong.FieldMapping{
+				GeneratedPrefix: "config.access_token_claim_field",
+				SourcePrefix:    "access.access_token_claim_field",
+			},
+			kong.FieldMapping{GeneratedPrefix: "config.server.tag", SourcePrefix: "config.server.label"},
+		)
 		route.Plugins = append(route.Plugins, plugin)
 
 		// Non-ACL policy plugins still apply at the route; ACLs are folded into
@@ -27,6 +40,7 @@ func (c *Converter) convertMCPServers() error {
 		if err != nil {
 			return err
 		}
+		guard = sourceScopedPlugins(guard, "mcp_server", m.Name)
 		route.Plugins = append(route.Plugins, guard...)
 
 		// Identity-provider / OAuth 2.0 Protected Resource Metadata access.
@@ -44,6 +58,7 @@ func (c *Converter) convertMCPServers() error {
 			Name:   m.Name,
 			Routes: []kong.Route{route},
 			Tags:   c.labelsToTags(m.Labels),
+			Source: serviceURLSource("mcp_server", m.Name),
 		}
 		if m.UpstreamURL != "" {
 			service.URL = m.UpstreamURL

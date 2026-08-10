@@ -96,6 +96,7 @@ type Service struct {
 	Routes   []Route  `yaml:"routes,omitempty"`
 	Plugins  []Plugin `yaml:"plugins,omitempty"`
 	Tags     []string `yaml:"tags,omitempty"`
+	Source   *Source  `yaml:"-"`
 }
 
 // Route is a Kong Gateway Route. Plugins may be nested.
@@ -118,6 +119,7 @@ type Route struct {
 	ResponseBuffering       *bool               `yaml:"response_buffering,omitempty"`
 	Plugins                 []Plugin            `yaml:"plugins,omitempty"`
 	Tags                    []string            `yaml:"tags,omitempty"`
+	Source                  *Source             `yaml:"-"`
 }
 
 // CIDRPort mirrors Kong route source/destination entries.
@@ -140,6 +142,33 @@ type Plugin struct {
 	ConsumerGroup *StringRef     `yaml:"consumer_group,omitempty"`
 	Model         *StringRef     `yaml:"model,omitempty"`
 	Tags          []string       `yaml:"tags,omitempty"`
+	TargetSources []TargetSource `yaml:"-"`
+	Source        *Source        `yaml:"-"`
+}
+
+// Source identifies the original AI Gateway entity field which produced a
+// generated Kong entity. It is conversion-only metadata and never emitted.
+// FieldMappings translate fields whose generated names or nesting differ from
+// the source API model.
+type Source struct {
+	EntityType    string
+	EntityName    string
+	FieldPrefix   string
+	FieldMappings []FieldMapping
+}
+
+type FieldMapping struct {
+	GeneratedPrefix string
+	SourcePrefix    string
+}
+
+// TargetSource identifies the AI Gateway model target and capability that
+// produced an ai-proxy-advanced target. It is conversion-only metadata and is
+// deliberately never emitted in a Kong declarative configuration.
+type TargetSource struct {
+	ModelName        string
+	ModelTargetIndex int
+	Capability       string
 }
 
 // Consumer is a Kong Gateway Consumer. Credentials and scoped plugins may be nested.
