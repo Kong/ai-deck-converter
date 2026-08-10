@@ -1,0 +1,51 @@
+# decK config using an Azure AI Foundry target: provider stays "azure", and the
+# foundry configuration lives in flat azure_* options (azure_service,
+# azure_foundry_resource, azure_foundry_domain, azure_foundry_path_prefix). The
+# reverse converter lifts these back into a provider config.foundry block plus a
+# per-model foundry_path_prefix, and synthesizes the azure-foundry provider.
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: anthropic-messages
+        paths:
+          - /ai/v1/messages
+        methods:
+          - POST
+        strip_path: false
+plugins:
+  - name: ai-model-selector
+    config:
+      body_path: model
+      max_request_body_size: 8388608
+      source: body
+    route: anthropic-messages
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      targets:
+        - auth:
+            header_name: api-key
+            header_value: '{vault://env/azure-foundry-key}'
+          description: claude-sonnet-4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: claude-foundry
+            name: claude-sonnet-4
+            options:
+              azure_foundry_domain: services.ai.azure.com
+              azure_foundry_path_prefix: /anthropic/v1
+              azure_foundry_resource: kong-foundry-east
+              azure_service: azure-foundry
+            provider: azure
+          route_type: llm/v1/chat
+    route: anthropic-messages
+    model: claude-foundry
+ai_models:
+  - name: claude-foundry

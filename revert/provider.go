@@ -29,11 +29,14 @@ func detectProviderType(enum, routePath string) string {
 // apart into its AI Gateway pieces: the target-level fields, the remaining
 // target options, and the provider-level fields to synthesize a Provider from.
 type defoldedTarget struct {
-	auth          aigw.ProviderAuth
-	allowOverride *bool
-	instance      string // azure
-	projectID     string // gemini / vertex
-	options       map[string]any
+	auth            aigw.ProviderAuth
+	allowOverride   *bool
+	instance        string // azure (azure-openai)
+	service         string // azure (azure-openai | azure-foundry)
+	foundryResource string // azure (azure-foundry)
+	foundryDomain   string // azure (azure-foundry)
+	projectID       string // gemini / vertex
+	options         map[string]any
 }
 
 // defoldAuth reverses convert's resolveAuth: it reads an ai-proxy-advanced
@@ -92,6 +95,14 @@ func defoldOptions(options map[string]any, providerType string, d *defoldedTarge
 			out["api_version"] = v
 		case providerType == "azure" && k == "azure_instance":
 			d.instance, _ = v.(string)
+		case providerType == "azure" && k == "azure_service":
+			d.service, _ = v.(string)
+		case providerType == "azure" && k == "azure_foundry_resource":
+			d.foundryResource, _ = v.(string)
+		case providerType == "azure" && k == "azure_foundry_domain":
+			d.foundryDomain, _ = v.(string)
+		case providerType == "azure" && k == "azure_foundry_path_prefix":
+			out["foundry_path_prefix"] = v
 		case providerType == "anthropic" && k == "anthropic_version":
 			out["version"] = v
 		case (providerType == "gemini" || providerType == "vertex") && k == "gemini":
@@ -180,8 +191,15 @@ func (r *Reverter) providerFor(providerType string, d *defoldedTarget) string {
 		Config: aigw.ProviderConfig{
 			Auth:      d.auth,
 			Instance:  d.instance,
+			Service:   d.service,
 			ProjectID: d.projectID,
 		},
+	}
+	if d.foundryResource != "" || d.foundryDomain != "" {
+		p.Config.Foundry = &aigw.AzureFoundry{
+			Resource: d.foundryResource,
+			Domain:   d.foundryDomain,
+		}
 	}
 	r.providers = append(r.providers, p)
 	r.providerByFP[fp] = name
@@ -195,6 +213,9 @@ func providerFingerprint(providerType string, d *defoldedTarget) string {
 		"type=" + providerType,
 		"auth.type=" + a.Type,
 		"instance=" + d.instance,
+		"service=" + d.service,
+		"foundry_resource=" + d.foundryResource,
+		"foundry_domain=" + d.foundryDomain,
 		"project_id=" + d.projectID,
 		"access_key_id=" + a.AccessKeyID,
 		"secret_access_key=" + a.SecretAccessKey,

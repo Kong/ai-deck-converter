@@ -218,6 +218,8 @@ func mapOptions(opts map[string]any, providerType, modelName string, provider *a
 			out["azure_deployment_id"] = v
 		case providerType == "azure" && k == "api_version":
 			out["azure_api_version"] = v
+		case providerType == "azure" && k == "foundry_path_prefix":
+			out["azure_foundry_path_prefix"] = v
 		case providerType == "anthropic" && k == "version":
 			out["anthropic_version"] = v
 		case (providerType == "gemini" || providerType == "vertex") && k == "gcp_environment":
@@ -267,6 +269,17 @@ func mapOptions(opts map[string]any, providerType, modelName string, provider *a
 		}
 		if providerType == "azure" && provider.Config.Instance != "" {
 			out["azure_instance"] = provider.Config.Instance
+		}
+		if providerType == "azure" && provider.Config.Service == "azure-foundry" {
+			out["azure_service"] = "azure-foundry"
+		}
+		if providerType == "azure" && provider.Config.Foundry != nil {
+			if provider.Config.Foundry.Resource != "" {
+				out["azure_foundry_resource"] = provider.Config.Foundry.Resource
+			}
+			if provider.Config.Foundry.Domain != "" {
+				out["azure_foundry_domain"] = provider.Config.Foundry.Domain
+			}
 		}
 		if providerType == "bedrock" {
 			a := provider.Config.Auth
