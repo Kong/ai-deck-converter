@@ -1,0 +1,50 @@
+models:
+  - display_name: GPT-5.2
+    name: gpt-5-2
+    type: model
+    enabled: true
+    capabilities: [generate]
+    formats:
+      - type: openai
+    config:
+      route:
+        paths: [/ai]
+      response_streaming: allow
+    targets:
+      - name: gpt-5.2
+        provider: openai-prod
+        config:
+          type: openai
+          temperature: 1.0
+          max_tokens: 1024
+          input_cost: 1.25
+          output_cost: 10.0
+          cache_read_cost: 0.125
+          cache_write_cost: 1.5625
+          cache_write_cost_list:
+            - ttl: 5m
+              cost: 1.5625
+            - ttl: 1h
+              cost: 2.5
+          context_window_factor:
+            - above: 128k
+              input_factor: 2.0
+              output_factor: 1.5
+          service_tier_factor:
+            - tier: priority
+              factor: 2.0
+            - tier: flex
+              factor: 0.5
+    policies: []
+    access:
+      acls: {allow: [], deny: []}
+model_providers:
+  - name: openai-prod
+    type: openai
+    display_name: OpenAI Prod
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://ai/openai-token}"
