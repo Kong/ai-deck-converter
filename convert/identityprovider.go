@@ -46,7 +46,11 @@ func identityProviderPlugin(idp *aigw.IdentityProvider) kong.Plugin {
 		cfg[k] = v
 	}
 	cfg["anonymous"] = anonymousConsumerName
-	return kong.Plugin{Name: idp.Type, Config: cfg}
+	return kong.Plugin{
+		Name:   idp.Type,
+		Config: cfg,
+		Source: source("identity_provider", idp.Name, "config"),
+	}
 }
 
 // ensureAnonymousConsumer appends the anonymous Consumer (with a

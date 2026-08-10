@@ -5,10 +5,12 @@ package convert
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 
 	publicaigw "github.com/Kong/ai-deck-converter/aigw"
 	"github.com/Kong/ai-deck-converter/internal/aigw"
+	"github.com/Kong/ai-deck-converter/internal/aimap"
 	"github.com/Kong/ai-deck-converter/internal/kong"
 	"gopkg.in/yaml.v3"
 )
@@ -44,11 +46,95 @@ func (o Options) withDefaults() Options {
 // Convert parses an AI Gateway document from YAML and returns Kong decK YAML
 // along with any non-fatal warnings.
 func Convert(src []byte, opts Options) ([]byte, []string, error) {
+	output, _, warnings, err := WithMetadata(src, opts)
+	return output, warnings, err
+}
+
+// ConversionMetadata identifies the AI Gateway source for generated plugin
+// targets. It is sidecar metadata and is never included in the emitted Kong
+// configuration.
+type ConversionMetadata struct {
+	PluginTargets []PluginTargetSource
+	Plugins       []GeneratedEntitySource
+	Routes        []GeneratedEntitySource
+	Services      []GeneratedEntitySource
+}
+
+// PluginTargetSource identifies one target in the converted plugin list and
+// the source model target and capability that produced it.
+type PluginTargetSource struct {
+	PluginIndex      int
+	Location         string
+	TargetIndex      int
+	ModelName        string
+	ModelTargetIndex int
+	Capability       string
+	CapabilityLabel  string
+}
+
+// GeneratedEntitySource identifies the source API entity for a generated
+// plugin, route, or service. FieldPrefix is used for direct field mappings;
+// FieldMappings handle generated field names that differ from the API model.
+type GeneratedEntitySource struct {
+	Index         int
+	Location      string
+	EntityType    string
+	EntityName    string
+	FieldPrefix   string
+	FieldMappings []FieldMapping
+}
+
+type FieldMapping struct {
+	GeneratedPrefix string
+	SourcePrefix    string
+}
+
+// ConversionDiagnostic identifies an API field involved in a conversion
+// failure. It is intentionally independent from Kong's validation errors so
+// converter callers can return source-native diagnostics without parsing text.
+type ConversionDiagnostic struct {
+	Field    string
+	Messages []string
+}
+
+// ConversionError is returned for source configurations that cannot be
+// represented safely as Kong entities.
+type ConversionError struct {
+	Diagnostics []ConversionDiagnostic
+}
+
+func (e *ConversionError) Error() string {
+	if len(e.Diagnostics) == 0 || len(e.Diagnostics[0].Messages) == 0 {
+		return "AI Gateway configuration cannot be converted"
+	}
+	return e.Diagnostics[0].Messages[0]
+}
+
+func (c *Converter) failAt(field, format string, args ...any) error {
+	return &ConversionError{Diagnostics: []ConversionDiagnostic{{
+		Field:    field,
+		Messages: []string{fmt.Sprintf(format, args...)},
+	}}}
+}
+
+// AsConversionError unwraps a converter error while preserving the public
+// error type behind any contextual wrappers added by callers.
+func AsConversionError(err error) (*ConversionError, bool) {
+	var conversionErr *ConversionError
+	if errors.As(err, &conversionErr) {
+		return conversionErr, true
+	}
+	return nil, false
+}
+
+// WithMetadata parses an AI Gateway document, converts it into a Kong
+// configuration, and returns source metadata for generated plugin targets.
+func WithMetadata(src []byte, opts Options) ([]byte, *ConversionMetadata, []string, error) {
 	doc, err := publicaigw.Parse(src)
 	if err != nil {
-		return nil, nil, fmt.Errorf("parsing source document: %w", err)
+		return nil, nil, nil, fmt.Errorf("parsing source document: %w", err)
 	}
-	return convertParsedDocument(doc, opts)
+	return convertParsedDocumentWithMetadata(doc, opts)
 }
 
 // marshalYAML encodes v as YAML using a fixed two-space indent.
@@ -90,19 +176,120 @@ func ConvertDocumentToDBLessYAML(doc *publicaigw.Document, opts Options) ([]byte
 	return data, warnings, err
 }
 
-func convertParsedDocument(doc *publicaigw.Document, opts Options) ([]byte, []string, error) {
+func convertParsedDocumentWithMetadata(
+	doc *publicaigw.Document,
+	opts Options,
+) ([]byte, *ConversionMetadata, []string, error) {
 	switch opts = opts.withDefaults(); opts.OutputMode {
 	case "deck":
-		out, warnings, err := ConvertDocument(doc, opts)
-		if err != nil {
-			return nil, warnings, err
+		c := newConverter(doc, opts)
+		if err := c.run(); err != nil {
+			return nil, nil, c.warnings, err
 		}
-		data, err := marshalYAML(out)
-		return data, warnings, err
+		data, err := marshalYAML(c.out)
+		return data, metadataForDeck(c.out), c.warnings, err
 	case "db-less":
-		return ConvertDocumentToDBLessYAML(doc, opts)
+		c := newConverter(doc, opts)
+		if err := c.run(); err != nil {
+			return nil, nil, c.warnings, err
+		}
+		out := c.projectDBLess()
+		data, err := marshalYAML(out)
+		metadata := metadataForDBLessPlugins(out.Plugins)
+		metadataForDBLessEntities(out, metadata)
+		return data, metadata, c.warnings, err
 	default:
-		return nil, nil, fmt.Errorf("invalid output_mode %q (want deck or db-less)", opts.OutputMode)
+		return nil, nil, nil, fmt.Errorf("invalid output_mode %q (want deck or db-less)", opts.OutputMode)
+	}
+}
+
+func metadataForDeck(document *kong.Document) *ConversionMetadata {
+	metadata := &ConversionMetadata{}
+	for index, plugin := range document.Plugins {
+		appendPluginMetadata(metadata, index, fmt.Sprintf("plugins[%d]", index), plugin)
+	}
+	for serviceIndex, service := range document.Services {
+		serviceLocation := fmt.Sprintf("services[%d]", serviceIndex)
+		if service.Source != nil {
+			metadata.Services = append(metadata.Services, generatedEntitySource(serviceIndex, serviceLocation, service.Source))
+		}
+		for pluginIndex, plugin := range service.Plugins {
+			location := fmt.Sprintf("%s.plugins[%d]", serviceLocation, pluginIndex)
+			appendPluginMetadata(metadata, pluginIndex, location, plugin)
+		}
+		for routeIndex, route := range service.Routes {
+			routeLocation := fmt.Sprintf("%s.routes[%d]", serviceLocation, routeIndex)
+			if route.Source != nil {
+				metadata.Routes = append(metadata.Routes, generatedEntitySource(routeIndex, routeLocation, route.Source))
+			}
+			for pluginIndex, plugin := range route.Plugins {
+				location := fmt.Sprintf("%s.plugins[%d]", routeLocation, pluginIndex)
+				appendPluginMetadata(metadata, pluginIndex, location, plugin)
+			}
+		}
+	}
+	return metadata
+}
+
+func metadataForDBLessPlugins(plugins []kong.DBLessPlugin) *ConversionMetadata {
+	metadata := &ConversionMetadata{}
+	for pluginIndex, plugin := range plugins {
+		appendPluginMetadata(metadata, pluginIndex, fmt.Sprintf("plugins[%d]", pluginIndex), kong.Plugin{
+			Source:        plugin.Source,
+			TargetSources: plugin.TargetSources,
+		})
+	}
+	return metadata
+}
+
+func appendPluginMetadata(metadata *ConversionMetadata, index int, location string, plugin kong.Plugin) {
+	if plugin.Source != nil {
+		metadata.Plugins = append(metadata.Plugins, generatedEntitySource(index, location, plugin.Source))
+	}
+	for targetIndex, targetSource := range plugin.TargetSources {
+		metadata.PluginTargets = append(metadata.PluginTargets, PluginTargetSource{
+			PluginIndex:      index,
+			Location:         location,
+			TargetIndex:      targetIndex,
+			ModelName:        targetSource.ModelName,
+			ModelTargetIndex: targetSource.ModelTargetIndex,
+			Capability:       targetSource.Capability,
+			CapabilityLabel:  aimap.CapabilityLabel(targetSource.Capability),
+		})
+	}
+}
+
+func generatedEntitySource(index int, location string, source *kong.Source) GeneratedEntitySource {
+	result := GeneratedEntitySource{
+		Index:       index,
+		Location:    location,
+		EntityType:  source.EntityType,
+		EntityName:  source.EntityName,
+		FieldPrefix: source.FieldPrefix,
+	}
+	for _, mapping := range source.FieldMappings {
+		result.FieldMappings = append(result.FieldMappings, FieldMapping{
+			GeneratedPrefix: mapping.GeneratedPrefix,
+			SourcePrefix:    mapping.SourcePrefix,
+		})
+	}
+	return result
+}
+
+func metadataForDBLessEntities(document *kong.DBLessDocument, metadata *ConversionMetadata) {
+	for index, route := range document.Routes {
+		if route.Source != nil {
+			metadata.Routes = append(metadata.Routes, generatedEntitySource(
+				index, fmt.Sprintf("routes[%d]", index), route.Source,
+			))
+		}
+	}
+	for index, service := range document.Services {
+		if service.Source != nil {
+			metadata.Services = append(metadata.Services, generatedEntitySource(
+				index, fmt.Sprintf("services[%d]", index), service.Source,
+			))
+		}
 	}
 }
 

@@ -34,6 +34,121 @@ models:
 		"expected unknown-provider warning")
 }
 
+func TestWithMetadataTracksGeneratedTargetSources(t *testing.T) {
+	src := []byte(`
+model_providers:
+  - name: local
+    type: ollama
+models:
+  - type: model
+    name: local-llama
+    capabilities: [generate, agentic]
+    formats: [{type: openai}]
+    targets:
+      - name: llama3.1:8b
+        provider: local
+        config: {type: llama2, format: ollama}
+    config:
+      route: {paths: [/ai]}
+      model: {}
+`)
+
+	_, metadata, _, err := WithMetadata(src, Options{OutputMode: "db-less"})
+	require.NoError(t, err)
+	require.Equal(t, []PluginTargetSource{
+		{
+			PluginIndex:      1,
+			Location:         "plugins[1]",
+			TargetIndex:      0,
+			ModelName:        "local-llama",
+			ModelTargetIndex: 0,
+			Capability:       "generate",
+			CapabilityLabel:  "Chat completions",
+		},
+		{
+			PluginIndex:      3,
+			Location:         "plugins[3]",
+			TargetIndex:      0,
+			ModelName:        "local-llama",
+			ModelTargetIndex: 0,
+			Capability:       "agentic",
+			CapabilityLabel:  "Responses",
+		},
+	}, metadata.PluginTargets)
+}
+
+func TestWithMetadataTracksMCPGeneratedEntities(t *testing.T) {
+	src := []byte(`
+mcp_servers:
+  - type: conversion-listener
+    name: tools
+    config:
+      route: {paths: [/mcp]}
+    tools:
+      - {name: search, description: Search, method: GET, path: /search, scheme: https, host: tools.internal}
+`)
+
+	_, metadata, _, err := WithMetadata(src, Options{OutputMode: "db-less"})
+	require.NoError(t, err)
+
+	require.Len(t, metadata.Plugins, 1)
+	require.Equal(t, GeneratedEntitySource{
+		Index:       0,
+		Location:    "plugins[0]",
+		EntityType:  "mcp_server",
+		EntityName:  "tools",
+		FieldPrefix: "config",
+		FieldMappings: []FieldMapping{
+			{GeneratedPrefix: "config.mode", SourcePrefix: "type"},
+			{GeneratedPrefix: "config.tools", SourcePrefix: "tools"},
+			{GeneratedPrefix: "config.proxy_config", SourcePrefix: "config.proxy"},
+			{GeneratedPrefix: "config.default_acl", SourcePrefix: "access"},
+			{GeneratedPrefix: "config.acl_attribute_type", SourcePrefix: "access.acl_attribute_type"},
+			{GeneratedPrefix: "config.access_token_claim_field", SourcePrefix: "access.access_token_claim_field"},
+			{GeneratedPrefix: "config.server.tag", SourcePrefix: "config.server.label"},
+		},
+	}, metadata.Plugins[0])
+	require.Len(t, metadata.Routes, 1)
+	require.Equal(t, "config.route", metadata.Routes[0].FieldPrefix)
+	require.Len(t, metadata.Services, 1)
+	require.Equal(t, "config.url", metadata.Services[0].FieldPrefix)
+	require.Contains(t, metadata.Services[0].FieldMappings, FieldMapping{
+		GeneratedPrefix: "protocol",
+		SourcePrefix:    "config.url",
+	})
+}
+
+func TestWithMetadataTracksNestedDeckEntities(t *testing.T) {
+	src := []byte(`
+agents:
+  - type: a2a
+    name: booking-agent
+    config:
+      url: https://agent.internal
+      route: {paths: [/agents/book]}
+`)
+
+	_, metadata, _, err := WithMetadata(src, Options{})
+	require.NoError(t, err)
+	require.Len(t, metadata.Services, 1)
+	require.Equal(t, "services[0]", metadata.Services[0].Location)
+	require.Equal(t, "config.url", metadata.Services[0].FieldPrefix)
+	require.Equal(t, []GeneratedEntitySource{{
+		Index:       0,
+		Location:    "services[0].routes[0]",
+		EntityType:  "agent",
+		EntityName:  "booking-agent",
+		FieldPrefix: "config.route",
+	}}, metadata.Routes)
+	require.Equal(t, []GeneratedEntitySource{{
+		Index:       0,
+		Location:    "services[0].routes[0].plugins[0]",
+		EntityType:  "agent",
+		EntityName:  "booking-agent",
+		FieldPrefix: "config",
+	}}, metadata.Plugins)
+}
+
 func TestConvertWarnsAndEmitsMultiTargetVideoLifecycleRoutes(t *testing.T) {
 	src := []byte(`
 model_providers:

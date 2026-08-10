@@ -41,6 +41,8 @@ type proxyGroup struct {
 	maxBodySize       *int
 	proxy             map[string]any
 	targets           []map[string]any
+	targetSources     []kong.TargetSource
+	source            *kong.Source
 	seen              map[string]bool
 }
 
@@ -175,6 +177,7 @@ func (c *Converter) convertModels() error {
 						modelSelectorConfig: selectorCfg,
 						proxyByOwner:        map[string]*proxyGroup{},
 					}
+					g.route.Source = source("model", m.Name, "config.route")
 					groups[key] = g
 					order = append(order, key)
 				} else if curSize, ok := g.modelSelectorConfig["max_request_body_size"].(int); ok {
@@ -223,7 +226,13 @@ func (c *Converter) convertModels() error {
 						modelNameHeader:   modelNameHeader,
 						maxBodySize:       m.Config.MaxRequestBodySize,
 						proxy:             proxyConfigBlock(m.Config.Proxy),
-						seen:              map[string]bool{},
+						source: source("model", m.Name, "config",
+							kong.FieldMapping{GeneratedPrefix: "config.proxy_config", SourcePrefix: "config.proxy"},
+							kong.FieldMapping{GeneratedPrefix: "config.model_name_header", SourcePrefix: "config.model.name_header"},
+							kong.FieldMapping{GeneratedPrefix: "config.vectordb", SourcePrefix: "config.balancer.vectordb"},
+							kong.FieldMapping{GeneratedPrefix: "config.embeddings", SourcePrefix: "config.balancer.embeddings"},
+						),
+						seen: map[string]bool{},
 					}
 					g.proxyByOwner[ownerKey] = pg
 					g.proxies = append(g.proxies, pg)
@@ -247,6 +256,11 @@ func (c *Converter) convertModels() error {
 				if !pg.seen[dedup] {
 					pg.seen[dedup] = true
 					pg.targets = append(pg.targets, target)
+					pg.targetSources = append(pg.targetSources, kong.TargetSource{
+						ModelName:        m.Name,
+						ModelTargetIndex: j,
+						Capability:       capability,
+					})
 				}
 			}
 		}
@@ -268,6 +282,7 @@ func (c *Converter) convertModels() error {
 		if err != nil {
 			return err
 		}
+		plugins = sourceScopedPlugins(plugins, "model", m.Name)
 		for _, routeName := range routeNames {
 			for k := range plugins {
 				p := plugins[k]
@@ -319,14 +334,23 @@ func (c *Converter) convertModels() error {
 				Name:   "ai-model-selector",
 				Route:  kong.NewStringRef(g.route.Name),
 				Config: g.modelSelectorConfig,
+				Source: source("model", g.route.Source.EntityName, "config.route.model",
+					kong.FieldMapping{GeneratedPrefix: "config.source", SourcePrefix: "config.route.model"},
+					kong.FieldMapping{GeneratedPrefix: "config.max_request_body_size", SourcePrefix: "config.max_request_body_size"},
+					kong.FieldMapping{GeneratedPrefix: "config.body_path", SourcePrefix: "config.route.model.body.body_param"},
+					kong.FieldMapping{GeneratedPrefix: "config.header_name", SourcePrefix: "config.route.model.header.header_param"},
+					kong.FieldMapping{GeneratedPrefix: "config.path_pattern", SourcePrefix: "config.route.model.path.values"},
+				),
 			})
 		}
 		for _, pg := range g.proxies {
 			plugin := kong.Plugin{
-				Name:    "ai-proxy-advanced",
-				Enabled: pg.enabled,
-				Route:   kong.NewStringRef(pg.routeName),
-				Config:  pg.proxyConfig(),
+				Name:          "ai-proxy-advanced",
+				Enabled:       pg.enabled,
+				Route:         kong.NewStringRef(pg.routeName),
+				Config:        pg.proxyConfig(),
+				TargetSources: pg.targetSources,
+				Source:        pg.source,
 			}
 			if pg.modelName != "" {
 				plugin.Model = kong.NewStringRef(pg.modelName)
@@ -337,6 +361,7 @@ func (c *Converter) convertModels() error {
 	for _, candidate := range lifecycleCandidates {
 		routeName := uniqueModelRouteName("openai-videos-lifecycle", usedRouteNames)
 		route := buildVideoLifecycleRoute(candidate.model.Config.Route, routeName, basePaths(candidate.model))
+		route.Source = source("model", candidate.model.Name, "config.route")
 		service.Routes = append(service.Routes, route)
 
 		logging := modelLoggingBlock(
@@ -344,7 +369,8 @@ func (c *Converter) convertModels() error {
 			candidate.spec.SupportsLogStatistics,
 		)
 		targets := make([]map[string]any, 0, len(candidate.targets))
-		for _, lifecycleTarget := range candidate.targets {
+		targetSources := make([]kong.TargetSource, 0, len(candidate.targets))
+		for targetIndex, lifecycleTarget := range candidate.targets {
 			targets = append(targets, c.buildTarget(
 				lifecycleTarget.target,
 				lifecycleTarget.provider,
@@ -355,6 +381,11 @@ func (c *Converter) convertModels() error {
 				candidate.spec.RouteType,
 				logging,
 			))
+			targetSources = append(targetSources, kong.TargetSource{
+				ModelName:        candidate.model.Name,
+				ModelTargetIndex: targetIndex,
+				Capability:       "video",
+			})
 		}
 		pg := &proxyGroup{
 			routeName:         routeName,
@@ -368,18 +399,28 @@ func (c *Converter) convertModels() error {
 			maxBodySize:       candidate.model.Config.MaxRequestBodySize,
 			proxy:             proxyConfigBlock(candidate.model.Config.Proxy),
 			targets:           targets,
+			targetSources:     targetSources,
+			source: source("model", candidate.model.Name, "config",
+				kong.FieldMapping{GeneratedPrefix: "config.proxy_config", SourcePrefix: "config.proxy"},
+				kong.FieldMapping{GeneratedPrefix: "config.model_name_header", SourcePrefix: "config.model.name_header"},
+				kong.FieldMapping{GeneratedPrefix: "config.vectordb", SourcePrefix: "config.balancer.vectordb"},
+				kong.FieldMapping{GeneratedPrefix: "config.embeddings", SourcePrefix: "config.balancer.embeddings"},
+			),
 		}
 		c.out.Plugins = append(c.out.Plugins, kong.Plugin{
-			Name:    "ai-proxy-advanced",
-			Enabled: pg.enabled,
-			Route:   kong.NewStringRef(routeName),
-			Config:  pg.proxyConfig(),
+			Name:          "ai-proxy-advanced",
+			Enabled:       pg.enabled,
+			Route:         kong.NewStringRef(routeName),
+			Config:        pg.proxyConfig(),
+			TargetSources: pg.targetSources,
+			Source:        pg.source,
 		})
 
 		plugins, err := c.scopedPlugins(entityModel, candidate.model.Policies, candidate.model.Access.ACLs)
 		if err != nil {
 			return err
 		}
+		plugins = sourceScopedPlugins(plugins, "model", candidate.model.Name)
 		for i := range plugins {
 			plugins[i].Route = kong.NewStringRef(routeName)
 			c.out.Plugins = append(c.out.Plugins, plugins[i])

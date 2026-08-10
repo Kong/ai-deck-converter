@@ -1,8 +1,6 @@
 package convert
 
 import (
-	"fmt"
-
 	"github.com/Kong/ai-deck-converter/internal/aigw"
 	"github.com/Kong/ai-deck-converter/internal/kong"
 )
@@ -52,7 +50,7 @@ func (c *Converter) mcpIdentityPlugins(m *aigw.MCPServer, route *kong.Route) ([]
 	// key-auth cannot serve OAuth 2.0 Protected Resource Metadata; reject the
 	// combination unconditionally (independent of -strict).
 	if meta != nil && idp != nil && idp.Type == "key-auth" {
-		return nil, fmt.Errorf(
+		return nil, c.failAt("access.metadata",
 			"MCP server %q references key-auth identity provider %q with access.metadata; "+
 				"OAuth Protected Resource Metadata is not supported for key-auth",
 			m.Name, idp.Name)
@@ -66,6 +64,7 @@ func (c *Converter) mcpIdentityPlugins(m *aigw.MCPServer, route *kong.Route) ([]
 		if meta.Endpoint != "" {
 			route.Paths = append(route.Paths, meta.Endpoint)
 		}
+		plugin.Source = mcpOAuth2Source(m, idp, meta)
 		return []kong.Plugin{plugin}, nil
 	}
 
@@ -78,7 +77,36 @@ func (c *Converter) mcpIdentityPlugins(m *aigw.MCPServer, route *kong.Route) ([]
 	for k, v := range idp.Config {
 		cfg[k] = v
 	}
-	return []kong.Plugin{{Name: idp.Type, Config: cfg}}, nil
+	plugin := kong.Plugin{Name: idp.Type, Config: cfg, Source: source("identity_provider", idp.Name, "config")}
+	return []kong.Plugin{plugin}, nil
+}
+
+func mcpOAuth2Source(
+	m *aigw.MCPServer,
+	idp *aigw.IdentityProvider,
+	meta *aigw.MCPProtectedResourceMetadata,
+) *kong.Source {
+	authorizationServersSource := "access.metadata.authorization_servers"
+	if len(meta.AuthorizationServers) == 0 && idp != nil && firstConfigString(idp.Config, "issuer") != "" {
+		authorizationServersSource = "access.identity_providers"
+	}
+	scopesSource := "access.metadata.scopes_supported"
+	if len(meta.ScopesSupported) == 0 && idp != nil && len(configStrings(idp.Config, "scopes")) > 0 {
+		scopesSource = "access.identity_providers"
+	}
+	return source("mcp_server", m.Name, "access.metadata",
+		kong.FieldMapping{GeneratedPrefix: "config.resource", SourcePrefix: "access.metadata.resource"},
+		kong.FieldMapping{GeneratedPrefix: "config.authorization_servers", SourcePrefix: authorizationServersSource},
+		kong.FieldMapping{GeneratedPrefix: "config.scopes_supported", SourcePrefix: scopesSource},
+		kong.FieldMapping{GeneratedPrefix: "config.metadata_endpoint", SourcePrefix: "access.metadata.endpoint"},
+		kong.FieldMapping{
+			GeneratedPrefix: "config.metadata_discovery_endpoint",
+			SourcePrefix:    "access.metadata.discovery_endpoint",
+		},
+		kong.FieldMapping{GeneratedPrefix: "config.client_id", SourcePrefix: "access.identity_providers"},
+		kong.FieldMapping{GeneratedPrefix: "config.client_secret", SourcePrefix: "access.identity_providers"},
+		kong.FieldMapping{GeneratedPrefix: "config.ssl_verify", SourcePrefix: "access.identity_providers"},
+	)
 }
 
 // mcpAccessIdentityProvider resolves the single (schema max 1) identity provider
