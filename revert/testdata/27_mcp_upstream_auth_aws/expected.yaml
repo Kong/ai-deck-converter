@@ -1,0 +1,21 @@
+mcp_servers:
+  - type: passthrough-listener
+    name: secure-vendor-mcp
+    config:
+      route:
+        paths:
+          - /mcp/secure-vendor
+      logging:
+        payloads: false
+        statistics: true
+        audits: false
+      upstream:
+        auth:
+          type: aws
+          access_key_id: AKIAIOSFODNN7EXAMPLE
+          secret_access_key: '{vault://env/aws-secret}'
+          region: us-west-2
+    tools:
+      - name: vendorTool
+        description: A vendor tool
+    upstream_url: https://mcp.internal.kongair.com

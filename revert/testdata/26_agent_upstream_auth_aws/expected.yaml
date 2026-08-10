@@ -1,0 +1,29 @@
+agents:
+  - type: a2a
+    name: booking-agent
+    config:
+      url: https://booking-agent.internal:8443/a2a
+      route:
+        name: booking-route
+        paths:
+          - /agents/booking
+        methods:
+          - POST
+      logging:
+        payloads: false
+        statistics: true
+        max_payload_size: 1048576
+      upstream:
+        auth:
+          type: aws
+          access_key_id: AKIAIOSFODNN7EXAMPLE
+          secret_access_key: '{vault://env/aws-secret}'
+          session_token: '{vault://env/aws-session}'
+          region: us-east-1
+          assume_role_arn: arn:aws:iam::123456789012:role/agentcore
+          role_session_name: kong-a2a
+          sts_endpoint_url: https://sts.us-east-1.amazonaws.com
+      proxy:
+        https_proxy:
+          host: proxy.internal
+          port: 8080

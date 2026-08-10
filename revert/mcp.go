@@ -1,6 +1,8 @@
 package revert
 
 import (
+	"fmt"
+
 	"github.com/Kong/ai-deck-converter/internal/aigw"
 	"github.com/Kong/ai-deck-converter/internal/kong"
 )
@@ -49,6 +51,11 @@ func (r *Reverter) revertMCPServer(svc *kong.Service, rt *kong.Route, plugins, s
 	m.Config.Logging = loggingFromBlockWithDefaults(getMap(cfg, "logging"), true, false)
 	m.Config.Server = mcpServerConfigForAIGateway(getMap(cfg, "server"))
 	m.Config.Proxy = proxyFromConfig(getMap(cfg, "proxy_config"))
+	upstream, err := r.upstreamFromConfig(getMap(cfg, "auth"), fmt.Sprintf("MCP server %q", svc.Name))
+	if err != nil {
+		return err
+	}
+	m.Config.Upstream = upstream
 	m.Config.ToolsCacheTTLSeconds = getInt(cfg, "tools_cache_ttl_seconds")
 
 	// Access: the ACL attribute config and default_acl live in the plugin

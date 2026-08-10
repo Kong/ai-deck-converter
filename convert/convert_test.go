@@ -784,8 +784,10 @@ func TestA2APluginDropsLogAudits(t *testing.T) {
 			},
 		},
 	}
-	logging, ok := a2aPlugin(a).Config["logging"].(map[string]any)
-	require.True(t, ok, "expected logging block, got %v", a2aPlugin(a).Config["logging"])
+	plugin, err := (&Converter{}).a2aPlugin(a)
+	require.NoError(t, err)
+	logging, ok := plugin.Config["logging"].(map[string]any)
+	require.True(t, ok, "expected logging block, got %v", plugin.Config["logging"])
 	require.NotContains(t, logging, "log_audits", "ai-a2a-proxy must not emit log_audits, got %v", logging)
 	require.Equal(t, true, logging["log_statistics"], "expected log_statistics true")
 }

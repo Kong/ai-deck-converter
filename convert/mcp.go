@@ -1,6 +1,8 @@
 package convert
 
 import (
+	"fmt"
+
 	"github.com/Kong/ai-deck-converter/internal/aigw"
 	"github.com/Kong/ai-deck-converter/internal/kong"
 )
@@ -83,6 +85,15 @@ func (c *Converter) mcpPlugin(m *aigw.MCPServer) (kong.Plugin, error) {
 	// but we pass it through whenever set and let the plugin validate.
 	if pc := proxyConfigBlock(m.Config.Proxy); pc != nil {
 		cfg["proxy_config"] = pc
+	}
+	// Upstream authentication (e.g. AWS SigV4) lowers to the plugin's auth
+	// record; only emitted when set.
+	auth, err := c.upstreamAuthBlock(m.Config.Upstream, fmt.Sprintf("MCP server %q", m.Name))
+	if err != nil {
+		return kong.Plugin{}, err
+	}
+	if auth != nil {
+		cfg["auth"] = auth
 	}
 	// tools_cache_ttl_seconds is required by the plugin in upstream-server mode.
 	if m.Config.ToolsCacheTTLSeconds != nil {

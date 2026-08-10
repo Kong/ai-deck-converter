@@ -1,6 +1,8 @@
 package convert
 
 import (
+	"fmt"
+
 	"github.com/Kong/ai-deck-converter/internal/aigw"
 	"github.com/Kong/ai-deck-converter/internal/aimap"
 	"github.com/Kong/ai-deck-converter/internal/kong"
@@ -31,7 +33,11 @@ func (c *Converter) convertAgents() error {
 
 		switch a.Type {
 		case "a2a":
-			route.Plugins = append(route.Plugins, a2aPlugin(a))
+			plugin, err := c.a2aPlugin(a)
+			if err != nil {
+				return err
+			}
+			route.Plugins = append(route.Plugins, plugin)
 		case "http":
 			// plain HTTP proxy: Service + Route only
 		default:
@@ -62,7 +68,7 @@ func (c *Converter) convertAgents() error {
 	return nil
 }
 
-func a2aPlugin(a *aigw.Agent) kong.Plugin {
+func (c *Converter) a2aPlugin(a *aigw.Agent) (kong.Plugin, error) {
 	cfg := map[string]any{}
 	if logging := loggingBlock(withLoggingDefaults(a.Config.Logging, false, true)); logging != nil {
 		// log_audits is an ai-mcp-proxy field; the ai-a2a-proxy schema has no
@@ -75,7 +81,17 @@ func a2aPlugin(a *aigw.Agent) kong.Plugin {
 	if a.Config.MaxRequestBodySize != nil {
 		cfg["max_request_body_size"] = *a.Config.MaxRequestBodySize
 	}
-	return kong.Plugin{Name: "ai-a2a-proxy", Config: cfg}
+	if pc := proxyConfigBlock(a.Config.Proxy); pc != nil {
+		cfg["proxy_config"] = pc
+	}
+	auth, err := c.upstreamAuthBlock(a.Config.Upstream, fmt.Sprintf("agent %q", a.Name))
+	if err != nil {
+		return kong.Plugin{}, err
+	}
+	if auth != nil {
+		cfg["auth"] = auth
+	}
+	return kong.Plugin{Name: "ai-a2a-proxy", Config: cfg}, nil
 }
 
 // withLoggingDefaults returns a copy of l with statistics/payloads defaulted

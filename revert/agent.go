@@ -1,6 +1,8 @@
 package revert
 
 import (
+	"fmt"
+
 	"github.com/Kong/ai-deck-converter/internal/aigw"
 	"github.com/Kong/ai-deck-converter/internal/kong"
 )
@@ -27,6 +29,12 @@ func (r *Reverter) revertAgent(svc *kong.Service, rt *kong.Route, name string, s
 		a.Type = "a2a"
 		a.Config.Logging = loggingFromBlockWithDefaults(getMap(a2a.Config, "logging"), false, true)
 		a.Config.MaxRequestBodySize = getInt(a2a.Config, "max_request_body_size")
+		a.Config.Proxy = proxyFromConfig(getMap(a2a.Config, "proxy_config"))
+		upstream, err := r.upstreamFromConfig(getMap(a2a.Config, "auth"), fmt.Sprintf("agent %q", name))
+		if err != nil {
+			return err
+		}
+		a.Config.Upstream = upstream
 	}
 
 	a.Config.URL = serviceURL(svc)

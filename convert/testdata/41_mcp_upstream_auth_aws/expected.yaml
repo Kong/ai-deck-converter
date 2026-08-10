@@ -1,0 +1,26 @@
+_format_version: "3.0"
+services:
+  - name: secure-vendor-mcp
+    url: https://mcp.internal.kongair.com
+    routes:
+      - name: secure-vendor-mcp-route
+        paths:
+          - /mcp/secure-vendor
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              auth:
+                aws_iam:
+                  aws_access_key_id: AKIAIOSFODNN7EXAMPLE
+                  aws_region: us-west-2
+                  aws_secret_access_key: '{vault://env/aws-secret}'
+                provider: aws_iam
+              include_consumer_groups: true
+              logging:
+                log_audits: false
+                log_payloads: false
+                log_statistics: true
+              mode: passthrough-listener
+              tools:
+                - description: A vendor tool
+                  name: vendorTool
