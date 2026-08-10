@@ -122,8 +122,9 @@ plugins:
     model: my-model-alias-header-value
   - name: ai-model-selector
     config:
-      path_pattern: my-model-path-alias-value
-      source: path
+      body_path: model
+      max_request_body_size: 8388608
+      source: body
     route: openai-chat-4
   - name: ai-proxy-advanced
     config:

@@ -22,8 +22,7 @@ models:
     config:
       route:
         model:
-          body:
-            body_param: model
+          automatic:
             values:
               - '@openai/guarded-gpt'
       logging:

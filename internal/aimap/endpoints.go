@@ -181,25 +181,11 @@ var defaultBodyModelSelectorConfig = map[string]any{
 }
 
 // Default path-selector patterns emitted by the forward converter for the
-// path-based sections. The reverse converter treats a route carrying one of
-// these as a plain default (no explicit PathAliases) so round trips stay clean;
-// any other pattern is a custom alias that must be materialized.
+// path-based sections.
 const (
 	GeminiDefaultPathPattern  = "models/([%w%.%-]+):"
 	BedrockDefaultPathPattern = "model/([^/]+)/"
 )
-
-// IsDefaultPathPattern reports whether pattern is one of the path-selector
-// patterns the forward converter emits by default (see the Default*PathPattern
-// constants). Keep this in step with the path_pattern values in EndpointTable's
-// path-based sections.
-func IsDefaultPathPattern(pattern string) bool {
-	switch pattern {
-	case GeminiDefaultPathPattern, BedrockDefaultPathPattern:
-		return true
-	}
-	return false
-}
 
 var geminiPathModelSelectorConfig = map[string]any{
 	"source":       "path",
