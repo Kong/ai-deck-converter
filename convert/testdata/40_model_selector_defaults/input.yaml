@@ -1,0 +1,102 @@
+models:
+  # No route.model: use the OpenAI body selector and model.name as the alias.
+  - name: openai-default-name
+    type: model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/openai-default-name]}
+    targets:
+      - name: gpt-5
+        provider: openai-provider
+        config: {type: openai}
+
+  # automatic.values preserves an alias without overriding OpenAI's body selector.
+  - name: openai-default-alias
+    type: model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/openai-default-alias], model: {automatic: {values: ["@kong/openai"]}}}
+    targets:
+      - name: gpt-5
+        provider: openai-provider
+        config: {type: openai}
+
+  # An explicit body source with no values still falls back to model.name.
+  - name: openai-custom-body
+    type: model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/openai-custom-body], model: {body: {body_param: requested_model}}}
+    targets:
+      - name: gpt-5
+        provider: openai-provider
+        config: {type: openai}
+
+  # An explicit header source with no values also falls back to model.name.
+  - name: openai-custom-header
+    type: model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/openai-custom-header], model: {header: {header_param: x-model}}}
+    targets:
+      - name: gpt-5
+        provider: openai-provider
+        config: {type: openai}
+
+  # No route.model: Gemini's format default is the native path selector.
+  - name: gemini-default-name
+    type: model
+    capabilities: [generate]
+    formats: [{type: gemini}]
+    config:
+      route: {paths: [/gemini-default-name]}
+    targets:
+      - name: gemini-2.5-pro
+        provider: gemini-provider
+        config: {type: gemini}
+
+  # automatic.values preserves an alias while keeping Gemini's path selector.
+  - name: gemini-default-alias
+    type: model
+    capabilities: [generate]
+    formats: [{type: gemini}]
+    config:
+      route: {paths: [/gemini-default-alias], model: {automatic: {values: ["@kong/gemini"]}}}
+    targets:
+      - name: gemini-2.5-pro
+        provider: gemini-provider
+        config: {type: gemini}
+
+  # An explicit path selector with no values retains Gemini's default pattern.
+  - name: gemini-path-name
+    type: model
+    capabilities: [generate]
+    formats: [{type: gemini}]
+    config:
+      route: {paths: [/gemini-path-name], model: {path: {path_param: model_name}}}
+    targets:
+      - name: gemini-2.5-pro
+        provider: gemini-provider
+        config: {type: gemini}
+
+  # An explicit path selector can carry a separate alias.
+  - name: gemini-path-alias
+    type: model
+    capabilities: [generate]
+    formats: [{type: gemini}]
+    config:
+      route: {paths: [/gemini-path-alias], model: {path: {path_param: model_name, values: ["@kong/gemini-path"]}}}
+    targets:
+      - name: gemini-2.5-pro
+        provider: gemini-provider
+        config: {type: gemini}
+
+model_providers:
+  - name: openai-provider
+    type: openai
+  - name: gemini-provider
+    type: gemini

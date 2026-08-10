@@ -16,8 +16,7 @@ models:
     config:
       route:
         model:
-          body:
-            body_param: model
+          automatic:
             values:
               - '@openai/gpt-5.4'
       logging:

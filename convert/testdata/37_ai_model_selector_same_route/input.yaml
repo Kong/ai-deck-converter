@@ -81,8 +81,7 @@ models:
       route:
         paths: [/ai]
         model:
-          path:
-            path_param: model-capture-group
+          automatic:
             values:
               - my-model-path-alias-value
       response_streaming: allow

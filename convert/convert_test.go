@@ -647,7 +647,7 @@ models:
         provider: p1
         config: {type: openai}
     config:
-      route: {paths: [/v1], model: {path: {values: ["@openai/custom-m1"]}}}
+      route: {paths: [/v1], model: {automatic: {values: ["@openai/custom-m1"]}}}
 model_providers:
   - name: p1
     type: openai
@@ -693,6 +693,43 @@ model_providers:
 	require.True(t, ok, "expected ai-proxy-advanced model")
 	require.Equal(t, "gpt-4o", model["name"])
 	require.Equal(t, "@openai/custom-m1", model["model_alias"], "target model_alias should match source model.alias")
+}
+
+func TestConvertAutomaticSelectorUsesFormatDefault(t *testing.T) {
+	src := []byte(`
+models:
+  - type: model
+    name: gemini-model
+    capabilities: [generate]
+    formats: [{type: gemini}]
+    targets:
+      - name: gemini-2.5-pro
+        provider: p1
+        config: {type: gemini}
+    config:
+      route: {paths: [/v1], model: {automatic: {values: ["@kong/gemini"]}}}
+model_providers:
+  - name: p1
+    type: gemini
+`)
+
+	out, _, err := Convert(src, Options{})
+	require.NoError(t, err, "convert")
+
+	var got map[string]any
+	require.NoError(t, yaml.Unmarshal(out, &got), "unmarshal output")
+	plugins := got["plugins"].([]any)
+	for _, raw := range plugins {
+		plugin := raw.(map[string]any)
+		if plugin["name"] != "ai-model-selector" {
+			continue
+		}
+		config := plugin["config"].(map[string]any)
+		require.Equal(t, "path", config["source"])
+		require.Equal(t, "models/([%w%.%-]+):", config["path_pattern"])
+		return
+	}
+	t.Fatal("expected ai-model-selector plugin")
 }
 
 func TestConvertSynthesizesAIModelNameWhenUnset(t *testing.T) {

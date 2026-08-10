@@ -50,9 +50,17 @@ type ModelNameConfig struct {
 
 // ModelSelectorConfig is the model selector configuration.
 type ModelSelectorConfig struct {
-	Body   ModelBodySelectorConfig   `yaml:"body,omitempty"`
-	Header ModelHeaderSelectorConfig `yaml:"header,omitempty"`
-	Path   ModelPathSelectorConfig   `yaml:"path,omitempty"`
+	// Automatic carries an alias while retaining the format/capability default
+	// selector source. It is emitted by Koko when an API request supplies values
+	// but no *_param override.
+	Automatic ModelAutomaticSelectorConfig `yaml:"automatic,omitempty"`
+	Body      ModelBodySelectorConfig      `yaml:"body,omitempty"`
+	Header    ModelHeaderSelectorConfig    `yaml:"header,omitempty"`
+	Path      ModelPathSelectorConfig      `yaml:"path,omitempty"`
+}
+
+type ModelAutomaticSelectorConfig struct {
+	Values []string `yaml:"values,omitempty"`
 }
 
 type ModelBodySelectorConfig struct {

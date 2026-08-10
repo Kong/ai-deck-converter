@@ -744,12 +744,16 @@ func disabledModelPluginEnabled(enabled *bool) *bool {
 	return nil
 }
 
-// extractModelAlias returns the source model's alias
-// It first attempts to read the alias from the path alias, then body alias, and lastly the headers alias.
-// API validation restricts the model Route.Model config to being a oneOf with only one alias value set.
+// extractModelAlias returns the source model's authored alias, or its name when
+// none is authored. Automatic carries an alias without overriding the selector
+// source; the remaining fields carry aliases alongside explicit source overrides.
 func extractModelAlias(m *aigw.Model) string {
-	// First attempt to read the alias from the path selector
-	if len(m.Config.Route.Model.Path.Values) > 0 {
+	if len(m.Config.Route.Model.Automatic.Values) > 0 {
+		return m.Config.Route.Model.Automatic.Values[0]
+	}
+
+	// First attempt to read the alias from the path selector.
+	if m.Config.Route.Model.Path.PathParam != "" && len(m.Config.Route.Model.Path.Values) > 0 {
 		return m.Config.Route.Model.Path.Values[0]
 	}
 
@@ -787,17 +791,17 @@ func bodySizeOrDefault(m *aigw.Model) int {
 }
 
 // buildModelSelectorConfig returns the ai-model-selector config a model wants
-// for its route, or nil if the endpoint needs no selector at all (e.g.
-// Bedrock's URI-capture routes). Route.Model picks the source explicitly
-// (path/body/header); absent that, capabilities that carry a body `model`
-// field by default (spec.TakesBodyModel) fall back to reading it there.
+// for its route, or nil if the endpoint needs no selector at all. Explicit
+// body/header/path parameters override the source. An automatic selector (or
+// no selector override at all) leaves source selection to the endpoint's
+// format/capability default.
 func buildModelSelectorConfig(m *aigw.Model, spec aimap.EndpointSpec) map[string]any {
 	switch {
-	case len(m.Config.Route.Model.Path.Values) > 0:
-		return map[string]any{
-			"source":       "path",
-			"path_pattern": m.Config.Route.Model.Path.Values[0],
-		}
+	case m.Config.Route.Model.Path.PathParam != "":
+		// ai-model-selector represents a path source with a Lua pattern, not a
+		// capture-group name. The API's path_param denotes the format-provided
+		// model capture, so retain that format's default path selector.
+		return defaultModelSelectorConfig(m, spec)
 	case m.Config.Route.Model.Body.BodyParam != "":
 		return map[string]any{
 			"source":                "body",
@@ -809,18 +813,24 @@ func buildModelSelectorConfig(m *aigw.Model, spec aimap.EndpointSpec) map[string
 			"source":      "header",
 			"header_name": m.Config.Route.Model.Header.HeaderParam,
 		}
-	case spec.DefaultModelSelectorConfig != nil:
-		// make a copy of default model selector config
-		config := make(map[string]any, len(*spec.DefaultModelSelectorConfig)+1)
-		for k, v := range *spec.DefaultModelSelectorConfig {
-			config[k] = v
-		}
-
-		config["max_request_body_size"] = bodySizeOrDefault(m)
-
-		return config
 	}
-	return nil
+
+	return defaultModelSelectorConfig(m, spec)
+}
+
+func defaultModelSelectorConfig(m *aigw.Model, spec aimap.EndpointSpec) map[string]any {
+	if spec.DefaultModelSelectorConfig == nil {
+		return nil
+	}
+
+	// Make a copy because max_request_body_size is model-specific.
+	config := make(map[string]any, len(*spec.DefaultModelSelectorConfig)+1)
+	for k, v := range *spec.DefaultModelSelectorConfig {
+		config[k] = v
+	}
+	config["max_request_body_size"] = bodySizeOrDefault(m)
+
+	return config
 }
 
 // modelSelectorShapeKey canonicalizes an ai-model-selector config's shape

@@ -15,7 +15,7 @@ models:
     config:
       route:
         model:
-          path:
+          automatic:
             values:
               - '@bedrock/titan-embed-text-v2'
       logging:
@@ -36,7 +36,7 @@ models:
     config:
       route:
         model:
-          path:
+          automatic:
             values:
               - '@bedrock/nova-canvas'
       logging:
@@ -57,7 +57,7 @@ models:
     config:
       route:
         model:
-          path:
+          automatic:
             values:
               - '@bedrock/nova-sonic'
       logging:
@@ -79,7 +79,7 @@ models:
     config:
       route:
         model:
-          path:
+          automatic:
             values:
               - '@bedrock/nova-reel'
       logging:
