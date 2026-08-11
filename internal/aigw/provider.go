@@ -50,6 +50,7 @@ type ProviderAuth struct {
 	// aws
 	AccessKeyID     string `yaml:"access_key_id,omitempty"`
 	SecretAccessKey string `yaml:"secret_access_key,omitempty"`
+	AWSSessionToken string `yaml:"aws_session_token,omitempty"`
 	AssumeRoleARN   string `yaml:"assume_role_arn,omitempty"`
 	RoleSessionName string `yaml:"role_session_name,omitempty"`
 	STSEndpointURL  string `yaml:"sts_endpoint_url,omitempty"`
