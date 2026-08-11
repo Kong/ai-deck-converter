@@ -261,7 +261,9 @@ func (r *Reverter) uniqueProviderName(providerType string, d *defoldedTarget) st
 // vaultPrefix returns the vault prefix referenced by the first credential
 // value in the auth, if any.
 func vaultPrefix(a aigw.ProviderAuth) string {
-	candidates := []string{a.SecretAccessKey, a.AWSSessionToken, a.SessionToken, a.AccessKeyID, a.ServiceAccountJSON, a.ClientSecret}
+	candidates := []string{
+		a.SecretAccessKey, a.AWSSessionToken, a.SessionToken, a.AccessKeyID, a.ServiceAccountJSON, a.ClientSecret,
+	}
 	if len(a.Headers) > 0 {
 		candidates = append([]string{a.Headers[0].Value}, candidates...)
 	}
