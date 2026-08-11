@@ -39,6 +39,9 @@ func resolveAuth(p *aigw.Provider, allowOverride *bool) map[string]any {
 		if a.SecretAccessKey != "" {
 			auth["aws_secret_access_key"] = a.SecretAccessKey
 		}
+		if p.Type != "sagemaker" && a.AWSSessionToken != "" {
+			auth["aws_session_token"] = a.AWSSessionToken
+		}
 		// azure
 		if a.ClientID != "" {
 			auth["azure_client_id"] = a.ClientID
@@ -68,7 +71,7 @@ func resolveAuth(p *aigw.Provider, allowOverride *bool) map[string]any {
 			auth["gcp_oauth_token_url"] = a.OAuthTokenURL
 		}
 		// sagemaker
-		if a.SessionToken != "" {
+		if p.Type == "sagemaker" && a.SessionToken != "" {
 			auth["aws_session_token"] = a.SessionToken
 		}
 	}

@@ -50,6 +50,7 @@ type ProviderAuth struct {
 	// aws
 	AccessKeyID     string `yaml:"access_key_id,omitempty"`
 	SecretAccessKey string `yaml:"secret_access_key,omitempty"`
+	AWSSessionToken string `yaml:"aws_session_token,omitempty"`
 	AssumeRoleARN   string `yaml:"assume_role_arn,omitempty"`
 	RoleSessionName string `yaml:"role_session_name,omitempty"`
 	STSEndpointURL  string `yaml:"sts_endpoint_url,omitempty"`
@@ -74,7 +75,7 @@ type ProviderAuth struct {
 // isEmpty reports whether no auth was decoded (used to detect the flattened form).
 func (a ProviderAuth) isEmpty() bool {
 	return a.Type == "" && len(a.Headers) == 0 && len(a.Params) == 0 &&
-		a.AccessKeyID == "" && a.ServiceAccountJSON == "" &&
+		a.AccessKeyID == "" && a.SessionToken == "" && a.AWSSessionToken == "" && a.ServiceAccountJSON == "" &&
 		a.ClientID == "" && a.UseManagedIdentity == nil && a.UseGCPServiceAccount == nil
 }
 

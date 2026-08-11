@@ -39,7 +39,7 @@ type defoldedTarget struct {
 // defoldAuth reverses convert's resolveAuth: it reads an ai-proxy-advanced
 // target auth block back into provider auth fields plus the target-level
 // allow_override flag, inferring the auth type from which fields are present.
-func defoldAuth(auth map[string]any) (aigw.ProviderAuth, *bool) {
+func defoldAuth(auth map[string]any, providerType string) (aigw.ProviderAuth, *bool) {
 	var a aigw.ProviderAuth
 	if name, value := getStr(auth, "header_name"), getStr(auth, "header_value"); name != "" || value != "" {
 		a.Headers = []aigw.AuthHeader{{Name: name, Value: value}}
@@ -50,7 +50,11 @@ func defoldAuth(auth map[string]any) (aigw.ProviderAuth, *bool) {
 	}
 	a.AccessKeyID = getStr(auth, "aws_access_key_id")
 	a.SecretAccessKey = getStr(auth, "aws_secret_access_key")
-	a.SessionToken = getStr(auth, "aws_session_token")
+	if providerType == "sagemaker" {
+		a.SessionToken = getStr(auth, "aws_session_token")
+	} else {
+		a.AWSSessionToken = getStr(auth, "aws_session_token")
+	}
 	a.ClientID = getStr(auth, "azure_client_id")
 	a.ClientSecret = getStr(auth, "azure_client_secret")
 	a.TenantID = getStr(auth, "azure_tenant_id")
@@ -63,8 +67,12 @@ func defoldAuth(auth map[string]any) (aigw.ProviderAuth, *bool) {
 	switch {
 	case len(a.Headers) > 0 || len(a.Params) > 0:
 		a.Type = "basic"
-	case a.AccessKeyID != "" || a.SecretAccessKey != "":
-		a.Type = "aws"
+	case a.AccessKeyID != "" || a.SecretAccessKey != "" || a.AWSSessionToken != "" || a.SessionToken != "":
+		if providerType == "sagemaker" {
+			a.Type = "sagemaker"
+		} else {
+			a.Type = "aws"
+		}
 	case a.ClientID != "" || a.UseManagedIdentity != nil:
 		a.Type = "azure"
 	case a.ServiceAccountJSON != "" || a.UseGCPServiceAccount != nil || a.MetadataURL != "":
@@ -155,7 +163,7 @@ func defoldOptions(options map[string]any, providerType string, d *defoldedTarge
 // provider-level pieces.
 func defoldTarget(target map[string]any, providerType string) defoldedTarget {
 	var d defoldedTarget
-	d.auth, d.allowOverride = defoldAuth(getMap(target, "auth"))
+	d.auth, d.allowOverride = defoldAuth(getMap(target, "auth"), providerType)
 	defoldOptions(getMap(getMap(target, "model"), "options"), providerType, &d)
 	return d
 }
@@ -198,6 +206,8 @@ func providerFingerprint(providerType string, d *defoldedTarget) string {
 		"project_id=" + d.projectID,
 		"access_key_id=" + a.AccessKeyID,
 		"secret_access_key=" + a.SecretAccessKey,
+		"aws_session_token=" + a.AWSSessionToken,
+		"session_token=" + a.SessionToken,
 		"assume_role_arn=" + a.AssumeRoleARN,
 		"role_session_name=" + a.RoleSessionName,
 		"sts_endpoint_url=" + a.STSEndpointURL,
@@ -251,7 +261,9 @@ func (r *Reverter) uniqueProviderName(providerType string, d *defoldedTarget) st
 // vaultPrefix returns the vault prefix referenced by the first credential
 // value in the auth, if any.
 func vaultPrefix(a aigw.ProviderAuth) string {
-	candidates := []string{a.SecretAccessKey, a.AccessKeyID, a.ServiceAccountJSON, a.ClientSecret}
+	candidates := []string{
+		a.SecretAccessKey, a.AWSSessionToken, a.SessionToken, a.AccessKeyID, a.ServiceAccountJSON, a.ClientSecret,
+	}
 	if len(a.Headers) > 0 {
 		candidates = append([]string{a.Headers[0].Value}, candidates...)
 	}
