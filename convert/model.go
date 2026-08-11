@@ -19,10 +19,13 @@ import (
 // client-facing route configuration; each owning model contributes its own
 // ai-proxy-advanced plugin (a proxyGroup).
 type routeGroup struct {
-	route         kong.Route
-	selectorOrder []string                  // dedup keys (json of entry minus max_request_body_size), first-contributed order
-	selectorByKey map[string]map[string]any // dedup key -> that entry (minus max_request_body_size)
-	selectorMax   int                       // largest max_request_body_size across every body-shaped contributor
+	route kong.Route
+	// selectorOrder holds dedup keys (json of entry minus max_request_body_size),
+	// in first-contributed order.
+	selectorOrder []string
+	// selectorByKey maps a dedup key to that entry (minus max_request_body_size).
+	selectorByKey map[string]map[string]any
+	selectorMax   int // largest max_request_body_size across contributors that set it
 	proxies       []*proxyGroup
 	proxyByOwner  map[string]*proxyGroup
 }
