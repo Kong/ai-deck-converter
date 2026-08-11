@@ -12,6 +12,9 @@ models:
           foundry_path_prefix: /anthropic/v1
           type: azure
     config:
+      route:
+        paths:
+          - /ai
       logging:
         payloads: false
         statistics: true

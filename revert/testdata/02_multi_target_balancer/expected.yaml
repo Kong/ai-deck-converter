@@ -21,6 +21,8 @@ models:
           type: azure
     config:
       route:
+        paths:
+          - /ai
         model:
           values:
             - '@openai/chat-lb'

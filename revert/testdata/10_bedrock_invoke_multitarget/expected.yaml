@@ -14,6 +14,8 @@ models:
           type: bedrock
     config:
       route:
+        paths:
+          - /ai
         model:
           values:
             - '@bedrock/titan-embed-text-v2'
@@ -34,6 +36,8 @@ models:
           type: bedrock
     config:
       route:
+        paths:
+          - /ai
         model:
           values:
             - '@bedrock/nova-canvas'
@@ -54,6 +58,8 @@ models:
           type: bedrock
     config:
       route:
+        paths:
+          - /ai
         model:
           values:
             - '@bedrock/nova-sonic'
@@ -75,6 +81,8 @@ models:
           video_output_s3_uri: s3://kong/nova-reel/
     config:
       route:
+        paths:
+          - /ai
         model:
           values:
             - '@bedrock/nova-reel'
