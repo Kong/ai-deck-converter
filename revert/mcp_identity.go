@@ -1,6 +1,12 @@
 package revert
 
 import (
+	"encoding/base64"
+	"net"
+	"net/url"
+	"strconv"
+	"strings"
+
 	"github.com/Kong/ai-deck-converter/internal/aigw"
 	"github.com/Kong/ai-deck-converter/internal/aimap"
 	"github.com/Kong/ai-deck-converter/internal/kong"
@@ -94,6 +100,9 @@ func oidcConfigFromOAuth2(cfg map[string]any) map[string]any {
 			}
 		}
 	}
+	for key, value := range oidcProxyFields(getMap(cfg, "proxy_config")) {
+		oidcCfg[key] = value
+	}
 
 	// passthrough_credentials: true <=> the provider disabled hide_credentials.
 	if p := getBool(cfg, "passthrough_credentials"); p != nil && *p {
@@ -110,6 +119,58 @@ func oidcConfigFromOAuth2(cfg map[string]any) map[string]any {
 	}
 
 	return oidcCfg
+}
+
+// oidcProxyFields reconstructs openid-connect's legacy proxy fields from the
+// shared ai-mcp-oauth2 proxy_config record. proxy_config has one scheme and
+// one credential pair, so both reconstructed authorization headers are
+// necessarily identical.
+func oidcProxyFields(proxyConfig map[string]any) map[string]any {
+	if len(proxyConfig) == 0 {
+		return nil
+	}
+
+	oidcFields := map[string]any{}
+	scheme := getStr(proxyConfig, "proxy_scheme")
+	if scheme == "http" || scheme == "https" {
+		if raw := proxyURL(
+			scheme, getStr(proxyConfig, "http_proxy_host"), getInt(proxyConfig, "http_proxy_port"),
+		); raw != "" {
+			oidcFields["http_proxy"] = raw
+		}
+		if raw := proxyURL(
+			scheme, getStr(proxyConfig, "https_proxy_host"), getInt(proxyConfig, "https_proxy_port"),
+		); raw != "" {
+			oidcFields["https_proxy"] = raw
+		}
+	}
+	if noProxy := getStr(proxyConfig, "no_proxy"); noProxy != "" {
+		oidcFields["no_proxy"] = noProxy
+	}
+
+	username, password := getStr(proxyConfig, "auth_username"), getStr(proxyConfig, "auth_password")
+	if username != "" || password != "" {
+		authorization := "Basic " + base64.StdEncoding.EncodeToString([]byte(username+":"+password))
+		if _, found := oidcFields["http_proxy"]; found {
+			oidcFields["http_proxy_authorization"] = authorization
+		}
+		if _, found := oidcFields["https_proxy"]; found {
+			oidcFields["https_proxy_authorization"] = authorization
+		}
+	}
+	return oidcFields
+}
+
+func proxyURL(scheme, host string, port *int) string {
+	if host == "" {
+		return ""
+	}
+	if port != nil {
+		host = net.JoinHostPort(host, strconv.Itoa(*port))
+	} else if strings.Contains(host, ":") {
+		host = "[" + host + "]"
+	}
+	return (&url.URL{Scheme: scheme, Host: host}).String()
 }
 
 // removeFirst returns paths with the first occurrence of target removed.

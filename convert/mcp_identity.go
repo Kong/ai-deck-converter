@@ -1,6 +1,12 @@
 package convert
 
 import (
+	"encoding/base64"
+	"fmt"
+	"net/url"
+	"strconv"
+	"strings"
+
 	"github.com/Kong/ai-deck-converter/internal/aigw"
 	"github.com/Kong/ai-deck-converter/internal/aimap"
 	"github.com/Kong/ai-deck-converter/internal/kong"
@@ -138,7 +144,9 @@ func (c *Converter) mcpOAuth2Plugin(
 
 	setIfNotEmpty(cfg, "resource", meta.Resource)
 	if meta.Resource == "" {
-		if err := c.warn("MCP server %q access.metadata has no resource; ai-mcp-oauth2 requires one", m.Name); err != nil {
+		if err := c.warn(
+			"MCP server %q access.metadata has no resource; ai-mcp-oauth2 requires one", m.Name,
+		); err != nil {
 			return kong.Plugin{}, err
 		}
 	}
@@ -169,6 +177,15 @@ func (c *Converter) mcpOAuth2Plugin(
 	setIfNotEmpty(cfg, "metadata_discovery_endpoint", meta.DiscoveryEndpoint)
 	if idp != nil {
 		applyOIDCFieldsToOAuth2(cfg, idp.Config)
+		proxyConfig, err := oidcProxyConfig(idp.Config)
+		if err != nil {
+			return kong.Plugin{}, c.failAt("access.identity_providers",
+				"MCP server %q references an identity provider with unsupported proxy configuration: %s",
+				m.Name, err)
+		}
+		if proxyConfig != nil {
+			cfg["proxy_config"] = proxyConfig
+		}
 		// passthrough_credentials is the inverse of the provider's
 		// hide_credentials (OIDC default true); only the non-default
 		// (hide_credentials: false) is carried, as passthrough_credentials: true.
@@ -184,6 +201,135 @@ func (c *Converter) mcpOAuth2Plugin(
 	cfg["insecure_relaxed_audience_validation"] = !oidcRequiresAudience(idp)
 
 	return kong.Plugin{Name: "ai-mcp-oauth2", Config: cfg}, nil
+}
+
+// oidcProxyConfig lowers openid-connect's legacy flat proxy fields into the
+// proxy_config record used by ai-mcp-oauth2. The target has one proxy scheme
+// and one Basic-auth credential pair shared by both HTTP and HTTPS proxies, so
+// configurations that require distinct schemes or credentials are rejected
+// rather than silently changed.
+func oidcProxyConfig(oidc map[string]any) (map[string]any, error) {
+	httpProxy, err := oidcProxyEndpoint(configString(oidc, "http_proxy"))
+	if err != nil {
+		return nil, fmt.Errorf("http_proxy: %w", err)
+	}
+	httpsProxy, err := oidcProxyEndpoint(configString(oidc, "https_proxy"))
+	if err != nil {
+		return nil, fmt.Errorf("https_proxy: %w", err)
+	}
+
+	httpAuth := configString(oidc, "http_proxy_authorization")
+	httpsAuth := configString(oidc, "https_proxy_authorization")
+	if httpAuth != "" && httpProxy == nil {
+		return nil, fmt.Errorf("http_proxy_authorization requires http_proxy")
+	}
+	if httpsAuth != "" && httpsProxy == nil {
+		return nil, fmt.Errorf("https_proxy_authorization requires https_proxy")
+	}
+	if httpProxy != nil && httpsProxy != nil {
+		if httpProxy.scheme != httpsProxy.scheme {
+			return nil, fmt.Errorf("http_proxy and https_proxy must use the same scheme")
+		}
+		if (httpAuth == "") != (httpsAuth == "") || (httpAuth != "" && httpAuth != httpsAuth) {
+			return nil, fmt.Errorf("http_proxy and https_proxy must use the same authorization")
+		}
+	}
+
+	if httpProxy == nil && httpsProxy == nil && httpAuth == "" &&
+		httpsAuth == "" && configString(oidc, "no_proxy") == "" {
+		return nil, nil
+	}
+
+	proxyConfig := map[string]any{}
+	if httpProxy != nil {
+		proxyConfig["http_proxy_host"] = httpProxy.host
+		if httpProxy.port != nil {
+			proxyConfig["http_proxy_port"] = *httpProxy.port
+		}
+		proxyConfig["proxy_scheme"] = httpProxy.scheme
+	}
+	if httpsProxy != nil {
+		proxyConfig["https_proxy_host"] = httpsProxy.host
+		if httpsProxy.port != nil {
+			proxyConfig["https_proxy_port"] = *httpsProxy.port
+		}
+		if _, exists := proxyConfig["proxy_scheme"]; !exists {
+			proxyConfig["proxy_scheme"] = httpsProxy.scheme
+		}
+	}
+	setIfNotEmpty(proxyConfig, "no_proxy", configString(oidc, "no_proxy"))
+
+	authorization := httpAuth
+	if authorization == "" {
+		authorization = httpsAuth
+	}
+	if authorization != "" {
+		username, password, err := basicProxyCredentials(authorization)
+		if err != nil {
+			return nil, err
+		}
+		proxyConfig["auth_username"] = username
+		proxyConfig["auth_password"] = password
+	}
+
+	return proxyConfig, nil
+}
+
+type oidcProxyEndpointConfig struct {
+	host   string
+	port   *int
+	scheme string
+}
+
+func oidcProxyEndpoint(raw string) (*oidcProxyEndpointConfig, error) {
+	if raw == "" {
+		return nil, nil
+	}
+	u, err := url.Parse(raw)
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		return nil, fmt.Errorf("must be an absolute URL")
+	}
+	if u.User != nil || (u.Path != "" && u.Path != "/") || u.RawQuery != "" || u.Fragment != "" {
+		return nil, fmt.Errorf("must not include user info, a path, a query, or a fragment")
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return nil, fmt.Errorf("scheme must be http or https")
+	}
+
+	endpoint := &oidcProxyEndpointConfig{host: u.Hostname(), scheme: u.Scheme}
+	if rawPort := u.Port(); rawPort != "" {
+		port, err := strconv.Atoi(rawPort)
+		if err != nil || port < 1 || port > 65535 {
+			return nil, fmt.Errorf("has an invalid port")
+		}
+		endpoint.port = &port
+	}
+	return endpoint, nil
+}
+
+func basicProxyCredentials(authorization string) (string, string, error) {
+	parts := strings.Fields(authorization)
+	if len(parts) != 2 || !strings.EqualFold(parts[0], "Basic") {
+		return "", "", fmt.Errorf("proxy authorization must use the Basic scheme")
+	}
+
+	decoded, err := base64.StdEncoding.DecodeString(parts[1])
+	if err != nil {
+		decoded, err = base64.RawStdEncoding.DecodeString(parts[1])
+	}
+	if err != nil {
+		return "", "", fmt.Errorf("proxy authorization has invalid Basic credentials")
+	}
+	username, password, found := strings.Cut(string(decoded), ":")
+	if !found {
+		return "", "", fmt.Errorf("proxy authorization Basic credentials must contain a username and password")
+	}
+	return username, password, nil
+}
+
+func configString(config map[string]any, key string) string {
+	v, _ := config[key].(string)
+	return v
 }
 
 // oidcRequiresAudience reports whether an openid-connect identity provider
