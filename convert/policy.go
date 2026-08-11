@@ -1,8 +1,6 @@
 package convert
 
 import (
-	"fmt"
-
 	"github.com/Kong/ai-deck-converter/internal/aigw"
 	"github.com/Kong/ai-deck-converter/internal/kong"
 )
@@ -55,7 +53,7 @@ func (c *Converter) scopedPlugins(entityKind string, refs []string, acls aigw.AC
 			continue
 		}
 		if entityKind == entityModel && authPolicyTypes[p.Type] {
-			return nil, fmt.Errorf(
+			return nil, c.failAt("policies",
 				"model policy %q has type %q, but authentication policies can only "+
 					"be applied to models via identity_providers, not policies",
 				ref, p.Type)
@@ -70,7 +68,7 @@ func (c *Converter) scopedPlugins(entityKind string, refs []string, acls aigw.AC
 		// AI Gateway acl that sets both is not representable as one valid plugin,
 		// so reject it rather than emit config the gateway will refuse to load.
 		if len(acls.Allow) > 0 && len(acls.Deny) > 0 {
-			return nil, fmt.Errorf(
+			return nil, c.failAt("access.acls",
 				"acl policy sets both allow (%v) and deny (%v), but a Kong acl plugin permits "+
 					"exactly one; set only allow or only deny", acls.Allow, acls.Deny)
 		}
@@ -80,7 +78,12 @@ func (c *Converter) scopedPlugins(entityKind string, refs []string, acls aigw.AC
 }
 
 func policyPlugin(p *aigw.Policy, tags []string, preserveID bool) kong.Plugin {
-	plugin := kong.Plugin{Name: p.Type, Config: p.Config, Tags: tags}
+	plugin := kong.Plugin{
+		Name:   p.Type,
+		Config: p.Config,
+		Tags:   tags,
+		Source: source("policy", p.Name, "config"),
+	}
 	if preserveID {
 		plugin.ID = p.ID
 	}

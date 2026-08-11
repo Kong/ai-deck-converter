@@ -22,10 +22,8 @@ models:
     config:
       route:
         model:
-          body:
-            body_param: model
-            values:
-              - '@openai/chat-lb'
+          values:
+            - '@openai/chat-lb'
       logging:
         payloads: false
         statistics: true

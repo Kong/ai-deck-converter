@@ -27,10 +27,8 @@ models:
     config:
       route:
         model:
-          body:
-            body_param: model
-            values:
-              - '@prod/prod-chat'
+          values:
+            - '@prod/prod-chat'
       logging:
         payloads: false
         statistics: true

@@ -50,24 +50,24 @@ type ModelNameConfig struct {
 
 // ModelSelectorConfig is the model selector configuration.
 type ModelSelectorConfig struct {
+	// Values carries the alias. When no source override is set, the endpoint
+	// format/capability default determines the selector source.
+	Values []string                  `yaml:"values,omitempty"`
 	Body   ModelBodySelectorConfig   `yaml:"body,omitempty"`
 	Header ModelHeaderSelectorConfig `yaml:"header,omitempty"`
 	Path   ModelPathSelectorConfig   `yaml:"path,omitempty"`
 }
 
 type ModelBodySelectorConfig struct {
-	BodyParam string   `yaml:"body_param,omitempty"`
-	Values    []string `yaml:"values,omitempty"`
+	BodyParam string `yaml:"body_param,omitempty"`
 }
 
 type ModelHeaderSelectorConfig struct {
-	HeaderParam string   `yaml:"header_param,omitempty"`
-	Values      []string `yaml:"values,omitempty"`
+	HeaderParam string `yaml:"header_param,omitempty"`
 }
 
 type ModelPathSelectorConfig struct {
-	PathParam string   `yaml:"path_param,omitempty"`
-	Values    []string `yaml:"values,omitempty"`
+	PathParam string `yaml:"path_param,omitempty"`
 }
 
 type ModelRouteConfig struct {

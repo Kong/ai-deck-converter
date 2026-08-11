@@ -15,9 +15,8 @@ models:
     config:
       route:
         model:
-          path:
-            values:
-              - '@bedrock/claude-3-5-sonnet'
+          values:
+            - '@bedrock/claude-3-5-sonnet'
       logging:
         payloads: false
         statistics: true

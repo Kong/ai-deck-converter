@@ -263,46 +263,29 @@ func (r *Reverter) modelGroupFor(
 	return g, nil
 }
 
-// setAliasField reconstructs the Route.Model field an alias round-trips into,
-// mirroring convert.convertModels' choice of source: body/header selectors
-// carry the field name to restore Body/Headers into; a path selector restores
-// PathAliases.
-//
-// When the route has no ai-model-selector at all, the endpoint is one that
-// does not select by request (Bedrock's URI-capture routes, OpenAI
-// batches/files) — a body-model endpoint always emits a selector. There, the
-// forward converter derives the target model_alias from the model name alone
-// (extractModelAlias's fallback), so an empty Route.Model already round-trips
-// the alias. Only materialize PathAliases when the alias differs from the
-// name; otherwise leaving it empty avoids provoking a spurious selector when
-// the config is converted again (buildModelSelectorConfig emits one for any
-// non-empty Route.Model, even on these non-selector endpoints).
+// setAliasField reconstructs the Route.Model field an alias round-trips into.
+// An alias without an explicit source keeps the format-specific selector
+// implementation implicit. Explicit body/header overrides retain their field names.
 func setAliasField(model *aigw.ModelSelectorConfig, alias, name string, selector *kong.Plugin) {
 	if selector != nil {
 		switch getStr(selector.Config, "source") {
 		case "body":
-			if bodyPath := getStr(selector.Config, "body_path"); bodyPath != "" {
-				model.Body = aigw.ModelBodySelectorConfig{BodyParam: bodyPath, Values: []string{alias}}
+			if bodyPath := getStr(selector.Config, "body_path"); bodyPath != "" && bodyPath != "model" {
+				model.Body = aigw.ModelBodySelectorConfig{BodyParam: bodyPath}
+				model.Values = []string{alias}
 				return
 			}
 		case "header":
 			if headerName := getStr(selector.Config, "header_name"); headerName != "" {
-				model.Header = aigw.ModelHeaderSelectorConfig{HeaderParam: headerName, Values: []string{alias}}
+				model.Header = aigw.ModelHeaderSelectorConfig{HeaderParam: headerName}
+				model.Values = []string{alias}
 				return
 			}
 		case "path":
-			if pattern := getStr(selector.Config, "path_pattern"); pattern != "" && !aimap.IsDefaultPathPattern(pattern) {
-				model.Path.Values = []string{alias}
-			} else if alias != name {
-				model.Path.Values = []string{alias}
-			}
-			return
 		}
-		model.Path.Values = []string{alias}
-		return
 	}
 	if alias != name {
-		model.Path.Values = []string{alias}
+		model.Values = []string{alias}
 	}
 }
 
@@ -314,7 +297,7 @@ func (r *Reverter) finalizeModels(acc *modelAcc) error {
 	}
 
 	built := map[string]bool{}
-	for _, key := range acc.order {
+	for _, key := range r.orderedModelKeys(acc) {
 		g := acc.groups[key]
 		g.model.Capabilities = g.caps
 		if isAPIOnly(g.caps) {
@@ -351,7 +334,7 @@ func (r *Reverter) finalizeModels(acc *modelAcc) error {
 		}
 		model := aigw.Model{Type: "model", Name: m.Name}
 		if m.Alias != "" {
-			model.Config.Route.Model.Path.Values = []string{m.Alias}
+			model.Config.Route.Model.Values = []string{m.Alias}
 		}
 		model.Labels = r.tagsToLabels(m.Tags)
 		built[m.Name] = true
@@ -372,6 +355,31 @@ func (r *Reverter) finalizeModels(acc *modelAcc) error {
 		}
 	}
 	return nil
+}
+
+// orderedModelKeys restores the source ai-models order when it is available.
+// Multiple models can now share one default selector route, so route traversal
+// alone is not a stable representation of the model declaration order.
+func (r *Reverter) orderedModelKeys(acc *modelAcc) []string {
+	byName := make(map[string]string, len(acc.order))
+	for _, key := range acc.order {
+		byName[acc.groups[key].model.Name] = key
+	}
+
+	ordered := make([]string, 0, len(acc.order))
+	seen := make(map[string]bool, len(acc.order))
+	for _, model := range r.src.AIModels {
+		if key, ok := byName[model.Name]; ok {
+			ordered = append(ordered, key)
+			seen[key] = true
+		}
+	}
+	for _, key := range acc.order {
+		if !seen[key] {
+			ordered = append(ordered, key)
+		}
+	}
+	return ordered
 }
 
 // nameAliaslessGroups assigns names to model groups whose targets carry no

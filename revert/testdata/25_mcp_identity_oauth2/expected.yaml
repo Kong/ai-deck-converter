@@ -80,10 +80,27 @@ identity_providers:
   - type: openid-connect
     name: openid-connect-1
     config:
+      cache_introspection: true
+      client_alg:
+        - RS256
+      client_auth:
+        - client_secret_post
       client_id:
         - mcp-client
       client_secret:
         - '{vault://ai-vault/okta-client-secret}'
+      consumer_by:
+        - username
+      consumer_claims:
+        - - sub
+      consumer_optional: true
+      credential_claim:
+        - sub
+      http_version: 1.1
+      introspection_endpoint: https://dev-123456.okta.com/oauth2/default/v1/introspect
+      keepalive: false
+      leeway: 30
+      timeout: 5000
   - type: key-auth
     name: key-auth-1
     config:

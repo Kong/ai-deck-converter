@@ -15,11 +15,13 @@ func (c *Converter) convertAgents() error {
 	for i := range c.src.Agents {
 		a := &c.src.Agents[i]
 		route := buildRoute(a.Config.Route, a.Name)
+		route.Source = source("agent", a.Name, "config.route")
 
 		guard, err := c.scopedPlugins(entityAgent, a.Policies, a.Access.ACLs)
 		if err != nil {
 			return err
 		}
+		guard = sourceScopedPlugins(guard, "agent", a.Name)
 		route.Plugins = append(route.Plugins, guard...)
 
 		identityProviderPlugins, err := c.scopedIdentityProviderPlugins(a.Access.IdentityProviders)
@@ -38,6 +40,7 @@ func (c *Converter) convertAgents() error {
 				return err
 			}
 			route.Plugins = append(route.Plugins, plugin)
+			plugin.Source = source("agent", a.Name, "config")
 		case "http":
 			// plain HTTP proxy: Service + Route only
 		default:
@@ -56,6 +59,7 @@ func (c *Converter) convertAgents() error {
 			URL:    a.Config.URL,
 			Routes: []kong.Route{route},
 			Tags:   c.labelsToTags(a.Labels),
+			Source: serviceURLSource("agent", a.Name),
 		}
 		// A disabled agent maps to a disabled Gateway Service so the DP stops
 		// proxying it. enabled defaults to true, so only emit the flag when the

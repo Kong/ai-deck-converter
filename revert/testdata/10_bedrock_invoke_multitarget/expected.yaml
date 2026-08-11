@@ -15,9 +15,8 @@ models:
     config:
       route:
         model:
-          path:
-            values:
-              - '@bedrock/titan-embed-text-v2'
+          values:
+            - '@bedrock/titan-embed-text-v2'
       logging:
         payloads: false
         statistics: true
@@ -36,9 +35,8 @@ models:
     config:
       route:
         model:
-          path:
-            values:
-              - '@bedrock/nova-canvas'
+          values:
+            - '@bedrock/nova-canvas'
       logging:
         payloads: false
         statistics: true
@@ -57,9 +55,8 @@ models:
     config:
       route:
         model:
-          path:
-            values:
-              - '@bedrock/nova-sonic'
+          values:
+            - '@bedrock/nova-sonic'
       logging:
         payloads: false
         statistics: true
@@ -79,9 +76,8 @@ models:
     config:
       route:
         model:
-          path:
-            values:
-              - '@bedrock/nova-reel'
+          values:
+            - '@bedrock/nova-reel'
       logging:
         payloads: false
         statistics: true
