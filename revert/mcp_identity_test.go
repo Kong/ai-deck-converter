@@ -105,6 +105,18 @@ services:
               jwt_claims_leeway: 30
               timeout: 5000
               consumer_claim: [sub]
+              proxy_config:
+                http_proxy_host: proxy.example.com
+                http_proxy_port: 8080
+                https_proxy_host: secure-proxy.example.com
+                https_proxy_port: 8443
+                proxy_scheme: http
+                auth_username: test
+                auth_password: pass
+                no_proxy: localhost,.example.com
+              upstream_headers:
+                - header: X-User-ID
+                  path: [user, id]
 `
 
 func TestRevertMCPOAuth2MapsIdentityFields(t *testing.T) {
@@ -116,6 +128,14 @@ func TestRevertMCPOAuth2MapsIdentityFields(t *testing.T) {
 	// Passthrough verbatim.
 	require.Contains(t, s, "cache_introspection: true")
 	require.Contains(t, s, "timeout: 5000")
+	require.Contains(t, s, "http_proxy: http://proxy.example.com:8080")
+	require.Contains(t, s, "https_proxy: http://secure-proxy.example.com:8443")
+	require.Contains(t, s, "http_proxy_authorization: Basic dGVzdDpwYXNz")
+	require.Contains(t, s, "https_proxy_authorization: Basic dGVzdDpwYXNz")
+	require.Contains(t, s, "no_proxy: localhost,.example.com")
+	require.Contains(t, s, "upstream_headers:")
+	require.Contains(t, s, "header: X-User-ID")
+	require.Contains(t, s, "path:\n            - user\n            - id")
 	// jwt_claims_leeway lifts back to the OIDC leeway key.
 	require.Contains(t, s, "leeway: 30")
 	require.NotContains(t, s, "jwt_claims_leeway")
@@ -125,6 +145,11 @@ func TestRevertMCPOAuth2MapsIdentityFields(t *testing.T) {
 	require.Contains(t, s, "consumer_claims:\n        - - sub")
 	// The identity fields belong to the provider, not the metadata block.
 	require.Contains(t, s, "metadata:")
+}
+
+func TestProxyURLFormatsPortlessIPv6Hosts(t *testing.T) {
+	require.Equal(t, "http://[2001:db8::1]", proxyURL("http", "2001:db8::1", nil))
+	require.Equal(t, "https://[fe80::1%25en0]", proxyURL("https", "fe80::1%en0", nil))
 }
 
 // mcpOAuth2AudiencePassthrough exercises the reverse of the two derived fields:

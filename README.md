@@ -179,9 +179,11 @@ Lossy by design (the forward direction never emits them): `display_name`,
   `leeway` (→ `jwt_claims_leeway`), `ssl_verify`, `consumer_by`,
   `consumer_claims` (→ `consumer_claim`), `consumer_optional`,
   `consumer_groups_claim`, `consumer_groups_optional`, `credential_claim`,
-  `keepalive`, `timeout`, `http_version`, and the `http(s)_proxy*` / `no_proxy`
-  fields (see `internal/aimap/mcp_oauth2.go` — the shared table both directions
-  use). The reverse synthesizes an openid-connect provider carrying exactly
+  `keepalive`, `timeout`, and `http_version`. OIDC's flat `http(s)_proxy*` /
+  `no_proxy` fields lower to the plugin's structured `proxy_config` record;
+  this requires a shared proxy scheme and Basic credentials, because the target
+  has one shared credential pair. The reverse reconstructs an equivalent OIDC
+  proxy configuration. The reverse synthesizes an openid-connect provider carrying exactly
   those fields; array-valued OIDC fields collapsed to a plugin scalar
   (`client_id`, `client_secret`, `client_alg`, `client_auth`) or single path
   (`consumer_claim`) are re-wrapped into a one-element array, so a multi-element

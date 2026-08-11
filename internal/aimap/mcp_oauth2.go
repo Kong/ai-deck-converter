@@ -44,8 +44,8 @@ type OAuth2FieldMap struct {
 // friend — OIDC legacy grant vs oauth2 RFC-8693 upstream-exchange object),
 // client_jwk (OIDC JWK object array vs oauth2 serialized string),
 // introspection_endpoint_auth_method (would collide with client_auth as a
-// second source), the downstream/upstream header-mapping fields (structured +
-// fuzzy semantics), tls_client_auth_cert_id (cert-entity UUID vs inline PEM),
+// second source), the downstream header-mapping fields (structured + fuzzy
+// semantics), tls_client_auth_cert_id (cert-entity UUID vs inline PEM),
 // and extra_jwks_uris (no oauth2 target).
 var OIDCToMCPOAuth2Fields = []OAuth2FieldMap{
 	// Client authentication credentials / parameters.
@@ -70,15 +70,11 @@ var OIDCToMCPOAuth2Fields = []OAuth2FieldMap{
 	{OIDCKey: "consumer_groups_optional", OAuth2Key: "consumer_groups_optional", Kind: OAuth2Passthrough},
 	{OIDCKey: "credential_claim", OAuth2Key: "credential_claim", Kind: OAuth2Passthrough},
 
-	// Network / proxy.
+	// Network.
 	{OIDCKey: "keepalive", OAuth2Key: "keepalive", Kind: OAuth2Passthrough},
 	{OIDCKey: "timeout", OAuth2Key: "timeout", Kind: OAuth2Passthrough},
 	{OIDCKey: "http_version", OAuth2Key: "http_version", Kind: OAuth2Passthrough},
-	{OIDCKey: "http_proxy", OAuth2Key: "http_proxy", Kind: OAuth2Passthrough},
-	{OIDCKey: "http_proxy_authorization", OAuth2Key: "http_proxy_authorization", Kind: OAuth2Passthrough},
-	{OIDCKey: "https_proxy", OAuth2Key: "https_proxy", Kind: OAuth2Passthrough},
-	{OIDCKey: "https_proxy_authorization", OAuth2Key: "https_proxy_authorization", Kind: OAuth2Passthrough},
-	{OIDCKey: "no_proxy", OAuth2Key: "no_proxy", Kind: OAuth2Passthrough},
+	{OIDCKey: "upstream_headers", OAuth2Key: "upstream_headers", Kind: OAuth2Passthrough},
 }
 
 // Two further openid-connect fields map onto ai-mcp-oauth2 by semantic
