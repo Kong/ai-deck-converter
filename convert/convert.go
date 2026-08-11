@@ -34,11 +34,26 @@ type Options struct {
 	// OutputMode controls the emitted Kong config flavor.
 	// Supported values are "deck" (default) and "db-less".
 	OutputMode string `yaml:"output_mode"`
+	// ModelSelectorSources targets the ai-model-selector schema that reads
+	// config.sources (Kong/kong-ee#20858): models with different selector
+	// shapes (body/header/path field) are merged onto one shared route and
+	// one ai-model-selector, with each shape as an entry in config.sources.
+	// The two schemas are mutually exclusive on the wire — data planes new
+	// enough for config.sources don't accept the legacy top-level
+	// config.source, and older data planes don't recognize config.sources at
+	// all — so this cannot be auto-detected from the input. A nil pointer
+	// (the zero value) defaults to true (config.sources); set it to false to
+	// keep targeting the legacy schema (config.source, one shape per route)
+	// for data planes that don't support config.sources yet.
+	ModelSelectorSources *bool `yaml:"model_selector_sources"`
 }
 
 func (o Options) withDefaults() Options {
 	if o.OutputMode == "" {
 		o.OutputMode = "deck"
+	}
+	if o.ModelSelectorSources == nil {
+		o.ModelSelectorSources = boolPtr(true)
 	}
 	return o
 }

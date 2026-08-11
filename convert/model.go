@@ -63,13 +63,28 @@ func (g *routeGroup) addSelector(cfg map[string]any) {
 }
 
 // selectorConfig assembles the ai-model-selector plugin config from every
-// distinct shape contributed by the route's models: one entry per shape in
-// config.sources, plus a single max_request_body_size raised to the largest
-// ceiling any body-shaped entry asked for. Returns nil when no model on the
-// route wants a selector at all.
-func (g *routeGroup) selectorConfig() map[string]any {
+// distinct shape contributed by the route's models, plus a single
+// max_request_body_size raised to the largest ceiling any body-shaped entry
+// asked for. Returns nil when no model on the route wants a selector at all.
+//
+// useSources selects which of the two mutually exclusive wire schemas to
+// target (Options.ModelSelectorSources): false emits the legacy flat form
+// (top-level source/body_path/header_name/path_pattern) — the route's key
+// already guarantees at most one shape was ever contributed in that mode,
+// see convertModels. true always emits config.sources, even for a single
+// shape, since data planes that understand config.sources do not accept the
+// legacy top-level config.source at all.
+func (g *routeGroup) selectorConfig(useSources bool) map[string]any {
 	if len(g.selectorOrder) == 0 {
 		return nil
+	}
+	if !useSources {
+		cfg := make(map[string]any, len(g.selectorByKey[g.selectorOrder[0]])+1)
+		maps.Copy(cfg, g.selectorByKey[g.selectorOrder[0]])
+		if g.selectorMax > 0 {
+			cfg["max_request_body_size"] = g.selectorMax
+		}
+		return cfg
 	}
 	sources := make([]map[string]any, 0, len(g.selectorOrder))
 	for _, key := range g.selectorOrder {
@@ -125,6 +140,10 @@ type videoLifecycleCandidate struct {
 // scoped to both the route and the ai-model entity; type "api" plugins are
 // scoped route-only.
 func (c *Converter) convertModels() error {
+	// useSources selects which of the two mutually exclusive
+	// ai-model-selector wire schemas to target; withDefaults populates the
+	// pointer before c.opts is ever read, so it is never nil here.
+	useSources := *c.opts.ModelSelectorSources
 	groups := map[string]*routeGroup{}
 	var order []string
 	var guardPlugins []kong.Plugin
@@ -212,14 +231,21 @@ func (c *Converter) convertModels() error {
 				}
 				selectorCfg := buildModelSelectorConfig(m, spec)
 				// The alias *value* is per-model and deliberately excluded from
-				// routeConfigKey. Unlike identity providers, the selector *shape*
-				// (which source/field an ai-model-selector reads) no longer forces a
-				// split: models wanting different shapes still share the route, and
-				// their shapes compact into config.sources (see routeGroup.addSelector).
+				// routeConfigKey. When targeting config.sources (Options.
+				// ModelSelectorSources), the selector *shape* (which source/field an
+				// ai-model-selector reads) no longer forces a split: models wanting
+				// different shapes still share the route, and their shapes compact
+				// into config.sources (see routeGroup.addSelector). Otherwise the
+				// shape stays a route-level concern like identity providers, since
+				// the legacy schema's ai-model-selector can only read one shape at
+				// a time: models wanting incompatible shapes cannot share a route.
 				key := sec + "|" +
 					spec.RouteLabel +
 					"|" + identityKey +
 					"|" + routeConfigKey
+				if !useSources {
+					key += "|" + modelSelectorShapeKey(selectorCfg)
+				}
 				g := groups[key]
 				if g == nil {
 					paths := make([]string, len(bases))
@@ -380,15 +406,25 @@ func (c *Converter) convertModels() error {
 		g := groups[key]
 		service.Routes = append(service.Routes, g.route)
 
-		if selectorCfg := g.selectorConfig(); selectorCfg != nil {
+		if selectorCfg := g.selectorConfig(useSources); selectorCfg != nil {
+			mappings := []kong.FieldMapping{
+				{GeneratedPrefix: "config.max_request_body_size", SourcePrefix: "config.max_request_body_size"},
+			}
+			if useSources {
+				mappings = append(mappings,
+					kong.FieldMapping{GeneratedPrefix: "config.sources", SourcePrefix: "config.route.model"})
+			} else {
+				mappings = append(mappings,
+					kong.FieldMapping{GeneratedPrefix: "config.body_path", SourcePrefix: "config.route.model.body.body_param"},
+					kong.FieldMapping{GeneratedPrefix: "config.header_name", SourcePrefix: "config.route.model.header.header_param"},
+					kong.FieldMapping{GeneratedPrefix: "config.path_pattern", SourcePrefix: "config.route.model.path.values"},
+				)
+			}
 			c.out.Plugins = append(c.out.Plugins, kong.Plugin{
 				Name:   "ai-model-selector",
 				Route:  kong.NewStringRef(g.route.Name),
 				Config: selectorCfg,
-				Source: source("model", g.route.Source.EntityName, "config.route.model",
-					kong.FieldMapping{GeneratedPrefix: "config.sources", SourcePrefix: "config.route.model"},
-					kong.FieldMapping{GeneratedPrefix: "config.max_request_body_size", SourcePrefix: "config.max_request_body_size"},
-				),
+				Source: source("model", g.route.Source.EntityName, "config.route.model", mappings...),
 			})
 		}
 		for _, pg := range g.proxies {
@@ -861,6 +897,28 @@ func defaultModelSelectorConfig(m *aigw.Model, spec aimap.EndpointSpec) map[stri
 	config["max_request_body_size"] = bodySizeOrDefault(m)
 
 	return config
+}
+
+// modelSelectorShapeKey canonicalizes an ai-model-selector config's shape
+// (source plus field name) for route grouping under the legacy schema,
+// deliberately dropping max_request_body_size and any alias value: two
+// models wanting the same shape can still share a route even if their alias
+// values or body-size ceilings differ (the latter merges to the max across
+// contributors), but models wanting different shapes need their own
+// ai-model-selector/route, the same way models with different
+// identity-provider sets do.
+func modelSelectorShapeKey(cfg map[string]any) string {
+	switch v, _ := cfg["source"].(string); v {
+	case "body":
+		bodyPath, _ := cfg["body_path"].(string)
+		return "body:" + bodyPath
+	case "header":
+		headerName, _ := cfg["header_name"].(string)
+		return "header:" + headerName
+	case "path":
+		return "path"
+	}
+	return ""
 }
 
 func boolPtr(b bool) *bool { return &b }
