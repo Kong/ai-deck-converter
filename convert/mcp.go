@@ -1,6 +1,8 @@
 package convert
 
 import (
+	"fmt"
+
 	"github.com/Kong/ai-deck-converter/internal/aigw"
 	"github.com/Kong/ai-deck-converter/internal/kong"
 )
@@ -24,6 +26,7 @@ func (c *Converter) convertMCPServers() error {
 			kong.FieldMapping{GeneratedPrefix: "config.mode", SourcePrefix: "type"},
 			kong.FieldMapping{GeneratedPrefix: "config.tools", SourcePrefix: "tools"},
 			kong.FieldMapping{GeneratedPrefix: "config.proxy_config", SourcePrefix: "config.proxy"},
+			kong.FieldMapping{GeneratedPrefix: "config.auth", SourcePrefix: "config.upstream.auth"},
 			kong.FieldMapping{GeneratedPrefix: "config.default_acl", SourcePrefix: "access"},
 			kong.FieldMapping{GeneratedPrefix: "config.acl_attribute_type", SourcePrefix: "access.acl_attribute_type"},
 			kong.FieldMapping{
@@ -98,6 +101,15 @@ func (c *Converter) mcpPlugin(m *aigw.MCPServer) (kong.Plugin, error) {
 	// but we pass it through whenever set and let the plugin validate.
 	if pc := proxyConfigBlock(m.Config.Proxy); pc != nil {
 		cfg["proxy_config"] = pc
+	}
+	// Upstream authentication (e.g. AWS SigV4) lowers to the plugin's auth
+	// record; only emitted when set.
+	auth, err := c.upstreamAuthBlock(m.Config.Upstream, fmt.Sprintf("MCP server %q", m.Name))
+	if err != nil {
+		return kong.Plugin{}, err
+	}
+	if auth != nil {
+		cfg["auth"] = auth
 	}
 	// tools_cache_ttl_seconds is required by the plugin in upstream-server mode.
 	if m.Config.ToolsCacheTTLSeconds != nil {

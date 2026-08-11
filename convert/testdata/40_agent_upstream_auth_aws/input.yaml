@@ -1,0 +1,21 @@
+agents:
+  # a2a agent with AWS SigV4 upstream auth (e.g. an AgentCore agent) and an
+  # outbound HTTPS proxy.
+  - type: a2a
+    display_name: Booking Agent
+    name: booking-agent
+    config:
+      url: https://booking-agent.internal:8443/a2a
+      route: {name: booking-route, paths: [/agents/booking], methods: [POST]}
+      upstream:
+        auth:
+          type: aws
+          region: us-east-1
+          access_key_id: AKIAIOSFODNN7EXAMPLE
+          secret_access_key: "{vault://env/aws-secret}"
+          session_token: "{vault://env/aws-session}"
+          assume_role_arn: arn:aws:iam::123456789012:role/agentcore
+          role_session_name: kong-a2a
+          sts_endpoint_url: https://sts.us-east-1.amazonaws.com
+      proxy:
+        https_proxy: {host: proxy.internal, port: 8080}
