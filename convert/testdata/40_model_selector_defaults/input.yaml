@@ -11,13 +11,13 @@ models:
         provider: openai-provider
         config: {type: openai}
 
-  # automatic.values preserves an alias without overriding OpenAI's body selector.
+  # values preserves an alias without overriding OpenAI's body selector.
   - name: openai-default-alias
     type: model
     capabilities: [generate]
     formats: [{type: openai}]
     config:
-      route: {paths: [/openai-default-alias], model: {automatic: {values: ["@kong/openai"]}}}
+      route: {paths: [/openai-default-alias], model: {values: ["@kong/openai"]}}
     targets:
       - name: gpt-5
         provider: openai-provider
@@ -59,13 +59,13 @@ models:
         provider: gemini-provider
         config: {type: gemini}
 
-  # automatic.values preserves an alias while keeping Gemini's path selector.
+  # values preserves an alias while keeping Gemini's path selector.
   - name: gemini-default-alias
     type: model
     capabilities: [generate]
     formats: [{type: gemini}]
     config:
-      route: {paths: [/gemini-default-alias], model: {automatic: {values: ["@kong/gemini"]}}}
+      route: {paths: [/gemini-default-alias], model: {values: ["@kong/gemini"]}}
     targets:
       - name: gemini-2.5-pro
         provider: gemini-provider

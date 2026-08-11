@@ -332,14 +332,14 @@ plugins:
             log_payloads: false
             log_statistics: true
           model:
-            model_alias: '@kong/gemini-path'
+            model_alias: gemini-path-alias
             name: gemini-2.5-pro
             provider: gemini
           route_type: llm/v1/chat
     route:
       id: 1c7e3f8d-03b4-5e58-aca8-585308f7a935
     model:
-      id: 74ba9010-ec53-57c9-8940-3503a46a934c
+      id: c7915821-8736-59a2-9d78-df6e12ddfe3a
 ai_models:
   - id: 8b5f4e44-2fb5-5ff7-a13c-155be254be31
     name: openai-default-name
@@ -355,5 +355,5 @@ ai_models:
     name: '@kong/gemini'
   - id: a34ab1e3-4979-5117-962a-0508b6e2c33a
     name: gemini-path-name
-  - id: 74ba9010-ec53-57c9-8940-3503a46a934c
-    name: '@kong/gemini-path'
+  - id: c7915821-8736-59a2-9d78-df6e12ddfe3a
+    name: gemini-path-alias

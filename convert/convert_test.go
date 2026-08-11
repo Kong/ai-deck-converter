@@ -647,7 +647,7 @@ models:
         provider: p1
         config: {type: openai}
     config:
-      route: {paths: [/v1], model: {automatic: {values: ["@openai/custom-m1"]}}}
+      route: {paths: [/v1], model: {values: ["@openai/custom-m1"]}}
 model_providers:
   - name: p1
     type: openai
@@ -695,7 +695,7 @@ model_providers:
 	require.Equal(t, "@openai/custom-m1", model["model_alias"], "target model_alias should match source model.alias")
 }
 
-func TestConvertAutomaticSelectorUsesFormatDefault(t *testing.T) {
+func TestConvertDefaultSelectorUsesFormatDefault(t *testing.T) {
 	src := []byte(`
 models:
   - type: model
@@ -707,7 +707,7 @@ models:
         provider: p1
         config: {type: gemini}
     config:
-      route: {paths: [/v1], model: {automatic: {values: ["@kong/gemini"]}}}
+      route: {paths: [/v1], model: {values: ["@kong/gemini"]}}
 model_providers:
   - name: p1
     type: gemini

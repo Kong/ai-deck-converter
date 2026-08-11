@@ -50,32 +50,24 @@ type ModelNameConfig struct {
 
 // ModelSelectorConfig is the model selector configuration.
 type ModelSelectorConfig struct {
-	// Automatic carries an alias while retaining the format/capability default
-	// selector source. It is emitted by Koko when an API request supplies values
-	// but no *_param override.
-	Automatic ModelAutomaticSelectorConfig `yaml:"automatic,omitempty"`
-	Body      ModelBodySelectorConfig      `yaml:"body,omitempty"`
-	Header    ModelHeaderSelectorConfig    `yaml:"header,omitempty"`
-	Path      ModelPathSelectorConfig      `yaml:"path,omitempty"`
-}
-
-type ModelAutomaticSelectorConfig struct {
-	Values []string `yaml:"values,omitempty"`
+	// Values carries the alias. When no source override is set, the endpoint
+	// format/capability default determines the selector source.
+	Values []string                  `yaml:"values,omitempty"`
+	Body   ModelBodySelectorConfig   `yaml:"body,omitempty"`
+	Header ModelHeaderSelectorConfig `yaml:"header,omitempty"`
+	Path   ModelPathSelectorConfig   `yaml:"path,omitempty"`
 }
 
 type ModelBodySelectorConfig struct {
-	BodyParam string   `yaml:"body_param,omitempty"`
-	Values    []string `yaml:"values,omitempty"`
+	BodyParam string `yaml:"body_param,omitempty"`
 }
 
 type ModelHeaderSelectorConfig struct {
-	HeaderParam string   `yaml:"header_param,omitempty"`
-	Values      []string `yaml:"values,omitempty"`
+	HeaderParam string `yaml:"header_param,omitempty"`
 }
 
 type ModelPathSelectorConfig struct {
-	PathParam string   `yaml:"path_param,omitempty"`
-	Values    []string `yaml:"values,omitempty"`
+	PathParam string `yaml:"path_param,omitempty"`
 }
 
 type ModelRouteConfig struct {

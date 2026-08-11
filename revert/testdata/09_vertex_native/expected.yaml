@@ -18,9 +18,8 @@ models:
     config:
       route:
         model:
-          automatic:
-            values:
-              - '@vertex/gemini-2.5-pro'
+          values:
+            - '@vertex/gemini-2.5-pro'
       logging:
         payloads: false
         statistics: true
@@ -41,9 +40,8 @@ models:
     config:
       route:
         model:
-          automatic:
-            values:
-              - '@vertex/text-embedding-005'
+          values:
+            - '@vertex/text-embedding-005'
       logging:
         payloads: false
         statistics: true
