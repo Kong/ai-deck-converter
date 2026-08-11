@@ -15,9 +15,18 @@ type Provider struct {
 
 // ProviderConfig holds the provider auth plus provider-specific top-level fields.
 type ProviderConfig struct {
-	Auth      ProviderAuth `yaml:"auth,omitempty"`
-	Instance  string       `yaml:"instance,omitempty"`   // azure
-	ProjectID string       `yaml:"project_id,omitempty"` // gemini / vertex
+	Auth      ProviderAuth  `yaml:"auth,omitempty"`
+	Instance  string        `yaml:"instance,omitempty"`   // azure (azure-openai)
+	Service   string        `yaml:"service,omitempty"`    // azure (azure-openai | azure-foundry)
+	Foundry   *AzureFoundry `yaml:"foundry,omitempty"`    // azure (azure-foundry)
+	ProjectID string        `yaml:"project_id,omitempty"` // gemini / vertex
+}
+
+// AzureFoundry is the endpoint configuration for Azure AI Foundry hosted models
+// (used when the azure provider's Service is "azure-foundry").
+type AzureFoundry struct {
+	Resource string `yaml:"resource,omitempty"`
+	Domain   string `yaml:"domain,omitempty"`
 }
 
 // UnmarshalYAML decodes a ProviderConfig and tolerates the flattened auth form

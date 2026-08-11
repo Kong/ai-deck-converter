@@ -1,0 +1,84 @@
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: openai-chat
+        paths:
+          - /ai/chat/completions
+        methods:
+          - POST
+        strip_path: false
+      - name: anthropic-messages
+        paths:
+          - /ai/v1/messages
+        methods:
+          - POST
+        strip_path: false
+plugins:
+  - name: ai-model-selector
+    config:
+      body_path: model
+      max_request_body_size: 8388608
+      source: body
+    route: openai-chat
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: api-key
+            header_value: '{vault://env/azure-foundry-key}'
+          description: gpt-4o
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: gpt-4o-foundry
+            name: gpt-4o
+            options:
+              azure_foundry_domain: services.ai.azure.com
+              azure_foundry_resource: kong-foundry-east
+              azure_service: azure-foundry
+            provider: azure
+          route_type: llm/v1/chat
+    route: openai-chat
+    model: gpt-4o-foundry
+  - name: ai-model-selector
+    config:
+      body_path: model
+      max_request_body_size: 8388608
+      source: body
+    route: anthropic-messages
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      targets:
+        - auth:
+            header_name: api-key
+            header_value: '{vault://env/azure-foundry-key}'
+          description: claude-sonnet-4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: claude-foundry
+            name: claude-sonnet-4
+            options:
+              azure_foundry_domain: services.ai.azure.com
+              azure_foundry_path_prefix: /anthropic/v1
+              azure_foundry_resource: kong-foundry-east
+              azure_service: azure-foundry
+            provider: azure
+          route_type: llm/v1/chat
+    route: anthropic-messages
+    model: claude-foundry
+ai_models:
+  - name: gpt-4o-foundry
+  - name: claude-foundry
