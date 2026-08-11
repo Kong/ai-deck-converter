@@ -32,6 +32,11 @@ func run() error {
 		direction = flag.String("direction", "auto",
 			"conversion direction: auto, to-deck (AI Gateway -> decK), to-dbless (AI Gateway -> db-less), "+
 				"or from-deck (decK -> AI Gateway)")
+		modelSelectorSources = flag.Bool("model-selector-sources", true,
+			"target the ai-model-selector config.sources schema (Kong/kong-ee#20858), merging models with "+
+				"different selector shapes onto one route; requires a data plane that supports config.sources. "+
+				"Set to false to keep targeting the legacy config.source schema (one shape per route) for data "+
+				"planes that don't support config.sources yet")
 	)
 	flag.Parse()
 
@@ -53,15 +58,17 @@ func run() error {
 	switch dir {
 	case "to-deck":
 		out, warnings, err = convert.Convert(in, convert.Options{
-			Strict:         *strict,
-			LabelTagPrefix: *tagPrefix,
-			OutputMode:     "deck",
+			Strict:               *strict,
+			LabelTagPrefix:       *tagPrefix,
+			OutputMode:           "deck",
+			ModelSelectorSources: modelSelectorSources,
 		})
 	case "to-dbless":
 		out, warnings, err = convert.Convert(in, convert.Options{
-			Strict:         *strict,
-			LabelTagPrefix: *tagPrefix,
-			OutputMode:     "db-less",
+			Strict:               *strict,
+			LabelTagPrefix:       *tagPrefix,
+			OutputMode:           "db-less",
+			ModelSelectorSources: modelSelectorSources,
 		})
 	case "from-deck":
 		out, warnings, err = revert.Revert(in, revert.Options{

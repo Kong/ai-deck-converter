@@ -12,12 +12,6 @@ models:
           foundry_path_prefix: /anthropic/v1
           type: azure
     config:
-      route:
-        model:
-          body:
-            body_param: model
-            values:
-              - claude-foundry
       logging:
         payloads: false
         statistics: true

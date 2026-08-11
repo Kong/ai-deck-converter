@@ -46,7 +46,7 @@ func TestRoundTrip(t *testing.T) {
 			require.NoError(t, err, "revert")
 			require.Empty(t, warnings, "unexpected revert warnings")
 
-			deck2, warnings, err := convert.Convert(aigwYAML, convert.Options{})
+			deck2, warnings, err := convert.Convert(aigwYAML, opts)
 			require.NoError(t, err, "re-convert")
 			require.Empty(t, warnings, "unexpected convert warnings")
 

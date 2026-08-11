@@ -730,8 +730,12 @@ model_providers:
 			continue
 		}
 		config := plugin["config"].(map[string]any)
-		require.Equal(t, "path", config["source"])
-		require.Equal(t, "models/([%w%.%-]+):", config["path_pattern"])
+		sources, ok := config["sources"].([]any)
+		require.True(t, ok, "default selector should use config.sources")
+		require.Len(t, sources, 1)
+		source := sources[0].(map[string]any)
+		require.Equal(t, "path", source["source"])
+		require.Equal(t, "models/([%w%.%-]+):", source["path_pattern"])
 		return
 	}
 	t.Fatal("expected ai-model-selector plugin")
