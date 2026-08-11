@@ -67,7 +67,7 @@ func resolveAuth(p *aigw.Provider, allowOverride *bool) map[string]any {
 		if a.OAuthTokenURL != "" {
 			auth["gcp_oauth_token_url"] = a.OAuthTokenURL
 		}
-		// sagemaker
+		// aws (Bedrock and SageMaker)
 		if a.SessionToken != "" {
 			auth["aws_session_token"] = a.SessionToken
 		}

@@ -50,6 +50,7 @@ type ProviderAuth struct {
 	// aws
 	AccessKeyID     string `yaml:"access_key_id,omitempty"`
 	SecretAccessKey string `yaml:"secret_access_key,omitempty"`
+	SessionToken    string `yaml:"session_token,omitempty"`
 	AssumeRoleARN   string `yaml:"assume_role_arn,omitempty"`
 	RoleSessionName string `yaml:"role_session_name,omitempty"`
 	STSEndpointURL  string `yaml:"sts_endpoint_url,omitempty"`
@@ -66,15 +67,12 @@ type ProviderAuth struct {
 	MetadataURL          string `yaml:"metadata_url,omitempty"`
 	OAuthTokenURL        string `yaml:"oauth_token_url,omitempty"`
 	UseGCPServiceAccount *bool  `yaml:"use_gcp_service_account,omitempty"`
-
-	// sagemaker
-	SessionToken string `yaml:"session_token,omitempty"`
 }
 
 // isEmpty reports whether no auth was decoded (used to detect the flattened form).
 func (a ProviderAuth) isEmpty() bool {
 	return a.Type == "" && len(a.Headers) == 0 && len(a.Params) == 0 &&
-		a.AccessKeyID == "" && a.ServiceAccountJSON == "" &&
+		a.AccessKeyID == "" && a.SessionToken == "" && a.ServiceAccountJSON == "" &&
 		a.ClientID == "" && a.UseManagedIdentity == nil && a.UseGCPServiceAccount == nil
 }
 
