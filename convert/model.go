@@ -2,6 +2,7 @@ package convert
 
 import (
 	"encoding/json"
+	"regexp"
 	"slices"
 	"sort"
 	"strconv"
@@ -786,12 +787,42 @@ func bodySizeOrDefault(m *aigw.Model) int {
 	return aimap.DefaultMaxBodySize
 }
 
+// pcreNamedGroup matches a PCRE named capture group, e.g. "(?<my_model>)" or
+// "(?<my_model>[a-z]+)".
+var pcreNamedGroup = regexp.MustCompile(`\(\?<[A-Za-z_][A-Za-z0-9_]*>[^)]*\)`)
+
+// genericPathAliasCapture is the Lua pattern substituted for a PCRE named
+// capture group when deriving an ai-model-selector path_pattern: it matches
+// any alias value Kong's route path leaves for the model segment.
+const genericPathAliasCapture = "([%w%.%-:]+)"
+
+// customPathSelectorPattern derives an ai-model-selector path_pattern from a
+// model's own hand-authored base path. A base path carrying a PCRE named
+// capture group (e.g. "(?<my_cool_model>)") marks where the client-supplied
+// model alias appears; Kong's route keeps matching that PCRE path verbatim,
+// but ai-model-selector uses a Lua string.match pattern, which is returned here.
+func customPathSelectorPattern(base string, spec aimap.EndpointSpec) (pattern string, ok bool) {
+	if !pcreNamedGroup.MatchString(strings.TrimPrefix(base, "~")) {
+		return "", false
+	}
+	full := strings.TrimPrefix(aimap.RoutePath(base, spec), "~")
+	return pcreNamedGroup.ReplaceAllString(full, genericPathAliasCapture), true
+}
+
 // buildModelSelectorConfig returns the ai-model-selector config a model wants
 // for its route, or nil if the endpoint needs no selector at all (e.g.
 // Bedrock's URI-capture routes). Route.Model picks the source explicitly
 // (path/body/header); absent that, capabilities that carry a body `model`
 // field by default (spec.TakesBodyModel) fall back to reading it there.
 func buildModelSelectorConfig(m *aigw.Model, spec aimap.EndpointSpec) map[string]any {
+	for _, base := range basePaths(m) {
+		if pattern, ok := customPathSelectorPattern(base, spec); ok {
+			return map[string]any{
+				"source":       "path",
+				"path_pattern": pattern,
+			}
+		}
+	}
 	switch {
 	case len(m.Config.Route.Model.Path.Values) > 0:
 		return map[string]any{
