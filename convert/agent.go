@@ -39,7 +39,10 @@ func (c *Converter) convertAgents() error {
 			if err != nil {
 				return err
 			}
-			plugin.Source = source("agent", a.Name, "config")
+			plugin.Source = source("agent", a.Name, "config",
+				kong.FieldMapping{GeneratedPrefix: "config.proxy_config", SourcePrefix: "config.proxy"},
+				kong.FieldMapping{GeneratedPrefix: "config.auth", SourcePrefix: "config.upstream.auth"},
+			)
 			route.Plugins = append(route.Plugins, plugin)
 		case "http":
 			// plain HTTP proxy: Service + Route only

@@ -26,6 +26,7 @@ func (c *Converter) convertMCPServers() error {
 			kong.FieldMapping{GeneratedPrefix: "config.mode", SourcePrefix: "type"},
 			kong.FieldMapping{GeneratedPrefix: "config.tools", SourcePrefix: "tools"},
 			kong.FieldMapping{GeneratedPrefix: "config.proxy_config", SourcePrefix: "config.proxy"},
+			kong.FieldMapping{GeneratedPrefix: "config.auth", SourcePrefix: "config.upstream.auth"},
 			kong.FieldMapping{GeneratedPrefix: "config.default_acl", SourcePrefix: "access"},
 			kong.FieldMapping{GeneratedPrefix: "config.acl_attribute_type", SourcePrefix: "access.acl_attribute_type"},
 			kong.FieldMapping{
