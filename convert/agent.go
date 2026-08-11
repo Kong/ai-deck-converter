@@ -39,8 +39,8 @@ func (c *Converter) convertAgents() error {
 			if err != nil {
 				return err
 			}
-			route.Plugins = append(route.Plugins, plugin)
 			plugin.Source = source("agent", a.Name, "config")
+			route.Plugins = append(route.Plugins, plugin)
 		case "http":
 			// plain HTTP proxy: Service + Route only
 		default:
