@@ -18,9 +18,10 @@ services:
 plugins:
   - name: ai-model-selector
     config:
-      body_path: model
       max_request_body_size: 8388608
-      source: body
+      sources:
+        - body_path: model
+          source: body
     route: openai-audio-transcribe
   - name: ai-proxy-advanced
     config:
@@ -49,9 +50,10 @@ plugins:
     model: gpt-5-2
   - name: ai-model-selector
     config:
-      body_path: model
       max_request_body_size: 8388608
-      source: body
+      sources:
+        - body_path: model
+          source: body
     route: openai-audio-transcribe-2
   - name: ai-proxy-advanced
     config:

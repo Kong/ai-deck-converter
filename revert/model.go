@@ -57,11 +57,21 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 	routeRefs, routeACLs, routeIDPRefs := r.modelPolicyRefs(routeGuards)
 
 	// The route's ai-model-selector (if any) determines which Route.Model field
-	// an alias round-trips into: source body/header carry the field name the
-	// selector reads; source path (or no selector at all, e.g. Bedrock's
-	// URI-capture routes) falls back to path_aliases, mirroring the forward
-	// converter's default.
+	// an alias round-trips into. config.sources compacts one entry per distinct
+	// selector shape, but the target does not identify its originating entry;
+	// entries are therefore assigned to model groups in encounter order and
+	// cycled when several models share one shape.
 	selector := findPlugin(plugins, "ai-model-selector")
+	entries := selectorSourceEntries(selector)
+	entryIdx := 0
+	nextEntry := func() map[string]any {
+		if len(entries) == 0 {
+			return nil
+		}
+		entry := entries[entryIdx%len(entries)]
+		entryIdx++
+		return entry
+	}
 
 	for _, proxy := range findPlugins(plugins, "ai-proxy-advanced") {
 		cfg := proxy.Config
@@ -133,7 +143,7 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 				continue
 			}
 
-			g, err := r.modelGroupFor(acc, rt, fkName, alias, llmFormat, bases, cfg, selector, refs, acls, idpRefs)
+			g, err := r.modelGroupFor(acc, rt, fkName, alias, llmFormat, bases, cfg, nextEntry, refs, acls, idpRefs)
 			if err != nil {
 				return err
 			}
@@ -190,7 +200,7 @@ func hasTag(tags []string, want string) bool {
 // case where ai-proxy-advanced carries an ai-model FK).
 func (r *Reverter) modelGroupFor(
 	acc *modelAcc, rt *kong.Route, fkName, alias, llmFormat string, bases []string,
-	cfg map[string]any, selector *kong.Plugin, refs []string, acls aigw.ACLs, idpRefs []string,
+	cfg map[string]any, nextEntry func() map[string]any, refs []string, acls aigw.ACLs, idpRefs []string,
 ) (*modelGroup, error) {
 	var key string
 	switch {
@@ -248,7 +258,7 @@ func (r *Reverter) modelGroupFor(
 		},
 	}
 	if alias != "" {
-		setAliasField(&g.model.Config.Route.Model, alias, name, selector)
+		setAliasField(&g.model.Config.Route.Model, alias, name, nextEntry())
 	}
 	g.model.Config.Model.NameHeader = getBool(cfg, "model_name_header")
 	g.model.Config.ResponseStreaming = getStr(cfg, "response_streaming")
@@ -266,27 +276,52 @@ func (r *Reverter) modelGroupFor(
 // setAliasField reconstructs the Route.Model field an alias round-trips into.
 // An alias without an explicit source keeps the format-specific selector
 // implementation implicit. Explicit body/header overrides retain their field names.
-func setAliasField(model *aigw.ModelSelectorConfig, alias, name string, selector *kong.Plugin) {
-	if selector != nil {
-		switch getStr(selector.Config, "source") {
+func setAliasField(model *aigw.ModelSelectorConfig, alias, name string, entry map[string]any) {
+	if entry != nil {
+		switch getStr(entry, "source") {
 		case "body":
-			if bodyPath := getStr(selector.Config, "body_path"); bodyPath != "" && bodyPath != "model" {
+			if bodyPath := getStr(entry, "body_path"); bodyPath != "" && bodyPath != "model" {
 				model.Body = aigw.ModelBodySelectorConfig{BodyParam: bodyPath}
 				model.Values = []string{alias}
 				return
 			}
 		case "header":
-			if headerName := getStr(selector.Config, "header_name"); headerName != "" {
+			if headerName := getStr(entry, "header_name"); headerName != "" {
 				model.Header = aigw.ModelHeaderSelectorConfig{HeaderParam: headerName}
 				model.Values = []string{alias}
 				return
 			}
 		case "path":
+			if alias != name {
+				model.Values = []string{alias}
+			}
+			return
 		}
 	}
 	if alias != name {
 		model.Values = []string{alias}
 	}
+}
+
+// selectorSourceEntries returns the route's selector shapes, preferring the
+// current config.sources array and falling back to the legacy flat form.
+func selectorSourceEntries(selector *kong.Plugin) []map[string]any {
+	if selector == nil {
+		return nil
+	}
+	if sources := getSlice(selector.Config, "sources"); len(sources) > 0 {
+		entries := make([]map[string]any, 0, len(sources))
+		for _, raw := range sources {
+			if entry, ok := raw.(map[string]any); ok {
+				entries = append(entries, entry)
+			}
+		}
+		return entries
+	}
+	if getStr(selector.Config, "source") != "" {
+		return []map[string]any{selector.Config}
+	}
+	return nil
 }
 
 // finalizeModels applies model-scoped (ai-models FK) plugins, classifies the

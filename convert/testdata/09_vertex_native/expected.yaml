@@ -21,8 +21,9 @@ plugins:
   - name: ai-model-selector
     config:
       max_request_body_size: 8388608
-      path_pattern: 'models/([%w%.%-]+):'
-      source: path
+      sources:
+        - path_pattern: 'models/([%w%.%-]+):'
+          source: path
     route: gemini-generate
   - name: ai-proxy-advanced
     config:
@@ -70,8 +71,9 @@ plugins:
   - name: ai-model-selector
     config:
       max_request_body_size: 8388608
-      path_pattern: 'models/([%w%.%-]+):'
-      source: path
+      sources:
+        - path_pattern: 'models/([%w%.%-]+):'
+          source: path
     route: gemini-embeddings
   - name: ai-proxy-advanced
     config:

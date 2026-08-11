@@ -21,9 +21,10 @@ consumers:
 plugins:
   - name: ai-model-selector
     config:
-      body_path: model
       max_request_body_size: 8388608
-      source: body
+      sources:
+        - body_path: model
+          source: body
     route: openai-chat
   - name: ai-proxy-advanced
     config:
