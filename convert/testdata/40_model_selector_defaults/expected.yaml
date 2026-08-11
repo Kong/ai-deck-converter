@@ -112,9 +112,10 @@ plugins:
   - id: 17fa8192-4b9f-5b5a-8379-20ad8bc836a7
     name: ai-model-selector
     config:
-      body_path: model
       max_request_body_size: 8388608
-      source: body
+      sources:
+        - body_path: model
+          source: body
     route:
       id: 8ae36805-da7a-55b9-b056-72bde6bb937d
   - id: f3adc007-171c-5519-8763-3a0eef79bde3
@@ -141,9 +142,10 @@ plugins:
   - id: dcebfb31-cc0f-5469-b6d7-9d8807a4e8d2
     name: ai-model-selector
     config:
-      body_path: model
       max_request_body_size: 8388608
-      source: body
+      sources:
+        - body_path: model
+          source: body
     route:
       id: 2384fe9d-eacc-5ac2-ae4c-4752cc597f81
   - id: 75ff22ed-6245-594b-895f-6a9fa36f4581
@@ -170,9 +172,10 @@ plugins:
   - id: 5477cac7-3c38-581b-899b-f9d520e9d5e4
     name: ai-model-selector
     config:
-      body_path: requested_model
       max_request_body_size: 8388608
-      source: body
+      sources:
+        - body_path: requested_model
+          source: body
     route:
       id: 10bf6bcb-e990-5997-afc1-265030165eed
   - id: 628550fd-b362-5247-b3ba-f2f6fa95de13
@@ -199,8 +202,9 @@ plugins:
   - id: 3912bf60-1edb-5602-89ae-a8a2e41177f4
     name: ai-model-selector
     config:
-      header_name: x-model
-      source: header
+      sources:
+        - header_name: x-model
+          source: header
     route:
       id: ef4e4a2f-dd25-5098-9807-b856c5ab0b97
   - id: ccc68bd9-2622-5864-b026-137e5c06c755
@@ -228,8 +232,9 @@ plugins:
     name: ai-model-selector
     config:
       max_request_body_size: 8388608
-      path_pattern: 'models/([%w%.%-]+):'
-      source: path
+      sources:
+        - path_pattern: 'models/([%w%.%-]+):'
+          source: path
     route:
       id: b4a57e40-147c-502b-a080-e3102a5c3273
   - id: d7038ac4-55db-505a-824e-d2a548ec7424
@@ -257,8 +262,9 @@ plugins:
     name: ai-model-selector
     config:
       max_request_body_size: 8388608
-      path_pattern: 'models/([%w%.%-]+):'
-      source: path
+      sources:
+        - path_pattern: 'models/([%w%.%-]+):'
+          source: path
     route:
       id: 7ddc17d8-fad0-5f2f-9988-d25560595484
   - id: e4b46606-e4f5-57c3-9298-949d4e990f2d
@@ -286,8 +292,9 @@ plugins:
     name: ai-model-selector
     config:
       max_request_body_size: 8388608
-      path_pattern: 'models/([%w%.%-]+):'
-      source: path
+      sources:
+        - path_pattern: 'models/([%w%.%-]+):'
+          source: path
     route:
       id: 61808011-06ae-5208-8ea7-6454b413c8c1
   - id: 1fc0cc9b-eb94-5eb9-8c69-d8361c990007
@@ -315,8 +322,9 @@ plugins:
     name: ai-model-selector
     config:
       max_request_body_size: 8388608
-      path_pattern: 'models/([%w%.%-]+):'
-      source: path
+      sources:
+        - path_pattern: 'models/([%w%.%-]+):'
+          source: path
     route:
       id: 1c7e3f8d-03b4-5e58-aca8-585308f7a935
   - id: cf7316be-1398-5d7d-bed6-bacd43b095b8
