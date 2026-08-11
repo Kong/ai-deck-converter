@@ -97,8 +97,8 @@ See `convert/testdata/*/input.yaml` for worked examples.
 |---|---|
 | Model | One **route per (provider endpoint, capability)** under a single shared `ai-gateway` Service, with the path derived from the model's `formats[0].type` (llm_format) + capability via the endpoint table. Each route gets an `ai-proxy-advanced` plugin (`route:` FK) — models that resolve to the same endpoint share one route, contributing one `targets[]` entry each. Body-model routes also get an `ai-model-selector` plugin. One `ai-models` entry (`name` + `alias`) is emitted per model. |
 | Provider | Not a standalone entity. Its `type` and `config.auth` populate each referencing target's `model.provider`, `model.options`, and `auth`. |
-| MCP Server | Service + Route + `ai-mcp-proxy` (`config.mode` = source type). Server ACLs / per-tool ACLs are written into the plugin config (`default_acl`, `tools[].acl`), not Kong `acl` plugins. `access.identity_providers` + `access.metadata` (openid-connect) add an `ai-mcp-oauth2` plugin and append `metadata.endpoint` to the route (listener / conversion-listener / passthrough-listener only); a `key-auth` provider adds a `key-auth` plugin (and is rejected if `metadata` is set). |
-| Agent (`a2a`) | Service (`config.url`) + Route + `ai-a2a-proxy` plugin (logging). |
+| MCP Server | Service + Route + `ai-mcp-proxy` (`config.mode` = source type). Server ACLs / per-tool ACLs are written into the plugin config (`default_acl`, `tools[].acl`), not Kong `acl` plugins. `access.identity_providers` + `access.metadata` (openid-connect) add an `ai-mcp-oauth2` plugin and append `metadata.endpoint` to the route (listener / conversion-listener / passthrough-listener only); a `key-auth` provider adds a `key-auth` plugin (and is rejected if `metadata` is set). `config.upstream.auth` (AWS SigV4) lowers to the plugin's `auth` record. |
+| Agent (`a2a`) | Service (`config.url`) + Route + `ai-a2a-proxy` plugin (logging). `config.upstream.auth` (AWS SigV4) lowers to the plugin's `auth` record, and `config.proxy` to `proxy_config`. |
 | Agent (`http`) | Service (`config.url`) + Route, no AI plugin. |
 | Policy | Kong plugin (`name` = policy `type`, config passed through). `global: true` -> one top-level plugin; otherwise instantiated per referencing entity. |
 | Consumer | Consumer (`username` = name, `custom_id`), `groups` membership, nested `keyauth_credentials`, scoped policy plugins. |
@@ -172,6 +172,11 @@ Lossy by design (the forward direction never emits them): `display_name`,
   credential types are warned about and skipped.
 - **MCP upstream.** Passthrough MCP servers without an `upstream_url` get a
   placeholder host and a warning.
+- **Upstream auth.** Agents and MCP Servers carry `config.upstream.auth` (AWS
+  SigV4, `type: aws`), which maps to the `ai-a2a-proxy` / `ai-mcp-proxy` `auth`
+  record (`provider: aws_iam`, nested `aws_iam` options). Unsupported auth types
+  are warned about and dropped. The plugin's `aws_iam.bearer_token` has no AI
+  Gateway representation, so the reverse direction warns and drops it.
 - **MCP OAuth2.** MCP `access.identity_providers` / `access.metadata` round-trips
   in both directions. An openid-connect provider lowers its client credentials
   plus the identically-typed / unambiguous fields onto the `ai-mcp-oauth2`

@@ -29,17 +29,20 @@ func detectProviderType(enum, routePath string) string {
 // apart into its AI Gateway pieces: the target-level fields, the remaining
 // target options, and the provider-level fields to synthesize a Provider from.
 type defoldedTarget struct {
-	auth          aigw.ProviderAuth
-	allowOverride *bool
-	instance      string // azure
-	projectID     string // gemini / vertex
-	options       map[string]any
+	auth            aigw.ProviderAuth
+	allowOverride   *bool
+	instance        string // azure (azure-openai)
+	service         string // azure (azure-openai | azure-foundry)
+	foundryResource string // azure (azure-foundry)
+	foundryDomain   string // azure (azure-foundry)
+	projectID       string // gemini / vertex
+	options         map[string]any
 }
 
 // defoldAuth reverses convert's resolveAuth: it reads an ai-proxy-advanced
 // target auth block back into provider auth fields plus the target-level
 // allow_override flag, inferring the auth type from which fields are present.
-func defoldAuth(auth map[string]any) (aigw.ProviderAuth, *bool) {
+func defoldAuth(auth map[string]any, providerType string) (aigw.ProviderAuth, *bool) {
 	var a aigw.ProviderAuth
 	if name, value := getStr(auth, "header_name"), getStr(auth, "header_value"); name != "" || value != "" {
 		a.Headers = []aigw.AuthHeader{{Name: name, Value: value}}
@@ -50,7 +53,11 @@ func defoldAuth(auth map[string]any) (aigw.ProviderAuth, *bool) {
 	}
 	a.AccessKeyID = getStr(auth, "aws_access_key_id")
 	a.SecretAccessKey = getStr(auth, "aws_secret_access_key")
-	a.SessionToken = getStr(auth, "aws_session_token")
+	if providerType == "sagemaker" {
+		a.SessionToken = getStr(auth, "aws_session_token")
+	} else {
+		a.AWSSessionToken = getStr(auth, "aws_session_token")
+	}
 	a.ClientID = getStr(auth, "azure_client_id")
 	a.ClientSecret = getStr(auth, "azure_client_secret")
 	a.TenantID = getStr(auth, "azure_tenant_id")
@@ -63,8 +70,12 @@ func defoldAuth(auth map[string]any) (aigw.ProviderAuth, *bool) {
 	switch {
 	case len(a.Headers) > 0 || len(a.Params) > 0:
 		a.Type = "basic"
-	case a.AccessKeyID != "" || a.SecretAccessKey != "":
-		a.Type = "aws"
+	case a.AccessKeyID != "" || a.SecretAccessKey != "" || a.AWSSessionToken != "" || a.SessionToken != "":
+		if providerType == "sagemaker" {
+			a.Type = "sagemaker"
+		} else {
+			a.Type = "aws"
+		}
 	case a.ClientID != "" || a.UseManagedIdentity != nil:
 		a.Type = "azure"
 	case a.ServiceAccountJSON != "" || a.UseGCPServiceAccount != nil || a.MetadataURL != "":
@@ -92,6 +103,14 @@ func defoldOptions(options map[string]any, providerType string, d *defoldedTarge
 			out["api_version"] = v
 		case providerType == "azure" && k == "azure_instance":
 			d.instance, _ = v.(string)
+		case providerType == "azure" && k == "azure_service":
+			d.service, _ = v.(string)
+		case providerType == "azure" && k == "azure_foundry_resource":
+			d.foundryResource, _ = v.(string)
+		case providerType == "azure" && k == "azure_foundry_domain":
+			d.foundryDomain, _ = v.(string)
+		case providerType == "azure" && k == "azure_foundry_path_prefix":
+			out["foundry_path_prefix"] = v
 		case providerType == "anthropic" && k == "anthropic_version":
 			out["version"] = v
 		case (providerType == "gemini" || providerType == "vertex") && k == "gemini":
@@ -155,7 +174,7 @@ func defoldOptions(options map[string]any, providerType string, d *defoldedTarge
 // provider-level pieces.
 func defoldTarget(target map[string]any, providerType string) defoldedTarget {
 	var d defoldedTarget
-	d.auth, d.allowOverride = defoldAuth(getMap(target, "auth"))
+	d.auth, d.allowOverride = defoldAuth(getMap(target, "auth"), providerType)
 	defoldOptions(getMap(getMap(target, "model"), "options"), providerType, &d)
 	return d
 }
@@ -180,8 +199,15 @@ func (r *Reverter) providerFor(providerType string, d *defoldedTarget) string {
 		Config: aigw.ProviderConfig{
 			Auth:      d.auth,
 			Instance:  d.instance,
+			Service:   d.service,
 			ProjectID: d.projectID,
 		},
+	}
+	if d.foundryResource != "" || d.foundryDomain != "" {
+		p.Config.Foundry = &aigw.AzureFoundry{
+			Resource: d.foundryResource,
+			Domain:   d.foundryDomain,
+		}
 	}
 	r.providers = append(r.providers, p)
 	r.providerByFP[fp] = name
@@ -195,9 +221,14 @@ func providerFingerprint(providerType string, d *defoldedTarget) string {
 		"type=" + providerType,
 		"auth.type=" + a.Type,
 		"instance=" + d.instance,
+		"service=" + d.service,
+		"foundry_resource=" + d.foundryResource,
+		"foundry_domain=" + d.foundryDomain,
 		"project_id=" + d.projectID,
 		"access_key_id=" + a.AccessKeyID,
 		"secret_access_key=" + a.SecretAccessKey,
+		"aws_session_token=" + a.AWSSessionToken,
+		"session_token=" + a.SessionToken,
 		"assume_role_arn=" + a.AssumeRoleARN,
 		"role_session_name=" + a.RoleSessionName,
 		"sts_endpoint_url=" + a.STSEndpointURL,
@@ -251,7 +282,9 @@ func (r *Reverter) uniqueProviderName(providerType string, d *defoldedTarget) st
 // vaultPrefix returns the vault prefix referenced by the first credential
 // value in the auth, if any.
 func vaultPrefix(a aigw.ProviderAuth) string {
-	candidates := []string{a.SecretAccessKey, a.AccessKeyID, a.ServiceAccountJSON, a.ClientSecret}
+	candidates := []string{
+		a.SecretAccessKey, a.AWSSessionToken, a.SessionToken, a.AccessKeyID, a.ServiceAccountJSON, a.ClientSecret,
+	}
 	if len(a.Headers) > 0 {
 		candidates = append([]string{a.Headers[0].Value}, candidates...)
 	}

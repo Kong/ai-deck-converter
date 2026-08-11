@@ -27,5 +27,6 @@ model_providers:
         type: aws
         access_key_id: "{vault://env/aws-key-id}"
         secret_access_key: "{vault://env/aws-secret}"
+        aws_session_token: "{vault://env/aws-session-token}"
         assume_role_arn: "arn:aws:iam::123:role/bedrock"
         role_session_name: kong-session
