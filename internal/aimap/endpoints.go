@@ -37,7 +37,7 @@ const (
 // Shared defaults and the converged gateway service identity.
 const (
 	DefaultLLMFormat      = "openai"
-	DefaultBasePath       = "/ai"
+	DefaultBasePath       = "/"
 	DefaultMaxBodySize    = 8388608
 	DefaultLogStatistics  = true
 	DefaultLogPayloads    = false
