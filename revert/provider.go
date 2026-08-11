@@ -67,8 +67,12 @@ func defoldAuth(auth map[string]any, providerType string) (aigw.ProviderAuth, *b
 	switch {
 	case len(a.Headers) > 0 || len(a.Params) > 0:
 		a.Type = "basic"
-	case a.AccessKeyID != "" || a.SecretAccessKey != "" || a.AWSSessionToken != "":
-		a.Type = "aws"
+	case a.AccessKeyID != "" || a.SecretAccessKey != "" || a.AWSSessionToken != "" || a.SessionToken != "":
+		if providerType == "sagemaker" {
+			a.Type = "sagemaker"
+		} else {
+			a.Type = "aws"
+		}
 	case a.ClientID != "" || a.UseManagedIdentity != nil:
 		a.Type = "azure"
 	case a.ServiceAccountJSON != "" || a.UseGCPServiceAccount != nil || a.MetadataURL != "":
@@ -203,6 +207,7 @@ func providerFingerprint(providerType string, d *defoldedTarget) string {
 		"access_key_id=" + a.AccessKeyID,
 		"secret_access_key=" + a.SecretAccessKey,
 		"aws_session_token=" + a.AWSSessionToken,
+		"session_token=" + a.SessionToken,
 		"assume_role_arn=" + a.AssumeRoleARN,
 		"role_session_name=" + a.RoleSessionName,
 		"sts_endpoint_url=" + a.STSEndpointURL,
@@ -256,7 +261,7 @@ func (r *Reverter) uniqueProviderName(providerType string, d *defoldedTarget) st
 // vaultPrefix returns the vault prefix referenced by the first credential
 // value in the auth, if any.
 func vaultPrefix(a aigw.ProviderAuth) string {
-	candidates := []string{a.SecretAccessKey, a.AWSSessionToken, a.AccessKeyID, a.ServiceAccountJSON, a.ClientSecret}
+	candidates := []string{a.SecretAccessKey, a.AWSSessionToken, a.SessionToken, a.AccessKeyID, a.ServiceAccountJSON, a.ClientSecret}
 	if len(a.Headers) > 0 {
 		candidates = append([]string{a.Headers[0].Value}, candidates...)
 	}

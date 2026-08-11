@@ -75,7 +75,7 @@ type ProviderAuth struct {
 // isEmpty reports whether no auth was decoded (used to detect the flattened form).
 func (a ProviderAuth) isEmpty() bool {
 	return a.Type == "" && len(a.Headers) == 0 && len(a.Params) == 0 &&
-		a.AccessKeyID == "" && a.ServiceAccountJSON == "" &&
+		a.AccessKeyID == "" && a.SessionToken == "" && a.AWSSessionToken == "" && a.ServiceAccountJSON == "" &&
 		a.ClientID == "" && a.UseManagedIdentity == nil && a.UseGCPServiceAccount == nil
 }
 
