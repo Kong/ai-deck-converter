@@ -17,6 +17,8 @@ models:
           type: gemini
     config:
       route:
+        paths:
+          - /ai
         model:
           values:
             - '@vertex/gemini-2.5-pro'
@@ -39,6 +41,8 @@ models:
           type: gemini
     config:
       route:
+        paths:
+          - /ai
         model:
           values:
             - '@vertex/text-embedding-005'

@@ -26,6 +26,8 @@ models:
           - premium
     config:
       route:
+        paths:
+          - /ai
         model:
           values:
             - '@prod/prod-chat'

@@ -265,7 +265,7 @@ func (r *Reverter) modelGroupFor(
 	g.model.Config.Proxy = proxyFromConfig(getMap(cfg, "proxy_config"))
 	g.model.Config.MaxRequestBodySize = getInt(cfg, "max_request_body_size")
 	g.model.Config.Balancer = balancerFromConfig(getMap(cfg, "balancer"), cfg["vectordb"], cfg["embeddings"])
-	if len(bases) > 1 || (len(bases) == 1 && bases[0] != aimap.DefaultBasePath) {
+	if len(bases) > 1 || (len(bases) == 1 && !isDefaultBasePath(bases[0])) {
 		g.model.Config.Route.Paths = bases
 	}
 	acc.groups[key] = g

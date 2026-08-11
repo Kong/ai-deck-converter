@@ -21,6 +21,8 @@ models:
           - banned
     config:
       route:
+        paths:
+          - /ai
         model:
           values:
             - '@openai/guarded-gpt'

@@ -16,6 +16,8 @@ models:
         - key-auth-1
     config:
       route:
+        paths:
+          - /ai
         model:
           values:
             - '@openai/gpt-5.4'

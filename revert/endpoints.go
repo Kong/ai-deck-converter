@@ -101,6 +101,14 @@ func resolveEndpoint(section, routeType, genaiCategory, routeName, routePath str
 	return cands[0], true
 }
 
+// isDefaultBasePath reports whether a recovered base path is the converter's
+// default. aimap.RoutePath trims a trailing slash off the base, so a root base
+// path ("/") comes back from basePathFor as ""; both spellings mean the same
+// thing and neither needs to be written back out as an explicit path.
+func isDefaultBasePath(base string) bool {
+	return base == "" || base == aimap.DefaultBasePath
+}
+
 // basePathFor recovers the base path a route path was built from, given the
 // spec it serves (the inverse of aimap.RoutePath). Returns ok=false when the
 // path does not look like it was built from the spec.
