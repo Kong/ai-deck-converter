@@ -22,9 +22,8 @@ models:
     config:
       route:
         model:
-          automatic:
-            values:
-              - '@openai/guarded-gpt'
+          values:
+            - '@openai/guarded-gpt'
       logging:
         payloads: false
         statistics: true

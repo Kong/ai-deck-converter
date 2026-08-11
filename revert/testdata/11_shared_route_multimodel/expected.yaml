@@ -13,9 +13,8 @@ models:
     config:
       route:
         model:
-          automatic:
-            values:
-              - '@openai/gpt-5.2'
+          values:
+            - '@openai/gpt-5.2'
       logging:
         payloads: false
         statistics: true
@@ -33,9 +32,8 @@ models:
     config:
       route:
         model:
-          automatic:
-            values:
-              - '@openai/gpt-5.2-mini'
+          values:
+            - '@openai/gpt-5.2-mini'
       logging:
         payloads: false
         statistics: true

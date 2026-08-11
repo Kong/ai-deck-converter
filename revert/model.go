@@ -264,27 +264,28 @@ func (r *Reverter) modelGroupFor(
 }
 
 // setAliasField reconstructs the Route.Model field an alias round-trips into.
-// A default body or path selector is represented by Automatic, which preserves
-// the alias without exposing the format-specific selector implementation.
-// Explicit body/header overrides retain their configured field names.
+// An alias without an explicit source keeps the format-specific selector
+// implementation implicit. Explicit body/header overrides retain their field names.
 func setAliasField(model *aigw.ModelSelectorConfig, alias, name string, selector *kong.Plugin) {
 	if selector != nil {
 		switch getStr(selector.Config, "source") {
 		case "body":
 			if bodyPath := getStr(selector.Config, "body_path"); bodyPath != "" && bodyPath != "model" {
-				model.Body = aigw.ModelBodySelectorConfig{BodyParam: bodyPath, Values: []string{alias}}
+				model.Body = aigw.ModelBodySelectorConfig{BodyParam: bodyPath}
+				model.Values = []string{alias}
 				return
 			}
 		case "header":
 			if headerName := getStr(selector.Config, "header_name"); headerName != "" {
-				model.Header = aigw.ModelHeaderSelectorConfig{HeaderParam: headerName, Values: []string{alias}}
+				model.Header = aigw.ModelHeaderSelectorConfig{HeaderParam: headerName}
+				model.Values = []string{alias}
 				return
 			}
 		case "path":
 		}
 	}
 	if alias != name {
-		model.Automatic = aigw.ModelAutomaticSelectorConfig{Values: []string{alias}}
+		model.Values = []string{alias}
 	}
 }
 
@@ -333,7 +334,7 @@ func (r *Reverter) finalizeModels(acc *modelAcc) error {
 		}
 		model := aigw.Model{Type: "model", Name: m.Name}
 		if m.Alias != "" {
-			model.Config.Route.Model.Automatic = aigw.ModelAutomaticSelectorConfig{Values: []string{m.Alias}}
+			model.Config.Route.Model.Values = []string{m.Alias}
 		}
 		model.Labels = r.tagsToLabels(m.Tags)
 		built[m.Name] = true

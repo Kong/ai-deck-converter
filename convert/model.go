@@ -745,29 +745,12 @@ func disabledModelPluginEnabled(enabled *bool) *bool {
 }
 
 // extractModelAlias returns the source model's authored alias, or its name when
-// none is authored. Automatic carries an alias without overriding the selector
-// source; the remaining fields carry aliases alongside explicit source overrides.
+// none is authored. Values do not override the selector source.
 func extractModelAlias(m *aigw.Model) string {
-	if len(m.Config.Route.Model.Automatic.Values) > 0 {
-		return m.Config.Route.Model.Automatic.Values[0]
+	if len(m.Config.Route.Model.Values) > 0 {
+		return m.Config.Route.Model.Values[0]
 	}
 
-	// First attempt to read the alias from the path selector.
-	if m.Config.Route.Model.Path.PathParam != "" && len(m.Config.Route.Model.Path.Values) > 0 {
-		return m.Config.Route.Model.Path.Values[0]
-	}
-
-	// Second attempt to read the alias from the body selector
-	if len(m.Config.Route.Model.Body.Values) > 0 {
-		return m.Config.Route.Model.Body.Values[0]
-	}
-
-	// Third attempt to read the alias from the header selector
-	if len(m.Config.Route.Model.Header.Values) > 0 {
-		return m.Config.Route.Model.Header.Values[0]
-	}
-
-	// Fall back to returning the empty name when there is no alias
 	return m.Name
 }
 
@@ -792,9 +775,8 @@ func bodySizeOrDefault(m *aigw.Model) int {
 
 // buildModelSelectorConfig returns the ai-model-selector config a model wants
 // for its route, or nil if the endpoint needs no selector at all. Explicit
-// body/header/path parameters override the source. An automatic selector (or
-// no selector override at all) leaves source selection to the endpoint's
-// format/capability default.
+// body/header/path parameters override the source. No source override leaves
+// source selection to the endpoint's format/capability default.
 func buildModelSelectorConfig(m *aigw.Model, spec aimap.EndpointSpec) map[string]any {
 	switch {
 	case m.Config.Route.Model.Path.PathParam != "":
