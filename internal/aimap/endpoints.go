@@ -376,6 +376,10 @@ func RoutePath(base string, spec EndpointSpec) string {
 	// like "//chat/completions", which Kong rejects.
 	base = strings.TrimRight(base, "/")
 	if spec.IsRegex {
+		// The generated route needs one regex marker. A model base may already
+		// be a regex path ("~/..."); do not turn it into an invalid "~~/..."
+		// route while appending the format-specific regex suffix.
+		base = strings.TrimPrefix(base, "~")
 		return "~" + base + "/" + spec.PathSuffix
 	}
 	return base + spec.PathSuffix
