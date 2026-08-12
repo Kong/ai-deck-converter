@@ -2,6 +2,7 @@ package convert
 
 import (
 	"encoding/json"
+	"maps"
 	"slices"
 	"sort"
 	"strconv"
@@ -18,10 +19,82 @@ import (
 // client-facing route configuration; each owning model contributes its own
 // ai-proxy-advanced plugin (a proxyGroup).
 type routeGroup struct {
-	route               kong.Route
-	modelSelectorConfig map[string]any
-	proxies             []*proxyGroup
-	proxyByOwner        map[string]*proxyGroup
+	route kong.Route
+	// selectorOrder holds dedup keys (json of entry minus max_request_body_size),
+	// in first-contributed order.
+	selectorOrder []string
+	// selectorByKey maps a dedup key to that entry (minus max_request_body_size).
+	selectorByKey map[string]map[string]any
+	selectorMax   int // largest max_request_body_size across contributors that set it
+	proxies       []*proxyGroup
+	proxyByOwner  map[string]*proxyGroup
+}
+
+// addSelector folds one model's desired ai-model-selector shape into the
+// route's accumulated set of sources, deduping identical shapes and merging
+// max_request_body_size across every body-shaped contributor: the group's
+// selector reads one shared byte ceiling regardless of which source entry
+// ends up matching a given request.
+func (g *routeGroup) addSelector(cfg map[string]any) {
+	if cfg == nil {
+		return
+	}
+	entry := make(map[string]any, len(cfg))
+	maps.Copy(entry, cfg)
+	if size, ok := entry["max_request_body_size"].(int); ok {
+		delete(entry, "max_request_body_size")
+		if size > g.selectorMax {
+			g.selectorMax = size
+		}
+	}
+
+	keyBytes, err := json.Marshal(entry)
+	if err != nil {
+		return
+	}
+	key := string(keyBytes)
+	if _, seen := g.selectorByKey[key]; !seen {
+		if g.selectorByKey == nil {
+			g.selectorByKey = map[string]map[string]any{}
+		}
+		g.selectorByKey[key] = entry
+		g.selectorOrder = append(g.selectorOrder, key)
+	}
+}
+
+// selectorConfig assembles the ai-model-selector plugin config from every
+// distinct shape contributed by the route's models, plus a single
+// max_request_body_size raised to the largest ceiling any body-shaped entry
+// asked for. Returns nil when no model on the route wants a selector at all.
+//
+// useSources selects which of the two mutually exclusive wire schemas to
+// target (Options.ModelSelectorSources): false emits the legacy flat form
+// (top-level source/body_path/header_name/path_pattern) — the route's key
+// already guarantees at most one shape was ever contributed in that mode,
+// see convertModels. true always emits config.sources, even for a single
+// shape, since data planes that understand config.sources do not accept the
+// legacy top-level config.source at all.
+func (g *routeGroup) selectorConfig(useSources bool) map[string]any {
+	if len(g.selectorOrder) == 0 {
+		return nil
+	}
+	if !useSources {
+		cfg := make(map[string]any, len(g.selectorByKey[g.selectorOrder[0]])+1)
+		maps.Copy(cfg, g.selectorByKey[g.selectorOrder[0]])
+		if g.selectorMax > 0 {
+			cfg["max_request_body_size"] = g.selectorMax
+		}
+		return cfg
+	}
+	sources := make([]map[string]any, 0, len(g.selectorOrder))
+	for _, key := range g.selectorOrder {
+		sources = append(sources, g.selectorByKey[key])
+	}
+	cfg := map[string]any{"sources": sources}
+	if g.selectorMax > 0 {
+		cfg["max_request_body_size"] = g.selectorMax
+	}
+	return cfg
 }
 
 // proxyGroup accumulates one ai-proxy-advanced plugin: the targets owned by a
@@ -41,6 +114,8 @@ type proxyGroup struct {
 	maxBodySize       *int
 	proxy             map[string]any
 	targets           []map[string]any
+	targetSources     []kong.TargetSource
+	source            *kong.Source
 	seen              map[string]bool
 }
 
@@ -65,6 +140,10 @@ type videoLifecycleCandidate struct {
 // scoped to both the route and the ai-model entity; type "api" plugins are
 // scoped route-only.
 func (c *Converter) convertModels() error {
+	// useSources selects which of the two mutually exclusive
+	// ai-model-selector wire schemas to target; withDefaults populates the
+	// pointer before c.opts is ever read, so it is never nil here.
+	useSources := *c.opts.ModelSelectorSources
 	groups := map[string]*routeGroup{}
 	var order []string
 	var guardPlugins []kong.Plugin
@@ -152,15 +231,21 @@ func (c *Converter) convertModels() error {
 				}
 				selectorCfg := buildModelSelectorConfig(m, spec)
 				// The alias *value* is per-model and deliberately excluded from
-				// routeConfigKey, but the selector *shape* (which source/field an
-				// ai-model-selector reads) is a route-level concern like identity
-				// providers: a shared route has one ai-model-selector, so models
-				// wanting incompatible shapes cannot share a route either.
+				// routeConfigKey. When targeting config.sources (Options.
+				// ModelSelectorSources), the selector *shape* (which source/field an
+				// ai-model-selector reads) no longer forces a split: models wanting
+				// different shapes still share the route, and their shapes compact
+				// into config.sources (see routeGroup.addSelector). Otherwise the
+				// shape stays a route-level concern like identity providers, since
+				// the legacy schema's ai-model-selector can only read one shape at
+				// a time: models wanting incompatible shapes cannot share a route.
 				key := sec + "|" +
 					spec.RouteLabel +
 					"|" + identityKey +
-					"|" + routeConfigKey +
-					"|" + modelSelectorShapeKey(selectorCfg)
+					"|" + routeConfigKey
+				if !useSources {
+					key += "|" + modelSelectorShapeKey(selectorCfg)
+				}
 				g := groups[key]
 				if g == nil {
 					paths := make([]string, len(bases))
@@ -172,18 +257,13 @@ func (c *Converter) convertModels() error {
 						route: buildModelRoute(
 							m.Config.Route, routeName,
 							paths, spec.Methods),
-						modelSelectorConfig: selectorCfg,
-						proxyByOwner:        map[string]*proxyGroup{},
+						proxyByOwner: map[string]*proxyGroup{},
 					}
+					g.route.Source = source("model", m.Name, "config.route")
 					groups[key] = g
 					order = append(order, key)
-				} else if curSize, ok := g.modelSelectorConfig["max_request_body_size"].(int); ok {
-					// Same shape (guaranteed by key), but a later model may need a
-					// larger body-read ceiling than the model that created the group.
-					if newSize, ok := selectorCfg["max_request_body_size"].(int); ok && newSize > curSize {
-						g.modelSelectorConfig["max_request_body_size"] = newSize
-					}
 				}
+				g.addSelector(selectorCfg)
 				if !routeSeen[g.route.Name] {
 					routeSeen[g.route.Name] = true
 					routeNames = append(routeNames, g.route.Name)
@@ -223,7 +303,13 @@ func (c *Converter) convertModels() error {
 						modelNameHeader:   modelNameHeader,
 						maxBodySize:       m.Config.MaxRequestBodySize,
 						proxy:             proxyConfigBlock(m.Config.Proxy),
-						seen:              map[string]bool{},
+						source: source("model", m.Name, "config",
+							kong.FieldMapping{GeneratedPrefix: "config.proxy_config", SourcePrefix: "config.proxy"},
+							kong.FieldMapping{GeneratedPrefix: "config.model_name_header", SourcePrefix: "config.model.name_header"},
+							kong.FieldMapping{GeneratedPrefix: "config.vectordb", SourcePrefix: "config.balancer.vectordb"},
+							kong.FieldMapping{GeneratedPrefix: "config.embeddings", SourcePrefix: "config.balancer.embeddings"},
+						),
+						seen: map[string]bool{},
 					}
 					g.proxyByOwner[ownerKey] = pg
 					g.proxies = append(g.proxies, pg)
@@ -247,6 +333,11 @@ func (c *Converter) convertModels() error {
 				if !pg.seen[dedup] {
 					pg.seen[dedup] = true
 					pg.targets = append(pg.targets, target)
+					pg.targetSources = append(pg.targetSources, kong.TargetSource{
+						ModelName:        m.Name,
+						ModelTargetIndex: j,
+						Capability:       capability,
+					})
 				}
 			}
 		}
@@ -268,6 +359,7 @@ func (c *Converter) convertModels() error {
 		if err != nil {
 			return err
 		}
+		plugins = sourceScopedPlugins(plugins, "model", m.Name)
 		for _, routeName := range routeNames {
 			for k := range plugins {
 				p := plugins[k]
@@ -314,19 +406,35 @@ func (c *Converter) convertModels() error {
 		g := groups[key]
 		service.Routes = append(service.Routes, g.route)
 
-		if g.modelSelectorConfig != nil {
+		if selectorCfg := g.selectorConfig(useSources); selectorCfg != nil {
+			mappings := []kong.FieldMapping{
+				{GeneratedPrefix: "config.max_request_body_size", SourcePrefix: "config.max_request_body_size"},
+			}
+			if useSources {
+				mappings = append(mappings,
+					kong.FieldMapping{GeneratedPrefix: "config.sources", SourcePrefix: "config.route.model"})
+			} else {
+				mappings = append(mappings,
+					kong.FieldMapping{GeneratedPrefix: "config.body_path", SourcePrefix: "config.route.model.body.body_param"},
+					kong.FieldMapping{GeneratedPrefix: "config.header_name", SourcePrefix: "config.route.model.header.header_param"},
+					kong.FieldMapping{GeneratedPrefix: "config.path_pattern", SourcePrefix: "config.route.model.path.values"},
+				)
+			}
 			c.out.Plugins = append(c.out.Plugins, kong.Plugin{
 				Name:   "ai-model-selector",
 				Route:  kong.NewStringRef(g.route.Name),
-				Config: g.modelSelectorConfig,
+				Config: selectorCfg,
+				Source: source("model", g.route.Source.EntityName, "config.route.model", mappings...),
 			})
 		}
 		for _, pg := range g.proxies {
 			plugin := kong.Plugin{
-				Name:    "ai-proxy-advanced",
-				Enabled: pg.enabled,
-				Route:   kong.NewStringRef(pg.routeName),
-				Config:  pg.proxyConfig(),
+				Name:          "ai-proxy-advanced",
+				Enabled:       pg.enabled,
+				Route:         kong.NewStringRef(pg.routeName),
+				Config:        pg.proxyConfig(),
+				TargetSources: pg.targetSources,
+				Source:        pg.source,
 			}
 			if pg.modelName != "" {
 				plugin.Model = kong.NewStringRef(pg.modelName)
@@ -337,6 +445,7 @@ func (c *Converter) convertModels() error {
 	for _, candidate := range lifecycleCandidates {
 		routeName := uniqueModelRouteName("openai-videos-lifecycle", usedRouteNames)
 		route := buildVideoLifecycleRoute(candidate.model.Config.Route, routeName, basePaths(candidate.model))
+		route.Source = source("model", candidate.model.Name, "config.route")
 		service.Routes = append(service.Routes, route)
 
 		logging := modelLoggingBlock(
@@ -344,7 +453,8 @@ func (c *Converter) convertModels() error {
 			candidate.spec.SupportsLogStatistics,
 		)
 		targets := make([]map[string]any, 0, len(candidate.targets))
-		for _, lifecycleTarget := range candidate.targets {
+		targetSources := make([]kong.TargetSource, 0, len(candidate.targets))
+		for targetIndex, lifecycleTarget := range candidate.targets {
 			targets = append(targets, c.buildTarget(
 				lifecycleTarget.target,
 				lifecycleTarget.provider,
@@ -355,6 +465,11 @@ func (c *Converter) convertModels() error {
 				candidate.spec.RouteType,
 				logging,
 			))
+			targetSources = append(targetSources, kong.TargetSource{
+				ModelName:        candidate.model.Name,
+				ModelTargetIndex: targetIndex,
+				Capability:       "video",
+			})
 		}
 		pg := &proxyGroup{
 			routeName:         routeName,
@@ -368,18 +483,28 @@ func (c *Converter) convertModels() error {
 			maxBodySize:       candidate.model.Config.MaxRequestBodySize,
 			proxy:             proxyConfigBlock(candidate.model.Config.Proxy),
 			targets:           targets,
+			targetSources:     targetSources,
+			source: source("model", candidate.model.Name, "config",
+				kong.FieldMapping{GeneratedPrefix: "config.proxy_config", SourcePrefix: "config.proxy"},
+				kong.FieldMapping{GeneratedPrefix: "config.model_name_header", SourcePrefix: "config.model.name_header"},
+				kong.FieldMapping{GeneratedPrefix: "config.vectordb", SourcePrefix: "config.balancer.vectordb"},
+				kong.FieldMapping{GeneratedPrefix: "config.embeddings", SourcePrefix: "config.balancer.embeddings"},
+			),
 		}
 		c.out.Plugins = append(c.out.Plugins, kong.Plugin{
-			Name:    "ai-proxy-advanced",
-			Enabled: pg.enabled,
-			Route:   kong.NewStringRef(routeName),
-			Config:  pg.proxyConfig(),
+			Name:          "ai-proxy-advanced",
+			Enabled:       pg.enabled,
+			Route:         kong.NewStringRef(routeName),
+			Config:        pg.proxyConfig(),
+			TargetSources: pg.targetSources,
+			Source:        pg.source,
 		})
 
 		plugins, err := c.scopedPlugins(entityModel, candidate.model.Policies, candidate.model.Access.ACLs)
 		if err != nil {
 			return err
 		}
+		plugins = sourceScopedPlugins(plugins, "model", candidate.model.Name)
 		for i := range plugins {
 			plugins[i].Route = kong.NewStringRef(routeName)
 			c.out.Plugins = append(c.out.Plugins, plugins[i])
@@ -703,26 +828,13 @@ func disabledModelPluginEnabled(enabled *bool) *bool {
 	return nil
 }
 
-// extractModelAlias returns the source model's alias
-// It first attempts to read the alias from the path alias, then body alias, and lastly the headers alias.
-// API validation restricts the model Route.Model config to being a oneOf with only one alias value set.
+// extractModelAlias returns the source model's authored alias, or its name when
+// none is authored. Values do not override the selector source.
 func extractModelAlias(m *aigw.Model) string {
-	// First attempt to read the alias from the path selector
-	if len(m.Config.Route.Model.Path.Values) > 0 {
-		return m.Config.Route.Model.Path.Values[0]
+	if len(m.Config.Route.Model.Values) > 0 {
+		return m.Config.Route.Model.Values[0]
 	}
 
-	// Second attempt to read the alias from the body selector
-	if len(m.Config.Route.Model.Body.Values) > 0 {
-		return m.Config.Route.Model.Body.Values[0]
-	}
-
-	// Third attempt to read the alias from the header selector
-	if len(m.Config.Route.Model.Header.Values) > 0 {
-		return m.Config.Route.Model.Header.Values[0]
-	}
-
-	// Fall back to returning the empty name when there is no alias
 	return m.Name
 }
 
@@ -746,17 +858,16 @@ func bodySizeOrDefault(m *aigw.Model) int {
 }
 
 // buildModelSelectorConfig returns the ai-model-selector config a model wants
-// for its route, or nil if the endpoint needs no selector at all (e.g.
-// Bedrock's URI-capture routes). Route.Model picks the source explicitly
-// (path/body/header); absent that, capabilities that carry a body `model`
-// field by default (spec.TakesBodyModel) fall back to reading it there.
+// for its route, or nil if the endpoint needs no selector at all. Explicit
+// body/header/path parameters override the source. No source override leaves
+// source selection to the endpoint's format/capability default.
 func buildModelSelectorConfig(m *aigw.Model, spec aimap.EndpointSpec) map[string]any {
 	switch {
-	case len(m.Config.Route.Model.Path.Values) > 0:
-		return map[string]any{
-			"source":       "path",
-			"path_pattern": m.Config.Route.Model.Path.Values[0],
-		}
+	case m.Config.Route.Model.Path.PathParam != "":
+		// ai-model-selector represents a path source with a Lua pattern, not a
+		// capture-group name. The API's path_param denotes the format-provided
+		// model capture, so retain that format's default path selector.
+		return defaultModelSelectorConfig(m, spec)
 	case m.Config.Route.Model.Body.BodyParam != "":
 		return map[string]any{
 			"source":                "body",
@@ -768,27 +879,34 @@ func buildModelSelectorConfig(m *aigw.Model, spec aimap.EndpointSpec) map[string
 			"source":      "header",
 			"header_name": m.Config.Route.Model.Header.HeaderParam,
 		}
-	case spec.DefaultModelSelectorConfig != nil:
-		// make a copy of default model selector config
-		config := make(map[string]any, len(*spec.DefaultModelSelectorConfig)+1)
-		for k, v := range *spec.DefaultModelSelectorConfig {
-			config[k] = v
-		}
-
-		config["max_request_body_size"] = bodySizeOrDefault(m)
-
-		return config
 	}
-	return nil
+
+	return defaultModelSelectorConfig(m, spec)
+}
+
+func defaultModelSelectorConfig(m *aigw.Model, spec aimap.EndpointSpec) map[string]any {
+	if spec.DefaultModelSelectorConfig == nil {
+		return nil
+	}
+
+	// Make a copy because max_request_body_size is model-specific.
+	config := make(map[string]any, len(*spec.DefaultModelSelectorConfig)+1)
+	for k, v := range *spec.DefaultModelSelectorConfig {
+		config[k] = v
+	}
+	config["max_request_body_size"] = bodySizeOrDefault(m)
+
+	return config
 }
 
 // modelSelectorShapeKey canonicalizes an ai-model-selector config's shape
-// (source plus field name) for route grouping, deliberately dropping
-// max_request_body_size and any alias value: two models wanting the same
-// shape can still share a route even if their alias values or body-size
-// ceilings differ (the latter merges to the max across contributors), but
-// models wanting different shapes need their own ai-model-selector/route,
-// the same way models with different identity-provider sets do.
+// (source plus field name) for route grouping under the legacy schema,
+// deliberately dropping max_request_body_size and any alias value: two
+// models wanting the same shape can still share a route even if their alias
+// values or body-size ceilings differ (the latter merges to the max across
+// contributors), but models wanting different shapes need their own
+// ai-model-selector/route, the same way models with different
+// identity-provider sets do.
 func modelSelectorShapeKey(cfg map[string]any) string {
 	switch v, _ := cfg["source"].(string); v {
 	case "body":

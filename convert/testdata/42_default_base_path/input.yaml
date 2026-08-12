@@ -1,0 +1,20 @@
+models:
+  - name: gpt-5-2
+    type: model
+    capabilities: [generate, embeddings]
+    formats:
+      - type: openai
+    targets:
+      - name: gpt-5.2
+        provider: openai-prod
+        config:
+          type: openai
+model_providers:
+  - name: openai-prod
+    type: openai
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://ai/openai-token}"

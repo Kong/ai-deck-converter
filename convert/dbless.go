@@ -193,6 +193,8 @@ func toDBLessPlugin(plugin kong.Plugin, id string, scope scopeRef) kong.DBLessPl
 		ConsumerGroup: toDBLessFK(scope.consumerGroup),
 		Model:         toDBLessFK(scope.model),
 		Tags:          plugin.Tags,
+		TargetSources: plugin.TargetSources,
+		Source:        plugin.Source,
 	}
 }
 
@@ -208,6 +210,7 @@ func toDBLessService(service kong.Service, id string) kong.DBLessService {
 		Enabled:  service.Enabled,
 		Retries:  service.Retries,
 		Tags:     service.Tags,
+		Source:   service.Source,
 	}
 	if service.URL != "" {
 		if parsed, err := url.Parse(service.URL); err == nil {
@@ -252,6 +255,7 @@ func toDBLessRoute(route kong.Route, id, serviceID string) kong.DBLessRoute {
 		RequestBuffering:        route.RequestBuffering,
 		ResponseBuffering:       route.ResponseBuffering,
 		Tags:                    route.Tags,
+		Source:                  route.Source,
 	}
 	if len(r.Protocols) == 0 {
 		r.Protocols = []string{"http", "https"}

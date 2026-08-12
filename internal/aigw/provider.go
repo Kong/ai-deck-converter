@@ -15,9 +15,18 @@ type Provider struct {
 
 // ProviderConfig holds the provider auth plus provider-specific top-level fields.
 type ProviderConfig struct {
-	Auth      ProviderAuth `yaml:"auth,omitempty"`
-	Instance  string       `yaml:"instance,omitempty"`   // azure
-	ProjectID string       `yaml:"project_id,omitempty"` // gemini / vertex
+	Auth      ProviderAuth  `yaml:"auth,omitempty"`
+	Instance  string        `yaml:"instance,omitempty"`   // azure (azure-openai)
+	Service   string        `yaml:"service,omitempty"`    // azure (azure-openai | azure-foundry)
+	Foundry   *AzureFoundry `yaml:"foundry,omitempty"`    // azure (azure-foundry)
+	ProjectID string        `yaml:"project_id,omitempty"` // gemini / vertex
+}
+
+// AzureFoundry is the endpoint configuration for Azure AI Foundry hosted models
+// (used when the azure provider's Service is "azure-foundry").
+type AzureFoundry struct {
+	Resource string `yaml:"resource,omitempty"`
+	Domain   string `yaml:"domain,omitempty"`
 }
 
 // UnmarshalYAML decodes a ProviderConfig and tolerates the flattened auth form
@@ -50,6 +59,7 @@ type ProviderAuth struct {
 	// aws
 	AccessKeyID     string `yaml:"access_key_id,omitempty"`
 	SecretAccessKey string `yaml:"secret_access_key,omitempty"`
+	AWSSessionToken string `yaml:"aws_session_token,omitempty"`
 	AssumeRoleARN   string `yaml:"assume_role_arn,omitempty"`
 	RoleSessionName string `yaml:"role_session_name,omitempty"`
 	STSEndpointURL  string `yaml:"sts_endpoint_url,omitempty"`
@@ -74,7 +84,7 @@ type ProviderAuth struct {
 // isEmpty reports whether no auth was decoded (used to detect the flattened form).
 func (a ProviderAuth) isEmpty() bool {
 	return a.Type == "" && len(a.Headers) == 0 && len(a.Params) == 0 &&
-		a.AccessKeyID == "" && a.ServiceAccountJSON == "" &&
+		a.AccessKeyID == "" && a.SessionToken == "" && a.AWSSessionToken == "" && a.ServiceAccountJSON == "" &&
 		a.ClientID == "" && a.UseManagedIdentity == nil && a.UseGCPServiceAccount == nil
 }
 

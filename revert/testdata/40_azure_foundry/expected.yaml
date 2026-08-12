@@ -1,0 +1,33 @@
+models:
+  - type: model
+    name: claude-foundry
+    capabilities:
+      - generate
+    formats:
+      - type: anthropic
+    targets:
+      - name: claude-sonnet-4
+        provider: azure-env
+        config:
+          foundry_path_prefix: /anthropic/v1
+          type: azure
+    config:
+      route:
+        paths:
+          - /ai
+      logging:
+        payloads: false
+        statistics: true
+model_providers:
+  - type: azure
+    name: azure-env
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: api-key
+            value: '{vault://env/azure-foundry-key}'
+      service: azure-foundry
+      foundry:
+        resource: kong-foundry-east
+        domain: services.ai.azure.com

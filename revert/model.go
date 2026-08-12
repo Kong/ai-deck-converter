@@ -57,11 +57,21 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 	routeRefs, routeACLs, routeIDPRefs := r.modelPolicyRefs(routeGuards)
 
 	// The route's ai-model-selector (if any) determines which Route.Model field
-	// an alias round-trips into: source body/header carry the field name the
-	// selector reads; source path (or no selector at all, e.g. Bedrock's
-	// URI-capture routes) falls back to path_aliases, mirroring the forward
-	// converter's default.
+	// an alias round-trips into. config.sources compacts one entry per distinct
+	// selector shape, but the target does not identify its originating entry;
+	// entries are therefore assigned to model groups in encounter order and
+	// cycled when several models share one shape.
 	selector := findPlugin(plugins, "ai-model-selector")
+	entries := selectorSourceEntries(selector)
+	entryIdx := 0
+	nextEntry := func() map[string]any {
+		if len(entries) == 0 {
+			return nil
+		}
+		entry := entries[entryIdx%len(entries)]
+		entryIdx++
+		return entry
+	}
 
 	for _, proxy := range findPlugins(plugins, "ai-proxy-advanced") {
 		cfg := proxy.Config
@@ -133,7 +143,7 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 				continue
 			}
 
-			g, err := r.modelGroupFor(acc, rt, fkName, alias, llmFormat, bases, cfg, selector, refs, acls, idpRefs)
+			g, err := r.modelGroupFor(acc, rt, fkName, alias, llmFormat, bases, cfg, nextEntry, refs, acls, idpRefs)
 			if err != nil {
 				return err
 			}
@@ -190,7 +200,7 @@ func hasTag(tags []string, want string) bool {
 // case where ai-proxy-advanced carries an ai-model FK).
 func (r *Reverter) modelGroupFor(
 	acc *modelAcc, rt *kong.Route, fkName, alias, llmFormat string, bases []string,
-	cfg map[string]any, selector *kong.Plugin, refs []string, acls aigw.ACLs, idpRefs []string,
+	cfg map[string]any, nextEntry func() map[string]any, refs []string, acls aigw.ACLs, idpRefs []string,
 ) (*modelGroup, error) {
 	var key string
 	switch {
@@ -248,14 +258,14 @@ func (r *Reverter) modelGroupFor(
 		},
 	}
 	if alias != "" {
-		setAliasField(&g.model.Config.Route.Model, alias, name, selector)
+		setAliasField(&g.model.Config.Route.Model, alias, name, nextEntry())
 	}
 	g.model.Config.Model.NameHeader = getBool(cfg, "model_name_header")
 	g.model.Config.ResponseStreaming = getStr(cfg, "response_streaming")
 	g.model.Config.Proxy = proxyFromConfig(getMap(cfg, "proxy_config"))
 	g.model.Config.MaxRequestBodySize = getInt(cfg, "max_request_body_size")
 	g.model.Config.Balancer = balancerFromConfig(getMap(cfg, "balancer"), cfg["vectordb"], cfg["embeddings"])
-	if len(bases) > 1 || (len(bases) == 1 && bases[0] != aimap.DefaultBasePath) {
+	if len(bases) > 1 || (len(bases) == 1 && !isDefaultBasePath(bases[0])) {
 		g.model.Config.Route.Paths = bases
 	}
 	acc.groups[key] = g
@@ -263,47 +273,55 @@ func (r *Reverter) modelGroupFor(
 	return g, nil
 }
 
-// setAliasField reconstructs the Route.Model field an alias round-trips into,
-// mirroring convert.convertModels' choice of source: body/header selectors
-// carry the field name to restore Body/Headers into; a path selector restores
-// PathAliases.
-//
-// When the route has no ai-model-selector at all, the endpoint is one that
-// does not select by request (Bedrock's URI-capture routes, OpenAI
-// batches/files) — a body-model endpoint always emits a selector. There, the
-// forward converter derives the target model_alias from the model name alone
-// (extractModelAlias's fallback), so an empty Route.Model already round-trips
-// the alias. Only materialize PathAliases when the alias differs from the
-// name; otherwise leaving it empty avoids provoking a spurious selector when
-// the config is converted again (buildModelSelectorConfig emits one for any
-// non-empty Route.Model, even on these non-selector endpoints).
-func setAliasField(model *aigw.ModelSelectorConfig, alias, name string, selector *kong.Plugin) {
-	if selector != nil {
-		switch getStr(selector.Config, "source") {
+// setAliasField reconstructs the Route.Model field an alias round-trips into.
+// An alias without an explicit source keeps the format-specific selector
+// implementation implicit. Explicit body/header overrides retain their field names.
+func setAliasField(model *aigw.ModelSelectorConfig, alias, name string, entry map[string]any) {
+	if entry != nil {
+		switch getStr(entry, "source") {
 		case "body":
-			if bodyPath := getStr(selector.Config, "body_path"); bodyPath != "" {
-				model.Body = aigw.ModelBodySelectorConfig{BodyParam: bodyPath, Values: []string{alias}}
+			if bodyPath := getStr(entry, "body_path"); bodyPath != "" && bodyPath != "model" {
+				model.Body = aigw.ModelBodySelectorConfig{BodyParam: bodyPath}
+				model.Values = []string{alias}
 				return
 			}
 		case "header":
-			if headerName := getStr(selector.Config, "header_name"); headerName != "" {
-				model.Header = aigw.ModelHeaderSelectorConfig{HeaderParam: headerName, Values: []string{alias}}
+			if headerName := getStr(entry, "header_name"); headerName != "" {
+				model.Header = aigw.ModelHeaderSelectorConfig{HeaderParam: headerName}
+				model.Values = []string{alias}
 				return
 			}
 		case "path":
-			if pattern := getStr(selector.Config, "path_pattern"); pattern != "" && !aimap.IsDefaultPathPattern(pattern) {
-				model.Path.Values = []string{alias}
-			} else if alias != name {
-				model.Path.Values = []string{alias}
+			if alias != name {
+				model.Values = []string{alias}
 			}
 			return
 		}
-		model.Path.Values = []string{alias}
-		return
 	}
 	if alias != name {
-		model.Path.Values = []string{alias}
+		model.Values = []string{alias}
 	}
+}
+
+// selectorSourceEntries returns the route's selector shapes, preferring the
+// current config.sources array and falling back to the legacy flat form.
+func selectorSourceEntries(selector *kong.Plugin) []map[string]any {
+	if selector == nil {
+		return nil
+	}
+	if sources := getSlice(selector.Config, "sources"); len(sources) > 0 {
+		entries := make([]map[string]any, 0, len(sources))
+		for _, raw := range sources {
+			if entry, ok := raw.(map[string]any); ok {
+				entries = append(entries, entry)
+			}
+		}
+		return entries
+	}
+	if getStr(selector.Config, "source") != "" {
+		return []map[string]any{selector.Config}
+	}
+	return nil
 }
 
 // finalizeModels applies model-scoped (ai-models FK) plugins, classifies the
@@ -314,7 +332,7 @@ func (r *Reverter) finalizeModels(acc *modelAcc) error {
 	}
 
 	built := map[string]bool{}
-	for _, key := range acc.order {
+	for _, key := range r.orderedModelKeys(acc) {
 		g := acc.groups[key]
 		g.model.Capabilities = g.caps
 		if isAPIOnly(g.caps) {
@@ -351,7 +369,7 @@ func (r *Reverter) finalizeModels(acc *modelAcc) error {
 		}
 		model := aigw.Model{Type: "model", Name: m.Name}
 		if m.Alias != "" {
-			model.Config.Route.Model.Path.Values = []string{m.Alias}
+			model.Config.Route.Model.Values = []string{m.Alias}
 		}
 		model.Labels = r.tagsToLabels(m.Tags)
 		built[m.Name] = true
@@ -372,6 +390,31 @@ func (r *Reverter) finalizeModels(acc *modelAcc) error {
 		}
 	}
 	return nil
+}
+
+// orderedModelKeys restores the source ai-models order when it is available.
+// Multiple models can now share one default selector route, so route traversal
+// alone is not a stable representation of the model declaration order.
+func (r *Reverter) orderedModelKeys(acc *modelAcc) []string {
+	byName := make(map[string]string, len(acc.order))
+	for _, key := range acc.order {
+		byName[acc.groups[key].model.Name] = key
+	}
+
+	ordered := make([]string, 0, len(acc.order))
+	seen := make(map[string]bool, len(acc.order))
+	for _, model := range r.src.AIModels {
+		if key, ok := byName[model.Name]; ok {
+			ordered = append(ordered, key)
+			seen[key] = true
+		}
+	}
+	for _, key := range acc.order {
+		if !seen[key] {
+			ordered = append(ordered, key)
+		}
+	}
+	return ordered
 }
 
 // nameAliaslessGroups assigns names to model groups whose targets carry no

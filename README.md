@@ -47,6 +47,7 @@ cat input.yaml | ./ai-deck-converter -
 | `-direction` | `auto` | Conversion direction: `auto`, `to-deck` (AI Gateway → decK), `to-dbless` (AI Gateway → db-less), or `from-deck` (decK → AI Gateway). Auto-detection keys off `_format_version`, which only decK documents carry. |
 | `-strict` | `false` | Treat unresolved references and unconvertible entities as errors instead of warnings. |
 | `-label-tag-prefix` | `""` | Prefix for label-derived tags, e.g. `aigw/` (prepended when converting to decK, stripped when reverting). |
+| `-model-selector-sources` | `true` | Target the `ai-model-selector` `config.sources` schema (Kong/kong-ee#20858), merging models with different selector shapes onto one shared route instead of one route per shape. Only for data planes new enough to support `config.sources` — they don't accept the legacy `config.source` it replaces. Set to `false` to keep targeting the legacy schema for data planes that don't support `config.sources` yet. |
 
 Warnings (unresolved references, unsupported features, placeholders, dropped
 entities) are printed to stderr; the converted config still goes to stdout/`-o`.
@@ -96,8 +97,8 @@ See `convert/testdata/*/input.yaml` for worked examples.
 |---|---|
 | Model | One **route per (provider endpoint, capability)** under a single shared `ai-gateway` Service, with the path derived from the model's `formats[0].type` (llm_format) + capability via the endpoint table. Each route gets an `ai-proxy-advanced` plugin (`route:` FK) — models that resolve to the same endpoint share one route, contributing one `targets[]` entry each. Body-model routes also get an `ai-model-selector` plugin. One `ai-models` entry (`name` + `alias`) is emitted per model. |
 | Provider | Not a standalone entity. Its `type` and `config.auth` populate each referencing target's `model.provider`, `model.options`, and `auth`. |
-| MCP Server | Service + Route + `ai-mcp-proxy` (`config.mode` = source type). Server ACLs / per-tool ACLs are written into the plugin config (`default_acl`, `tools[].acl`), not Kong `acl` plugins. `access.identity_providers` + `access.metadata` (openid-connect) add an `ai-mcp-oauth2` plugin and append `metadata.endpoint` to the route (listener / conversion-listener / passthrough-listener only); a `key-auth` provider adds a `key-auth` plugin (and is rejected if `metadata` is set). |
-| Agent (`a2a`) | Service (`config.url`) + Route + `ai-a2a-proxy` plugin (logging). |
+| MCP Server | Service + Route + `ai-mcp-proxy` (`config.mode` = source type). Server ACLs / per-tool ACLs are written into the plugin config (`default_acl`, `tools[].acl`), not Kong `acl` plugins. `access.identity_providers` + `access.metadata` (openid-connect) add an `ai-mcp-oauth2` plugin and append `metadata.endpoint` to the route (listener / conversion-listener / passthrough-listener only); a `key-auth` provider adds a `key-auth` plugin (and is rejected if `metadata` is set). `config.upstream.auth` (AWS SigV4) lowers to the plugin's `auth` record. |
+| Agent (`a2a`) | Service (`config.url`) + Route + `ai-a2a-proxy` plugin (logging). `config.upstream.auth` (AWS SigV4) lowers to the plugin's `auth` record, and `config.proxy` to `proxy_config`. |
 | Agent (`http`) | Service (`config.url`) + Route, no AI plugin. |
 | Policy | Kong plugin (`name` = policy `type`, config passed through). `global: true` -> one top-level plugin; otherwise instantiated per referencing entity. |
 | Consumer | Consumer (`username` = name, `custom_id`), `groups` membership, nested `keyauth_credentials`, scoped policy plugins. |
@@ -171,12 +172,46 @@ Lossy by design (the forward direction never emits them): `display_name`,
   credential types are warned about and skipped.
 - **MCP upstream.** Passthrough MCP servers without an `upstream_url` get a
   placeholder host and a warning.
+- **Upstream auth.** Agents and MCP Servers carry `config.upstream.auth` (AWS
+  SigV4, `type: aws`), which maps to the `ai-a2a-proxy` / `ai-mcp-proxy` `auth`
+  record (`provider: aws_iam`, nested `aws_iam` options). Unsupported auth types
+  are warned about and dropped. The plugin's `aws_iam.bearer_token` has no AI
+  Gateway representation, so the reverse direction warns and drops it.
 - **MCP OAuth2.** MCP `access.identity_providers` / `access.metadata` round-trips
-  in both directions, but the reverse synthesizes a **minimal** openid-connect
-  identity provider (client credentials only) from an `ai-mcp-oauth2` plugin —
-  provider config the plugin doesn't carry (e.g. `cache_tokens_salt`,
-  `auth_methods`) is not recovered, and `authorization_servers`/`scopes_supported`
-  are always attributed to the metadata rather than the provider's issuer/scopes.
+  in both directions. An openid-connect provider lowers its client credentials
+  plus the identically-typed / unambiguous fields onto the `ai-mcp-oauth2`
+  plugin: `client_alg`, `client_auth`, `introspection_endpoint`,
+  `mtls_introspection_endpoint`, `cache_introspection`, `jwks_endpoint`,
+  `leeway` (→ `jwt_claims_leeway`), `ssl_verify`, `consumer_by`,
+  `consumer_claims` (→ `consumer_claim`), `consumer_optional`,
+  `consumer_groups_claim`, `consumer_groups_optional`, `credential_claim`,
+  `keepalive`, `timeout`, and `http_version`. OIDC's flat `http(s)_proxy*` /
+  `no_proxy` fields lower to the plugin's structured `proxy_config` record;
+  this requires a shared proxy scheme and Basic credentials, because the target
+  has one shared credential pair. The reverse reconstructs an equivalent OIDC
+  proxy configuration. The reverse synthesizes an openid-connect provider carrying exactly
+  those fields; array-valued OIDC fields collapsed to a plugin scalar
+  (`client_id`, `client_secret`, `client_alg`, `client_auth`) or single path
+  (`consumer_claim`) are re-wrapped into a one-element array, so a multi-element
+  source is lossy in the intermediate model but re-converts byte-identically.
+  Two further fields map by semantic derivation rather than a plain copy:
+  the provider's `hide_credentials: false` becomes the plugin's
+  `passthrough_credentials: true` (logical inverse; defaults agree, so only the
+  non-default is emitted), and `insecure_relaxed_audience_validation` is
+  **always** emitted to mirror OIDC audience enforcement — `false` when the
+  provider's `audience_required` is set, `true` otherwise (the reverse
+  reconstructs `audience_required` from the metadata `resource`, its RFC 8707
+  audience, when the flag is `false`). Deliberately **not** mapped (documented
+  non-conversions): `token_exchange`
+  (a false friend — OIDC's legacy grant vs the plugin's RFC-8693 upstream
+  exchange object), `client_jwk` (OIDC JWK object array vs plugin serialized
+  string), `introspection_endpoint_auth_method` (would collide with
+  `client_auth`), the downstream/upstream header-mapping fields,
+  `tls_client_auth_cert_id` (cert-entity UUID vs inline PEM), and
+  `extra_jwks_uris` (no plugin target). Provider config the plugin doesn't carry
+  (e.g. `cache_tokens_salt`, `auth_methods`) is not recovered, and
+  `authorization_servers`/`scopes_supported` are always attributed to the
+  metadata rather than the provider's issuer/scopes.
 - **Labels** are lossy as tags when a value contains `:`.
 
 ## Community

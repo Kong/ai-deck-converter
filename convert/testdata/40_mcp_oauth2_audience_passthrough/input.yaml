@@ -1,0 +1,33 @@
+identity_providers:
+  - display_name: Okta OIDC
+    name: okta-oidc
+    type: openid-connect
+    config:
+      issuer: https://dev-123456.okta.com/oauth2/default
+      client_id: [mcp-client]
+      client_secret: ["{vault://ai-vault/okta-client-secret}"]
+      # hide_credentials: false -> passthrough_credentials: true
+      hide_credentials: false
+      # audience_required set -> insecure_relaxed_audience_validation: false
+      audience_required: [https://api.example.com/mcp/audience]
+mcp_servers:
+  - type: listener
+    display_name: Secure MCP
+    name: secure-mcp
+    config:
+      route:
+        paths: [/mcp/secure]
+    access:
+      identity_providers: [okta-oidc]
+      metadata:
+        endpoint: /mcp/secure/.well-known/oauth-protected-resource
+        resource: https://api.example.com/mcp/secure
+        authorization_servers:
+          - https://dev-123456.okta.com/oauth2/default
+    tools:
+      - name: ping
+        description: Ping the server
+        method: GET
+        path: /ping
+        scheme: https
+        host: secure.internal

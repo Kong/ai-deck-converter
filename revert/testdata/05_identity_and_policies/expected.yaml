@@ -21,11 +21,11 @@ models:
           - banned
     config:
       route:
+        paths:
+          - /ai
         model:
-          body:
-            body_param: model
-            values:
-              - '@openai/guarded-gpt'
+          values:
+            - '@openai/guarded-gpt'
       logging:
         payloads: false
         statistics: true

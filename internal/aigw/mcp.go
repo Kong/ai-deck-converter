@@ -64,6 +64,9 @@ type MCPServerConfig struct {
 	// Proxy lowers to the ai-mcp-proxy plugin's proxy_config (only honored by
 	// the plugin in passthrough-listener mode).
 	Proxy *ProxyConfig `yaml:"proxy,omitempty"`
+	// Upstream lowers to the ai-mcp-proxy plugin's auth record (upstream
+	// authentication, e.g. AWS SigV4).
+	Upstream *UpstreamConfig `yaml:"upstream,omitempty"`
 	// ToolsCacheTTLSeconds maps to the ai-mcp-proxy plugin's
 	// tools_cache_ttl_seconds (required by the plugin in upstream-server mode).
 	ToolsCacheTTLSeconds *int `yaml:"tools_cache_ttl_seconds,omitempty"`

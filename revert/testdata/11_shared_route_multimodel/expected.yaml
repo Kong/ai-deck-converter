@@ -12,11 +12,11 @@ models:
           type: openai
     config:
       route:
+        paths:
+          - /ai
         model:
-          body:
-            body_param: model
-            values:
-              - '@openai/gpt-5.2'
+          values:
+            - '@openai/gpt-5.2'
       logging:
         payloads: false
         statistics: true
@@ -33,11 +33,11 @@ models:
           type: openai
     config:
       route:
+        paths:
+          - /ai
         model:
-          body:
-            body_param: model
-            values:
-              - '@openai/gpt-5.2-mini'
+          values:
+            - '@openai/gpt-5.2-mini'
       logging:
         payloads: false
         statistics: true

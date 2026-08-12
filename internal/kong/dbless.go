@@ -37,6 +37,7 @@ type DBLessService struct {
 	Enabled  *bool    `yaml:"enabled,omitempty"`
 	Retries  *int     `yaml:"retries,omitempty"`
 	Tags     []string `yaml:"tags,omitempty"`
+	Source   *Source  `yaml:"-"`
 }
 
 type DBLessRoute struct {
@@ -59,6 +60,7 @@ type DBLessRoute struct {
 	RequestBuffering        *bool               `yaml:"request_buffering,omitempty"`
 	ResponseBuffering       *bool               `yaml:"response_buffering,omitempty"`
 	Tags                    []string            `yaml:"tags,omitempty"`
+	Source                  *Source             `yaml:"-"`
 }
 
 type DBLessCIDRPort struct {
@@ -77,6 +79,8 @@ type DBLessPlugin struct {
 	ConsumerGroup map[string]string `yaml:"consumer_group,omitempty"`
 	Model         map[string]string `yaml:"model,omitempty"`
 	Tags          []string          `yaml:"tags,omitempty"`
+	TargetSources []TargetSource    `yaml:"-"`
+	Source        *Source           `yaml:"-"`
 }
 
 type DBLessConsumer struct {

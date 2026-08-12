@@ -15,11 +15,11 @@ models:
         - openid-connect-1
     config:
       route:
+        paths:
+          - /ai
         model:
-          body:
-            body_param: model
-            values:
-              - '@openai/gpt-5.4'
+          values:
+            - '@openai/gpt-5.4'
       logging:
         payloads: false
         statistics: true

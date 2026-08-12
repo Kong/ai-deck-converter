@@ -26,11 +26,11 @@ models:
           - premium
     config:
       route:
+        paths:
+          - /ai
         model:
-          body:
-            body_param: model
-            values:
-              - '@prod/prod-chat'
+          values:
+            - '@prod/prod-chat'
       logging:
         payloads: false
         statistics: true

@@ -34,6 +34,126 @@ models:
 		"expected unknown-provider warning")
 }
 
+func TestWithMetadataTracksGeneratedTargetSources(t *testing.T) {
+	src := []byte(`
+model_providers:
+  - name: local
+    type: ollama
+models:
+  - type: model
+    name: local-llama
+    capabilities: [generate, agentic]
+    formats: [{type: openai}]
+    targets:
+      - name: llama3.1:8b
+        provider: local
+        config: {type: llama2, format: ollama}
+    config:
+      route: {paths: [/ai]}
+      model: {}
+`)
+
+	_, metadata, _, err := WithMetadata(src, Options{OutputMode: "db-less"})
+	require.NoError(t, err)
+	require.Equal(t, []PluginTargetSource{
+		{
+			PluginIndex:      1,
+			Location:         "plugins[1]",
+			TargetIndex:      0,
+			ModelName:        "local-llama",
+			ModelTargetIndex: 0,
+			Capability:       "generate",
+			CapabilityLabel:  "Chat completions",
+		},
+		{
+			PluginIndex:      3,
+			Location:         "plugins[3]",
+			TargetIndex:      0,
+			ModelName:        "local-llama",
+			ModelTargetIndex: 0,
+			Capability:       "agentic",
+			CapabilityLabel:  "Responses",
+		},
+	}, metadata.PluginTargets)
+}
+
+func TestWithMetadataTracksMCPGeneratedEntities(t *testing.T) {
+	src := []byte(`
+mcp_servers:
+  - type: conversion-listener
+    name: tools
+    config:
+      route: {paths: [/mcp]}
+    tools:
+      - {name: search, description: Search, method: GET, path: /search, scheme: https, host: tools.internal}
+`)
+
+	_, metadata, _, err := WithMetadata(src, Options{OutputMode: "db-less"})
+	require.NoError(t, err)
+
+	require.Len(t, metadata.Plugins, 1)
+	require.Equal(t, GeneratedEntitySource{
+		Index:       0,
+		Location:    "plugins[0]",
+		EntityType:  "mcp_server",
+		EntityName:  "tools",
+		FieldPrefix: "config",
+		FieldMappings: []FieldMapping{
+			{GeneratedPrefix: "config.mode", SourcePrefix: "type"},
+			{GeneratedPrefix: "config.tools", SourcePrefix: "tools"},
+			{GeneratedPrefix: "config.proxy_config", SourcePrefix: "config.proxy"},
+			{GeneratedPrefix: "config.auth", SourcePrefix: "config.upstream.auth"},
+			{GeneratedPrefix: "config.default_acl", SourcePrefix: "access"},
+			{GeneratedPrefix: "config.acl_attribute_type", SourcePrefix: "access.acl_attribute_type"},
+			{GeneratedPrefix: "config.access_token_claim_field", SourcePrefix: "access.access_token_claim_field"},
+			{GeneratedPrefix: "config.server.tag", SourcePrefix: "config.server.label"},
+		},
+	}, metadata.Plugins[0])
+	require.Len(t, metadata.Routes, 1)
+	require.Equal(t, "config.route", metadata.Routes[0].FieldPrefix)
+	require.Len(t, metadata.Services, 1)
+	require.Equal(t, "config.url", metadata.Services[0].FieldPrefix)
+	require.Contains(t, metadata.Services[0].FieldMappings, FieldMapping{
+		GeneratedPrefix: "protocol",
+		SourcePrefix:    "config.url",
+	})
+}
+
+func TestWithMetadataTracksNestedDeckEntities(t *testing.T) {
+	src := []byte(`
+agents:
+  - type: a2a
+    name: booking-agent
+    config:
+      url: https://agent.internal
+      route: {paths: [/agents/book]}
+`)
+
+	_, metadata, _, err := WithMetadata(src, Options{})
+	require.NoError(t, err)
+	require.Len(t, metadata.Services, 1)
+	require.Equal(t, "services[0]", metadata.Services[0].Location)
+	require.Equal(t, "config.url", metadata.Services[0].FieldPrefix)
+	require.Equal(t, []GeneratedEntitySource{{
+		Index:       0,
+		Location:    "services[0].routes[0]",
+		EntityType:  "agent",
+		EntityName:  "booking-agent",
+		FieldPrefix: "config.route",
+	}}, metadata.Routes)
+	require.Equal(t, []GeneratedEntitySource{{
+		Index:       0,
+		Location:    "services[0].routes[0].plugins[0]",
+		EntityType:  "agent",
+		EntityName:  "booking-agent",
+		FieldPrefix: "config",
+		FieldMappings: []FieldMapping{
+			{GeneratedPrefix: "config.proxy_config", SourcePrefix: "config.proxy"},
+			{GeneratedPrefix: "config.auth", SourcePrefix: "config.upstream.auth"},
+		},
+	}}, metadata.Plugins)
+}
+
 func TestConvertWarnsAndEmitsMultiTargetVideoLifecycleRoutes(t *testing.T) {
 	src := []byte(`
 model_providers:
@@ -532,7 +652,7 @@ models:
         provider: p1
         config: {type: openai}
     config:
-      route: {paths: [/v1], model: {path: {values: ["@openai/custom-m1"]}}}
+      route: {paths: [/v1], model: {values: ["@openai/custom-m1"]}}
 model_providers:
   - name: p1
     type: openai
@@ -578,6 +698,47 @@ model_providers:
 	require.True(t, ok, "expected ai-proxy-advanced model")
 	require.Equal(t, "gpt-4o", model["name"])
 	require.Equal(t, "@openai/custom-m1", model["model_alias"], "target model_alias should match source model.alias")
+}
+
+func TestConvertDefaultSelectorUsesFormatDefault(t *testing.T) {
+	src := []byte(`
+models:
+  - type: model
+    name: gemini-model
+    capabilities: [generate]
+    formats: [{type: gemini}]
+    targets:
+      - name: gemini-2.5-pro
+        provider: p1
+        config: {type: gemini}
+    config:
+      route: {paths: [/v1], model: {values: ["@kong/gemini"]}}
+model_providers:
+  - name: p1
+    type: gemini
+`)
+
+	out, _, err := Convert(src, Options{})
+	require.NoError(t, err, "convert")
+
+	var got map[string]any
+	require.NoError(t, yaml.Unmarshal(out, &got), "unmarshal output")
+	plugins := got["plugins"].([]any)
+	for _, raw := range plugins {
+		plugin := raw.(map[string]any)
+		if plugin["name"] != "ai-model-selector" {
+			continue
+		}
+		config := plugin["config"].(map[string]any)
+		sources, ok := config["sources"].([]any)
+		require.True(t, ok, "default selector should use config.sources")
+		require.Len(t, sources, 1)
+		source := sources[0].(map[string]any)
+		require.Equal(t, "path", source["source"])
+		require.Equal(t, "models/([%w%.%-]+):", source["path_pattern"])
+		return
+	}
+	t.Fatal("expected ai-model-selector plugin")
 }
 
 func TestConvertSynthesizesAIModelNameWhenUnset(t *testing.T) {
@@ -784,8 +945,10 @@ func TestA2APluginDropsLogAudits(t *testing.T) {
 			},
 		},
 	}
-	logging, ok := a2aPlugin(a).Config["logging"].(map[string]any)
-	require.True(t, ok, "expected logging block, got %v", a2aPlugin(a).Config["logging"])
+	plugin, err := (&Converter{}).a2aPlugin(a)
+	require.NoError(t, err)
+	logging, ok := plugin.Config["logging"].(map[string]any)
+	require.True(t, ok, "expected logging block, got %v", plugin.Config["logging"])
 	require.NotContains(t, logging, "log_audits", "ai-a2a-proxy must not emit log_audits, got %v", logging)
 	require.Equal(t, true, logging["log_statistics"], "expected log_statistics true")
 }

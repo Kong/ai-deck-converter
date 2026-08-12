@@ -1,0 +1,367 @@
+_format_version: "3.0"
+_transform: false
+services:
+  - id: 947a4e23-b483-5a65-8165-da9aed24565b
+    name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    host: ai-gateway.upstream.local
+    port: 80
+    protocol: http
+routes:
+  - id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+    name: openai-chat
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /openai-default-name/chat/completions
+    methods:
+      - POST
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: 2384fe9d-eacc-5ac2-ae4c-4752cc597f81
+    name: openai-chat-2
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /openai-default-alias/chat/completions
+    methods:
+      - POST
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: 10bf6bcb-e990-5997-afc1-265030165eed
+    name: openai-chat-3
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /openai-custom-body/chat/completions
+    methods:
+      - POST
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: ef4e4a2f-dd25-5098-9807-b856c5ab0b97
+    name: openai-chat-4
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /openai-custom-header/chat/completions
+    methods:
+      - POST
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: b4a57e40-147c-502b-a080-e3102a5c3273
+    name: gemini-generate
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - ~/gemini-default-name/v1beta/models/(?<model_name>[^:/]+):(?:generateContent|streamGenerateContent)
+    methods:
+      - GET
+      - POST
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: 7ddc17d8-fad0-5f2f-9988-d25560595484
+    name: gemini-generate-2
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - ~/gemini-default-alias/v1beta/models/(?<model_name>[^:/]+):(?:generateContent|streamGenerateContent)
+    methods:
+      - GET
+      - POST
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: 61808011-06ae-5208-8ea7-6454b413c8c1
+    name: gemini-generate-3
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - ~/gemini-path-name/v1beta/models/(?<model_name>[^:/]+):(?:generateContent|streamGenerateContent)
+    methods:
+      - GET
+      - POST
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: 1c7e3f8d-03b4-5e58-aca8-585308f7a935
+    name: gemini-generate-4
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - ~/gemini-path-alias/v1beta/models/(?<model_name>[^:/]+):(?:generateContent|streamGenerateContent)
+    methods:
+      - GET
+      - POST
+    protocols:
+      - http
+      - https
+    strip_path: false
+plugins:
+  - id: 17fa8192-4b9f-5b5a-8379-20ad8bc836a7
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+  - id: f3adc007-171c-5519-8763-3a0eef79bde3
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - description: gpt-5
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: openai-default-name
+            name: gpt-5
+            provider: openai
+          route_type: llm/v1/chat
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+    model:
+      id: 8b5f4e44-2fb5-5ff7-a13c-155be254be31
+  - id: dcebfb31-cc0f-5469-b6d7-9d8807a4e8d2
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route:
+      id: 2384fe9d-eacc-5ac2-ae4c-4752cc597f81
+  - id: 75ff22ed-6245-594b-895f-6a9fa36f4581
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - description: gpt-5
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: '@kong/openai'
+            name: gpt-5
+            provider: openai
+          route_type: llm/v1/chat
+    route:
+      id: 2384fe9d-eacc-5ac2-ae4c-4752cc597f81
+    model:
+      id: eb93e1da-5536-57b6-b50b-9a2e9d679164
+  - id: 5477cac7-3c38-581b-899b-f9d520e9d5e4
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: requested_model
+          source: body
+    route:
+      id: 10bf6bcb-e990-5997-afc1-265030165eed
+  - id: 628550fd-b362-5247-b3ba-f2f6fa95de13
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - description: gpt-5
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: openai-custom-body
+            name: gpt-5
+            provider: openai
+          route_type: llm/v1/chat
+    route:
+      id: 10bf6bcb-e990-5997-afc1-265030165eed
+    model:
+      id: 1070836f-a742-5831-8fcd-6d244fca0810
+  - id: 3912bf60-1edb-5602-89ae-a8a2e41177f4
+    name: ai-model-selector
+    config:
+      sources:
+        - header_name: x-model
+          source: header
+    route:
+      id: ef4e4a2f-dd25-5098-9807-b856c5ab0b97
+  - id: ccc68bd9-2622-5864-b026-137e5c06c755
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - description: gpt-5
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: openai-custom-header
+            name: gpt-5
+            provider: openai
+          route_type: llm/v1/chat
+    route:
+      id: ef4e4a2f-dd25-5098-9807-b856c5ab0b97
+    model:
+      id: 201de38c-7153-537b-9315-7e7f3799ef28
+  - id: cd4aa418-5dc5-57fe-860c-f5ddb6889d88
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - path_pattern: 'models/([%w%.%-]+):'
+          source: path
+    route:
+      id: b4a57e40-147c-502b-a080-e3102a5c3273
+  - id: d7038ac4-55db-505a-824e-d2a548ec7424
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: gemini
+      targets:
+        - description: gemini-2.5-pro
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: gemini-default-name
+            name: gemini-2.5-pro
+            provider: gemini
+          route_type: llm/v1/chat
+    route:
+      id: b4a57e40-147c-502b-a080-e3102a5c3273
+    model:
+      id: cb864ea7-b5fc-567a-bb09-254e9a2edd35
+  - id: b5fb23d3-496f-532c-9b75-245ccfee68d3
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - path_pattern: 'models/([%w%.%-]+):'
+          source: path
+    route:
+      id: 7ddc17d8-fad0-5f2f-9988-d25560595484
+  - id: e4b46606-e4f5-57c3-9298-949d4e990f2d
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: gemini
+      targets:
+        - description: gemini-2.5-pro
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: '@kong/gemini'
+            name: gemini-2.5-pro
+            provider: gemini
+          route_type: llm/v1/chat
+    route:
+      id: 7ddc17d8-fad0-5f2f-9988-d25560595484
+    model:
+      id: bc123b7e-e80a-5e9c-8623-be038a536152
+  - id: 47b56eb4-93bb-5ba2-a7a7-1b24635b434e
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - path_pattern: 'models/([%w%.%-]+):'
+          source: path
+    route:
+      id: 61808011-06ae-5208-8ea7-6454b413c8c1
+  - id: 1fc0cc9b-eb94-5eb9-8c69-d8361c990007
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: gemini
+      targets:
+        - description: gemini-2.5-pro
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: gemini-path-name
+            name: gemini-2.5-pro
+            provider: gemini
+          route_type: llm/v1/chat
+    route:
+      id: 61808011-06ae-5208-8ea7-6454b413c8c1
+    model:
+      id: a34ab1e3-4979-5117-962a-0508b6e2c33a
+  - id: b21a1b0e-3d70-5c23-84a5-d25fee046ce9
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - path_pattern: 'models/([%w%.%-]+):'
+          source: path
+    route:
+      id: 1c7e3f8d-03b4-5e58-aca8-585308f7a935
+  - id: cf7316be-1398-5d7d-bed6-bacd43b095b8
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: gemini
+      targets:
+        - description: gemini-2.5-pro
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: gemini-path-alias
+            name: gemini-2.5-pro
+            provider: gemini
+          route_type: llm/v1/chat
+    route:
+      id: 1c7e3f8d-03b4-5e58-aca8-585308f7a935
+    model:
+      id: c7915821-8736-59a2-9d78-df6e12ddfe3a
+ai_models:
+  - id: 8b5f4e44-2fb5-5ff7-a13c-155be254be31
+    name: openai-default-name
+  - id: eb93e1da-5536-57b6-b50b-9a2e9d679164
+    name: '@kong/openai'
+  - id: 1070836f-a742-5831-8fcd-6d244fca0810
+    name: openai-custom-body
+  - id: 201de38c-7153-537b-9315-7e7f3799ef28
+    name: openai-custom-header
+  - id: cb864ea7-b5fc-567a-bb09-254e9a2edd35
+    name: gemini-default-name
+  - id: bc123b7e-e80a-5e9c-8623-be038a536152
+    name: '@kong/gemini'
+  - id: a34ab1e3-4979-5117-962a-0508b6e2c33a
+    name: gemini-path-name
+  - id: c7915821-8736-59a2-9d78-df6e12ddfe3a
+    name: gemini-path-alias

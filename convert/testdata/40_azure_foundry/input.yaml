@@ -1,0 +1,56 @@
+# Azure AI Foundry provider. The provider carries service: azure-foundry plus a
+# foundry.{resource,domain} block; these fold into each target's flat
+# azure_service / azure_foundry_resource / azure_foundry_domain options. The
+# per-model foundry_path_prefix renames to azure_foundry_path_prefix. Both models
+# reference the same provider, so the reverse converter dedupes them back into one.
+models:
+  - type: model
+    display_name: gpt-4o Foundry
+    name: gpt-4o-foundry
+    capabilities: [generate]
+    formats:
+      - type: openai
+    targets:
+      # No foundry_path_prefix -> defaults to /openai/v1 at runtime (not emitted).
+      - name: gpt-4o
+        provider: azure-foundry-east
+        config:
+          type: azure
+    policies: []
+    access:
+      acls: {allow: [], deny: []}
+    config:
+      route:
+        paths: [/ai]
+  - type: model
+    display_name: Claude Foundry
+    name: claude-foundry
+    capabilities: [generate]
+    formats:
+      - type: anthropic
+    targets:
+      - name: claude-sonnet-4
+        provider: azure-foundry-east
+        config:
+          type: azure
+          foundry_path_prefix: /anthropic/v1
+    policies: []
+    access:
+      acls: {allow: [], deny: []}
+    config:
+      route:
+        paths: [/ai]
+model_providers:
+  - type: azure
+    display_name: Azure Foundry East
+    name: azure-foundry-east
+    config:
+      service: azure-foundry
+      foundry:
+        resource: kong-foundry-east
+        domain: services.ai.azure.com
+      auth:
+        type: basic
+        headers:
+          - name: api-key
+            value: "{vault://env/azure-foundry-key}"

@@ -23,7 +23,7 @@ models:
     access:
       acls: {allow: [], deny: []}
     config:
-      route: {paths: [/ai], model: {path: {path_param: "model-capture-group", values: ["@sagemaker/claude-3-5-sonnet"]}}}
+      route: {paths: [/ai], model: {values: ["@sagemaker/claude-3-5-sonnet"]}}
 model_providers:
   - type: sagemaker
     display_name: Sagemaker Prod

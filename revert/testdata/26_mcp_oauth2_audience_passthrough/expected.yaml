@@ -1,0 +1,37 @@
+mcp_servers:
+  - type: listener
+    name: secure-mcp
+    config:
+      route:
+        paths:
+          - /mcp/secure
+      logging:
+        payloads: false
+        statistics: true
+        audits: false
+    tools:
+      - name: ping
+        description: Ping the server
+        method: GET
+        path: /ping
+        scheme: https
+        host: secure.internal
+    access:
+      identity_providers:
+        - openid-connect-1
+      metadata:
+        endpoint: /mcp/secure/.well-known/oauth-protected-resource
+        authorization_servers:
+          - https://dev-123456.okta.com/oauth2/default
+        resource: https://api.example.com/mcp/secure
+identity_providers:
+  - type: openid-connect
+    name: openid-connect-1
+    config:
+      audience_required:
+        - https://api.example.com/mcp/secure
+      client_id:
+        - mcp-client
+      client_secret:
+        - '{vault://ai-vault/okta-client-secret}'
+      hide_credentials: false

@@ -98,9 +98,10 @@ plugins:
   - id: 17fa8192-4b9f-5b5a-8379-20ad8bc836a7
     name: ai-model-selector
     config:
-      body_path: model
       max_request_body_size: 8388608
-      source: body
+      sources:
+        - body_path: model
+          source: body
     route:
       id: 8ae36805-da7a-55b9-b056-72bde6bb937d
   - id: f3adc007-171c-5519-8763-3a0eef79bde3
@@ -143,9 +144,10 @@ plugins:
   - id: dcebfb31-cc0f-5469-b6d7-9d8807a4e8d2
     name: ai-model-selector
     config:
-      body_path: model
       max_request_body_size: 8388608
-      source: body
+      sources:
+        - body_path: model
+          source: body
     route:
       id: 0da1097c-6edc-5c9c-a032-cd042d0db5e4
   - id: 75ff22ed-6245-594b-895f-6a9fa36f4581
