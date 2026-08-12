@@ -77,7 +77,7 @@ type ProviderAuth struct {
 	OAuthTokenURL        string `yaml:"oauth_token_url,omitempty"`
 	UseGCPServiceAccount *bool  `yaml:"use_gcp_service_account,omitempty"`
 
-	// sagemaker
+	// aws (bedrock/sagemaker) — temporary IAM session token
 	SessionToken string `yaml:"session_token,omitempty"`
 }
 
