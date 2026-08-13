@@ -1,7 +1,6 @@
 package convert
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/Kong/ai-deck-converter/internal/aigw"
@@ -133,29 +132,32 @@ func TestLowerEmbeddingsModelBedrockNonAnthropicDoesNotDefaultAnthropicVersion(t
 	require.NotContains(t, model, "options")
 }
 
-func TestConvertWarnsUnsupportedCapability(t *testing.T) {
+func TestConvertRejectsUnsupportedCapability(t *testing.T) {
 	src := []byte(`
 models:
   - type: model
     name: m1
-    capabilities: [image]
-    formats: [{type: anthropic}]
+    capabilities: [rerank]
+    formats: [{type: openai}]
     targets:
-      - name: claude
-        provider: anthropic-main
-        config: {type: anthropic}
+      - name: cohere.rerank-v3-5:0
+        provider: bedrock-main
+        config: {type: bedrock}
     policies: []
     acls: {allow: [], deny: []}
     config:
       route: {paths: [/ai]}
       model: {}
 model_providers:
-  - type: anthropic
-    name: anthropic-main
+  - type: bedrock
+    name: bedrock-main
     config: {auth: {type: basic, headers: [{name: x-api-key, value: k}]}}
 `)
-	_, warnings, err := Convert(src, Options{})
-	require.NoError(t, err, "convert")
-	require.Contains(t, strings.Join(warnings, "\n"), "no endpoint for capability",
-		"expected unsupported-capability warning")
+	_, _, err := Convert(src, Options{})
+	require.Error(t, err, "convert")
+	require.Contains(t, err.Error(), `capability "rerank" is not supported with llm_format "openai" for provider type "bedrock"`)
+
+	conversionErr, ok := AsConversionError(err)
+	require.True(t, ok)
+	require.Equal(t, "capabilities", conversionErr.Diagnostics[0].Field)
 }

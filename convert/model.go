@@ -212,12 +212,9 @@ func (c *Converter) convertModels() error {
 				sec := aimap.EndpointSectionFor(llmFormat(m), providerType, capability)
 				spec, ok := aimap.LookupEndpoint(sec, capability)
 				if !ok {
-					if err := c.warn(
-						"model %q: provider section %q has no endpoint for capability %q; skipping",
-						m.Name, sec, capability); err != nil {
-						return err
-					}
-					continue
+					return c.failAt("capabilities",
+						"model %q: capability %q is not supported with llm_format %q for provider type %q",
+						m.Name, capability, llmFormat(m), providerType)
 				}
 				logging := modelLoggingBlock(withLoggingDefaults(m.Config.Logging, false, false), spec.SupportsLogStatistics)
 				// Authentication plugins execute before the model selector. Models
