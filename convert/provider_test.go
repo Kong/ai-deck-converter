@@ -155,7 +155,8 @@ model_providers:
 `)
 	_, _, err := Convert(src, Options{})
 	require.Error(t, err, "convert")
-	require.Contains(t, err.Error(), `capability "rerank" is not supported with llm_format "openai" for provider type "bedrock"`)
+	require.Contains(t, err.Error(), `capability "rerank" is not supported `+
+		`with llm_format "openai" for provider type "bedrock"`)
 
 	conversionErr, ok := AsConversionError(err)
 	require.True(t, ok)
