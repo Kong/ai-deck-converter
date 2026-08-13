@@ -38,15 +38,28 @@ func (c *Converter) mcpIdentityPlugins(m *aigw.MCPServer, route *kong.Route) ([]
 	}
 
 	// Listener guard: only listener-style modes can front the ai-mcp-oauth2
-	// plugin (and its metadata endpoint). For other modes, warn and skip.
+	// plugin (and its metadata endpoint). Reject rather than drop the requested
+	// authentication behavior.
 	if !mcpListenerTypes[m.Type] {
-		if err := c.warn(
+		message := fmt.Sprintf(
 			"MCP server %q has type %q; access.identity_providers/metadata are only "+
 				"supported for listener, conversion-listener, and passthrough-listener",
-			m.Name, m.Type); err != nil {
-			return nil, err
+			m.Name, m.Type,
+		)
+		diagnostics := make([]ConversionDiagnostic, 0, 2) //nolint:mnd
+		if len(m.Access.IdentityProviders) > 0 {
+			diagnostics = append(diagnostics, ConversionDiagnostic{
+				Field:    "access.identity_providers",
+				Messages: []string{message},
+			})
 		}
-		return nil, nil
+		if meta != nil {
+			diagnostics = append(diagnostics, ConversionDiagnostic{
+				Field:    "access.metadata",
+				Messages: []string{message},
+			})
+		}
+		return nil, &ConversionError{Diagnostics: diagnostics}
 	}
 
 	idp, err := c.mcpAccessIdentityProvider(m)

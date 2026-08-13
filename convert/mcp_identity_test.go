@@ -1,7 +1,6 @@
 package convert
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -76,18 +75,17 @@ mcp_servers:
         description: An upstream tool
 `
 
-func TestMCPIdentityUnsupportedListenerWarns(t *testing.T) {
-	// Non-strict: unsupported listener type warns and skips auth (no error).
-	out, warnings, err := Convert([]byte(oidcOnUnsupportedListener), Options{})
-	require.NoError(t, err)
-	require.NotEmpty(t, warnings)
-	require.Contains(t, strings.Join(warnings, "\n"),
-		"only supported for listener, conversion-listener, and passthrough-listener")
-	require.NotContains(t, string(out), "ai-mcp-oauth2", "no auth plugin should be emitted")
-
-	// Strict: the same condition becomes an error.
-	_, _, err = Convert([]byte(oidcOnUnsupportedListener), Options{Strict: true})
+func TestMCPIdentityUnsupportedListenerIsHardError(t *testing.T) {
+	_, _, err := Convert([]byte(oidcOnUnsupportedListener), Options{})
 	require.Error(t, err)
+	require.Contains(t, err.Error(), "only supported for listener, conversion-listener, and passthrough-listener")
+
+	conversionErr, ok := AsConversionError(err)
+	require.True(t, ok)
+	require.Len(t, conversionErr.Diagnostics, 2)
+	require.Equal(t, "access.identity_providers", conversionErr.Diagnostics[0].Field)
+	require.Equal(t, "access.metadata", conversionErr.Diagnostics[1].Field)
+	require.Equal(t, conversionErr.Diagnostics[0].Messages, conversionErr.Diagnostics[1].Messages)
 }
 
 // oidcMetadataWithoutAuthServers omits metadata.authorization_servers so the
