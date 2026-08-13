@@ -183,6 +183,7 @@ var defaultBodyModelSelectorConfig = map[string]any{
 // Default path-selector patterns emitted by the forward converter for the
 // path-based sections.
 const (
+	OpenAIDefaultPathPattern  = "model/([^/]+)/"
 	GeminiDefaultPathPattern  = "models/([%w%.%-]+):"
 	BedrockDefaultPathPattern = "model/([^/]+)/"
 )
