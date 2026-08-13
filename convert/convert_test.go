@@ -640,6 +640,54 @@ policies:
 	require.NotEqual(t, "provided-policy-id", keyAuthID)
 }
 
+func TestConvertRateLimitingProviderEntityMatchUsesProviderType(t *testing.T) {
+	src := []byte(`
+policies:
+  - name: provider-limit
+    type: ai-rate-limiting-advanced
+    global: true
+    config:
+      identifier: ip
+      strategy: local
+      policies:
+        - match:
+            - type: provider
+              values: [poc-openai-provider, "open*", unknown-provider]
+          limits:
+            - limit: 10
+              window_size: 20
+              tokens_count_strategy: total_tokens
+model_providers:
+  - name: poc-openai-provider
+    type: openai
+`)
+
+	out, _, err := Convert(src, Options{OutputMode: "db-less"})
+	require.NoError(t, err, "convert db-less")
+
+	var got struct {
+		Plugins []struct {
+			Name   string         `yaml:"name"`
+			Config map[string]any `yaml:"config"`
+		} `yaml:"plugins"`
+	}
+	require.NoError(t, yaml.Unmarshal(out, &got), "unmarshal output")
+
+	var config map[string]any
+	for _, plugin := range got.Plugins {
+		if plugin.Name == "ai-rate-limiting-advanced" {
+			config = plugin.Config
+			break
+		}
+	}
+	require.NotNil(t, config, "expected ai-rate-limiting-advanced plugin")
+
+	policies := config["policies"].([]any)
+	matches := policies[0].(map[string]any)["match"].([]any)
+	values := matches[0].(map[string]any)["values"]
+	require.Equal(t, []any{"openai", "open*", "unknown-provider"}, values)
+}
+
 func TestConvertMapsConfiguredModelName(t *testing.T) {
 	src := []byte(`
 models:
