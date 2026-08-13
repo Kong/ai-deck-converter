@@ -980,7 +980,7 @@ func boolPtr(b bool) *bool { return &b }
 // model alias appears.
 func tryConvertPCREToLua(pattern string) string {
 	pattern = strings.TrimPrefix(pattern, "~")
-	var pcreNamedGroup = regexp.MustCompile(`\(\?<[A-Za-z_][A-Za-z0-9_]*>[^)]*\)`)
+	pcreNamedGroup := regexp.MustCompile(`\(\?<[A-Za-z_][A-Za-z0-9_]*>[^)]*\)`)
 
 	// genericPathAliasCapture is the Lua pattern substituted for a PCRE named
 	// capture group when deriving an ai-model-selector path_pattern: it matches
