@@ -375,14 +375,51 @@ func RoutePath(base string, spec EndpointSpec) string {
 	// with the leading slash of the suffix and produce an empty path segment
 	// like "//chat/completions", which Kong rejects.
 	base = strings.TrimRight(base, "/")
-	if spec.IsRegex {
-		// The generated route needs one regex marker. A model base may already
-		// be a regex path ("~/..."); do not turn it into an invalid "~~/..."
-		// route while appending the format-specific regex suffix.
-		base = strings.TrimPrefix(base, "~")
-		return "~" + base + "/" + spec.PathSuffix
+
+	// A model base may already be a regex path ("~^/deployments/(?<id>[^/]+)$").
+	// Strip the single regex marker so we never emit an invalid "~~/..." route,
+	// and drop a trailing "$" end-anchor: the format-specific suffix is appended
+	// after the base, so keeping the anchor would strand a "$" mid-path and
+	// reject the route.
+	baseIsRegex := strings.HasPrefix(base, "~")
+	base = strings.TrimPrefix(base, "~")
+
+	// The route is a regex whenever either side contributes one: a regex base
+	// needs the marker so Kong compiles its capture groups, a regex spec brings
+	// its own capture in the suffix. Either way the anchor must go so the suffix
+	// lands after it, and the single marker is re-added once.
+	isRegex := baseIsRegex || spec.IsRegex
+	if isRegex {
+		base = trimRegexEndAnchor(base)
 	}
-	return base + spec.PathSuffix
+	suffix := spec.PathSuffix
+	if spec.IsRegex {
+		// A regex suffix carries no leading slash of its own.
+		suffix = "/" + suffix
+	}
+	if isRegex {
+		return "~" + base + suffix
+	}
+	return base + suffix
+}
+
+// trimRegexEndAnchor drops a single trailing "$" end-anchor from a regex body so
+// the format-specific suffix can be appended after it. A "$" escaped as "\$" is a
+// literal dollar, not an anchor, and is preserved: an anchor is only recognized
+// when preceded by an even number (including zero) of backslashes.
+func trimRegexEndAnchor(s string) string {
+	body, ok := strings.CutSuffix(s, "$")
+	if !ok {
+		return s
+	}
+	backslashes := 0
+	for i := len(body) - 1; i >= 0 && body[i] == '\\'; i-- {
+		backslashes++
+	}
+	if backslashes%2 == 1 {
+		return s
+	}
+	return body
 }
 
 // PluginProvider maps an AI Gateway provider type to the ai-proxy-advanced
