@@ -115,6 +115,13 @@ func isDefaultBasePath(base string) bool {
 func basePathFor(path string, spec aimap.EndpointSpec) (string, bool) {
 	if strings.HasPrefix(path, "~") {
 		if !spec.IsRegex {
+			// A regex base path ("~...") carrying a non-regex endpoint suffix:
+			// the forward direction appended the suffix directly, keeping the
+			// marker. Recover the regex base with its marker intact so a re-
+			// conversion reproduces the same route.
+			if base, ok := strings.CutSuffix(path, spec.PathSuffix); ok {
+				return base, true
+			}
 			return "", false
 		}
 		body := strings.TrimPrefix(path, "~")

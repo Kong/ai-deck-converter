@@ -1,0 +1,22 @@
+models:
+  - name: azure-chat
+    capabilities: [generate]
+    formats:
+      - type: openai
+    config:
+      route:
+        paths: ['~^/deployments/(?<id>[^/]+)$']
+    targets:
+      - name: gpt-4o
+        provider: openai-prod
+        config:
+          type: openai
+model_providers:
+  - name: openai-prod
+    type: openai
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "Bearer test"

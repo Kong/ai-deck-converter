@@ -112,6 +112,32 @@ func TestRoutePath(t *testing.T) {
 		{"regex root base", "/", "~/model/(?<model_name>[^/]+)/converse(?:-stream)?", bedrock},
 		{"regex base retains one marker", "~/ai", "~/ai/model/(?<model_name>[^/]+)/converse(?:-stream)?", bedrock},
 		{"regex root base retains one marker", "~/", "~/model/(?<model_name>[^/]+)/converse(?:-stream)?", bedrock},
+		{
+			"regex base with non-regex suffix keeps marker",
+			"~^/deployments/(?<id>[^/]+)", "~^/deployments/(?<id>[^/]+)/chat/completions", chat,
+		},
+		{
+			"regex base end-anchor stripped before non-regex suffix",
+			"~^/deployments/(?<id>[^/]+)$", "~^/deployments/(?<id>[^/]+)/chat/completions", chat,
+		},
+		{
+			"regex base end-anchor stripped before regex suffix",
+			"~^/deployments/(?<id>[^/]+)$",
+			"~^/deployments/(?<id>[^/]+)/model/(?<model_name>[^/]+)/converse(?:-stream)?",
+			bedrock,
+		},
+		{
+			"escaped literal dollar at end is preserved",
+			`~^/pay/(?<amt>[0-9]+)\$`, `~^/pay/(?<amt>[0-9]+)\$/chat/completions`, chat,
+		},
+		{
+			"escaped dollar kept while real end-anchor is stripped",
+			`~^/pay/(?<amt>\$[0-9]+)$`, `~^/pay/(?<amt>\$[0-9]+)/chat/completions`, chat,
+		},
+		{
+			"escaped backslash before real anchor strips only the anchor",
+			`~^/x\\$`, `~^/x\\/chat/completions`, chat,
+		},
 	}
 	for _, tc := range cases {
 		require.Equalf(t, tc.want, RoutePath(tc.base, tc.spec), "RoutePath(%q) [%s]", tc.base, tc.name)
