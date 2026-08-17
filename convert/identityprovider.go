@@ -46,11 +46,30 @@ func identityProviderPlugin(idp *aigw.IdentityProvider) kong.Plugin {
 		cfg[k] = v
 	}
 	cfg["anonymous"] = anonymousConsumerName
+	if idp.Type == "key-auth" {
+		forceKeyAuthIdentityRealms(cfg)
+	}
 	return kong.Plugin{
 		Name:   idp.Type,
 		Config: cfg,
 		Source: source("identity_provider", idp.Name, "config"),
 	}
+}
+
+// forceKeyAuthIdentityRealms enforces the key-auth schema constraint that when
+// principal hydration is enabled (config.principals.enabled = true),
+// config.identity_realms must be present as an empty array rather than unset,
+// as identity_realms is set by the DP to the default realm.
+// See https://github.com/Kong/kong-ee/blob/master/kong/plugins/key-auth/schema.lua#L63
+func forceKeyAuthIdentityRealms(cfg map[string]any) {
+	principals, ok := cfg["principals"].(map[string]any)
+	if !ok {
+		return
+	}
+	if enabled, _ := principals["enabled"].(bool); !enabled {
+		return
+	}
+	cfg["identity_realms"] = []any{}
 }
 
 // ensureAnonymousConsumer appends the anonymous Consumer (with a
