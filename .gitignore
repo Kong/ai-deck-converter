@@ -49,3 +49,6 @@ coverage.html
 
 # macOS
 .DS_Store
+
+# reference documentation
+.ref-docs
