@@ -3,9 +3,50 @@ package convert
 import (
 	"testing"
 
+	"github.com/Kong/ai-deck-converter/internal/aigw"
 	"github.com/Kong/ai-deck-converter/internal/kong"
 	"github.com/stretchr/testify/require"
 )
+
+func TestIdentityProviderKeyAuthForcesEmptyIdentityRealms(t *testing.T) {
+	idp := &aigw.IdentityProvider{
+		Name:        "agent-key-auth",
+		DisplayName: "agent-key-auth",
+		Type:        "key-auth",
+		Config: map[string]any{
+			"hide_credentials": true,
+			"key_in_body":      false,
+			"key_in_header":    true,
+			"key_in_query":     false,
+			"key_names":        []any{"x-api-key"},
+			"principals":       map[string]any{"directory": "default", "enabled": true},
+		},
+	}
+
+	p := identityProviderPlugin(idp)
+
+	require.Equal(t, "key-auth", p.Name)
+	require.Contains(t, p.Config, "identity_realms")
+	require.Equal(t, []any{}, p.Config["identity_realms"], "identity_realms must be an empty array, not unset")
+	require.Equal(t, anonymousConsumerName, p.Config["anonymous"])
+	// The rest of the config passes through verbatim.
+	require.Equal(t, true, p.Config["hide_credentials"])
+	require.Equal(t, []any{"x-api-key"}, p.Config["key_names"])
+	require.Equal(t, map[string]any{"directory": "default", "enabled": true}, p.Config["principals"])
+}
+
+func TestIdentityProviderKeyAuthLeavesIdentityRealmsUnsetWhenPrincipalsDisabled(t *testing.T) {
+	cases := map[string]map[string]any{
+		"principals disabled": {"principals": map[string]any{"enabled": false}},
+		"no principals":       {"key_names": []any{"x-api-key"}},
+	}
+	for name, cfg := range cases {
+		t.Run(name, func(t *testing.T) {
+			p := identityProviderPlugin(&aigw.IdentityProvider{Type: "key-auth", Config: cfg})
+			require.NotContains(t, p.Config, "identity_realms")
+		})
+	}
+}
 
 func TestEnsureAnonymousConsumerCreatesWhenMissing(t *testing.T) {
 	c := newConverter(nil, Options{})
