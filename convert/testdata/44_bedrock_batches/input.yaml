@@ -1,0 +1,32 @@
+# Bedrock batch inference (type=api) maps to the model-invocation-job lifecycle
+# API, not async-invoke. The paths carry no model, so the route is route-only
+# with no ai-model-selector plugin.
+model_providers:
+  - name: bedrock-prod
+    type: bedrock
+    display_name: Bedrock Prod
+    config:
+      auth:
+        type: aws
+        access_key_id: "{vault://ai/aws-access-key-id}"
+        secret_access_key: "{vault://ai/aws-secret-access-key}"
+models:
+  - display_name: Bedrock Batch API
+    name: bedrock-batch-api
+    type: api
+    capabilities: [batches]
+    formats: [{type: bedrock}]
+    config:
+      route: {paths: [/ai]}
+      response_streaming: deny
+      model: {}
+    targets:
+      - name: batch-api
+        provider: bedrock-prod
+        config:
+          type: bedrock
+          region: us-east-1
+          batch_bucket_prefix: "s3://kong-bedrock-batches/jobs/"
+    policies: []
+    access:
+      acls: {allow: [], deny: []}

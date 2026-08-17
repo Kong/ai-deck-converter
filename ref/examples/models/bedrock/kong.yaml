@@ -38,13 +38,12 @@ services:
         - GET
         - POST
       strip_path: false
-    # batches: kept at 2 paths — the two endpoints have fundamentally different
-    # shapes (model-in-URL vs workspace-level list) and collapsing them into a
-    # single regex would be unreadable for example code.
+    # batches: the model-invocation-job lifecycle API (create/list/get/stop).
+    # Route-only, no model selector — these paths carry no model. (async-invoke
+    # is single-request async inference, which the DP treats as video.)
     - name: bedrock-batches
       paths:
-        - ~/ai/model/(?<model_name>[^/]+)/async-invoke
-        - /ai/model-invocations
+        - ~/ai/model-invocation-jobs?(?:/[^/]+(?:/stop)?)?
       methods:
         - GET
         - POST
@@ -241,7 +240,7 @@ plugins:
             bedrock:
               aws_region: us-east-1
 
-# ---- batches (async-invoke + model-invocations list) -----------------------
+# ---- batches (model-invocation-job lifecycle API) --------------------------
 - name: ai-proxy-advanced
   route:
     name: bedrock-batches

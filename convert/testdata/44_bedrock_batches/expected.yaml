@@ -1,0 +1,40 @@
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: bedrock-batches
+        paths:
+          - ~/ai/model-invocation-jobs?(?:/[^/]+(?:/stop)?)?
+        methods:
+          - GET
+          - POST
+        strip_path: false
+plugins:
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: bedrock
+      model_name_header: false
+      response_streaming: deny
+      targets:
+        - auth:
+            aws_access_key_id: '{vault://ai/aws-access-key-id}'
+            aws_secret_access_key: '{vault://ai/aws-secret-access-key}'
+          description: batch-api
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: batch-api
+            options:
+              bedrock:
+                aws_region: us-east-1
+                batch_bucket_prefix: s3://kong-bedrock-batches/jobs/
+            provider: bedrock
+          route_type: llm/v1/batches
+    route: bedrock-batches
+ai_models:
+  - name: bedrock-batch-api

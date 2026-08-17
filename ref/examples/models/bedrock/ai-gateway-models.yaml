@@ -192,9 +192,9 @@ models:
     policies: []
 
   # -------------------------------------------------------------------------
-  # capabilities: batches  (type=api — Bedrock async-invoke + model-invocations)
+  # capabilities: batches  (type=api — Bedrock model-invocation-job lifecycle)
   # -------------------------------------------------------------------------
-  - display_name: Bedrock Batch / Async Invoke API
+  - display_name: Bedrock Batch API
     name: bedrock-batch-api
     type: api
     enabled: true
@@ -205,8 +205,8 @@ models:
       route:
         paths:
           - /ai
-      # async-invoke and model-invocations don't carry a top-level `model`
-      # field — the model is in the URL path or the job spec.
+      # model-invocation-job requests don't carry a top-level `model` field —
+      # the model is specified inside the job spec.
       model: {}
       response_streaming: deny
     capabilities:

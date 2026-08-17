@@ -118,6 +118,7 @@ Below is a mapping of supported Capabilities to LLM Formats.
 - `generate` (converse): Standardized chat format. Primary generate endpoints.
 - `generate` (invoke): Native provider format. Used for text generation when converse isn't suitable or provider-specific params are needed.
 - `agentic`: Server-side RAG: retrieves from Knowledge Bases, then generates. Orchestration is opaque to the caller.
+- `batch`: The `model-invocation-job` lifecycle API (create/list/get/stop). Not `async-invoke` — that is single-request asynchronous inference (e.g. video generation), which the DP classifies as video. The batch paths carry no model, so the route is route-only with no model selector.
 
 | Capability | Supported Endpoint(s) | route_type | genai_category |
 |---|---|---|---|
@@ -130,7 +131,7 @@ Below is a mapping of supported Capabilities to LLM Formats.
 | audio | `~/model/(?<model_name>[^/]+)/invoke` | `llm/v1/chat` | `text/generation` |
 | video | `~/model/(?<model_name>[^/]+)/invoke` | `video/v1/videos/generations` | `video/generation` |
 | rerank | `~/model/(?<model_name>[^/]+)/rerank` | `llm/v1/chat` | `text/generation` |
-| batch | `~/model/(?<model_name>[^/]+)/async-invoke`, `/model-invocations` | `llm/v1/batches` | `text/generation` |
+| batch | `~/model-invocation-jobs?(?:/[^/]+(?:/stop)?)?` | `llm/v1/batches` | `text/generation` |
 | files | — | - | - |
 </details>
 
