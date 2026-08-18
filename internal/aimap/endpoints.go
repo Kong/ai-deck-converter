@@ -279,9 +279,13 @@ var EndpointTable = map[string]map[string]EndpointSpec{
 			"rerank", "model/(?<model_name>[^/]+)/rerank",
 			true, mGetPost, "llm/v1/chat", catTextGen, &bedrockPathModelSelectorConfig, true,
 		},
+		// Bedrock batch inference is the model-invocation-job lifecycle API, not
+		// async-invoke (async-invoke is single-request asynchronous inference,
+		// which the DP classifies as video generation). These paths carry no
+		// model, so the route is route-only with no ai-model-selector.
 		"batches": {
-			"batches", "model/(?<model_name>[^/]+)/async-invoke",
-			true, mGetPost, "llm/v1/batches", catTextGen, &bedrockPathModelSelectorConfig, true,
+			"batches", "model-invocation-jobs?(?:/[^/]+(?:/stop)?)?",
+			true, mGetPost, "llm/v1/batches", catTextGen, nil, true,
 		},
 	},
 	"gemini": {
