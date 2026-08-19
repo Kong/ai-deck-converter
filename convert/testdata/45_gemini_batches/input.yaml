@@ -1,0 +1,45 @@
+# Gemini batch routes (type=api, route-only, no model selector). The batches
+# suffix is non-regex, so it must join the base path with a separator
+# ("/gm" + "/v1beta/batches"), not fuse into "/gmv1beta/batches". Gemini-format
+# batches served by Vertex render on the same gemini client path, so both
+# providers are exercised. Regression for KOKO-4240.
+model_providers:
+  - name: gemini-prod
+    type: gemini
+  - name: vertex-prod
+    type: vertex
+    config:
+      auth:
+        type: gcp
+        service_account_json: "{vault://ai/gcp-service-account-json}"
+models:
+  - display_name: Gemini Batches
+    name: gemini-batches
+    type: api
+    capabilities: [batches]
+    formats: [{type: gemini}]
+    config:
+      route: {paths: [/gm]}
+      model: {}
+    targets:
+      - name: gemini-batch-target
+        provider: gemini-prod
+        config: {type: gemini}
+    policies: []
+    access:
+      acls: {allow: [], deny: []}
+  - display_name: Gemini Batches on Vertex
+    name: gemini-batches-vertex
+    type: api
+    capabilities: [batches]
+    formats: [{type: gemini}]
+    config:
+      route: {paths: [/gv]}
+      model: {}
+    targets:
+      - name: gemini-batch-vertex-target
+        provider: vertex-prod
+        config: {type: vertex}
+    policies: []
+    access:
+      acls: {allow: [], deny: []}

@@ -297,7 +297,7 @@ var EndpointTable = map[string]map[string]EndpointSpec{
 			"embeddings", "v1beta/models/(?<model_name>[^:/]+):(?:embedContent|batchEmbedContents)",
 			true, mGetPost, "llm/v1/embeddings", catEmbeddings, &geminiPathModelSelectorConfig, true,
 		},
-		"batches": {"batches", "v1beta/batches", false, mGetPost, "llm/v1/batches", catTextGen, nil, true},
+		"batches": {"batches", "/v1beta/batches", false, mGetPost, "llm/v1/batches", catTextGen, nil, true},
 		"files":   {"files", "(?:upload/)?v1beta/files", true, mGetPost, "llm/v1/chat", catTextGen, nil, true},
 	},
 	"vertex": {
