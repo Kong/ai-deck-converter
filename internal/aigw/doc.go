@@ -15,6 +15,7 @@ type Document struct {
 	Consumers         []Consumer         `yaml:"consumers,omitempty"`
 	ConsumerGroups    []ConsumerGroup    `yaml:"consumer_groups,omitempty"`
 	Vaults            []Vault            `yaml:"vaults,omitempty"`
+	Certificates      []Certificate      `yaml:"certificates,omitempty"`
 }
 
 // Parse decodes an AI Gateway entity-model document from YAML bytes.

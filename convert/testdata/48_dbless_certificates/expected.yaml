@@ -1,0 +1,89 @@
+_format_version: "3.0"
+_transform: false
+services:
+  - id: 947a4e23-b483-5a65-8165-da9aed24565b
+    name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    host: ai-gateway.upstream.local
+    port: 80
+    protocol: http
+routes:
+  - id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+    name: openai-chat
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /chat/completions
+    methods:
+      - POST
+    protocols:
+      - http
+      - https
+    strip_path: false
+plugins:
+  - id: 17fa8192-4b9f-5b5a-8379-20ad8bc836a7
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+  - id: f3adc007-171c-5519-8763-3a0eef79bde3
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - description: gpt-4o
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: chat
+            name: gpt-4o
+            provider: openai
+          route_type: llm/v1/chat
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+    model:
+      id: 7b1cfd1c-89d1-5291-8bac-5a9998310a53
+certificates:
+  - id: c090fb7f-2394-51b4-979f-0ffe4cfd8d14
+    cert: |
+      -----BEGIN CERTIFICATE-----
+      MIIBrsBgNVBAMMCnVwc3RyZWFtLTE=
+      -----END CERTIFICATE-----
+    key: |
+      -----BEGIN PRIVATE KEY-----
+      MIIBVAIBADANBgkqhkiG9w0BAQEFAA==
+      -----END PRIVATE KEY-----
+    tags:
+      - env:prod
+      - team:ai-platform
+  - id: 4f4d4985-5c6a-5ab3-be44-9d0f554e944c
+    cert: |
+      -----BEGIN CERTIFICATE-----
+      MIIBrsBgNVBAMMCmR1YWwtcnNhLTE=
+      -----END CERTIFICATE-----
+    key: |
+      -----BEGIN PRIVATE KEY-----
+      MIIBVAIBADANBgkqhkiG9w0BAQEFAB==
+      -----END PRIVATE KEY-----
+    cert_alt: |
+      -----BEGIN CERTIFICATE-----
+      MIIBrsBgNVBAMMC2R1YWwtZWNkc2E=
+      -----END CERTIFICATE-----
+    key_alt: |
+      -----BEGIN EC PRIVATE KEY-----
+      MHcCAQEEIQDkZmVjZHNhLWtleS0x
+      -----END EC PRIVATE KEY-----
+  - id: 9aabf7a0-77b1-5cb8-a7e1-28b3b25fc3b0
+    cert: '{vault://env-vault/cert}'
+    key: '{vault://env-vault/key}'
+ai_models:
+  - id: 7b1cfd1c-89d1-5291-8bac-5a9998310a53
+    name: chat

@@ -15,6 +15,7 @@ var dbLessNamespace = [16]byte{
 
 type dbLessIDs struct {
 	service  map[string]string
+	cert     map[string]string
 	route    map[string]string
 	plugin   map[string]string
 	model    map[string]string
@@ -36,6 +37,7 @@ func (c *Converter) projectDBLess() *kong.DBLessDocument {
 		plugin:   map[string]string{},
 		model:    map[string]string{},
 		vault:    map[string]string{},
+		cert:     map[string]string{},
 		group:    map[string]string{},
 		consumer: map[string]string{},
 	}
@@ -51,6 +53,9 @@ func (c *Converter) projectDBLess() *kong.DBLessDocument {
 	}
 	for _, vault := range c.out.Vaults {
 		ids.vault[vault.Prefix] = firstNonEmpty(vault.ID, stableUUID("vault:"+vault.Prefix))
+	}
+	for i, cert := range c.out.Certificates {
+		ids.cert[certKey(cert, i)] = firstNonEmpty(cert.ID, stableUUID("certificate:"+certKey(cert, i)))
 	}
 	for _, group := range c.out.ConsumerGroups {
 		ids.group[group.Name] = firstNonEmpty(group.ID, stableUUID("consumer_group:"+group.Name))
@@ -137,6 +142,17 @@ func (c *Converter) projectDBLess() *kong.DBLessDocument {
 				fmt.Sprintf("plugin:consumer_group:%s:%s:%d", group.Name, plugin.Name, pluginIdx)))
 			out.Plugins = append(out.Plugins, toDBLessPlugin(plugin, id, scopeRef{consumerGroup: groupID}))
 		}
+	}
+
+	for i, cert := range c.out.Certificates {
+		out.Certificates = append(out.Certificates, kong.DBLessCertificate{
+			ID:      ids.cert[certKey(cert, i)],
+			Cert:    cert.Cert,
+			Key:     cert.Key,
+			CertAlt: cert.CertAlt,
+			KeyAlt:  cert.KeyAlt,
+			Tags:    cert.Tags,
+		})
 	}
 
 	for _, vault := range c.out.Vaults {

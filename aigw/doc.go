@@ -30,6 +30,7 @@ type (
 	MCPServer         = internal.MCPServer
 	Agent             = internal.Agent
 	Vault             = internal.Vault
+	Certificate       = internal.Certificate
 )
 
 func Parse(data []byte) (*Document, error) {

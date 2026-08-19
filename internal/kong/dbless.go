@@ -15,6 +15,7 @@ type DBLessDocument struct {
 	ConsumerGroupConsumers []DBLessConsumerGroupMember `yaml:"consumer_group_consumers,omitempty"`
 	Plugins                []DBLessPlugin              `yaml:"plugins,omitempty"`
 	Vaults                 []DBLessVault               `yaml:"vaults,omitempty"`
+	Certificates           []DBLessCertificate         `yaml:"certificates,omitempty"`
 	AIModels               []DBLessAIModel             `yaml:"ai_models,omitempty"`
 	KeyAuthCredentials     []DBLessKeyAuthCredential   `yaml:"keyauth_credentials,omitempty"`
 }
@@ -108,6 +109,15 @@ type DBLessVault struct {
 	Description string         `yaml:"description,omitempty"`
 	Config      map[string]any `yaml:"config,omitempty"`
 	Tags        []string       `yaml:"tags,omitempty"`
+}
+
+type DBLessCertificate struct {
+	ID      string   `yaml:"id"`
+	Cert    string   `yaml:"cert"`
+	Key     string   `yaml:"key,omitempty"`
+	CertAlt string   `yaml:"cert_alt,omitempty"`
+	KeyAlt  string   `yaml:"key_alt,omitempty"`
+	Tags    []string `yaml:"tags,omitempty"`
 }
 
 type DBLessAIModel struct {
