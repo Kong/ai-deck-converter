@@ -1,0 +1,42 @@
+models:
+  - display_name: GPT-4o
+    name: gpt-4o
+    type: model
+    enabled: true
+    capabilities: [generate]
+    formats:
+      - type: openai
+    config:
+      route:
+        paths: [/ai]
+    targets:
+      - name: gpt-4o
+        provider: openai
+        config:
+          type: openai
+      - name: gpt-4o
+        provider: openai-alt
+        config:
+          type: openai
+    policies: []
+    access:
+      acls: {allow: [], deny: []}
+model_providers:
+  - name: openai
+    type: openai
+    display_name: OpenAI
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://ai/openai-token}"
+  - name: openai-alt
+    type: openai
+    display_name: OpenAI Alt
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://ai/openai-alt-token}"

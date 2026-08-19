@@ -2,6 +2,7 @@ package convert
 
 import (
 	"encoding/json"
+	"fmt"
 	"maps"
 	"slices"
 	"sort"
@@ -326,7 +327,13 @@ func (c *Converter) convertModels() error {
 					targetModelAlias = targetAlias
 				}
 				target := c.buildTarget(tm, provider, providerType, targetModelAlias, spec.RouteType, logging)
-				dedup := tm.Name + "|" + spec.RouteType
+				// Dedup on the built target's full shape rather than
+				// (name, route_type): two targets can share a model name yet
+				// be genuinely distinct via different providers (distinct
+				// auth/options) or weights. The same (tm, provider) reached
+				// through several capabilities that share a route_type still
+				// fingerprints identically, so those collapse as before.
+				dedup := targetFingerprint(target)
 				if !pg.seen[dedup] {
 					pg.seen[dedup] = true
 					pg.targets = append(pg.targets, target)
@@ -746,6 +753,19 @@ func (c *Converter) buildTarget(
 		target["logging"] = logging
 	}
 	return target
+}
+
+// targetFingerprint returns a stable dedup key for a built ai-proxy-advanced
+// target. json.Marshal sorts map keys, so structurally identical targets
+// fingerprint identically regardless of build order. On the (unreachable in
+// practice) marshal error the target name is used, which at worst keeps a
+// duplicate rather than dropping a distinct target.
+func targetFingerprint(target map[string]any) string {
+	b, err := json.Marshal(target)
+	if err != nil {
+		return fmt.Sprintf("%v", target)
+	}
+	return string(b)
 }
 
 // expandCapabilities normalizes a model's capabilities into canonical keys.
