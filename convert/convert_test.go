@@ -106,7 +106,7 @@ mcp_servers:
 			{GeneratedPrefix: "config.default_acl", SourcePrefix: "access"},
 			{GeneratedPrefix: "config.acl_attribute_type", SourcePrefix: "access.acl_attribute_type"},
 			{GeneratedPrefix: "config.access_token_claim_field", SourcePrefix: "access.access_token_claim_field"},
-			{GeneratedPrefix: "config.server.tag", SourcePrefix: "config.server.label"},
+			{GeneratedPrefix: "config.server.tag", SourcePrefix: "config.server.tag"},
 		},
 	}, metadata.Plugins[0])
 	require.Len(t, metadata.Routes, 1)
@@ -1582,12 +1582,6 @@ mcp_servers:
           description: Get a report
           method: GET
           path: /report
-  - type: listener
-    name: aggregate
-    config:
-      route: {paths: [/mcp/aggregate]}
-      server:
-        label: aigw610:tools
 `)
 
 	out, _, err := Convert(src, Options{OutputMode: "db-less"})
@@ -1622,7 +1616,6 @@ mcp_servers:
 	}
 
 	var conversionOnlyTags []string
-	var listenerTag string
 	for _, plugin := range got.Plugins {
 		if plugin.Name != "ai-mcp-proxy" {
 			continue
@@ -1630,18 +1623,198 @@ mcp_servers:
 		if plugin.Config["mode"] == "conversion-only" {
 			conversionOnlyTags = plugin.Tags
 		}
-		if plugin.Config["mode"] == "listener" {
-			server, _ := plugin.Config["server"].(map[string]any)
-			listenerTag, _ = server["tag"].(string)
-		}
 	}
 
 	if len(conversionOnlyTags) != 1 || conversionOnlyTags[0] != "aigw610:tools" {
 		t.Fatalf("unexpected conversion-only plugin tags: %#v", conversionOnlyTags)
 	}
-	if listenerTag != "aigw610:tools" {
-		t.Fatalf("unexpected listener tag: %q", listenerTag)
+}
+
+// TestConvertMCPListenerSourcesTagSourcePlugins asserts the listener/source
+// relationship: a listener's server.tag (set by the CP from the listener id) is
+// carried through to its plugin and attached to every referenced source's
+// ai-mcp-proxy plugin tags, so the DP exposes exactly those sources' tools on
+// the listener. A source referenced by two listeners accumulates both tags.
+func TestConvertMCPListenerSourcesTagSourcePlugins(t *testing.T) {
+	src := []byte(`
+mcp_servers:
+  - type: conversion-only
+    name: team-a
+    labels:
+      team: a
+    config:
+      route: {paths: [/mcp/team-a]}
+      url: https://team-a.internal.example.com/mcp
+      tools:
+        - {name: team-a-report, description: Get a report, method: GET, path: /report}
+  - type: upstream-server
+    name: team-b
+    config:
+      route: {paths: [/mcp/team-b]}
+      url: https://team-b.internal.example.com/mcp
+      tools_cache_ttl_seconds: 0
+  - type: listener
+    name: aggregate
+    config:
+      route: {paths: [/mcp/aggregate]}
+      server:
+        tag: mcp-listener:aggregate-id
+      sources: [team-a, team-b]
+  - type: listener
+    name: aggregate-2
+    config:
+      route: {paths: [/mcp/aggregate-2]}
+      server:
+        tag: mcp-listener:aggregate-2-id
+      sources: [team-a]
+`)
+
+	out, _, err := Convert(src, Options{OutputMode: "db-less"})
+	if err != nil {
+		t.Fatalf("convert db-less: %v", err)
 	}
+
+	var got struct {
+		Services []struct {
+			ID   string `yaml:"id"`
+			Name string `yaml:"name"`
+		} `yaml:"services"`
+		Routes []struct {
+			ID      string `yaml:"id"`
+			Service struct {
+				ID string `yaml:"id"`
+			} `yaml:"service"`
+		} `yaml:"routes"`
+		Plugins []struct {
+			Name   string         `yaml:"name"`
+			Tags   []string       `yaml:"tags"`
+			Config map[string]any `yaml:"config"`
+			Route  struct {
+				ID string `yaml:"id"`
+			} `yaml:"route"`
+		} `yaml:"plugins"`
+	}
+	if err := yaml.Unmarshal(out, &got); err != nil {
+		t.Fatalf("unmarshal output: %v", err)
+	}
+
+	// Resolve each plugin's MCP server name via route.id -> route.service.id ->
+	// service.name (db-less output references entities by id, not name).
+	serviceNameByID := map[string]string{}
+	for _, s := range got.Services {
+		serviceNameByID[s.ID] = s.Name
+	}
+	serviceByRouteID := map[string]string{}
+	for _, r := range got.Routes {
+		serviceByRouteID[r.ID] = serviceNameByID[r.Service.ID]
+	}
+
+	pluginTagsByService := map[string][]string{}
+	serverTagByService := map[string]string{}
+	for _, plugin := range got.Plugins {
+		if plugin.Name != "ai-mcp-proxy" {
+			continue
+		}
+		name := serviceByRouteID[plugin.Route.ID]
+		pluginTagsByService[name] = plugin.Tags
+		if server, ok := plugin.Config["server"].(map[string]any); ok {
+			serverTagByService[name], _ = server["tag"].(string)
+		}
+	}
+	aggregateServerTag := serverTagByService["aggregate"]
+	aggregate2ServerTag := serverTagByService["aggregate-2"]
+
+	// Listener plugins keep their own server.tag bucket selector.
+	require.Equal(t, "mcp-listener:aggregate-id", aggregateServerTag)
+	require.Equal(t, "mcp-listener:aggregate-2-id", aggregate2ServerTag)
+
+	// team-a is referenced by both listeners, so it accumulates both tags (plus
+	// its own label tag), sorted for determinism.
+	require.Equal(t, []string{
+		"mcp-listener:aggregate-2-id",
+		"mcp-listener:aggregate-id",
+		"team:a",
+	}, pluginTagsByService["team-a"])
+
+	// team-b is referenced only by the first listener.
+	require.Equal(t, []string{"mcp-listener:aggregate-id"}, pluginTagsByService["team-b"])
+
+	// Listeners are not themselves sources, so they carry no listener tags.
+	require.Empty(t, pluginTagsByService["aggregate"])
+	require.Empty(t, pluginTagsByService["aggregate-2"])
+}
+
+// TestConvertMCPListenerSourcesFallBackToServerLabel asserts that a listener
+// declaring its bucket selector under the deprecated server.label (as reverted
+// documents and older hand-written configs still do) keeps wiring sources — the
+// converter falls back to server.label when server.tag is absent.
+func TestConvertMCPListenerSourcesFallBackToServerLabel(t *testing.T) {
+	src := []byte(`
+mcp_servers:
+  - type: conversion-only
+    name: team-a
+    config:
+      route: {paths: [/mcp/team-a]}
+      url: https://team-a.internal.example.com/mcp
+      tools:
+        - {name: team-a-report, description: Get a report, method: GET, path: /report}
+  - type: listener
+    name: aggregate
+    config:
+      route: {paths: [/mcp/aggregate]}
+      server:
+        label: mcp-listener:aggregate-id
+      sources: [team-a]
+`)
+
+	out, _, err := Convert(src, Options{OutputMode: "db-less"})
+	if err != nil {
+		t.Fatalf("convert db-less: %v", err)
+	}
+
+	var got struct {
+		Services []struct {
+			ID   string `yaml:"id"`
+			Name string `yaml:"name"`
+		} `yaml:"services"`
+		Routes []struct {
+			ID      string `yaml:"id"`
+			Service struct {
+				ID string `yaml:"id"`
+			} `yaml:"service"`
+		} `yaml:"routes"`
+		Plugins []struct {
+			Name  string   `yaml:"name"`
+			Tags  []string `yaml:"tags"`
+			Route struct {
+				ID string `yaml:"id"`
+			} `yaml:"route"`
+		} `yaml:"plugins"`
+	}
+	if err := yaml.Unmarshal(out, &got); err != nil {
+		t.Fatalf("unmarshal output: %v", err)
+	}
+
+	serviceNameByID := map[string]string{}
+	for _, s := range got.Services {
+		serviceNameByID[s.ID] = s.Name
+	}
+	serviceByRouteID := map[string]string{}
+	for _, r := range got.Routes {
+		serviceByRouteID[r.ID] = serviceNameByID[r.Service.ID]
+	}
+
+	var teamATags []string
+	for _, plugin := range got.Plugins {
+		if plugin.Name != "ai-mcp-proxy" {
+			continue
+		}
+		if serviceByRouteID[plugin.Route.ID] == "team-a" {
+			teamATags = plugin.Tags
+		}
+	}
+
+	require.Equal(t, []string{"mcp-listener:aggregate-id"}, teamATags)
 }
 
 func TestConvertScopedPoliciesDoNotReusePolicyID(t *testing.T) {
