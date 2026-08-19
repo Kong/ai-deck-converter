@@ -220,8 +220,18 @@ type Certificate struct {
 	CertAlt string   `yaml:"cert_alt,omitempty"`
 	KeyAlt  string   `yaml:"key_alt,omitempty"`
 	Tags    []string `yaml:"tags,omitempty"`
+	SNIs    []SNI    `yaml:"snis,omitempty"`
 
 	SourceName string `yaml:"-"`
+}
+
+// SNI is a Kong Gateway SNI, always nested under the certificate it matches
+// to -- decK's file format has no top-level snis entity; the relationship is
+// expressed purely by nesting.
+type SNI struct {
+	ID   string   `yaml:"id,omitempty"`
+	Name string   `yaml:"name"`
+	Tags []string `yaml:"tags,omitempty"`
 }
 
 // AIModel is the Kong Gateway ai-model entity: a named model with an optional
