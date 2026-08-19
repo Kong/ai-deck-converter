@@ -15,6 +15,7 @@ type Document struct {
 	ConsumerGroups []ConsumerGroup `yaml:"consumer_groups,omitempty"`
 	Plugins        []Plugin        `yaml:"plugins,omitempty"`
 	Vaults         []Vault         `yaml:"vaults,omitempty"`
+	Certificates   []Certificate   `yaml:"certificates,omitempty"`
 	AIModels       []AIModel       `yaml:"ai_models,omitempty"`
 }
 
@@ -207,6 +208,20 @@ type Vault struct {
 	Description string         `yaml:"description,omitempty"`
 	Config      map[string]any `yaml:"config,omitempty"`
 	Tags        []string       `yaml:"tags,omitempty"`
+}
+
+// Certificate is a Kong Gateway certificate. Kong identifies certificates by
+// id only -- the entity has no name -- so SourceName carries the AI Gateway
+// certificate name for stable db-less ID derivation and is never serialized.
+type Certificate struct {
+	ID      string   `yaml:"id,omitempty"`
+	Cert    string   `yaml:"cert"`
+	Key     string   `yaml:"key,omitempty"`
+	CertAlt string   `yaml:"cert_alt,omitempty"`
+	KeyAlt  string   `yaml:"key_alt,omitempty"`
+	Tags    []string `yaml:"tags,omitempty"`
+
+	SourceName string `yaml:"-"`
 }
 
 // AIModel is the Kong Gateway ai-model entity: a named model with an optional
