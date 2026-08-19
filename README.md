@@ -106,7 +106,7 @@ See `convert/testdata/*/input.yaml` for worked examples.
 | Consumer Group | `consumer_groups` entry + scoped policy plugins. |
 | Credential | `keyauth_credentials` nested under the consumer (`key` from `api_key`, `ttl`). |
 | Vault | `vaults` entry (`prefix` = name, `name` = backend type, config passed through). |
-| CA Certificate | `ca_certificates` entry (`cert`, `cert_digest`). Control-plane-only fields (e.g. `description`) aren't part of this model since they never reach the dataplane. Kong's entity has no name field, so `name` is preserved as an `ai-gateway-name:` tag for revert to recover. |
+| CA Certificate | `ca_certificates` entry (`cert`, `cert_digest`); `name` preserved as an `ai-gateway-name:` tag (Kong's entity has no name field). |
 | Model `policies`/`acls` | Top-level plugins scoped to the `ai-models` entity via a `model:` FK. |
 | Agent `access.acls` | Kong `acl` plugin on the agent's Route. |
 | `labels` | `tags` flattened to sorted `key:value` strings. |
