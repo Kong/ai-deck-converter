@@ -46,3 +46,26 @@ func TagsToLabels(tags []string, prefix string) (labels map[string]string, rest 
 	}
 	return labels, rest
 }
+
+// caCertificateNameTag namespaces the tag used to preserve an AI Gateway
+// CACertificate's name across the round trip: Kong's ca_certificates entity
+// has no name field, so decK has nowhere else to keep it.
+const caCertificateNameTag = "ai-gateway-name:"
+
+// EncodeCACertificateName renders name as a tag Kong can carry.
+func EncodeCACertificateName(name string) string {
+	return caCertificateNameTag + name
+}
+
+// DecodeCACertificateName finds the tag written by EncodeCACertificateName and
+// returns its name, along with the remaining tags in input order.
+func DecodeCACertificateName(tags []string) (name string, rest []string) {
+	for _, tag := range tags {
+		if body, ok := strings.CutPrefix(tag, caCertificateNameTag); ok && name == "" {
+			name = body
+			continue
+		}
+		rest = append(rest, tag)
+	}
+	return name, rest
+}
