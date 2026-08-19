@@ -1,0 +1,46 @@
+name: Agentic Reviewer
+
+concurrency:
+  group: agentic-flow-${{ github.actor_id }}-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+  cancel-in-progress: true
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  muthur:
+    name: Muthur review bot trigger
+    # The ai-reviewer-federated action is incompatible with aws runners
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    if: github.event.issue.pull_request != null && contains(github.event.comment.body, '/ai-reviewer')
+    permissions:
+      contents: read
+      pull-requests: read
+      id-token: write
+    steps:
+      - uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+
+      - name: Generate Kong token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        id: kong-app-token
+        with:
+          client-id: ${{ vars.KONG_GH_APP_READ_ID }}
+          private-key: ${{ secrets.KONG_GH_APP_READ_PRIVATE_KEY }}
+          owner: Kong
+          repositories: |
+            Ksai
+            ai-deck-converter
+
+      - uses: Kong/ksai/.github/actions/ai-reviewer-federated@e21ddfca6f972e17eb841d186a17766b67533544 # ai-reviewer-federated/v1.12.0
+        with:
+          trigger_phrase: '/ai-reviewer'
+          kong_org_github_token: ${{ steps.kong-app-token.outputs.token }}
+          source_org_github_token: ${{ steps.kong-app-token.outputs.token }}
+          organization_id: 4ce7a6d3-9549-4842-bd51-1def5eba611b
+          workspace_id: wrkspc_01G7dX83HGYMZDwLuJNPnA5T
+          service_account_id: svac_0169VR5vhjtrizNiDXtHUhWX
+          federation_rule_id: fdrl_01C5RcDXUMwwgQr3nvAxMjfK
