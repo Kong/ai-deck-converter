@@ -70,6 +70,12 @@ type MCPServerConfig struct {
 	// ToolsCacheTTLSeconds maps to the ai-mcp-proxy plugin's
 	// tools_cache_ttl_seconds (required by the plugin in upstream-server mode).
 	ToolsCacheTTLSeconds *int `yaml:"tools_cache_ttl_seconds,omitempty"`
+	// Sources lists, for a `listener` MCP server, the names of the source MCP
+	// servers (conversion-only toolsets / upstream-server third-party servers)
+	// whose tools the listener exposes. The converter attaches the listener's
+	// private server.tag to each referenced source plugin's tags so the DP
+	// exposes exactly those sources' tools on the listener.
+	Sources []string `yaml:"sources,omitempty"`
 }
 
 // MCPTool is a single MCP tool definition. Fields mirror the ai-mcp-proxy

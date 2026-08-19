@@ -2,6 +2,7 @@ package convert
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/Kong/ai-deck-converter/internal/aigw"
 	"github.com/Kong/ai-deck-converter/internal/kong"
@@ -33,7 +34,7 @@ func (c *Converter) convertMCPServers() error {
 				GeneratedPrefix: "config.access_token_claim_field",
 				SourcePrefix:    "access.access_token_claim_field",
 			},
-			kong.FieldMapping{GeneratedPrefix: "config.server.tag", SourcePrefix: "config.server.label"},
+			kong.FieldMapping{GeneratedPrefix: "config.server.tag", SourcePrefix: "config.server.tag"},
 		)
 		route.Plugins = append(route.Plugins, plugin)
 
@@ -83,7 +84,65 @@ func (c *Converter) convertMCPServers() error {
 		}
 		c.out.Services = append(c.out.Services, service)
 	}
+	c.wireListenerSources()
 	return nil
+}
+
+// wireListenerSources implements the listener/source relationship. A `listener`
+// MCP server exposes the tools of the source MCP servers named in its
+// config.sources. On the DP this is expressed with tags: the listener plugin's
+// server.tag (set by the CP from the listener id) selects a bucket, and each
+// source plugin contributes its tools to that bucket via a matching entry in its
+// own tags. So for every listener we take its server.tag and add it to the tags
+// of each referenced source's ai-mcp-proxy plugin.
+//
+// A source referenced by more than one listener accumulates one tag per listener
+// (it belongs to several buckets). A referenced source that is absent from the
+// document (e.g. write-time validation of a single listener) is skipped.
+func (c *Converter) wireListenerSources() {
+	// Index each MCP server's ai-mcp-proxy plugin by service name. Pointers into
+	// c.out.Services are stable now that every service has been appended.
+	pluginByServer := make(map[string]*kong.Plugin)
+	for si := range c.out.Services {
+		svc := &c.out.Services[si]
+		for ri := range svc.Routes {
+			route := &svc.Routes[ri]
+			for pi := range route.Plugins {
+				if route.Plugins[pi].Name == "ai-mcp-proxy" {
+					pluginByServer[svc.Name] = &route.Plugins[pi]
+				}
+			}
+		}
+	}
+
+	for i := range c.src.MCPServers {
+		m := &c.src.MCPServers[i]
+		if m.Type != "listener" || len(m.Config.Sources) == 0 {
+			continue
+		}
+		tag, _ := m.Config.Server["tag"].(string)
+		if tag == "" {
+			continue
+		}
+		for _, sourceName := range m.Config.Sources {
+			plugin, ok := pluginByServer[sourceName]
+			if !ok {
+				continue
+			}
+			plugin.Tags = addTag(plugin.Tags, tag)
+		}
+	}
+}
+
+// addTag appends tag to tags if absent, keeping the result sorted so conversion
+// output is deterministic regardless of listener/source ordering.
+func addTag(tags []string, tag string) []string {
+	if slices.Contains(tags, tag) {
+		return tags
+	}
+	tags = append(tags, tag)
+	slices.Sort(tags)
+	return tags
 }
 
 func (c *Converter) mcpPlugin(m *aigw.MCPServer) (kong.Plugin, error) {
@@ -148,16 +207,15 @@ func (c *Converter) mcpPlugin(m *aigw.MCPServer) (kong.Plugin, error) {
 	}, nil
 }
 
-// mcpServerConfigForPlugin maps the AI Gateway API's server.label to the
-// ai-mcp-proxy plugin's server.tag without mutating the source document.
+// mcpServerConfigForPlugin returns a shallow copy of the MCP server's server
+// config for the ai-mcp-proxy plugin, so plugin-side handling never mutates the
+// source document. server.tag (the listener bucket selector) is carried through
+// as-is; the CP sets it from the listener id and wireListenerSources propagates
+// it to the referenced source plugins' tags.
 func mcpServerConfigForPlugin(server map[string]any) map[string]any {
 	config := make(map[string]any, len(server))
 	for key, value := range server {
 		config[key] = value
-	}
-	if label, ok := config["label"]; ok {
-		delete(config, "label")
-		config["tag"] = label
 	}
 	return config
 }
