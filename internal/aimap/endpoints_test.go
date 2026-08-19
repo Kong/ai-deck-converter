@@ -100,6 +100,7 @@ func TestEndpointLookupAndNormalization(t *testing.T) {
 func TestRoutePath(t *testing.T) {
 	chat, _ := LookupEndpoint("openai", "generate")
 	bedrock, _ := LookupEndpoint("bedrock", "generate")
+	geminiBatches, _ := LookupEndpoint("gemini", "batches")
 	cases := []struct {
 		name, base, want string
 		spec             EndpointSpec
@@ -108,6 +109,8 @@ func TestRoutePath(t *testing.T) {
 		{"root base does not double slash", "/", "/chat/completions", chat},
 		{"empty base", "", "/chat/completions", chat},
 		{"trailing slash trimmed", "/ai/", "/ai/chat/completions", chat},
+		{"gemini batches joins with separator", "/gm", "/gm/v1beta/batches", geminiBatches},
+		{"gemini batches root base", "/", "/v1beta/batches", geminiBatches},
 		{"regex plain base", "/ai", "~/ai/model/(?<model_name>[^/]+)/converse(?:-stream)?", bedrock},
 		{"regex root base", "/", "~/model/(?<model_name>[^/]+)/converse(?:-stream)?", bedrock},
 		{"regex base retains one marker", "~/ai", "~/ai/model/(?<model_name>[^/]+)/converse(?:-stream)?", bedrock},
