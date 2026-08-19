@@ -1,6 +1,8 @@
 package revert
 
 import (
+	"encoding/json"
+	"fmt"
 	"sort"
 	"strings"
 
@@ -18,6 +20,20 @@ type modelGroup struct {
 	targetsSeen map[string]bool
 	aliasless   bool   // no model_alias on the targets; name is provisional
 	routeName   string // route the group was created from (for warnings)
+}
+
+// targetFingerprint returns a stable dedup key for a reconstructed target
+// model. Every field of TargetModel/TargetModelConfig is exported and
+// json.Marshal sorts map keys, so structurally identical targets fingerprint
+// identically. On the (unreachable in practice) marshal error the rendered
+// struct is used, which at worst keeps a duplicate rather than dropping a
+// distinct target.
+func targetFingerprint(tm aigw.TargetModel) string {
+	b, err := json.Marshal(tm)
+	if err != nil {
+		return fmt.Sprintf("%+v", tm)
+	}
+	return string(b)
 }
 
 // modelAcc collects model groups in first-seen order.
@@ -176,8 +192,15 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 			tm.Config.Options = d.options
 			tm.Provider = r.providerFor(providerType, &d)
 
-			if !g.targetsSeen[tm.Name] {
-				g.targetsSeen[tm.Name] = true
+			// Mirrors convert's target dedup: key on the whole reconstructed
+			// target, not just its name, so targets sharing a model name but
+			// differing in synthesized provider (distinct auth/options) or
+			// weight are all kept. One target reached through several
+			// capabilities still fingerprints identically (capability lives on
+			// the model, not the target), so those collapse as before.
+			key := targetFingerprint(tm)
+			if !g.targetsSeen[key] {
+				g.targetsSeen[key] = true
 				g.model.TargetModels = append(g.model.TargetModels, tm)
 			}
 		}
