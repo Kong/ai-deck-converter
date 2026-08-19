@@ -4,7 +4,6 @@ ca_certificates:
       -----BEGIN CERTIFICATE-----
       MIIB...
       -----END CERTIFICATE-----
-    description: internal root CA
     labels:
       env: prod
   - name: vault-ref-ca
