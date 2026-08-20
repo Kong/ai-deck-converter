@@ -30,7 +30,7 @@ jobs:
         id: kong-app-token
         with:
           client-id: ${{ vars.KONG_GH_APP_ID }}
-          private-key: ${{ secrets.GH_APP__KONG__PRIVATE_KEY }}
+          private-key: ${{ secrets.KONG_GH_APP_PRIVATE_KEY }}
           owner: Kong
           repositories: |
             Ksai
