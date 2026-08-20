@@ -35,9 +35,24 @@ jobs:
             Ksai
             ai-deck-converter
 
-      - uses: Kong/ksai/.github/actions/ai-reviewer-federated@e21ddfca6f972e17eb841d186a17766b67533544 # ai-reviewer-federated/v1.12.0
+      # Kong/ksai is an internal repo; GitHub Actions won't resolve an action hosted there from a
+      # public repo's workflow. Checking it out locally and using a path-based `uses:` sidesteps
+      # that restriction, since the runner then treats it as local files rather than a remote action.
+      - name: Checkout ksai action
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: Kong/ksai
+          ref: e21ddfca6f972e17eb841d186a17766b67533544 # ai-reviewer-federated/v1.12.0
+          token: ${{ steps.kong-app-token.outputs.token }}
+          path: ksai-checkout
+          sparse-checkout: |
+            .github/actions/ai-reviewer-federated
+          sparse-checkout-cone-mode: false
+
+      - uses: ./ksai-checkout/.github/actions/ai-reviewer-federated
         with:
           trigger_phrase: '/ai-reviewer'
+          ksai_ref: e21ddfca6f972e17eb841d186a17766b67533544 # ai-reviewer-federated/v1.12.0
           kong_org_github_token: ${{ steps.kong-app-token.outputs.token }}
           source_org_github_token: ${{ steps.kong-app-token.outputs.token }}
           organization_id: 4ce7a6d3-9549-4842-bd51-1def5eba611b
