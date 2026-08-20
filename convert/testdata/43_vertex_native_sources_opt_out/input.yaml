@@ -1,0 +1,64 @@
+model_providers:
+  - name: vertex-prod
+    type: vertex
+    display_name: Google Vertex AI (Prod)
+    config:
+      auth:
+        type: gcp
+        service_account_json: "{vault://ai/gcp-service-account-json}"
+models:
+  - display_name: Gemini 2.5 Pro (Vertex)
+    name: vertex-gemini-2-5-pro
+    type: model
+    capabilities: [generate]
+    formats:
+      - type: vertex
+    config:
+      route:
+        paths: [/ai]
+    targets:
+      - name: gemini-2.5-pro-with-gcp-env
+        provider: vertex-prod
+        config:
+          type: vertex
+          gcp_environment:
+            api_endpoint: https://us-central1-aiplatform.googleapis.com
+            location_id: us-central1
+            project_id: kong-vertex-project
+          max_tokens: 4096
+          temperature: 1.0
+      - name: gemini-2.6-pro-without-gcp-env
+        provider: vertex-prod
+        config:
+          type: vertex
+          max_tokens: 4096
+          temperature: 1.0
+    policies: []
+    access:
+      acls: {allow: [], deny: []}
+  - display_name: Text Embedding 005 (Vertex)
+    name: vertex-text-embedding-005
+    type: model
+    capabilities: [embeddings]
+    formats:
+      - type: vertex
+    config:
+      route:
+        paths: [/ai]
+    targets:
+      - name: text-embedding-005-with-gcp-env
+        provider: vertex-prod
+        config:
+          type: vertex
+          gcp_environment:
+            endpoint_id: "my-endpoint-id"
+            api_endpoint: https://us-central2-aiplatform.googleapis.com
+            location_id: us-central2
+            project_id: other-vertex-project
+      - name: text-embedding-006-without-gcp-env
+        provider: vertex-prod
+        config:
+          type: vertex
+    policies: []
+    access:
+      acls: {allow: [], deny: []}
