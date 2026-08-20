@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
-	"regexp"
 	"slices"
 	"sort"
 	"strconv"
@@ -83,32 +82,19 @@ func (g *routeGroup) selectorConfig(useSources bool) map[string]any {
 	if !useSources {
 		cfg := make(map[string]any, len(g.selectorByKey[g.selectorOrder[0]])+1)
 		maps.Copy(cfg, g.selectorByKey[g.selectorOrder[0]])
-
 		if g.selectorMax > 0 {
 			cfg["max_request_body_size"] = g.selectorMax
 		}
-
-		// If a new PCRE pattern type comes in,
-		// replace it with a best-effort Lua str:match
-		if path, ok := cfg["pcre_pattern"]; ok {
-			cfg["path_pattern"] = tryConvertPCREToLua(path.(string))
-			delete(cfg, "pcre_pattern")
-			delete(cfg, "pcre_capture_name")
-		}
-
 		return cfg
 	}
-
 	sources := make([]map[string]any, 0, len(g.selectorOrder))
 	for _, key := range g.selectorOrder {
 		sources = append(sources, g.selectorByKey[key])
 	}
-
 	cfg := map[string]any{"sources": sources}
 	if g.selectorMax > 0 {
 		cfg["max_request_body_size"] = g.selectorMax
 	}
-
 	return cfg
 }
 
@@ -241,7 +227,7 @@ func (c *Converter) convertModels() error {
 				if err != nil {
 					return err
 				}
-				selectorCfgs := buildModelSelectorConfig(m, spec)
+				selectorCfg := buildModelSelectorConfig(m, spec)
 				// The alias *value* is per-model and deliberately excluded from
 				// routeConfigKey. When targeting config.sources (Options.
 				// ModelSelectorSources), the selector *shape* (which source/field an
@@ -256,7 +242,7 @@ func (c *Converter) convertModels() error {
 					"|" + identityKey +
 					"|" + routeConfigKey
 				if !useSources {
-					key += "|" + modelSelectorShapeKey(selectorCfgs)
+					key += "|" + modelSelectorShapeKey(selectorCfg)
 				}
 				g := groups[key]
 				if g == nil {
@@ -275,10 +261,7 @@ func (c *Converter) convertModels() error {
 					groups[key] = g
 					order = append(order, key)
 				}
-
-				for _, selector := range selectorCfgs {
-					g.addSelector(selector)
-				}
+				g.addSelector(selectorCfg)
 				if !routeSeen[g.route.Name] {
 					routeSeen[g.route.Name] = true
 					routeNames = append(routeNames, g.route.Name)
@@ -895,39 +878,27 @@ func bodySizeOrDefault(m *aigw.Model) int {
 // for its route, or nil if the endpoint needs no selector at all. Explicit
 // body/header/path parameters override the source. No source override leaves
 // source selection to the endpoint's format/capability default.
-func buildModelSelectorConfig(m *aigw.Model, spec aimap.EndpointSpec) []map[string]any {
+func buildModelSelectorConfig(m *aigw.Model, spec aimap.EndpointSpec) map[string]any {
 	switch {
 	case m.Config.Route.Model.Path.PathParam != "":
-		sources := make([]map[string]any, len(m.Config.Route.Paths))
-
-		for i, sourcePath := range m.Config.Route.Paths {
-			sources[i] = map[string]any{
-				"source":                "path",
-				"pcre_pattern":          sourcePath,
-				"pcre_capture_name":     m.Config.Route.Model.Path.PathParam,
-				"max_request_body_size": bodySizeOrDefault(m),
-			}
-		}
-		return sources
-
+		// ai-model-selector represents a path source with a Lua pattern, not a
+		// capture-group name. The API's path_param denotes the format-provided
+		// model capture, so retain that format's default path selector.
+		return defaultModelSelectorConfig(m, spec)
 	case m.Config.Route.Model.Body.BodyParam != "":
-		return []map[string]any{
-			{
-				"source":                "body",
-				"body_path":             m.Config.Route.Model.Body.BodyParam,
-				"max_request_body_size": bodySizeOrDefault(m),
-			},
+		return map[string]any{
+			"source":                "body",
+			"body_path":             m.Config.Route.Model.Body.BodyParam,
+			"max_request_body_size": bodySizeOrDefault(m),
 		}
 	case m.Config.Route.Model.Header.HeaderParam != "":
-		return []map[string]any{
-			{
-				"source":      "header",
-				"header_name": m.Config.Route.Model.Header.HeaderParam,
-			},
+		return map[string]any{
+			"source":      "header",
+			"header_name": m.Config.Route.Model.Header.HeaderParam,
 		}
 	}
 
-	return []map[string]any{defaultModelSelectorConfig(m, spec)}
+	return defaultModelSelectorConfig(m, spec)
 }
 
 func defaultModelSelectorConfig(m *aigw.Model, spec aimap.EndpointSpec) map[string]any {
@@ -953,43 +924,18 @@ func defaultModelSelectorConfig(m *aigw.Model, spec aimap.EndpointSpec) map[stri
 // contributors), but models wanting different shapes need their own
 // ai-model-selector/route, the same way models with different
 // identity-provider sets do.
-func modelSelectorShapeKey(cfg []map[string]any) string {
-	var sources strings.Builder
-	sources.WriteString("")
-	for _, source := range cfg {
-		switch v, _ := source["source"].(string); v {
-		case "body":
-			bodyPath, _ := source["body_path"].(string)
-			sources.WriteString("body:" + bodyPath + ".")
-		case "header":
-			headerName, _ := source["header_name"].(string)
-			sources.WriteString("header:" + headerName + ".")
-		case "path":
-			sources.WriteString("path" + ".")
-		}
+func modelSelectorShapeKey(cfg map[string]any) string {
+	switch v, _ := cfg["source"].(string); v {
+	case "body":
+		bodyPath, _ := cfg["body_path"].(string)
+		return "body:" + bodyPath
+	case "header":
+		headerName, _ := cfg["header_name"].(string)
+		return "header:" + headerName
+	case "path":
+		return "path"
 	}
-
-	return strings.TrimSuffix(sources.String(), ".")
+	return ""
 }
 
 func boolPtr(b bool) *bool { return &b }
-
-// tryConvertPCREToLua derives an ai-model-selector Lua path_pattern from
-// a model's own hand-authored base path. A base path carrying a PCRE named
-// capture group (e.g. "(?<my_openai_model>)") marks where the client-supplied
-// model alias appears.
-func tryConvertPCREToLua(pattern string) string {
-	pattern = strings.TrimPrefix(pattern, "~")
-	pcreNamedGroup := regexp.MustCompile(`\(\?<[A-Za-z_][A-Za-z0-9_]*>[^)]*\)`)
-
-	// genericPathAliasCapture is the Lua pattern substituted for a PCRE named
-	// capture group when deriving an ai-model-selector path_pattern: it matches
-	// any alias value Kong's route path leaves for the model segment.
-	const genericPathAliasCapture = "([%w%.%-:]+)"
-
-	if !pcreNamedGroup.MatchString(pattern) {
-		// Didn't work, use the default pattern
-		return aimap.OpenAIDefaultPathPattern
-	}
-	return pcreNamedGroup.ReplaceAllString(pattern, genericPathAliasCapture)
-}

@@ -280,9 +280,6 @@ func (r *Reverter) modelGroupFor(
 			Access:   aigw.ModelAccess{ACLs: acls, IdentityProviders: idpRefs},
 		},
 	}
-	if len(bases) > 1 || (len(bases) == 1 && !isDefaultBasePath(bases[0])) {
-		g.model.Config.Route.Paths = bases
-	}
 	if alias != "" {
 		setAliasField(&g.model.Config.Route.Model, alias, name, nextEntry())
 	}
@@ -291,6 +288,9 @@ func (r *Reverter) modelGroupFor(
 	g.model.Config.Proxy = proxyFromConfig(getMap(cfg, "proxy_config"))
 	g.model.Config.MaxRequestBodySize = getInt(cfg, "max_request_body_size")
 	g.model.Config.Balancer = balancerFromConfig(getMap(cfg, "balancer"), cfg["vectordb"], cfg["embeddings"])
+	if len(bases) > 1 || (len(bases) == 1 && !isDefaultBasePath(bases[0])) {
+		g.model.Config.Route.Paths = bases
+	}
 	acc.groups[key] = g
 	acc.order = append(acc.order, key)
 	return g, nil
@@ -315,13 +315,6 @@ func setAliasField(model *aigw.ModelSelectorConfig, alias, name string, entry ma
 				return
 			}
 		case "path":
-			// accumulateModelRoute rejects the legacy flat schema's
-			// path_pattern shape outright (errIrreversiblePathPattern), so any
-			// "path" entry reaching here still carries its pcre_capture_name.
-			captureName := getStr(entry, "pcre_capture_name")
-			if captureName != "" {
-				model.Path = aigw.ModelPathSelectorConfig{PathParam: captureName}
-			}
 			if alias != name {
 				model.Values = []string{alias}
 			}
