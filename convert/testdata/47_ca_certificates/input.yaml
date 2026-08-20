@@ -1,0 +1,11 @@
+ca_certificates:
+  - name: my-root-ca
+    cert: |
+      -----BEGIN CERTIFICATE-----
+      MIIB...
+      -----END CERTIFICATE-----
+    labels:
+      env: prod
+  - name: vault-ref-ca
+    cert: "{vault://env/vault-ca-cert}"
+    cert_digest: deadbeef

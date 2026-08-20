@@ -17,6 +17,7 @@ type Document struct {
 	Vaults         []Vault         `yaml:"vaults,omitempty"`
 	Certificates   []Certificate   `yaml:"certificates,omitempty"`
 	AIModels       []AIModel       `yaml:"ai_models,omitempty"`
+	CACertificates []CACertificate `yaml:"ca_certificates,omitempty"`
 }
 
 // Ref is a name-based foreign-key reference, rendered as `{name: <x>}`.
@@ -208,6 +209,18 @@ type Vault struct {
 	Description string         `yaml:"description,omitempty"`
 	Config      map[string]any `yaml:"config,omitempty"`
 	Tags        []string       `yaml:"tags,omitempty"`
+}
+
+// CACertificate is a Kong Gateway CA certificate entity: the dataplane-visible
+// subset of the AI Gateway CACertificate (control-plane-only fields like
+// description and managed_by never cross to Kong). Unlike most decK entities
+// it has no name field; the AI Gateway CACertificate.Name is preserved via
+// Tags so it can be recovered on revert.
+type CACertificate struct {
+	ID         string   `yaml:"id,omitempty"`
+	Cert       string   `yaml:"cert,omitempty"`
+	CertDigest string   `yaml:"cert_digest,omitempty"`
+	Tags       []string `yaml:"tags,omitempty"`
 }
 
 // Certificate is a Kong Gateway certificate. Kong identifies certificates by

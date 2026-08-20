@@ -19,6 +19,7 @@ type DBLessDocument struct {
 	SNIs                   []DBLessSNI                 `yaml:"snis,omitempty"`
 	AIModels               []DBLessAIModel             `yaml:"ai_models,omitempty"`
 	KeyAuthCredentials     []DBLessKeyAuthCredential   `yaml:"keyauth_credentials,omitempty"`
+	CACertificates         []DBLessCACertificate       `yaml:"ca_certificates,omitempty"`
 }
 
 func NewDBLessDocument() *DBLessDocument {
@@ -133,6 +134,13 @@ type DBLessAIModel struct {
 	Name  string   `yaml:"name"`
 	Alias string   `yaml:"alias,omitempty"`
 	Tags  []string `yaml:"tags,omitempty"`
+}
+
+type DBLessCACertificate struct {
+	ID         string   `yaml:"id"`
+	Cert       string   `yaml:"cert,omitempty"`
+	CertDigest string   `yaml:"cert_digest,omitempty"`
+	Tags       []string `yaml:"tags,omitempty"`
 }
 
 type DBLessKeyAuthCredential struct {

@@ -84,6 +84,7 @@ policies:        [ ... ] # -> Kong plugins (global, or scoped per reference)
 consumers:       [ ... ] # -> consumers (+ nested keyauth_credentials, groups)
 consumer_groups: [ ... ] # -> consumer_groups
 vaults:          [ ... ] # -> vaults
+ca_certificates: [ ... ] # -> ca_certificates
 ```
 
 A Model's `config.route.paths[0]` provides the **base path** (e.g. `/ai`); the
@@ -105,6 +106,7 @@ See `convert/testdata/*/input.yaml` for worked examples.
 | Consumer Group | `consumer_groups` entry + scoped policy plugins. |
 | Credential | `keyauth_credentials` nested under the consumer (`key` from `api_key`, `ttl`). |
 | Vault | `vaults` entry (`prefix` = name, `name` = backend type, config passed through). |
+| CA Certificate | `ca_certificates` entry (`cert`, `cert_digest`); `name` preserved as an `ai-gateway-name:` tag (Kong's entity has no name field). |
 | Certificate | `certificates` entry (`cert`/`key` and the optional `cert_alt`/`key_alt` pair passed through). Kong certificates have no `name`, so the source name is not represented in the output; in `db-less` mode it still seeds the generated `id`. |
 | SNI | Nested under its referenced Certificate's `snis` list (`hostname` → `name`, `labels` → `tags`); decK's file format has no standalone SNI entity. The SNI's own `name`/`display_name` have no Kong counterpart and are dropped. In `db-less` mode SNIs become a top-level `snis` entry referencing the certificate's generated `id`. |
 | Model `policies`/`acls` | Top-level plugins scoped to the `ai-models` entity via a `model:` FK. |

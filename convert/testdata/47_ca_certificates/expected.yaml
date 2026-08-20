@@ -1,0 +1,13 @@
+_format_version: "3.0"
+ca_certificates:
+  - cert: |
+      -----BEGIN CERTIFICATE-----
+      MIIB...
+      -----END CERTIFICATE-----
+    tags:
+      - ai-gateway-name:my-root-ca
+      - env:prod
+  - cert: '{vault://env/vault-ca-cert}'
+    cert_digest: deadbeef
+    tags:
+      - ai-gateway-name:vault-ref-ca
