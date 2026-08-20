@@ -77,7 +77,7 @@ models:
     capabilities: [generate]
     formats: [{type: gemini}]
     config:
-      route: {paths: [/gemini-path-name], model: {path: {}}}
+      route: {paths: [/gemini-path-name], model: {path: {path_param: model_name}}}
     targets:
       - name: gemini-2.5-pro
         provider: gemini-provider
@@ -89,7 +89,7 @@ models:
     capabilities: [generate]
     formats: [{type: gemini}]
     config:
-      route: {paths: [/gemini-path-alias], model: {path: {}}}
+      route: {paths: [/gemini-path-alias], model: {path: {path_param: model_name, values: ["@kong/gemini-path"]}}}
     targets:
       - name: gemini-2.5-pro
         provider: gemini-provider
