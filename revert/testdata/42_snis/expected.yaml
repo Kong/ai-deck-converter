@@ -1,0 +1,31 @@
+certificates:
+  - name: certificate-1
+    cert: |
+      -----BEGIN CERTIFICATE-----
+      MIIBrsBgNVBAMMCnVwc3RyZWFtLTE=
+      -----END CERTIFICATE-----
+    key: |
+      -----BEGIN PRIVATE KEY-----
+      MIIBVAIBADANBgkqhkiG9w0BAQEFAA==
+      -----END PRIVATE KEY-----
+  - name: certificate-2
+    cert: |
+      -----BEGIN CERTIFICATE-----
+      MIIBrsBgNVBAMMCmR1YWwtcnNhLTE=
+      -----END CERTIFICATE-----
+    key: |
+      -----BEGIN PRIVATE KEY-----
+      MIIBVAIBADANBgkqhkiG9w0BAQEFAB==
+      -----END PRIVATE KEY-----
+snis:
+  - name: sni-1
+    hostname: upstream.example.com
+    certificate: certificate-1
+    labels:
+      env: prod
+  - name: sni-2
+    hostname: '*.upstream.example.com'
+    certificate: certificate-1
+  - name: sni-3
+    hostname: dual.example.com
+    certificate: certificate-2

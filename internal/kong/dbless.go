@@ -16,6 +16,7 @@ type DBLessDocument struct {
 	Plugins                []DBLessPlugin              `yaml:"plugins,omitempty"`
 	Vaults                 []DBLessVault               `yaml:"vaults,omitempty"`
 	Certificates           []DBLessCertificate         `yaml:"certificates,omitempty"`
+	SNIs                   []DBLessSNI                 `yaml:"snis,omitempty"`
 	AIModels               []DBLessAIModel             `yaml:"ai_models,omitempty"`
 	KeyAuthCredentials     []DBLessKeyAuthCredential   `yaml:"keyauth_credentials,omitempty"`
 }
@@ -118,6 +119,13 @@ type DBLessCertificate struct {
 	CertAlt string   `yaml:"cert_alt,omitempty"`
 	KeyAlt  string   `yaml:"key_alt,omitempty"`
 	Tags    []string `yaml:"tags,omitempty"`
+}
+
+type DBLessSNI struct {
+	ID          string            `yaml:"id"`
+	Name        string            `yaml:"name"`
+	Certificate map[string]string `yaml:"certificate"`
+	Tags        []string          `yaml:"tags,omitempty"`
 }
 
 type DBLessAIModel struct {

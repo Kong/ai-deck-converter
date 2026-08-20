@@ -1,0 +1,91 @@
+_format_version: "3.0"
+_transform: false
+services:
+  - id: 947a4e23-b483-5a65-8165-da9aed24565b
+    name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    host: ai-gateway.upstream.local
+    port: 80
+    protocol: http
+routes:
+  - id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+    name: openai-chat
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /chat/completions
+    methods:
+      - POST
+    protocols:
+      - http
+      - https
+    strip_path: false
+plugins:
+  - id: 17fa8192-4b9f-5b5a-8379-20ad8bc836a7
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+  - id: f3adc007-171c-5519-8763-3a0eef79bde3
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - description: gpt-4o
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: chat
+            name: gpt-4o
+            provider: openai
+          route_type: llm/v1/chat
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+    model:
+      id: 7b1cfd1c-89d1-5291-8bac-5a9998310a53
+certificates:
+  - id: c090fb7f-2394-51b4-979f-0ffe4cfd8d14
+    cert: |
+      -----BEGIN CERTIFICATE-----
+      MIIBrsBgNVBAMMCnVwc3RyZWFtLTE=
+      -----END CERTIFICATE-----
+    key: |
+      -----BEGIN PRIVATE KEY-----
+      MIIBVAIBADANBgkqhkiG9w0BAQEFAA==
+      -----END PRIVATE KEY-----
+  - id: 4f4d4985-5c6a-5ab3-be44-9d0f554e944c
+    cert: |
+      -----BEGIN CERTIFICATE-----
+      MIIBrsBgNVBAMMCmR1YWwtcnNhLTE=
+      -----END CERTIFICATE-----
+    key: |
+      -----BEGIN PRIVATE KEY-----
+      MIIBVAIBADANBgkqhkiG9w0BAQEFAB==
+      -----END PRIVATE KEY-----
+snis:
+  - id: 7998c031-7d2c-5e94-8e5e-e39e151340f2
+    name: upstream.example.com
+    certificate:
+      id: c090fb7f-2394-51b4-979f-0ffe4cfd8d14
+    tags:
+      - env:prod
+      - team:ai-platform
+  - id: 4caef581-67d6-56e6-9f6d-e0f0a92d5435
+    name: '*.upstream.example.com'
+    certificate:
+      id: c090fb7f-2394-51b4-979f-0ffe4cfd8d14
+  - id: 6323acea-b899-5284-9834-9201770a45e3
+    name: dual.example.com
+    certificate:
+      id: 4f4d4985-5c6a-5ab3-be44-9d0f554e944c
+ai_models:
+  - id: 7b1cfd1c-89d1-5291-8bac-5a9998310a53
+    name: chat

@@ -15,7 +15,7 @@ func (r *Reverter) revertCertificates() {
 	for i := range r.src.Certificates {
 		cert := &r.src.Certificates[i]
 		r.out.Certificates = append(r.out.Certificates, aigw.Certificate{
-			Name:    fmt.Sprintf("certificate-%d", i+1),
+			Name:    certificateName(i),
 			Cert:    cert.Cert,
 			Key:     cert.Key,
 			CertAlt: cert.CertAlt,
@@ -23,4 +23,12 @@ func (r *Reverter) revertCertificates() {
 			Labels:  r.tagsToLabels(cert.Tags),
 		})
 	}
+}
+
+// certificateName synthesizes the AI Gateway certificate name for the
+// certificate at position i. Shared with revertSNIs so a nested SNI's
+// certificate reference always matches the certificate reverted from the
+// same index.
+func certificateName(i int) string {
+	return fmt.Sprintf("certificate-%d", i+1)
 }

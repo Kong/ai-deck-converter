@@ -145,14 +145,23 @@ func (c *Converter) projectDBLess() *kong.DBLessDocument {
 	}
 
 	for i, cert := range c.out.Certificates {
+		certID := ids.cert[certKey(cert, i)]
 		out.Certificates = append(out.Certificates, kong.DBLessCertificate{
-			ID:      ids.cert[certKey(cert, i)],
+			ID:      certID,
 			Cert:    cert.Cert,
 			Key:     cert.Key,
 			CertAlt: cert.CertAlt,
 			KeyAlt:  cert.KeyAlt,
 			Tags:    cert.Tags,
 		})
+		for _, sni := range cert.SNIs {
+			out.SNIs = append(out.SNIs, kong.DBLessSNI{
+				ID:          firstNonEmpty(sni.ID, stableUUID("sni:"+certKey(cert, i)+":"+sni.Name)),
+				Name:        sni.Name,
+				Certificate: map[string]string{"id": certID},
+				Tags:        sni.Tags,
+			})
+		}
 	}
 
 	for _, vault := range c.out.Vaults {
