@@ -17,7 +17,8 @@ jobs:
     if: github.event.issue.pull_request != null && contains(github.event.comment.body, '/ai-reviewer')
     permissions:
       contents: read
-      pull-requests: read
+      pull-requests: write
+      issues: write
       id-token: write
     steps:
       - uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
@@ -29,17 +30,45 @@ jobs:
         id: kong-app-token
         with:
           client-id: ${{ vars.KONG_GH_APP_ID }}
-          private-key: ${{ secrets.GH_APP__KONG__PRIVATE_KEY }}
+          private-key: ${{ secrets.KONG_GH_APP_PRIVATE_KEY }}
           owner: Kong
           repositories: |
             Ksai
             ai-deck-converter
 
-      - uses: Kong/ksai/.github/actions/ai-reviewer-federated@e21ddfca6f972e17eb841d186a17766b67533544 # ai-reviewer-federated/v1.12.0
+      # Kong/ksai is an internal repo; GitHub Actions won't resolve an action hosted there from a
+      # public repo's workflow. Checking it out locally and using a path-based `uses:` sidesteps
+      # that restriction, since the runner then treats it as local files rather than a remote action.
+
+      # The composite checks the PR head out at the workspace root. Initialize that root as a Git
+      # repository first so checkout updates it in place instead of deleting the nested ksai action.
+      - name: Checkout trusted default branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      - name: Checkout ksai action
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: Kong/ksai
+          ref: e21ddfca6f972e17eb841d186a17766b67533544 # ai-reviewer-federated/v1.12.0
+          token: ${{ steps.kong-app-token.outputs.token }}
+          path: ./.github/actions/ksai
+          sparse-checkout: |
+            .github/actions/ai-reviewer-federated
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+
+      - uses: ./.github/actions/ksai/.github/actions/ai-reviewer-federated
         with:
           trigger_phrase: '/ai-reviewer'
+          # ksai_ref otherwise defaults to github.action_ref, which is empty for a local-path
+          # `uses:` — pin explicitly so the action's own internal checkouts (plugin, scripts,
+          # codeowners-authz) stay pinned to the same commit as the action itself.
+          ksai_ref: e21ddfca6f972e17eb841d186a17766b67533544 # ai-reviewer-federated/v1.12.0
           kong_org_github_token: ${{ steps.kong-app-token.outputs.token }}
-          source_org_github_token: ${{ steps.kong-app-token.outputs.token }}
+          source_org_github_token: ${{ github.token }}
           organization_id: 4ce7a6d3-9549-4842-bd51-1def5eba611b
           workspace_id: wrkspc_01G7dX83HGYMZDwLuJNPnA5T
           service_account_id: svac_0169VR5vhjtrizNiDXtHUhWX

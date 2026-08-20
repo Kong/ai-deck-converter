@@ -15,6 +15,7 @@ type Document struct {
 	ConsumerGroups []ConsumerGroup `yaml:"consumer_groups,omitempty"`
 	Plugins        []Plugin        `yaml:"plugins,omitempty"`
 	Vaults         []Vault         `yaml:"vaults,omitempty"`
+	Certificates   []Certificate   `yaml:"certificates,omitempty"`
 	AIModels       []AIModel       `yaml:"ai_models,omitempty"`
 	CACertificates []CACertificate `yaml:"ca_certificates,omitempty"`
 }
@@ -220,6 +221,30 @@ type CACertificate struct {
 	Cert       string   `yaml:"cert,omitempty"`
 	CertDigest string   `yaml:"cert_digest,omitempty"`
 	Tags       []string `yaml:"tags,omitempty"`
+}
+
+// Certificate is a Kong Gateway certificate. Kong identifies certificates by
+// id only -- the entity has no name -- so SourceName carries the AI Gateway
+// certificate name for stable db-less ID derivation and is never serialized.
+type Certificate struct {
+	ID      string   `yaml:"id,omitempty"`
+	Cert    string   `yaml:"cert"`
+	Key     string   `yaml:"key,omitempty"`
+	CertAlt string   `yaml:"cert_alt,omitempty"`
+	KeyAlt  string   `yaml:"key_alt,omitempty"`
+	Tags    []string `yaml:"tags,omitempty"`
+	SNIs    []SNI    `yaml:"snis,omitempty"`
+
+	SourceName string `yaml:"-"`
+}
+
+// SNI is a Kong Gateway SNI, always nested under the certificate it matches
+// to -- decK's file format has no top-level snis entity; the relationship is
+// expressed purely by nesting.
+type SNI struct {
+	ID   string   `yaml:"id,omitempty"`
+	Name string   `yaml:"name"`
+	Tags []string `yaml:"tags,omitempty"`
 }
 
 // AIModel is the Kong Gateway ai-model entity: a named model with an optional

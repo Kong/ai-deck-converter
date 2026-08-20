@@ -107,6 +107,8 @@ See `convert/testdata/*/input.yaml` for worked examples.
 | Credential | `keyauth_credentials` nested under the consumer (`key` from `api_key`, `ttl`). |
 | Vault | `vaults` entry (`prefix` = name, `name` = backend type, config passed through). |
 | CA Certificate | `ca_certificates` entry (`cert`, `cert_digest`); `name` preserved as an `ai-gateway-name:` tag (Kong's entity has no name field). |
+| Certificate | `certificates` entry (`cert`/`key` and the optional `cert_alt`/`key_alt` pair passed through). Kong certificates have no `name`, so the source name is not represented in the output; in `db-less` mode it still seeds the generated `id`. |
+| SNI | Nested under its referenced Certificate's `snis` list (`hostname` → `name`, `labels` → `tags`); decK's file format has no standalone SNI entity. The SNI's own `name`/`display_name` have no Kong counterpart and are dropped. In `db-less` mode SNIs become a top-level `snis` entry referencing the certificate's generated `id`. |
 | Model `policies`/`acls` | Top-level plugins scoped to the `ai-models` entity via a `model:` FK. |
 | Agent `access.acls` | Kong `acl` plugin on the agent's Route. |
 | `labels` | `tags` flattened to sorted `key:value` strings. |
@@ -147,14 +149,21 @@ How Kong entities come back:
   plugin → `access.metadata` + a synthesized openid-connect provider (the
   `.well-known` path is stripped back off the route), and `key-auth` /
   `openid-connect` → `access.identity_providers`.
+- **`certificates` → Certificates**, passed straight back through. Kong has no
+  certificate name, so one is synthesized positionally (`certificate-1`); the
+  name is absent from the decK output, so this never changes a round trip.
+- **Certificate `snis` → SNIs**, one AI Gateway SNI per nested entry. Both the
+  SNI name and its `certificate` reference are synthesized positionally
+  (`sni-1`, `certificate-1`, ...), so this never changes a round trip either.
 - **Unknown plugins → Policies** (global when top-level and unscoped, otherwise
   referenced from the owning entity); `acl` plugins → `acls`.
 - **Anything unconvertible is warned about and dropped**; `-strict` makes those
   drops fatal.
 
 Lossy by design (the forward direction never emits them): `display_name`,
-`enabled`, original provider names, capability spellings (`chat` comes back as
-`generate`; bare `audio` stays fanned out), and `formats` beyond the first.
+`enabled`, original provider names, certificate names, SNI names, capability
+spellings (`chat` comes back as `generate`; bare `audio` stays fanned out),
+and `formats` beyond the first.
 
 ## Assumptions and limitations
 

@@ -1,0 +1,117 @@
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: gemini-generate
+        paths:
+          - ~/ai/v1beta/models/(?<model_name>[^:/]+):(?:generateContent|streamGenerateContent)
+        methods:
+          - GET
+          - POST
+        strip_path: false
+      - name: gemini-embeddings
+        paths:
+          - ~/ai/v1beta/models/(?<model_name>[^:/]+):(?:embedContent|batchEmbedContents)
+        methods:
+          - GET
+          - POST
+        strip_path: false
+plugins:
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      path_pattern: 'models/([%w%.%-]+):'
+      source: path
+    route: gemini-generate
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: gemini
+      targets:
+        - auth:
+            gcp_service_account_json: '{vault://ai/gcp-service-account-json}'
+            gcp_use_service_account: true
+          description: gemini-2.5-pro-with-gcp-env
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: vertex-gemini-2-5-pro
+            name: gemini-2.5-pro-with-gcp-env
+            options:
+              gemini:
+                api_endpoint: https://us-central1-aiplatform.googleapis.com
+                location_id: us-central1
+                project_id: kong-vertex-project
+              max_tokens: 4096
+              temperature: 1
+            provider: gemini
+          route_type: llm/v1/chat
+        - auth:
+            gcp_service_account_json: '{vault://ai/gcp-service-account-json}'
+            gcp_use_service_account: true
+          description: gemini-2.6-pro-without-gcp-env
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: vertex-gemini-2-5-pro
+            name: gemini-2.6-pro-without-gcp-env
+            options:
+              max_tokens: 4096
+              temperature: 1
+            provider: gemini
+          route_type: llm/v1/chat
+    route: gemini-generate
+    model: vertex-gemini-2-5-pro
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      path_pattern: 'models/([%w%.%-]+):'
+      source: path
+    route: gemini-embeddings
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/embeddings
+      llm_format: gemini
+      targets:
+        - auth:
+            gcp_service_account_json: '{vault://ai/gcp-service-account-json}'
+            gcp_use_service_account: true
+          description: text-embedding-005-with-gcp-env
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: vertex-text-embedding-005
+            name: text-embedding-005-with-gcp-env
+            options:
+              gemini:
+                api_endpoint: https://us-central2-aiplatform.googleapis.com
+                endpoint_id: my-endpoint-id
+                location_id: us-central2
+                project_id: other-vertex-project
+            provider: gemini
+          route_type: llm/v1/embeddings
+        - auth:
+            gcp_service_account_json: '{vault://ai/gcp-service-account-json}'
+            gcp_use_service_account: true
+          description: text-embedding-006-without-gcp-env
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: vertex-text-embedding-005
+            name: text-embedding-006-without-gcp-env
+            provider: gemini
+          route_type: llm/v1/embeddings
+    route: gemini-embeddings
+    model: vertex-text-embedding-005
+ai_models:
+  - name: vertex-gemini-2-5-pro
+  - name: vertex-text-embedding-005

@@ -442,6 +442,10 @@ func (c *Converter) run() error {
 	c.convertGlobalPolicies()
 	c.convertVaults()
 	c.convertCACertificates()
+	c.convertCertificates()
+	if err := c.convertSNIs(); err != nil {
+		return err
+	}
 	if err := c.convertConsumerGroups(); err != nil {
 		return err
 	}
