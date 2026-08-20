@@ -71,25 +71,26 @@ models:
         provider: gemini-provider
         config: {type: gemini}
 
-  # An explicit path selector with no values retains Gemini's default pattern.
+  # A path_param whose path carries no PCRE capture group retains Gemini's
+  # default path pattern (no pcre_pattern is emitted). Regression for KOKO-4266.
   - name: gemini-path-name
     type: model
     capabilities: [generate]
     formats: [{type: gemini}]
     config:
-      route: {paths: [/gemini-path-name], model: {path: {}}}
+      route: {paths: [/gemini-path-name], model: {path: {path_param: model_name}}}
     targets:
       - name: gemini-2.5-pro
         provider: gemini-provider
         config: {type: gemini}
 
-  # An explicit path selector can carry a separate alias.
+  # A path_param with no capture can still carry a separate alias via values.
   - name: gemini-path-alias
     type: model
     capabilities: [generate]
     formats: [{type: gemini}]
     config:
-      route: {paths: [/gemini-path-alias], model: {path: {}}}
+      route: {paths: [/gemini-path-alias], model: {path: {path_param: model_name, values: ["@kong/gemini-path"]}}}
     targets:
       - name: gemini-2.5-pro
         provider: gemini-provider

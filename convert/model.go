@@ -898,13 +898,19 @@ func bodySizeOrDefault(m *aigw.Model) int {
 func buildModelSelectorConfig(m *aigw.Model, spec aimap.EndpointSpec) []map[string]any {
 	switch {
 	case m.Config.Route.Model.Path.PathParam != "":
-		sources := make([]map[string]any, len(m.Config.Route.Paths))
+		param := m.Config.Route.Model.Path.PathParam
+		// PCRE-in-path model extraction applies only when the authored paths are regex paths that actually carry
+		// a named capture group for this param.
+		if !pathParamCaptured(m.Config.Route.Paths, param, spec.IsRegex) {
+			return []map[string]any{defaultModelSelectorConfig(m, spec)}
+		}
 
+		sources := make([]map[string]any, len(m.Config.Route.Paths))
 		for i, sourcePath := range m.Config.Route.Paths {
 			sources[i] = map[string]any{
 				"source":                "path",
 				"pcre_pattern":          sourcePath,
-				"pcre_capture_name":     m.Config.Route.Model.Path.PathParam,
+				"pcre_capture_name":     param,
 				"max_request_body_size": bodySizeOrDefault(m),
 			}
 		}
@@ -973,6 +979,26 @@ func modelSelectorShapeKey(cfg []map[string]any) string {
 }
 
 func boolPtr(b bool) *bool { return &b }
+
+// pathParamCaptured reports whether every authored path is a regex path (a
+// decK "~" marker or a regex endpoint spec) that carries a PCRE named capture
+// group for param (e.g. path_param "model_name" needs "(?<model_name>" in each
+// path).
+func pathParamCaptured(paths []string, param string, specIsRegex bool) bool {
+	if len(paths) == 0 || param == "" {
+		return false
+	}
+	needle := "(?<" + param + ">"
+	for _, p := range paths {
+		if !specIsRegex && !strings.HasPrefix(p, "~") {
+			return false
+		}
+		if !strings.Contains(p, needle) {
+			return false
+		}
+	}
+	return true
+}
 
 // tryConvertPCREToLua derives an ai-model-selector Lua path_pattern from
 // a model's own hand-authored base path. A base path carrying a PCRE named
