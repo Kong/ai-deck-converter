@@ -17,6 +17,7 @@ type Document struct {
 	Vaults         []Vault         `yaml:"vaults,omitempty"`
 	Certificates   []Certificate   `yaml:"certificates,omitempty"`
 	AIModels       []AIModel       `yaml:"ai_models,omitempty"`
+	CACertificates []CACertificate `yaml:"ca_certificates,omitempty"`
 }
 
 // Ref is a name-based foreign-key reference, rendered as `{name: <x>}`.
@@ -210,6 +211,18 @@ type Vault struct {
 	Tags        []string       `yaml:"tags,omitempty"`
 }
 
+// CACertificate is a Kong Gateway CA certificate entity: the dataplane-visible
+// subset of the AI Gateway CACertificate (control-plane-only fields like
+// description and managed_by never cross to Kong). Unlike most decK entities
+// it has no name field; the AI Gateway CACertificate.Name is preserved via
+// Tags so it can be recovered on revert.
+type CACertificate struct {
+	ID         string   `yaml:"id,omitempty"`
+	Cert       string   `yaml:"cert,omitempty"`
+	CertDigest string   `yaml:"cert_digest,omitempty"`
+	Tags       []string `yaml:"tags,omitempty"`
+}
+
 // Certificate is a Kong Gateway certificate. Kong identifies certificates by
 // id only -- the entity has no name -- so SourceName carries the AI Gateway
 // certificate name for stable db-less ID derivation and is never serialized.
@@ -220,8 +233,18 @@ type Certificate struct {
 	CertAlt string   `yaml:"cert_alt,omitempty"`
 	KeyAlt  string   `yaml:"key_alt,omitempty"`
 	Tags    []string `yaml:"tags,omitempty"`
+	SNIs    []SNI    `yaml:"snis,omitempty"`
 
 	SourceName string `yaml:"-"`
+}
+
+// SNI is a Kong Gateway SNI, always nested under the certificate it matches
+// to -- decK's file format has no top-level snis entity; the relationship is
+// expressed purely by nesting.
+type SNI struct {
+	ID   string   `yaml:"id,omitempty"`
+	Name string   `yaml:"name"`
+	Tags []string `yaml:"tags,omitempty"`
 }
 
 // AIModel is the Kong Gateway ai-model entity: a named model with an optional

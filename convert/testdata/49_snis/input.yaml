@@ -1,0 +1,50 @@
+models:
+  - type: model
+    name: chat
+    capabilities: [generate]
+    formats: [{type: openai}]
+    targets:
+      - {name: gpt-4o, provider: openai-main, config: {type: openai}}
+
+model_providers:
+  - name: openai-main
+    type: openai
+    config:
+      auth:
+        header_name: Authorization
+        header_value: Bearer sk-test
+
+certificates:
+  - name: upstream-tls
+    cert: |
+      -----BEGIN CERTIFICATE-----
+      MIIBrsBgNVBAMMCnVwc3RyZWFtLTE=
+      -----END CERTIFICATE-----
+    key: |
+      -----BEGIN PRIVATE KEY-----
+      MIIBVAIBADANBgkqhkiG9w0BAQEFAA==
+      -----END PRIVATE KEY-----
+  - name: dual-algorithm
+    cert: |
+      -----BEGIN CERTIFICATE-----
+      MIIBrsBgNVBAMMCmR1YWwtcnNhLTE=
+      -----END CERTIFICATE-----
+    key: |
+      -----BEGIN PRIVATE KEY-----
+      MIIBVAIBADANBgkqhkiG9w0BAQEFAB==
+      -----END PRIVATE KEY-----
+
+snis:
+  - name: upstream-primary
+    display_name: Upstream Primary SNI
+    hostname: upstream.example.com
+    certificate: upstream-tls
+    labels:
+      env: prod
+      team: ai-platform
+  - name: upstream-wildcard
+    hostname: "*.upstream.example.com"
+    certificate: upstream-tls
+  - name: dual-sni
+    hostname: dual.example.com
+    certificate: dual-algorithm

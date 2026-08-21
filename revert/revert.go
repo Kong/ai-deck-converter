@@ -151,7 +151,9 @@ func (r *Reverter) run() error {
 	r.buildIndexes()
 	r.revertGlobalPolicies()
 	r.revertVaults()
+	r.revertCACertificates()
 	r.revertCertificates()
+	r.revertSNIs()
 	if err := r.revertConsumerGroups(); err != nil {
 		return err
 	}

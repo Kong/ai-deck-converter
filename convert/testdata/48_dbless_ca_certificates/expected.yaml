@@ -1,0 +1,16 @@
+_format_version: "3.0"
+_transform: false
+ca_certificates:
+  - id: a598ea3c-6220-5165-8f46-e37f3d1c9280
+    cert: |
+      -----BEGIN CERTIFICATE-----
+      MIIB...
+      -----END CERTIFICATE-----
+    tags:
+      - ai-gateway-name:my-root-ca
+      - env:prod
+  - id: f9559d9b-e979-51bb-98b2-134520d6e94f
+    cert: '{vault://env/vault-ca-cert}'
+    cert_digest: deadbeef
+    tags:
+      - ai-gateway-name:vault-ref-ca

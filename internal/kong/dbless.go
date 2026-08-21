@@ -16,8 +16,10 @@ type DBLessDocument struct {
 	Plugins                []DBLessPlugin              `yaml:"plugins,omitempty"`
 	Vaults                 []DBLessVault               `yaml:"vaults,omitempty"`
 	Certificates           []DBLessCertificate         `yaml:"certificates,omitempty"`
+	SNIs                   []DBLessSNI                 `yaml:"snis,omitempty"`
 	AIModels               []DBLessAIModel             `yaml:"ai_models,omitempty"`
 	KeyAuthCredentials     []DBLessKeyAuthCredential   `yaml:"keyauth_credentials,omitempty"`
+	CACertificates         []DBLessCACertificate       `yaml:"ca_certificates,omitempty"`
 }
 
 func NewDBLessDocument() *DBLessDocument {
@@ -120,11 +122,25 @@ type DBLessCertificate struct {
 	Tags    []string `yaml:"tags,omitempty"`
 }
 
+type DBLessSNI struct {
+	ID          string            `yaml:"id"`
+	Name        string            `yaml:"name"`
+	Certificate map[string]string `yaml:"certificate"`
+	Tags        []string          `yaml:"tags,omitempty"`
+}
+
 type DBLessAIModel struct {
 	ID    string   `yaml:"id"`
 	Name  string   `yaml:"name"`
 	Alias string   `yaml:"alias,omitempty"`
 	Tags  []string `yaml:"tags,omitempty"`
+}
+
+type DBLessCACertificate struct {
+	ID         string   `yaml:"id"`
+	Cert       string   `yaml:"cert,omitempty"`
+	CertDigest string   `yaml:"cert_digest,omitempty"`
+	Tags       []string `yaml:"tags,omitempty"`
 }
 
 type DBLessKeyAuthCredential struct {
