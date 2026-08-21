@@ -1,5 +1,7 @@
 package aigw
 
+import "gopkg.in/yaml.v3"
+
 // MCPServer is an AI Gateway MCP Server. The discriminator `type` is the mode
 // (conversion-only | conversion-listener | listener | passthrough-listener |
 // upstream-server), which maps to the ai-mcp-proxy plugin's config.mode.
@@ -22,7 +24,7 @@ type MCPServer struct {
 
 // MCPAccess is the access-control configuration for an MCP Server: the ACL
 // attribute config, consumer/group ACLs, and the default ACL applied to every
-// tool. It also carries the identity-provider reference and OAuth 2.0 Protected
+// tool. It also carries the auth-strategy reference and OAuth 2.0 Protected
 // Resource Metadata used to protect the MCP server (lowered into an
 // ai-mcp-oauth2 plugin).
 type MCPAccess struct {
@@ -32,14 +34,34 @@ type MCPAccess struct {
 	AccessTokenClaimField string `yaml:"access_token_claim_field,omitempty"`
 	ACLs                  ACLs   `yaml:"acls,omitempty"`
 	DefaultToolACLs       ACLs   `yaml:"default_tool_acls,omitempty"`
-	// IdentityProviders references an identity provider (at most one) by name.
-	// A key-auth provider becomes a key-auth plugin; an openid-connect provider
+	// AuthStrategies references an auth strategy (at most one) by name.
+	// A key-auth strategy becomes a key-auth plugin; an openid-connect strategy
 	// combined with Metadata becomes an ai-mcp-oauth2 plugin.
-	IdentityProviders []string `yaml:"identity_providers,omitempty"`
+	AuthStrategies []string `yaml:"auth_strategies,omitempty"`
 	// Metadata is the OAuth 2.0 Protected Resource Metadata advertised for this
 	// MCP server. When set (with an openid-connect provider), it lowers into an
 	// ai-mcp-oauth2 plugin.
 	Metadata *MCPProtectedResourceMetadata `yaml:"metadata,omitempty"`
+}
+
+// mcpAccessFields mirrors MCPAccess without its UnmarshalYAML, so the decoder
+// can populate the current keys without recursing.
+type mcpAccessFields MCPAccess
+
+// UnmarshalYAML decodes an MCPAccess, folding the deprecated
+// identity_providers key into AuthStrategies.
+func (a *MCPAccess) UnmarshalYAML(node *yaml.Node) error {
+	var fields mcpAccessFields
+	if err := node.Decode(&fields); err != nil {
+		return err
+	}
+	*a = MCPAccess(fields)
+	refs, err := appendDeprecatedAuthStrategyRefs(node, a.AuthStrategies)
+	if err != nil {
+		return err
+	}
+	a.AuthStrategies = refs
+	return nil
 }
 
 // MCPProtectedResourceMetadata is the OAuth 2.0 Protected Resource Metadata

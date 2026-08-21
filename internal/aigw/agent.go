@@ -1,5 +1,7 @@
 package aigw
 
+import "gopkg.in/yaml.v3"
+
 // Agent is an AI Gateway agent. type is "a2a" (gets an ai-a2a-proxy plugin) or
 // "http" (plain proxy Service+Route). Both share the same config shape.
 type Agent struct {
@@ -20,8 +22,28 @@ type AccessConfig struct {
 
 // AgentAccessConfig holds Agent-specific access-related configuration.
 type AgentAccessConfig struct {
-	AccessConfig      `yaml:",inline"`
-	IdentityProviders []string `yaml:"identity_providers,omitempty"`
+	AccessConfig   `yaml:",inline"`
+	AuthStrategies []string `yaml:"auth_strategies,omitempty"`
+}
+
+// agentAccessFields mirrors AgentAccessConfig without its UnmarshalYAML, so the
+// decoder can populate the current keys without recursing.
+type agentAccessFields AgentAccessConfig
+
+// UnmarshalYAML decodes an AgentAccessConfig, folding the deprecated
+// identity_providers key into AuthStrategies.
+func (a *AgentAccessConfig) UnmarshalYAML(node *yaml.Node) error {
+	var fields agentAccessFields
+	if err := node.Decode(&fields); err != nil {
+		return err
+	}
+	*a = AgentAccessConfig(fields)
+	refs, err := appendDeprecatedAuthStrategyRefs(node, a.AuthStrategies)
+	if err != nil {
+		return err
+	}
+	a.AuthStrategies = refs
+	return nil
 }
 
 // AgentConfig holds the upstream URL, route, logging, upstream-auth, and proxy

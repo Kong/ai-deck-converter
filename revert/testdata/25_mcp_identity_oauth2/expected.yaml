@@ -17,7 +17,7 @@ mcp_servers:
         scheme: https
         host: flights.internal
     access:
-      identity_providers:
+      auth_strategies:
         - openid-connect-1
       metadata:
         endpoint: /mcp/secure-flights/.well-known/oauth-protected-resource
@@ -45,7 +45,7 @@ mcp_servers:
         scheme: https
         host: keyed.internal
     access:
-      identity_providers:
+      auth_strategies:
         - key-auth-1
   - type: passthrough-listener
     name: vendor-proxy-mcp
@@ -65,7 +65,7 @@ mcp_servers:
         scheme: https
         host: vendor.internal
     access:
-      identity_providers:
+      auth_strategies:
         - openid-connect-1
       metadata:
         endpoint: /mcp/vendor-proxy/.well-known/oauth-protected-resource

@@ -36,14 +36,13 @@ func TestRevertMCPOIDCWithoutMetadata(t *testing.T) {
 	// access reference to it, with the full passthrough config preserved (no
 	// metadata).
 	require.Contains(t, s, "auth_strategies:")
-	require.Contains(t, s, "identity_providers:")
 	require.Contains(t, s, "type: openid-connect")
 	require.Contains(t, s, "cache_tokens_salt: pepper", "full OIDC config should survive")
 	require.NotContains(t, s, "metadata:", "no metadata should be reconstructed")
 }
 
 // mcpOAuth2MetadataOnly is an ai-mcp-oauth2 plugin with no client credentials
-// (metadata-only): revert must reconstruct metadata but no identity provider.
+// (metadata-only): revert must reconstruct metadata but no auth strategy.
 const mcpOAuth2MetadataOnly = `
 _format_version: "3.0"
 services:
@@ -78,7 +77,6 @@ func TestRevertMCPOAuth2MetadataOnly(t *testing.T) {
 		"/mcp/meta/.well-known/oauth-protected-resource")
 	// No client credentials => no synthesized auth strategy.
 	require.NotContains(t, s, "auth_strategies:")
-	require.NotContains(t, s, "identity_providers:")
 }
 
 // mcpOAuth2MappedFields carries the mapped identity fields on an ai-mcp-oauth2

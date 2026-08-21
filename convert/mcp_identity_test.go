@@ -6,11 +6,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// keyAuthWithMetadata references a key-auth identity provider together with
+// keyAuthWithMetadata references a key-auth auth strategy together with
 // access.metadata, which is unsupported (OAuth Protected Resource Metadata
 // cannot be served by key-auth).
 const keyAuthWithMetadata = `
-identity_providers:
+auth_strategies:
   - name: mcp-key-auth
     type: key-auth
     config:
@@ -22,7 +22,7 @@ mcp_servers:
       route:
         paths: [/mcp/keyed]
     access:
-      identity_providers: [mcp-key-auth]
+      auth_strategies: [mcp-key-auth]
       metadata:
         endpoint: /mcp/keyed/.well-known/oauth-protected-resource
         resource: https://api.example.com/mcp/keyed
@@ -51,7 +51,7 @@ func TestMCPKeyAuthWithMetadataIsHardError(t *testing.T) {
 // oidcOnUnsupportedListener puts identity/metadata access on an
 // upstream-server MCP server, which does not support it.
 const oidcOnUnsupportedListener = `
-identity_providers:
+auth_strategies:
   - name: okta-oidc
     type: openid-connect
     config:
@@ -65,7 +65,7 @@ mcp_servers:
         paths: [/mcp/upstream]
       tools_cache_ttl_seconds: 300
     access:
-      identity_providers: [okta-oidc]
+      auth_strategies: [okta-oidc]
       metadata:
         endpoint: /mcp/upstream/.well-known/oauth-protected-resource
         resource: https://api.example.com/mcp/upstream
@@ -83,7 +83,7 @@ func TestMCPIdentityUnsupportedListenerIsHardError(t *testing.T) {
 	conversionErr, ok := AsConversionError(err)
 	require.True(t, ok)
 	require.Len(t, conversionErr.Diagnostics, 2)
-	require.Equal(t, "access.identity_providers", conversionErr.Diagnostics[0].Field)
+	require.Equal(t, "access.auth_strategies", conversionErr.Diagnostics[0].Field)
 	require.Equal(t, "access.metadata", conversionErr.Diagnostics[1].Field)
 	require.Equal(t, conversionErr.Diagnostics[0].Messages, conversionErr.Diagnostics[1].Messages)
 }
@@ -91,7 +91,7 @@ func TestMCPIdentityUnsupportedListenerIsHardError(t *testing.T) {
 // oidcMetadataWithoutAuthServers omits metadata.authorization_servers so the
 // OIDC issuer is used as the fallback.
 const oidcMetadataWithoutAuthServers = `
-identity_providers:
+auth_strategies:
   - name: okta-oidc
     type: openid-connect
     config:
@@ -103,7 +103,7 @@ mcp_servers:
       route:
         paths: [/mcp/fallback]
     access:
-      identity_providers: [okta-oidc]
+      auth_strategies: [okta-oidc]
       metadata:
         endpoint: /mcp/fallback/.well-known/oauth-protected-resource
         resource: https://api.example.com/mcp/fallback
@@ -130,7 +130,7 @@ func TestMCPOAuth2FallsBackToIssuerForAuthServers(t *testing.T) {
 // oidcWithMappedFields carries a spread of the Gap 1 & 2 identity fields plus
 // an OIDC-only field (cache_tokens_salt) that has no ai-mcp-oauth2 target.
 const oidcWithMappedFields = `
-identity_providers:
+auth_strategies:
   - name: okta-oidc
     type: openid-connect
     config:
@@ -159,7 +159,7 @@ mcp_servers:
       route:
         paths: [/mcp/mapped]
     access:
-      identity_providers: [okta-oidc]
+      auth_strategies: [okta-oidc]
       metadata:
         endpoint: /mcp/mapped/.well-known/oauth-protected-resource
         resource: https://api.example.com/mcp/mapped
@@ -228,7 +228,7 @@ func TestBasicProxyCredentialsAcceptsUnpaddedBase64AndWhitespace(t *testing.T) {
 // oidcWithAudienceAndPassthrough exercises the two derived fields: a provider
 // that disables hide_credentials and requires an audience.
 const oidcWithAudienceAndPassthrough = `
-identity_providers:
+auth_strategies:
   - name: okta-oidc
     type: openid-connect
     config:
@@ -242,7 +242,7 @@ mcp_servers:
       route:
         paths: [/mcp/secure]
     access:
-      identity_providers: [okta-oidc]
+      auth_strategies: [okta-oidc]
       metadata:
         endpoint: /mcp/secure/.well-known/oauth-protected-resource
         resource: https://api.example.com/mcp/secure

@@ -11,7 +11,7 @@ models:
         config:
           type: openai
     access:
-      identity_providers:
+      auth_strategies:
         - openid-connect-1
         - key-auth-1
     config:

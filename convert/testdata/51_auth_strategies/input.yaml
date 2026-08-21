@@ -16,7 +16,7 @@ models:
           type: openai
     policies: []
     access:
-      identity_providers: [okta-oidc]
+      auth_strategies: [okta-oidc]
 model_providers:
   - name: openai-prod
     type: openai

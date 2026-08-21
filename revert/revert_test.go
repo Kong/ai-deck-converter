@@ -114,7 +114,7 @@ services:
 
 	out, _, err := Revert(src, Options{})
 	require.NoError(t, err)
-	require.Contains(t, string(out), "identity_providers:")
+	require.Contains(t, string(out), "auth_strategies:\n        - key-auth-1")
 	require.Contains(t, string(out), "- key-auth-1")
 	require.Contains(t, string(out), "auth_strategies:\n  - type: key-auth")
 	require.NotContains(t, string(out), "policies:\n")

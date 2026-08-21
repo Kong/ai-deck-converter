@@ -50,7 +50,7 @@ func (r *Reverter) revertAgent(svc *kong.Service, rt *kong.Route, name string, s
 	)
 	a.Policies = refs
 	a.Access.ACLs = acls
-	a.Access.IdentityProviders = authStrategies
+	a.Access.AuthStrategies = authStrategies
 
 	r.out.Agents = append(r.out.Agents, a)
 	return nil

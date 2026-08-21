@@ -17,7 +17,7 @@ mcp_servers:
         scheme: https
         host: secure.internal
     access:
-      identity_providers:
+      auth_strategies:
         - openid-connect-1
       metadata:
         endpoint: /mcp/secure/.well-known/oauth-protected-resource

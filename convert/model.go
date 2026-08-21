@@ -233,10 +233,10 @@ func (c *Converter) convertModels() error {
 				}
 				logging := modelLoggingBlock(withLoggingDefaults(m.Config.Logging, false, false), spec.SupportsLogStatistics)
 				// Authentication plugins execute before the model selector. Models
-				// with different identity-provider sets therefore cannot share a
+				// with different auth-strategy sets therefore cannot share a
 				// route: a route-scoped auth plugin would otherwise protect every
 				// model on that route.
-				identityKey := authStrategyKey(m.Access.IdentityProviders)
+				identityKey := authStrategyKey(m.Access.AuthStrategies)
 				routeConfigKey, err := modelRouteConfigKey(m.Config.Route)
 				if err != nil {
 					return err
@@ -251,7 +251,7 @@ func (c *Converter) convertModels() error {
 				// ai-model-selector reads) no longer forces a split: models wanting
 				// different shapes still share the route, and their shapes compact
 				// into config.sources (see routeGroup.addSelector). Otherwise the
-				// shape stays a route-level concern like identity providers, since
+				// shape stays a route-level concern like auth strategies, since
 				// the legacy schema's ai-model-selector can only read one shape at
 				// a time: models wanting incompatible shapes cannot share a route.
 				key := sec + "|" +
@@ -397,9 +397,9 @@ func (c *Converter) convertModels() error {
 			}
 		}
 
-		// Each route group contains only models with the same identity-provider
+		// Each route group contains only models with the same auth-strategy
 		// set, so these plugins can safely remain route-scoped.
-		idpPlugins, err := c.scopedAuthStrategyPlugins(m.Access.IdentityProviders)
+		idpPlugins, err := c.scopedAuthStrategyPlugins(m.Access.AuthStrategies)
 		if err != nil {
 			return err
 		}
@@ -407,7 +407,7 @@ func (c *Converter) convertModels() error {
 			c.ensureAnonymousConsumer()
 		}
 		for _, routeName := range routeNames {
-			key := routeName + "\x00" + authStrategyKey(m.Access.IdentityProviders)
+			key := routeName + "\x00" + authStrategyKey(m.Access.AuthStrategies)
 			if identityPluginSeen[key] {
 				continue
 			}
@@ -533,7 +533,7 @@ func (c *Converter) convertModels() error {
 			plugins[i].Route = kong.NewStringRef(routeName)
 			c.out.Plugins = append(c.out.Plugins, plugins[i])
 		}
-		idpPlugins, err := c.scopedAuthStrategyPlugins(candidate.model.Access.IdentityProviders)
+		idpPlugins, err := c.scopedAuthStrategyPlugins(candidate.model.Access.AuthStrategies)
 		if err != nil {
 			return err
 		}
@@ -550,7 +550,7 @@ func (c *Converter) convertModels() error {
 	return nil
 }
 
-// authStrategyKey canonicalizes identity-provider references for route
+// authStrategyKey canonicalizes auth-strategy references for route
 // grouping. Duplicate references have no semantic effect, and their ordering
 // must not make otherwise identical access policies create separate routes.
 func authStrategyKey(refs []string) string {
@@ -1001,7 +1001,7 @@ func defaultModelSelectorConfig(m *aigw.Model, spec aimap.EndpointSpec) map[stri
 // values or body-size ceilings differ (the latter merges to the max across
 // contributors), but models wanting different shapes need their own
 // ai-model-selector/route, the same way models with different
-// identity-provider sets do.
+// auth-strategy sets do.
 func modelSelectorShapeKey(cfg []map[string]any) string {
 	var sources strings.Builder
 	sources.WriteString("")

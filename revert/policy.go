@@ -27,7 +27,7 @@ func (r *Reverter) revertGlobalPolicies() {
 }
 
 // authPluginNames are authentication plugins reconstructed into identity
-// providers (with an entity's access.identity_providers reference) rather than
+// providers (with an entity's access.auth_strategies reference) rather than
 // plain policies when found on a Model or Agent route.
 var authPluginNames = map[string]bool{
 	"key-auth":       true,
@@ -54,7 +54,7 @@ func (r *Reverter) policyRefs(plugins []kong.Plugin) ([]string, aigw.ACLs) {
 }
 
 // authStrategyPolicyRefs is policyRefs plus auth-strategy recovery: it
-// pulls key-auth/openid-connect plugins out into access.identity_providers
+// pulls key-auth/openid-connect plugins out into access.auth_strategies
 // references
 // before delegating the remaining plugins to policyRefs.
 func (r *Reverter) authStrategyPolicyRefs(plugins []kong.Plugin) ([]string, aigw.ACLs, []string) {
