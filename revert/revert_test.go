@@ -92,7 +92,7 @@ func TestDeriveModelName(t *testing.T) {
 	}
 }
 
-func TestRevertAgentIdentityProviderPlugin(t *testing.T) {
+func TestRevertAgentAuthStrategyPlugin(t *testing.T) {
 	src := []byte(`
 _format_version: "3.0"
 services:
@@ -116,7 +116,7 @@ services:
 	require.NoError(t, err)
 	require.Contains(t, string(out), "identity_providers:")
 	require.Contains(t, string(out), "- key-auth-1")
-	require.Contains(t, string(out), "identity_providers:\n  - type: key-auth")
+	require.Contains(t, string(out), "auth_strategies:\n  - type: key-auth")
 	require.NotContains(t, string(out), "policies:\n")
 }
 

@@ -236,7 +236,7 @@ func (c *Converter) convertModels() error {
 				// with different identity-provider sets therefore cannot share a
 				// route: a route-scoped auth plugin would otherwise protect every
 				// model on that route.
-				identityKey := identityProviderKey(m.Access.IdentityProviders)
+				identityKey := authStrategyKey(m.Access.IdentityProviders)
 				routeConfigKey, err := modelRouteConfigKey(m.Config.Route)
 				if err != nil {
 					return err
@@ -399,7 +399,7 @@ func (c *Converter) convertModels() error {
 
 		// Each route group contains only models with the same identity-provider
 		// set, so these plugins can safely remain route-scoped.
-		idpPlugins, err := c.scopedIdentityProviderPlugins(m.Access.IdentityProviders)
+		idpPlugins, err := c.scopedAuthStrategyPlugins(m.Access.IdentityProviders)
 		if err != nil {
 			return err
 		}
@@ -407,7 +407,7 @@ func (c *Converter) convertModels() error {
 			c.ensureAnonymousConsumer()
 		}
 		for _, routeName := range routeNames {
-			key := routeName + "\x00" + identityProviderKey(m.Access.IdentityProviders)
+			key := routeName + "\x00" + authStrategyKey(m.Access.IdentityProviders)
 			if identityPluginSeen[key] {
 				continue
 			}
@@ -533,7 +533,7 @@ func (c *Converter) convertModels() error {
 			plugins[i].Route = kong.NewStringRef(routeName)
 			c.out.Plugins = append(c.out.Plugins, plugins[i])
 		}
-		idpPlugins, err := c.scopedIdentityProviderPlugins(candidate.model.Access.IdentityProviders)
+		idpPlugins, err := c.scopedAuthStrategyPlugins(candidate.model.Access.IdentityProviders)
 		if err != nil {
 			return err
 		}
@@ -550,10 +550,10 @@ func (c *Converter) convertModels() error {
 	return nil
 }
 
-// identityProviderKey canonicalizes identity-provider references for route
+// authStrategyKey canonicalizes identity-provider references for route
 // grouping. Duplicate references have no semantic effect, and their ordering
 // must not make otherwise identical access policies create separate routes.
-func identityProviderKey(refs []string) string {
+func authStrategyKey(refs []string) string {
 	seen := make(map[string]bool, len(refs))
 	var unique []string
 	for _, ref := range refs {

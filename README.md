@@ -81,6 +81,7 @@ model_providers: [ ... ] # folded into ai-proxy-advanced targets (not standalone
 mcp_servers:     [ ... ] # -> Service + Route + ai-mcp-proxy
 agents:          [ ... ] # -> Service + Route (+ ai-a2a-proxy when type: a2a)
 policies:        [ ... ] # -> Kong plugins (global, or scoped per reference)
+auth_strategies: [ ... ] # -> key-auth / openid-connect plugins on guarded routes
 consumers:       [ ... ] # -> consumers (+ nested keyauth_credentials, groups)
 consumer_groups: [ ... ] # -> consumer_groups
 vaults:          [ ... ] # -> vaults
@@ -89,6 +90,12 @@ ca_certificates: [ ... ] # -> ca_certificates
 
 A Model's `config.route.paths[0]` provides the **base path** (e.g. `/ai`); the
 full route paths are derived per capability/format from the endpoint table.
+
+`identity_providers:` is the former name of `auth_strategies:`. It is
+deprecated but still accepted on input (entries under both keys are merged);
+the reverse direction only ever emits `auth_strategies:`. The reference field
+that selects them — `access.identity_providers` on models, agents, and MCP
+servers — keeps its name for now.
 
 See `convert/testdata/*/input.yaml` for worked examples.
 
@@ -102,6 +109,7 @@ See `convert/testdata/*/input.yaml` for worked examples.
 | Agent (`a2a`) | Service (`config.url`) + Route + `ai-a2a-proxy` plugin (logging). `config.upstream.auth` (AWS SigV4) lowers to the plugin's `auth` record, and `config.proxy` to `proxy_config`. |
 | Agent (`http`) | Service (`config.url`) + Route, no AI plugin. |
 | Policy | Kong plugin (`name` = policy `type`, config passed through). `global: true` -> one top-level plugin; otherwise instantiated per referencing entity. |
+| Auth Strategy | Kong authentication plugin (`name` = strategy `type`: `key-auth` or `openid-connect`, config passed through) on the route of each entity whose `access.identity_providers` references it, with `config.anonymous` pointing at a synthesized `anonymous` consumer that a `request-termination` plugin rejects with a 401. Models with different auth-strategy sets never share a route. |
 | Consumer | Consumer (`username` = name, `custom_id`), `groups` membership, nested `keyauth_credentials`, scoped policy plugins. |
 | Consumer Group | `consumer_groups` entry + scoped policy plugins. |
 | Credential | `keyauth_credentials` nested under the consumer (`key` from `api_key`, `ttl`). |
@@ -149,6 +157,10 @@ How Kong entities come back:
   plugin → `access.metadata` + a synthesized openid-connect provider (the
   `.well-known` path is stripped back off the route), and `key-auth` /
   `openid-connect` → `access.identity_providers`.
+- **`key-auth` / `openid-connect` plugins → Auth Strategies**, deduped by
+  (type, config minus the synthesized `anonymous` fallback) and named
+  `<type>-<n>` (`openid-connect-1`), emitted under `auth_strategies:` and
+  referenced from the owning entity's `access.identity_providers`.
 - **`certificates` → Certificates**, passed straight back through. Kong has no
   certificate name, so one is synthesized positionally (`certificate-1`); the
   name is absent from the decK output, so this never changes a round trip.

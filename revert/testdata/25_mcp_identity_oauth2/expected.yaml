@@ -76,7 +76,7 @@ mcp_servers:
           - openid
           - profile
     upstream_url: https://vendor.example.com/mcp
-identity_providers:
+auth_strategies:
   - type: openid-connect
     name: openid-connect-1
     config:

@@ -24,12 +24,12 @@ func (c *Converter) convertAgents() error {
 		guard = sourceScopedPlugins(guard, "agent", a.Name)
 		route.Plugins = append(route.Plugins, guard...)
 
-		identityProviderPlugins, err := c.scopedIdentityProviderPlugins(a.Access.IdentityProviders)
+		authStrategyPlugins, err := c.scopedAuthStrategyPlugins(a.Access.IdentityProviders)
 		if err != nil {
 			return err
 		}
-		route.Plugins = append(route.Plugins, identityProviderPlugins...)
-		if len(identityProviderPlugins) > 0 {
+		route.Plugins = append(route.Plugins, authStrategyPlugins...)
+		if len(authStrategyPlugins) > 0 {
 			c.ensureAnonymousConsumer()
 		}
 

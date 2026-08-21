@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestIdentityProviderKeyAuthForcesEmptyIdentityRealms(t *testing.T) {
-	idp := &aigw.IdentityProvider{
+func TestAuthStrategyKeyAuthForcesEmptyIdentityRealms(t *testing.T) {
+	idp := &aigw.AuthStrategy{
 		Name:        "agent-key-auth",
 		DisplayName: "agent-key-auth",
 		Type:        "key-auth",
@@ -23,7 +23,7 @@ func TestIdentityProviderKeyAuthForcesEmptyIdentityRealms(t *testing.T) {
 		},
 	}
 
-	p := identityProviderPlugin(idp)
+	p := authStrategyPlugin(idp)
 
 	require.Equal(t, "key-auth", p.Name)
 	require.Contains(t, p.Config, "identity_realms")
@@ -35,14 +35,14 @@ func TestIdentityProviderKeyAuthForcesEmptyIdentityRealms(t *testing.T) {
 	require.Equal(t, map[string]any{"directory": "default", "enabled": true}, p.Config["principals"])
 }
 
-func TestIdentityProviderKeyAuthLeavesIdentityRealmsUnsetWhenPrincipalsDisabled(t *testing.T) {
+func TestAuthStrategyKeyAuthLeavesIdentityRealmsUnsetWhenPrincipalsDisabled(t *testing.T) {
 	cases := map[string]map[string]any{
 		"principals disabled": {"principals": map[string]any{"enabled": false}},
 		"no principals":       {"key_names": []any{"x-api-key"}},
 	}
 	for name, cfg := range cases {
 		t.Run(name, func(t *testing.T) {
-			p := identityProviderPlugin(&aigw.IdentityProvider{Type: "key-auth", Config: cfg})
+			p := authStrategyPlugin(&aigw.AuthStrategy{Type: "key-auth", Config: cfg})
 			require.NotContains(t, p.Config, "identity_realms")
 		})
 	}
