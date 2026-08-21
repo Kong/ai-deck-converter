@@ -29,7 +29,7 @@ func (r *Reverter) revertMCPAccess(m *aigw.MCPServer, plugins []kong.Plugin) []k
 		case "ai-mcp-oauth2":
 			r.applyMCPOAuth2(m, p)
 		case "key-auth", "openid-connect":
-			idp := r.registerIdentityProvider(p)
+			idp := r.registerAuthStrategy(p)
 			m.Access.IdentityProviders = append(m.Access.IdentityProviders, idp.Name)
 		default:
 			rest = append(rest, p)
@@ -72,7 +72,7 @@ func (r *Reverter) applyMCPOAuth2(m *aigw.MCPServer, p kong.Plugin) {
 		// reconstruct.
 		return
 	}
-	idp := r.registerIdentityProvider(kong.Plugin{Name: "openid-connect", Config: oidcCfg})
+	idp := r.registerAuthStrategy(kong.Plugin{Name: "openid-connect", Config: oidcCfg})
 	m.Access.IdentityProviders = append(m.Access.IdentityProviders, idp.Name)
 }
 

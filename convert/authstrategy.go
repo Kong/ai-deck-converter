@@ -6,7 +6,7 @@ import (
 )
 
 // anonymousConsumerName is the username/custom_id of the synthesized Consumer
-// that identity-provider authentication plugins fall back to when a request
+// that auth-strategy authentication plugins fall back to when a request
 // isn't authenticated, so it can be rejected by a request-termination plugin
 // instead of silently reaching the upstream.
 const (
@@ -15,9 +15,9 @@ const (
 	unauthorizedErrorMessage = "Unauthorized"
 )
 
-// scopedIdentityProviderPlugins builds one authentication plugin per identity
-// provider reference, each configured to fall back to the anonymous consumer.
-func (c *Converter) scopedIdentityProviderPlugins(refs []string) ([]kong.Plugin, error) {
+// scopedAuthStrategyPlugins builds one authentication plugin per auth strategy
+// reference, each configured to fall back to the anonymous consumer.
+func (c *Converter) scopedAuthStrategyPlugins(refs []string) ([]kong.Plugin, error) {
 	var plugins []kong.Plugin
 	seen := map[string]bool{}
 	for _, ref := range refs {
@@ -25,22 +25,22 @@ func (c *Converter) scopedIdentityProviderPlugins(refs []string) ([]kong.Plugin,
 			continue
 		}
 		seen[ref] = true
-		idp := c.identityProviders[ref]
+		idp := c.authStrategies[ref]
 		if idp == nil {
-			if err := c.warn("unknown identity provider reference %q", ref); err != nil {
+			if err := c.warn("unknown auth strategy reference %q", ref); err != nil {
 				return nil, err
 			}
 			continue
 		}
-		plugins = append(plugins, identityProviderPlugin(idp))
+		plugins = append(plugins, authStrategyPlugin(idp))
 	}
 	return plugins, nil
 }
 
-// identityProviderPlugin builds a Kong authentication plugin from an AI
-// Gateway identity provider, with config.anonymous set so failed
+// authStrategyPlugin builds a Kong authentication plugin from an AI
+// Gateway auth strategy, with config.anonymous set so failed
 // authentication falls back to the anonymous consumer instead of erroring.
-func identityProviderPlugin(idp *aigw.IdentityProvider) kong.Plugin {
+func authStrategyPlugin(idp *aigw.AuthStrategy) kong.Plugin {
 	cfg := make(map[string]any, len(idp.Config)+1)
 	for k, v := range idp.Config {
 		cfg[k] = v

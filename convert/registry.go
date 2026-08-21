@@ -10,9 +10,9 @@ func (c *Converter) buildRegistries() {
 		p := &c.src.Policies[i]
 		c.policies[p.Name] = p
 	}
-	for i := range c.src.IdentityProviders {
-		p := &c.src.IdentityProviders[i]
-		c.identityProviders[p.Name] = p
+	for i := range c.src.AuthStrategies {
+		p := &c.src.AuthStrategies[i]
+		c.authStrategies[p.Name] = p
 	}
 	for i := range c.src.ConsumerGroups {
 		g := &c.src.ConsumerGroups[i]
