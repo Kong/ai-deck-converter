@@ -1,0 +1,34 @@
+# A regex ("~") path carrying a named capture group whose name does NOT match
+# path_param. Because no "(?<model_name>...)" group exists, the converter must
+# not emit a pcre_pattern/pcre_capture_name for it; it falls back to the format
+# default (OpenAI = body). Complements 49 (non-regex path). Regression KOKO-4266.
+models:
+  - name: mismatch-model
+    display_name: Path Param Capture Mismatch
+    type: model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    config:
+      route:
+        paths:
+          - '~/openai/(?<other_group>[^:/]+)'
+        model:
+          path:
+            path_param: model_name
+      max_request_body_size: 2097152
+    targets:
+      - name: gpt-4o
+        provider: openai-prod
+        config: {type: openai}
+    policies: []
+    access:
+      acls: {allow: [], deny: []}
+model_providers:
+  - name: openai-prod
+    type: openai
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://ai/openai-token}"

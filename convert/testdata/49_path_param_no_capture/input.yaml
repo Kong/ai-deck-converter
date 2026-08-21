@@ -1,0 +1,36 @@
+# A path_param set on plain (non-PCRE) paths that carry no named capture group.
+# The converter must NOT emit a pcre_pattern/pcre_capture_name naming a group
+# that does not exist; it falls back to the format's default selector (OpenAI =
+# body). Regression for KOKO-4266 ("too eager" PCRE path extraction).
+models:
+  - name: no-capture-model
+    display_name: Path Param Without Capture
+    type: model
+    capabilities: [generate, embeddings]
+    formats: [{type: openai}]
+    config:
+      route:
+        paths:
+          - /v1/chat/completions
+          - /v1/embeddings
+        model:
+          path:
+            path_param: model_name
+          values: ["my-model-alias"]
+      max_request_body_size: 8388608
+    targets:
+      - name: gpt-4o
+        provider: openai-prod
+        config: {type: openai}
+    policies: []
+    access:
+      acls: {allow: [], deny: []}
+model_providers:
+  - name: openai-prod
+    type: openai
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://ai/openai-token}"
