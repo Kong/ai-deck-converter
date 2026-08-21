@@ -62,7 +62,7 @@ func (c *Converter) mcpIdentityPlugins(m *aigw.MCPServer, route *kong.Route) ([]
 		return nil, &ConversionError{Diagnostics: diagnostics}
 	}
 
-	idp, err := c.mcpAccessIdentityProvider(m)
+	idp, err := c.mcpAccessAuthStrategy(m)
 	if err != nil {
 		return nil, err
 	}
@@ -103,7 +103,7 @@ func (c *Converter) mcpIdentityPlugins(m *aigw.MCPServer, route *kong.Route) ([]
 
 func mcpOAuth2Source(
 	m *aigw.MCPServer,
-	idp *aigw.IdentityProvider,
+	idp *aigw.AuthStrategy,
 	meta *aigw.MCPProtectedResourceMetadata,
 ) *kong.Source {
 	authorizationServersSource := "access.metadata.authorization_servers"
@@ -129,13 +129,13 @@ func mcpOAuth2Source(
 	)
 }
 
-// mcpAccessIdentityProvider resolves the single (schema max 1) identity provider
+// mcpAccessAuthStrategy resolves the single (schema max 1) auth strategy
 // referenced by an MCP server's access block, warning on unknown references.
-func (c *Converter) mcpAccessIdentityProvider(m *aigw.MCPServer) (*aigw.IdentityProvider, error) {
+func (c *Converter) mcpAccessAuthStrategy(m *aigw.MCPServer) (*aigw.AuthStrategy, error) {
 	for _, ref := range m.Access.IdentityProviders {
-		idp := c.identityProviders[ref]
+		idp := c.authStrategies[ref]
 		if idp == nil {
-			if err := c.warn("MCP server %q references unknown identity provider %q", m.Name, ref); err != nil {
+			if err := c.warn("MCP server %q references unknown auth strategy %q", m.Name, ref); err != nil {
 				return nil, err
 			}
 			continue
@@ -151,7 +151,7 @@ func (c *Converter) mcpAccessIdentityProvider(m *aigw.MCPServer) (*aigw.Identity
 // primary source, with the OIDC issuer/scopes filling in when the metadata
 // omits them.
 func (c *Converter) mcpOAuth2Plugin(
-	m *aigw.MCPServer, idp *aigw.IdentityProvider, meta *aigw.MCPProtectedResourceMetadata,
+	m *aigw.MCPServer, idp *aigw.AuthStrategy, meta *aigw.MCPProtectedResourceMetadata,
 ) (kong.Plugin, error) {
 	cfg := map[string]any{}
 
@@ -347,7 +347,7 @@ func configString(config map[string]any, key string) string {
 
 // oidcRequiresAudience reports whether an openid-connect identity provider
 // enforces a token audience (audience_required is set and non-empty).
-func oidcRequiresAudience(idp *aigw.IdentityProvider) bool {
+func oidcRequiresAudience(idp *aigw.AuthStrategy) bool {
 	return idp != nil && len(configStrings(idp.Config, "audience_required")) > 0
 }
 

@@ -32,8 +32,10 @@ func TestRevertMCPOIDCWithoutMetadata(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, warnings)
 	s := string(out)
-	// A plain openid-connect plugin round-trips into an identity provider
-	// reference with the full passthrough config preserved (no metadata).
+	// A plain openid-connect plugin round-trips into an auth strategy plus the
+	// access reference to it, with the full passthrough config preserved (no
+	// metadata).
+	require.Contains(t, s, "auth_strategies:")
 	require.Contains(t, s, "identity_providers:")
 	require.Contains(t, s, "type: openid-connect")
 	require.Contains(t, s, "cache_tokens_salt: pepper", "full OIDC config should survive")
@@ -74,7 +76,8 @@ func TestRevertMCPOAuth2MetadataOnly(t *testing.T) {
 	// The .well-known path is stripped from the route paths.
 	require.NotContains(t, strings.SplitN(s, "access:", 2)[0],
 		"/mcp/meta/.well-known/oauth-protected-resource")
-	// No client credentials => no synthesized identity provider.
+	// No client credentials => no synthesized auth strategy.
+	require.NotContains(t, s, "auth_strategies:")
 	require.NotContains(t, s, "identity_providers:")
 }
 
