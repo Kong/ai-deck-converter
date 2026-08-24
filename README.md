@@ -91,12 +91,6 @@ ca_certificates: [ ... ] # -> ca_certificates
 A Model's `config.route.paths[0]` provides the **base path** (e.g. `/ai`); the
 full route paths are derived per capability/format from the endpoint table.
 
-`identity_providers` is the former name of `auth_strategies`, both as the
-top-level key and as the `access` reference list on models, agents, and MCP
-servers. It is deprecated but still accepted on input — entries under both
-spellings are merged, current key first — and the reverse direction only ever
-emits `auth_strategies`.
-
 See `convert/testdata/*/input.yaml` for worked examples.
 
 ## Entity mapping

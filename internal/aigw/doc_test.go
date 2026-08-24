@@ -1,11 +1,9 @@
 package aigw
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v3"
 )
 
 const sampleDoc = `
@@ -84,8 +82,7 @@ func TestParseEnvelope(t *testing.T) {
 	require.Equal(t, "env", doc.Vaults[0].Type, "vault type")
 }
 
-// TestParseAuthStrategies covers the auth_strategies key and its deprecated
-// identity_providers alias, which Parse folds into the same slice.
+// TestParseAuthStrategies covers the auth_strategies document key.
 func TestParseAuthStrategies(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
@@ -100,27 +97,6 @@ auth_strategies:
     type: openid-connect
 `,
 			names: []string{"okta-oidc"},
-		},
-		{
-			name: "deprecated key",
-			src: `
-identity_providers:
-  - name: okta-oidc
-    type: openid-connect
-`,
-			names: []string{"okta-oidc"},
-		},
-		{
-			name: "both keys merge, current first",
-			src: `
-identity_providers:
-  - name: legacy-key-auth
-    type: key-auth
-auth_strategies:
-  - name: okta-oidc
-    type: openid-connect
-`,
-			names: []string{"okta-oidc", "legacy-key-auth"},
 		},
 		{
 			name:  "neither key",
@@ -140,20 +116,16 @@ auth_strategies:
 	}
 }
 
-// TestMarshalNeverEmitsDeprecatedAuthStrategyKey guards the reverse direction:
-// auth strategies always round-trip out under the current key.
-func TestMarshalNeverEmitsDeprecatedAuthStrategyKey(t *testing.T) {
+// TestParseIgnoresRemovedIdentityProvidersKey pins that the retired spelling is no longer
+// understood: a document using it parses to no auth strategies rather than silently working.
+func TestParseIgnoresRemovedIdentityProvidersKey(t *testing.T) {
 	doc, err := Parse([]byte("identity_providers:\n  - name: okta-oidc\n    type: openid-connect\n"))
 	require.NoError(t, err)
-	out, err := yaml.Marshal(doc)
-	require.NoError(t, err)
-	require.Contains(t, string(out), "auth_strategies:")
-	require.NotContains(t, string(out), "identity_providers:")
+	require.Empty(t, doc.AuthStrategies)
 }
 
-// TestParseAccessAuthStrategyRefs covers the access-block auth_strategies list
-// and its deprecated identity_providers alias, on each of the three entity
-// kinds that carry one.
+// TestParseAccessAuthStrategyRefs covers the access-block auth_strategies list on each of the
+// three entity kinds that carry one.
 func TestParseAccessAuthStrategyRefs(t *testing.T) {
 	refs := func(doc *Document) [3][]string {
 		return [3][]string{
@@ -170,11 +142,6 @@ func TestParseAccessAuthStrategyRefs(t *testing.T) {
 		{
 			name: "current key",
 			key:  "auth_strategies: [okta-oidc]",
-			want: [3][]string{{"okta-oidc"}, {"okta-oidc"}, {"okta-oidc"}},
-		},
-		{
-			name: "deprecated key",
-			key:  "identity_providers: [okta-oidc]",
 			want: [3][]string{{"okta-oidc"}, {"okta-oidc"}, {"okta-oidc"}},
 		},
 	} {
@@ -200,40 +167,15 @@ mcp_servers:
 	}
 }
 
-// TestParseAccessAuthStrategyRefsMergeBothKeys pins the merge order when an
-// access block transitionally carries both spellings.
-func TestParseAccessAuthStrategyRefsMergeBothKeys(t *testing.T) {
-	doc, err := Parse([]byte(`
-models:
-  - name: m
-    access:
-      auth_strategies: [okta-oidc]
-      identity_providers: [legacy-key-auth]
-`))
-	require.NoError(t, err)
-	require.Equal(t, []string{"okta-oidc", "legacy-key-auth"}, doc.Models[0].Access.AuthStrategies)
-}
-
-// TestMarshalNeverEmitsDeprecatedAccessKey guards the reverse direction: access
-// references always round-trip out under the current key.
-func TestMarshalNeverEmitsDeprecatedAccessKey(t *testing.T) {
+// TestParseAccessIgnoresRemovedIdentityProvidersKey is the access-block counterpart: the retired
+// spelling no longer resolves to a reference.
+func TestParseAccessIgnoresRemovedIdentityProvidersKey(t *testing.T) {
 	doc, err := Parse([]byte(`
 models:
   - name: m
     access:
       identity_providers: [okta-oidc]
-agents:
-  - name: a
-    access:
-      identity_providers: [okta-oidc]
-mcp_servers:
-  - name: s
-    access:
-      identity_providers: [okta-oidc]
 `))
 	require.NoError(t, err)
-	out, err := yaml.Marshal(doc)
-	require.NoError(t, err)
-	require.Equal(t, 3, strings.Count(string(out), "auth_strategies:"))
-	require.NotContains(t, string(out), "identity_providers:")
+	require.Empty(t, doc.Models[0].Access.AuthStrategies)
 }
