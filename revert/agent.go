@@ -45,12 +45,12 @@ func (r *Reverter) revertAgent(svc *kong.Service, rt *kong.Route, name string, s
 	}
 	a.Config.Route = routeConfig(rt, name)
 
-	refs, acls, identityProviders := r.identityProviderPolicyRefs(
+	refs, acls, authStrategies := r.authStrategyPolicyRefs(
 		append(append([]kong.Plugin{}, plugins...), svcPlugins...),
 	)
 	a.Policies = refs
 	a.Access.ACLs = acls
-	a.Access.IdentityProviders = identityProviders
+	a.Access.AuthStrategies = authStrategies
 
 	r.out.Agents = append(r.out.Agents, a)
 	return nil

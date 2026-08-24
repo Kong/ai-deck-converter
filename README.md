@@ -81,6 +81,7 @@ model_providers: [ ... ] # folded into ai-proxy-advanced targets (not standalone
 mcp_servers:     [ ... ] # -> Service + Route + ai-mcp-proxy
 agents:          [ ... ] # -> Service + Route (+ ai-a2a-proxy when type: a2a)
 policies:        [ ... ] # -> Kong plugins (global, or scoped per reference)
+auth_strategies: [ ... ] # -> key-auth / openid-connect plugins on guarded routes
 consumers:       [ ... ] # -> consumers (+ nested keyauth_credentials, groups)
 consumer_groups: [ ... ] # -> consumer_groups
 vaults:          [ ... ] # -> vaults
@@ -90,6 +91,12 @@ ca_certificates: [ ... ] # -> ca_certificates
 A Model's `config.route.paths[0]` provides the **base path** (e.g. `/ai`); the
 full route paths are derived per capability/format from the endpoint table.
 
+`identity_providers` is the former name of `auth_strategies`, both as the
+top-level key and as the `access` reference list on models, agents, and MCP
+servers. It is deprecated but still accepted on input — entries under both
+spellings are merged, current key first — and the reverse direction only ever
+emits `auth_strategies`.
+
 See `convert/testdata/*/input.yaml` for worked examples.
 
 ## Entity mapping
@@ -98,10 +105,11 @@ See `convert/testdata/*/input.yaml` for worked examples.
 |---|---|
 | Model | One **route per (provider endpoint, capability)** under a single shared `ai-gateway` Service, with the path derived from the model's `formats[0].type` (llm_format) + capability via the endpoint table. Each route gets an `ai-proxy-advanced` plugin (`route:` FK) — models that resolve to the same endpoint share one route, contributing one `targets[]` entry each. Body-model routes also get an `ai-model-selector` plugin. One `ai-models` entry (`name` + `alias`) is emitted per model. |
 | Provider | Not a standalone entity. Its `type` and `config.auth` populate each referencing target's `model.provider`, `model.options`, and `auth`. |
-| MCP Server | Service + Route + `ai-mcp-proxy` (`config.mode` = source type). Server ACLs / per-tool ACLs are written into the plugin config (`default_acl`, `tools[].acl`), not Kong `acl` plugins. `access.identity_providers` + `access.metadata` (openid-connect) add an `ai-mcp-oauth2` plugin and append `metadata.endpoint` to the route (listener / conversion-listener / passthrough-listener only); a `key-auth` provider adds a `key-auth` plugin (and is rejected if `metadata` is set). `config.upstream.auth` (AWS SigV4) lowers to the plugin's `auth` record. |
+| MCP Server | Service + Route + `ai-mcp-proxy` (`config.mode` = source type). Server ACLs / per-tool ACLs are written into the plugin config (`default_acl`, `tools[].acl`), not Kong `acl` plugins. `access.auth_strategies` + `access.metadata` (openid-connect) add an `ai-mcp-oauth2` plugin and append `metadata.endpoint` to the route (listener / conversion-listener / passthrough-listener only); a `key-auth` strategy adds a `key-auth` plugin (and is rejected if `metadata` is set). `config.upstream.auth` (AWS SigV4) lowers to the plugin's `auth` record. |
 | Agent (`a2a`) | Service (`config.url`) + Route + `ai-a2a-proxy` plugin (logging). `config.upstream.auth` (AWS SigV4) lowers to the plugin's `auth` record, and `config.proxy` to `proxy_config`. |
 | Agent (`http`) | Service (`config.url`) + Route, no AI plugin. |
 | Policy | Kong plugin (`name` = policy `type`, config passed through). `global: true` -> one top-level plugin; otherwise instantiated per referencing entity. |
+| Auth Strategy | Kong authentication plugin (`name` = strategy `type`: `key-auth` or `openid-connect`, config passed through) on the route of each entity whose `access.auth_strategies` references it, with `config.anonymous` pointing at a synthesized `anonymous` consumer that a `request-termination` plugin rejects with a 401. Models with different auth-strategy sets never share a route. |
 | Consumer | Consumer (`username` = name, `custom_id`), `groups` membership, nested `keyauth_credentials`, scoped policy plugins. |
 | Consumer Group | `consumer_groups` entry + scoped policy plugins. |
 | Credential | `keyauth_credentials` nested under the consumer (`key` from `api_key`, `ttl`). |
@@ -146,9 +154,13 @@ How Kong entities come back:
   the vault prefix in the credential (`openai-env`) or a per-type counter.
 - **ai-mcp-proxy → MCP Servers**, **ai-a2a-proxy → a2a Agents**, plain
   services with routes → **http Agents**. On an MCP route, an `ai-mcp-oauth2`
-  plugin → `access.metadata` + a synthesized openid-connect provider (the
+  plugin → `access.metadata` + a synthesized openid-connect auth strategy (the
   `.well-known` path is stripped back off the route), and `key-auth` /
-  `openid-connect` → `access.identity_providers`.
+  `openid-connect` → `access.auth_strategies`.
+- **`key-auth` / `openid-connect` plugins → Auth Strategies**, deduped by
+  (type, config minus the synthesized `anonymous` fallback) and named
+  `<type>-<n>` (`openid-connect-1`), emitted under `auth_strategies:` and
+  referenced from the owning entity's `access.auth_strategies`.
 - **`certificates` → Certificates**, passed straight back through. Kong has no
   certificate name, so one is synthesized positionally (`certificate-1`); the
   name is absent from the decK output, so this never changes a round trip.
@@ -188,8 +200,8 @@ and `formats` beyond the first.
   record (`provider: aws_iam`, nested `aws_iam` options). Unsupported auth types
   are warned about and dropped. The plugin's `aws_iam.bearer_token` has no AI
   Gateway representation, so the reverse direction warns and drops it.
-- **MCP OAuth2.** MCP `access.identity_providers` / `access.metadata` round-trips
-  in both directions. An openid-connect provider lowers its client credentials
+- **MCP OAuth2.** MCP `access.auth_strategies` / `access.metadata` round-trips
+  in both directions. An openid-connect auth strategy lowers its client credentials
   plus the identically-typed / unambiguous fields onto the `ai-mcp-oauth2`
   plugin: `client_alg`, `client_auth`, `introspection_endpoint`,
   `mtls_introspection_endpoint`, `cache_introspection`, `jwks_endpoint`,

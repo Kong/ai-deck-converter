@@ -27,7 +27,7 @@ func (r *Reverter) revertGlobalPolicies() {
 }
 
 // authPluginNames are authentication plugins reconstructed into identity
-// providers (with an entity's access.identity_providers reference) rather than
+// providers (with an entity's access.auth_strategies reference) rather than
 // plain policies when found on a Model or Agent route.
 var authPluginNames = map[string]bool{
 	"key-auth":       true,
@@ -53,18 +53,19 @@ func (r *Reverter) policyRefs(plugins []kong.Plugin) ([]string, aigw.ACLs) {
 	return refs, acls
 }
 
-// identityProviderPolicyRefs is policyRefs plus identity-provider recovery: it
-// pulls key-auth/openid-connect plugins out into identity provider references
+// authStrategyPolicyRefs is policyRefs plus auth-strategy recovery: it
+// pulls key-auth/openid-connect plugins out into access.auth_strategies
+// references
 // before delegating the remaining plugins to policyRefs.
-func (r *Reverter) identityProviderPolicyRefs(plugins []kong.Plugin) ([]string, aigw.ACLs, []string) {
+func (r *Reverter) authStrategyPolicyRefs(plugins []kong.Plugin) ([]string, aigw.ACLs, []string) {
 	var rest []kong.Plugin
 	var idpRefs []string
 	for _, p := range plugins {
 		// The anonymous fallback is the forward converter's marker that an auth
-		// plugin originated from an identity provider. A bare key-auth/OIDC
+		// plugin originated from an auth strategy. A bare key-auth/OIDC
 		// plugin remains a regular policy for backwards-compatible reversals.
 		if authPluginNames[p.Name] && p.Config["anonymous"] == anonymousConsumerName {
-			idpRefs = append(idpRefs, r.registerIdentityProvider(p).Name)
+			idpRefs = append(idpRefs, r.registerAuthStrategy(p).Name)
 			continue
 		}
 		rest = append(rest, p)
@@ -74,7 +75,7 @@ func (r *Reverter) identityProviderPolicyRefs(plugins []kong.Plugin) ([]string, 
 }
 
 func (r *Reverter) modelPolicyRefs(plugins []kong.Plugin) ([]string, aigw.ACLs, []string) {
-	return r.identityProviderPolicyRefs(plugins)
+	return r.authStrategyPolicyRefs(plugins)
 }
 
 // registerPolicy dedupes a plugin into the policy registry: a plugin with the

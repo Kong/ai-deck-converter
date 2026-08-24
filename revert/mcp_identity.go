@@ -12,12 +12,12 @@ import (
 	"github.com/Kong/ai-deck-converter/internal/kong"
 )
 
-// revertMCPAccess reconstructs an MCP server's access.identity_providers and
+// revertMCPAccess reconstructs an MCP server's access.auth_strategies and
 // access.metadata from the auth plugins on its route, and returns the plugins
 // that are NOT MCP auth (to be handled as policies).
 //
-// Auth on an MCP route is always identity-provider access (the forward
-// converter emits it from access.identity_providers/metadata, never as a
+// Auth on an MCP route is always auth-strategy access (the forward
+// converter emits it from access.auth_strategies/metadata, never as a
 // policy), so — unlike agents/models — recognition does not depend on the
 // synthesized "anonymous" fallback marker (MCP auth carries none):
 //   - ai-mcp-oauth2      -> access.metadata + a synthesized openid-connect provider
@@ -29,8 +29,8 @@ func (r *Reverter) revertMCPAccess(m *aigw.MCPServer, plugins []kong.Plugin) []k
 		case "ai-mcp-oauth2":
 			r.applyMCPOAuth2(m, p)
 		case "key-auth", "openid-connect":
-			idp := r.registerIdentityProvider(p)
-			m.Access.IdentityProviders = append(m.Access.IdentityProviders, idp.Name)
+			idp := r.registerAuthStrategy(p)
+			m.Access.AuthStrategies = append(m.Access.AuthStrategies, idp.Name)
 		default:
 			rest = append(rest, p)
 		}
@@ -40,7 +40,7 @@ func (r *Reverter) revertMCPAccess(m *aigw.MCPServer, plugins []kong.Plugin) []k
 
 // applyMCPOAuth2 lifts an ai-mcp-oauth2 plugin back into an MCP server's
 // access.metadata and (when the plugin carries client credentials) a
-// synthesized openid-connect identity provider.
+// synthesized openid-connect auth strategy.
 //
 // The forward converter can source authorization_servers/scopes_supported from
 // either the metadata or the OIDC provider (issuer/scopes fallback); the
@@ -68,16 +68,16 @@ func (r *Reverter) applyMCPOAuth2(m *aigw.MCPServer, p kong.Plugin) {
 
 	oidcCfg := oidcConfigFromOAuth2(cfg)
 	if len(oidcCfg) == 0 {
-		// Metadata-only (no identity-provider fields): no identity provider to
+		// Metadata-only (no auth-strategy fields): no auth strategy to
 		// reconstruct.
 		return
 	}
-	idp := r.registerIdentityProvider(kong.Plugin{Name: "openid-connect", Config: oidcCfg})
-	m.Access.IdentityProviders = append(m.Access.IdentityProviders, idp.Name)
+	idp := r.registerAuthStrategy(kong.Plugin{Name: "openid-connect", Config: oidcCfg})
+	m.Access.AuthStrategies = append(m.Access.AuthStrategies, idp.Name)
 }
 
 // oidcConfigFromOAuth2 lifts an ai-mcp-oauth2 plugin config back into an
-// openid-connect identity provider config, inverting
+// openid-connect auth strategy config, inverting
 // convert's applyOIDCFieldsToOAuth2 via aimap's shared field table. The array-
 // first kinds re-wrap the plugin's scalar/path into the one-element array the
 // forward converter collapses; this is lossy for multi-element sources but

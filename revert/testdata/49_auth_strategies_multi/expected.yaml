@@ -11,8 +11,9 @@ models:
         config:
           type: openai
     access:
-      identity_providers:
+      auth_strategies:
         - openid-connect-1
+        - key-auth-1
     config:
       route:
         paths:
@@ -32,8 +33,13 @@ model_providers:
         headers:
           - name: Authorization
             value: '{vault://ai/openai-token}'
-identity_providers:
+auth_strategies:
   - type: openid-connect
     name: openid-connect-1
     config:
       issuer: https://dev-123456.okta.com/oauth2/default
+  - type: key-auth
+    name: key-auth-1
+    config:
+      key_names:
+        - x-api-key

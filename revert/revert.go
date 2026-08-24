@@ -107,31 +107,31 @@ type Reverter struct {
 	policies    []aigw.Policy
 	policyNames map[string]bool
 
-	// identity providers recovered from key-auth/openid-connect plugins, deduped
+	// auth strategies recovered from key-auth/openid-connect plugins, deduped
 	// by (type, config-without-anonymous) fingerprint.
-	identityProviders      []aigw.IdentityProvider
-	identityProviderByFP   map[string]string // fingerprint -> identity provider name
-	identityProviderNames  map[string]bool
-	identityProviderCounts map[string]int // identity provider type -> running index
+	authStrategies     []aigw.AuthStrategy
+	authStrategyByFP   map[string]string // fingerprint -> auth strategy name
+	authStrategyNames  map[string]bool
+	authStrategyCounts map[string]int // auth strategy type -> running index
 
 	warnings []string
 }
 
 func newReverter(doc *kong.Document, opts Options) *Reverter {
 	return &Reverter{
-		opts:                   opts,
-		src:                    doc,
-		out:                    &aigw.Document{},
-		aiModelByAlias:         map[string]string{},
-		aiModelByName:          map[string]kong.AIModel{},
-		aiModelUsed:            map[string]bool{},
-		providerByFP:           map[string]string{},
-		providerNames:          map[string]bool{},
-		providerCounts:         map[string]int{},
-		policyNames:            map[string]bool{},
-		identityProviderByFP:   map[string]string{},
-		identityProviderNames:  map[string]bool{},
-		identityProviderCounts: map[string]int{},
+		opts:               opts,
+		src:                doc,
+		out:                &aigw.Document{},
+		aiModelByAlias:     map[string]string{},
+		aiModelByName:      map[string]kong.AIModel{},
+		aiModelUsed:        map[string]bool{},
+		providerByFP:       map[string]string{},
+		providerNames:      map[string]bool{},
+		providerCounts:     map[string]int{},
+		policyNames:        map[string]bool{},
+		authStrategyByFP:   map[string]string{},
+		authStrategyNames:  map[string]bool{},
+		authStrategyCounts: map[string]int{},
 	}
 }
 
@@ -165,7 +165,7 @@ func (r *Reverter) run() error {
 	}
 	r.out.ModelProviders = r.providers
 	r.out.Policies = r.policies
-	r.out.IdentityProviders = r.identityProviders
+	r.out.AuthStrategies = r.authStrategies
 	return nil
 }
 

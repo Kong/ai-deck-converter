@@ -47,7 +47,7 @@ func (c *Converter) convertMCPServers() error {
 		guard = sourceScopedPlugins(guard, "mcp_server", m.Name)
 		route.Plugins = append(route.Plugins, guard...)
 
-		// Identity-provider / OAuth 2.0 Protected Resource Metadata access.
+		// Auth-strategy / OAuth 2.0 Protected Resource Metadata access.
 		// Emits an ai-mcp-oauth2 plugin (openid-connect + metadata) or a plain
 		// auth plugin (no metadata), and appends the metadata endpoint path to
 		// the route so one route serves both MCP traffic and the .well-known

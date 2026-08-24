@@ -277,7 +277,7 @@ func (r *Reverter) modelGroupFor(
 			Name:     name,
 			Formats:  []aigw.Format{{Type: llmFormat}},
 			Policies: refs,
-			Access:   aigw.ModelAccess{ACLs: acls, IdentityProviders: idpRefs},
+			Access:   aigw.ModelAccess{ACLs: acls, AuthStrategies: idpRefs},
 		},
 	}
 	if len(bases) > 1 || (len(bases) == 1 && !isDefaultBasePath(bases[0])) {

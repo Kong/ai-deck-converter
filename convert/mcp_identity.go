@@ -12,7 +12,7 @@ import (
 	"github.com/Kong/ai-deck-converter/internal/kong"
 )
 
-// mcpListenerTypes are the MCP server modes that support identity-provider /
+// mcpListenerTypes are the MCP server modes that support auth-strategy /
 // Protected Resource Metadata based access. Other modes (conversion-only,
 // upstream-server) do not front a client-facing listener the ai-mcp-oauth2
 // plugin can protect.
@@ -23,7 +23,7 @@ var mcpListenerTypes = map[string]bool{
 }
 
 // mcpIdentityPlugins builds the authentication plugin(s) for an MCP server's
-// access.identity_providers / access.metadata, appending the metadata endpoint
+// access.auth_strategies / access.metadata, appending the metadata endpoint
 // path to the route when an ai-mcp-oauth2 plugin is produced. It returns nil
 // when the server declares no identity/metadata access.
 //
@@ -33,7 +33,7 @@ var mcpListenerTypes = map[string]bool{
 // route enforces on its own.
 func (c *Converter) mcpIdentityPlugins(m *aigw.MCPServer, route *kong.Route) ([]kong.Plugin, error) {
 	meta := m.Access.Metadata
-	if len(m.Access.IdentityProviders) == 0 && meta == nil {
+	if len(m.Access.AuthStrategies) == 0 && meta == nil {
 		return nil, nil
 	}
 
@@ -42,14 +42,14 @@ func (c *Converter) mcpIdentityPlugins(m *aigw.MCPServer, route *kong.Route) ([]
 	// authentication behavior.
 	if !mcpListenerTypes[m.Type] {
 		message := fmt.Sprintf(
-			"MCP server %q has type %q; access.identity_providers/metadata are only "+
+			"MCP server %q has type %q; access.auth_strategies/metadata are only "+
 				"supported for listener, conversion-listener, and passthrough-listener",
 			m.Name, m.Type,
 		)
 		diagnostics := make([]ConversionDiagnostic, 0, 2) //nolint:mnd
-		if len(m.Access.IdentityProviders) > 0 {
+		if len(m.Access.AuthStrategies) > 0 {
 			diagnostics = append(diagnostics, ConversionDiagnostic{
-				Field:    "access.identity_providers",
+				Field:    "access.auth_strategies",
 				Messages: []string{message},
 			})
 		}
@@ -62,7 +62,7 @@ func (c *Converter) mcpIdentityPlugins(m *aigw.MCPServer, route *kong.Route) ([]
 		return nil, &ConversionError{Diagnostics: diagnostics}
 	}
 
-	idp, err := c.mcpAccessIdentityProvider(m)
+	idp, err := c.mcpAccessAuthStrategy(m)
 	if err != nil {
 		return nil, err
 	}
@@ -71,7 +71,7 @@ func (c *Converter) mcpIdentityPlugins(m *aigw.MCPServer, route *kong.Route) ([]
 	// combination unconditionally (independent of -strict).
 	if meta != nil && idp != nil && idp.Type == "key-auth" {
 		return nil, c.failAt("access.metadata",
-			"MCP server %q references key-auth identity provider %q with access.metadata; "+
+			"MCP server %q references key-auth auth strategy %q with access.metadata; "+
 				"OAuth Protected Resource Metadata is not supported for key-auth",
 			m.Name, idp.Name)
 	}
@@ -89,7 +89,7 @@ func (c *Converter) mcpIdentityPlugins(m *aigw.MCPServer, route *kong.Route) ([]
 	}
 
 	// No metadata: emit a plain passthrough auth plugin (key-auth or
-	// openid-connect) named after the identity provider type.
+	// openid-connect) named after the auth strategy type.
 	if idp == nil {
 		return nil, nil
 	}
@@ -103,16 +103,16 @@ func (c *Converter) mcpIdentityPlugins(m *aigw.MCPServer, route *kong.Route) ([]
 
 func mcpOAuth2Source(
 	m *aigw.MCPServer,
-	idp *aigw.IdentityProvider,
+	idp *aigw.AuthStrategy,
 	meta *aigw.MCPProtectedResourceMetadata,
 ) *kong.Source {
 	authorizationServersSource := "access.metadata.authorization_servers"
 	if len(meta.AuthorizationServers) == 0 && idp != nil && firstConfigString(idp.Config, "issuer") != "" {
-		authorizationServersSource = "access.identity_providers"
+		authorizationServersSource = "access.auth_strategies"
 	}
 	scopesSource := "access.metadata.scopes_supported"
 	if len(meta.ScopesSupported) == 0 && idp != nil && len(configStrings(idp.Config, "scopes")) > 0 {
-		scopesSource = "access.identity_providers"
+		scopesSource = "access.auth_strategies"
 	}
 	return source("mcp_server", m.Name, "access.metadata",
 		kong.FieldMapping{GeneratedPrefix: "config.resource", SourcePrefix: "access.metadata.resource"},
@@ -123,19 +123,19 @@ func mcpOAuth2Source(
 			GeneratedPrefix: "config.metadata_discovery_endpoint",
 			SourcePrefix:    "access.metadata.discovery_endpoint",
 		},
-		kong.FieldMapping{GeneratedPrefix: "config.client_id", SourcePrefix: "access.identity_providers"},
-		kong.FieldMapping{GeneratedPrefix: "config.client_secret", SourcePrefix: "access.identity_providers"},
-		kong.FieldMapping{GeneratedPrefix: "config.ssl_verify", SourcePrefix: "access.identity_providers"},
+		kong.FieldMapping{GeneratedPrefix: "config.client_id", SourcePrefix: "access.auth_strategies"},
+		kong.FieldMapping{GeneratedPrefix: "config.client_secret", SourcePrefix: "access.auth_strategies"},
+		kong.FieldMapping{GeneratedPrefix: "config.ssl_verify", SourcePrefix: "access.auth_strategies"},
 	)
 }
 
-// mcpAccessIdentityProvider resolves the single (schema max 1) identity provider
+// mcpAccessAuthStrategy resolves the single (schema max 1) auth strategy
 // referenced by an MCP server's access block, warning on unknown references.
-func (c *Converter) mcpAccessIdentityProvider(m *aigw.MCPServer) (*aigw.IdentityProvider, error) {
-	for _, ref := range m.Access.IdentityProviders {
-		idp := c.identityProviders[ref]
+func (c *Converter) mcpAccessAuthStrategy(m *aigw.MCPServer) (*aigw.AuthStrategy, error) {
+	for _, ref := range m.Access.AuthStrategies {
+		idp := c.authStrategies[ref]
 		if idp == nil {
-			if err := c.warn("MCP server %q references unknown identity provider %q", m.Name, ref); err != nil {
+			if err := c.warn("MCP server %q references unknown auth strategy %q", m.Name, ref); err != nil {
 				return nil, err
 			}
 			continue
@@ -146,12 +146,12 @@ func (c *Converter) mcpAccessIdentityProvider(m *aigw.MCPServer) (*aigw.Identity
 }
 
 // mcpOAuth2Plugin builds an ai-mcp-oauth2 plugin from an MCP server's Protected
-// Resource Metadata and (optional) openid-connect identity provider. Required
+// Resource Metadata and (optional) openid-connect auth strategy. Required
 // plugin fields are resource and authorization_servers; the metadata is the
 // primary source, with the OIDC issuer/scopes filling in when the metadata
 // omits them.
 func (c *Converter) mcpOAuth2Plugin(
-	m *aigw.MCPServer, idp *aigw.IdentityProvider, meta *aigw.MCPProtectedResourceMetadata,
+	m *aigw.MCPServer, idp *aigw.AuthStrategy, meta *aigw.MCPProtectedResourceMetadata,
 ) (kong.Plugin, error) {
 	cfg := map[string]any{}
 
@@ -192,8 +192,8 @@ func (c *Converter) mcpOAuth2Plugin(
 		applyOIDCFieldsToOAuth2(cfg, idp.Config)
 		proxyConfig, err := oidcProxyConfig(idp.Config)
 		if err != nil {
-			return kong.Plugin{}, c.failAt("access.identity_providers",
-				"MCP server %q references an identity provider with unsupported proxy configuration: %s",
+			return kong.Plugin{}, c.failAt("access.auth_strategies",
+				"MCP server %q references an auth strategy with unsupported proxy configuration: %s",
 				m.Name, err)
 		}
 		if proxyConfig != nil {
@@ -345,13 +345,13 @@ func configString(config map[string]any, key string) string {
 	return v
 }
 
-// oidcRequiresAudience reports whether an openid-connect identity provider
+// oidcRequiresAudience reports whether an openid-connect auth strategy
 // enforces a token audience (audience_required is set and non-empty).
-func oidcRequiresAudience(idp *aigw.IdentityProvider) bool {
+func oidcRequiresAudience(idp *aigw.AuthStrategy) bool {
 	return idp != nil && len(configStrings(idp.Config, "audience_required")) > 0
 }
 
-// applyOIDCFieldsToOAuth2 lowers an openid-connect identity provider's config
+// applyOIDCFieldsToOAuth2 lowers an openid-connect auth strategy's config
 // fields onto an ai-mcp-oauth2 plugin config, following aimap's shared field
 // table so the forward and reverse mappings cannot drift. Fields absent from
 // the provider config (and empty scalars for the array-first kinds) are left

@@ -1,9 +1,11 @@
 package aigw
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 const sampleDoc = `
@@ -80,4 +82,158 @@ func TestParseEnvelope(t *testing.T) {
 	require.Len(t, doc.Consumers[0].Credentials, 1, "credential not parsed")
 	require.Len(t, doc.Vaults, 1, "vault not parsed")
 	require.Equal(t, "env", doc.Vaults[0].Type, "vault type")
+}
+
+// TestParseAuthStrategies covers the auth_strategies key and its deprecated
+// identity_providers alias, which Parse folds into the same slice.
+func TestParseAuthStrategies(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		src   string
+		names []string
+	}{
+		{
+			name: "current key",
+			src: `
+auth_strategies:
+  - name: okta-oidc
+    type: openid-connect
+`,
+			names: []string{"okta-oidc"},
+		},
+		{
+			name: "deprecated key",
+			src: `
+identity_providers:
+  - name: okta-oidc
+    type: openid-connect
+`,
+			names: []string{"okta-oidc"},
+		},
+		{
+			name: "both keys merge, current first",
+			src: `
+identity_providers:
+  - name: legacy-key-auth
+    type: key-auth
+auth_strategies:
+  - name: okta-oidc
+    type: openid-connect
+`,
+			names: []string{"okta-oidc", "legacy-key-auth"},
+		},
+		{
+			name:  "neither key",
+			src:   "models: []\n",
+			names: nil,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			doc, err := Parse([]byte(tc.src))
+			require.NoError(t, err)
+			var got []string
+			for _, s := range doc.AuthStrategies {
+				got = append(got, s.Name)
+			}
+			require.Equal(t, tc.names, got)
+		})
+	}
+}
+
+// TestMarshalNeverEmitsDeprecatedAuthStrategyKey guards the reverse direction:
+// auth strategies always round-trip out under the current key.
+func TestMarshalNeverEmitsDeprecatedAuthStrategyKey(t *testing.T) {
+	doc, err := Parse([]byte("identity_providers:\n  - name: okta-oidc\n    type: openid-connect\n"))
+	require.NoError(t, err)
+	out, err := yaml.Marshal(doc)
+	require.NoError(t, err)
+	require.Contains(t, string(out), "auth_strategies:")
+	require.NotContains(t, string(out), "identity_providers:")
+}
+
+// TestParseAccessAuthStrategyRefs covers the access-block auth_strategies list
+// and its deprecated identity_providers alias, on each of the three entity
+// kinds that carry one.
+func TestParseAccessAuthStrategyRefs(t *testing.T) {
+	refs := func(doc *Document) [3][]string {
+		return [3][]string{
+			doc.Models[0].Access.AuthStrategies,
+			doc.Agents[0].Access.AuthStrategies,
+			doc.MCPServers[0].Access.AuthStrategies,
+		}
+	}
+	for _, tc := range []struct {
+		name string
+		key  string
+		want [3][]string
+	}{
+		{
+			name: "current key",
+			key:  "auth_strategies: [okta-oidc]",
+			want: [3][]string{{"okta-oidc"}, {"okta-oidc"}, {"okta-oidc"}},
+		},
+		{
+			name: "deprecated key",
+			key:  "identity_providers: [okta-oidc]",
+			want: [3][]string{{"okta-oidc"}, {"okta-oidc"}, {"okta-oidc"}},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			src := `
+models:
+  - name: m
+    access:
+      ` + tc.key + `
+agents:
+  - name: a
+    access:
+      ` + tc.key + `
+mcp_servers:
+  - name: s
+    access:
+      ` + tc.key + `
+`
+			doc, err := Parse([]byte(src))
+			require.NoError(t, err)
+			require.Equal(t, tc.want, refs(doc))
+		})
+	}
+}
+
+// TestParseAccessAuthStrategyRefsMergeBothKeys pins the merge order when an
+// access block transitionally carries both spellings.
+func TestParseAccessAuthStrategyRefsMergeBothKeys(t *testing.T) {
+	doc, err := Parse([]byte(`
+models:
+  - name: m
+    access:
+      auth_strategies: [okta-oidc]
+      identity_providers: [legacy-key-auth]
+`))
+	require.NoError(t, err)
+	require.Equal(t, []string{"okta-oidc", "legacy-key-auth"}, doc.Models[0].Access.AuthStrategies)
+}
+
+// TestMarshalNeverEmitsDeprecatedAccessKey guards the reverse direction: access
+// references always round-trip out under the current key.
+func TestMarshalNeverEmitsDeprecatedAccessKey(t *testing.T) {
+	doc, err := Parse([]byte(`
+models:
+  - name: m
+    access:
+      identity_providers: [okta-oidc]
+agents:
+  - name: a
+    access:
+      identity_providers: [okta-oidc]
+mcp_servers:
+  - name: s
+    access:
+      identity_providers: [okta-oidc]
+`))
+	require.NoError(t, err)
+	out, err := yaml.Marshal(doc)
+	require.NoError(t, err)
+	require.Equal(t, 3, strings.Count(string(out), "auth_strategies:"))
+	require.NotContains(t, string(out), "identity_providers:")
 }

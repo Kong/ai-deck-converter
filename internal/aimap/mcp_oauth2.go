@@ -1,6 +1,6 @@
 package aimap
 
-// OAuth2FieldKind describes how an openid-connect identity-provider config
+// OAuth2FieldKind describes how an openid-connect auth-strategy config
 // value is reshaped when it is lowered onto an ai-mcp-oauth2 plugin config
 // value (and lifted back). The kind fully determines both the forward and the
 // reverse transform, so the two directions cannot drift.
@@ -19,7 +19,7 @@ const (
 	OAuth2FirstOfPaths
 )
 
-// OAuth2FieldMap maps one openid-connect identity-provider config key onto one
+// OAuth2FieldMap maps one openid-connect auth-strategy config key onto one
 // ai-mcp-oauth2 plugin config key. OIDCKey and OAuth2Key are equal except for
 // the deliberately renamed fields (e.g. leeway -> jwt_claims_leeway).
 type OAuth2FieldMap struct {
@@ -29,7 +29,7 @@ type OAuth2FieldMap struct {
 }
 
 // OIDCToMCPOAuth2Fields is the shared source of truth for lowering an
-// openid-connect identity provider's config onto an ai-mcp-oauth2 plugin (and
+// openid-connect auth strategy's config onto an ai-mcp-oauth2 plugin (and
 // lifting it back). It is the "clean subset" of the openid-connect ->
 // ai-mcp-oauth2 field overlap: fields with an unambiguous, round-trip-safe
 // mapping.
@@ -38,7 +38,7 @@ type OAuth2FieldMap struct {
 // client_secret are FirstOfArray; ssl_verify is Passthrough). The
 // issuer -> authorization_servers and scopes -> scopes_supported fallbacks are
 // NOT in this table: they are attributed to access.metadata rather than to the
-// identity provider, so convert/revert keep handling them separately.
+// auth strategy, so convert/revert keep handling them separately.
 //
 // Deliberately excluded as not cleanly convertible: token_exchange (false
 // friend — OIDC legacy grant vs oauth2 RFC-8693 upstream-exchange object),

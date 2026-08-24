@@ -38,7 +38,7 @@ func (r *Reverter) revertConsumers() error {
 			name = c.CustomID
 		}
 		if isSynthesizedAnonymousConsumer(c) {
-			// Converter-generated identity-provider infrastructure, not
+			// Converter-generated auth-strategy infrastructure, not
 			// user-declared state; recreated automatically on the next convert.
 			continue
 		}

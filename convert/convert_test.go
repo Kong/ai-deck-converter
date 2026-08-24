@@ -381,7 +381,7 @@ model_providers:
 
 // A model's policies list must not reference an authentication policy
 // (key-auth/openid-connect) directly: those require anonymous fallback and a
-// companion anonymous consumer, which only the identity_providers mechanism
+// companion anonymous consumer, which only the auth_strategies mechanism
 // provides. Referencing one via policies is rejected rather than silently
 // emitting an auth plugin with no anonymous fallback.
 func TestConvertRejectsAuthPolicyOnModel(t *testing.T) {
@@ -409,10 +409,10 @@ policies:
 `)
 	_, _, err := Convert(src, Options{})
 	require.Error(t, err, "model policies referencing key-auth/openid-connect must be rejected")
-	require.Contains(t, err.Error(), "identity_providers")
+	require.Contains(t, err.Error(), "auth_strategies")
 }
 
-func TestConvertScopesIdentityProvidersWithoutLeakingAcrossSharedRoutes(t *testing.T) {
+func TestConvertScopesAuthStrategiesWithoutLeakingAcrossSharedRoutes(t *testing.T) {
 	src := []byte(`
 models:
   - type: model
@@ -435,14 +435,14 @@ models:
         provider: p1
         config: {type: openai}
     access:
-      identity_providers: [oidc]
+      auth_strategies: [oidc]
     config:
       route: {paths: [/oidc-repro/model-b]}
       model: {alias: protected}
 model_providers:
   - name: p1
     type: openai
-identity_providers:
+auth_strategies:
   - name: oidc
     type: openid-connect
     config: {issuer: https://id.example.test}
@@ -480,7 +480,7 @@ identity_providers:
 	require.NotEqual(t, publicRoute, oidcRoute, "the public model must not share the OIDC route")
 }
 
-func TestConvertSharesIdentityProviderForUniformlyGuardedSharedRoute(t *testing.T) {
+func TestConvertSharesAuthStrategyForUniformlyGuardedSharedRoute(t *testing.T) {
 	src := []byte(`
 models:
   - type: model
@@ -491,7 +491,7 @@ models:
       - name: gpt-a
         provider: p1
         config: {type: openai}
-    access: {identity_providers: [oidc]}
+    access: {auth_strategies: [oidc]}
     config: {route: {paths: [/ai]}, model: {alias: a}}
   - type: model
     name: model-b
@@ -501,12 +501,12 @@ models:
       - name: gpt-b
         provider: p1
         config: {type: openai}
-    access: {identity_providers: [oidc]}
+    access: {auth_strategies: [oidc]}
     config: {route: {paths: [/ai]}, model: {alias: b}}
 model_providers:
   - name: p1
     type: openai
-identity_providers:
+auth_strategies:
   - name: oidc
     type: openid-connect
 `)
@@ -1128,9 +1128,9 @@ agents:
 	require.Nil(t, byName["on-agent"], "enabled agent should not emit the flag")
 }
 
-func TestConvertAgentIdentityProvidersBecomeRoutePlugins(t *testing.T) {
+func TestConvertAgentAuthStrategiesBecomeRoutePlugins(t *testing.T) {
 	src := []byte(`
-identity_providers:
+auth_strategies:
   - name: agent-key-auth
     type: key-auth
     config:
@@ -1140,7 +1140,7 @@ agents:
     name: protected-agent
     access:
       acls: {allow: [allowed-group]}
-      identity_providers: [agent-key-auth]
+      auth_strategies: [agent-key-auth]
     config:
       url: https://example.test
       route: {paths: [/protected-agent]}

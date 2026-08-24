@@ -17,14 +17,14 @@ mcp_servers:
         scheme: https
         host: secure.internal
     access:
-      identity_providers:
+      auth_strategies:
         - openid-connect-1
       metadata:
         endpoint: /mcp/secure/.well-known/oauth-protected-resource
         authorization_servers:
           - https://dev-123456.okta.com/oauth2/default
         resource: https://api.example.com/mcp/secure
-identity_providers:
+auth_strategies:
   - type: openid-connect
     name: openid-connect-1
     config:

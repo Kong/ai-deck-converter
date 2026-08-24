@@ -20,11 +20,31 @@ type Model struct {
 	Labels       Labels        `yaml:"labels,omitempty"`
 }
 
-// ModelAccess is the access-control configuration for a Model: identity
-// providers gating the model's route, plus consumer/group ACLs.
+// ModelAccess is the access-control configuration for a Model: auth strategies
+// gating the model's route, plus consumer/group ACLs.
 type ModelAccess struct {
-	IdentityProviders []string `yaml:"identity_providers,omitempty"`
-	ACLs              ACLs     `yaml:"acls,omitempty"`
+	AuthStrategies []string `yaml:"auth_strategies,omitempty"`
+	ACLs           ACLs     `yaml:"acls,omitempty"`
+}
+
+// modelAccessFields mirrors ModelAccess without its UnmarshalYAML, so the
+// decoder can populate the current keys without recursing.
+type modelAccessFields ModelAccess
+
+// UnmarshalYAML decodes a ModelAccess, folding the deprecated
+// identity_providers key into AuthStrategies.
+func (a *ModelAccess) UnmarshalYAML(node *yaml.Node) error {
+	var fields modelAccessFields
+	if err := node.Decode(&fields); err != nil {
+		return err
+	}
+	*a = ModelAccess(fields)
+	refs, err := appendDeprecatedAuthStrategyRefs(node, a.AuthStrategies)
+	if err != nil {
+		return err
+	}
+	a.AuthStrategies = refs
+	return nil
 }
 
 // Format is a request/response format supported by a model.
