@@ -1834,11 +1834,10 @@ mcp_servers:
 	require.Empty(t, pluginTagsByService["aggregate-2"])
 }
 
-// TestConvertMCPListenerSourcesFallBackToServerLabel asserts that a listener
-// declaring its bucket selector under the deprecated server.label (as reverted
-// documents and older hand-written configs still do) keeps wiring sources — the
-// converter falls back to server.label when server.tag is absent.
-func TestConvertMCPListenerSourcesFallBackToServerLabel(t *testing.T) {
+// TestConvertMCPListenerSourcesIgnoreServerLabel asserts that a listener
+// declaring its bucket selector under the deprecated server.label no longer
+// wires sources — only server.tag is honored.
+func TestConvertMCPListenerSourcesIgnoreServerLabel(t *testing.T) {
 	src := []byte(`
 mcp_servers:
   - type: conversion-only
@@ -1904,7 +1903,7 @@ mcp_servers:
 		}
 	}
 
-	require.Equal(t, []string{"mcp-listener:aggregate-id"}, teamATags)
+	require.Nil(t, teamATags)
 }
 
 func TestConvertScopedPoliciesDoNotReusePolicyID(t *testing.T) {

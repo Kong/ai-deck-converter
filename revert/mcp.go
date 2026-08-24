@@ -2,10 +2,71 @@ package revert
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/Kong/ai-deck-converter/internal/aigw"
 	"github.com/Kong/ai-deck-converter/internal/kong"
 )
+
+// indexMCPListenerSources reconstructs the listener/source relationship the
+// forward converter encodes purely as tags (see convert.wireListenerSources): a
+// listener's ai-mcp-proxy carries a config.server.tag bucket selector, and each
+// source's ai-mcp-proxy plugin carries that same value in its tags. It records
+// every bucket tag (so revertMCPServer can strip it from source labels, since
+// it is a data-plane detail rather than a user label) and, for each listener,
+// the source MCP servers whose plugin tags join its bucket.
+func (r *Reverter) indexMCPListenerSources() {
+	listenerByTag := map[string]string{}
+	type mcpEntry struct {
+		service string
+		tags    []string
+	}
+	var entries []mcpEntry
+	for i := range r.src.Services {
+		svc := &r.src.Services[i]
+		for j := range svc.Routes {
+			mcp := findPlugin(r.routePlugins(&svc.Routes[j]), "ai-mcp-proxy")
+			if mcp == nil {
+				continue
+			}
+			entries = append(entries, mcpEntry{service: svc.Name, tags: mcp.Tags})
+			if getStr(mcp.Config, "mode") != "listener" {
+				continue
+			}
+			if tag := getStr(getMap(mcp.Config, "server"), "tag"); tag != "" {
+				listenerByTag[tag] = svc.Name
+				r.mcpBucketTags[tag] = true
+			}
+		}
+	}
+	for _, e := range entries {
+		for _, tag := range e.tags {
+			listener, ok := listenerByTag[tag]
+			if !ok || listener == e.service {
+				continue
+			}
+			r.mcpSources[listener] = append(r.mcpSources[listener], e.service)
+		}
+	}
+	for listener := range r.mcpSources {
+		sort.Strings(r.mcpSources[listener])
+	}
+}
+
+// stripBucketTags removes listener bucket selectors from a tag list so they are
+// not misread as user labels; see indexMCPListenerSources.
+func (r *Reverter) stripBucketTags(tags []string) []string {
+	if len(r.mcpBucketTags) == 0 {
+		return tags
+	}
+	out := make([]string, 0, len(tags))
+	for _, t := range tags {
+		if !r.mcpBucketTags[t] {
+			out = append(out, t)
+		}
+	}
+	return out
+}
 
 // revertMCPServer lifts a service route carrying ai-mcp-proxy back into an AI
 // Gateway MCP Server: config.mode becomes the type, the plugin's embedded tools
@@ -16,9 +77,9 @@ func (r *Reverter) revertMCPServer(svc *kong.Service, rt *kong.Route, plugins, s
 	mcpPlugin := findPlugin(plugins, "ai-mcp-proxy")
 	cfg := mcpPlugin.Config
 
-	labels := r.tagsToLabels(mcpPlugin.Tags)
+	labels := r.tagsToLabels(r.stripBucketTags(mcpPlugin.Tags))
 	if len(labels) == 0 {
-		labels = r.tagsToLabels(svc.Tags)
+		labels = r.tagsToLabels(r.stripBucketTags(svc.Tags))
 	}
 
 	m := aigw.MCPServer{
@@ -50,6 +111,7 @@ func (r *Reverter) revertMCPServer(svc *kong.Service, rt *kong.Route, plugins, s
 	m.Config.MaxRequestBodySize = getInt(cfg, "max_request_body_size")
 	m.Config.Logging = loggingFromBlockWithDefaults(getMap(cfg, "logging"), true, false)
 	m.Config.Server = mcpServerConfigForAIGateway(getMap(cfg, "server"))
+	m.Config.Sources = r.mcpSources[svc.Name]
 	m.Config.Proxy = proxyFromConfig(getMap(cfg, "proxy_config"))
 	upstream, err := r.upstreamFromConfig(getMap(cfg, "auth"), fmt.Sprintf("MCP server %q", svc.Name))
 	if err != nil {
@@ -97,8 +159,10 @@ func (r *Reverter) revertMCPServer(svc *kong.Service, rt *kong.Route, plugins, s
 	return nil
 }
 
-// mcpServerConfigForAIGateway maps the ai-mcp-proxy plugin's server.tag to
-// the AI Gateway API's server.label without mutating the parsed decK config.
+// mcpServerConfigForAIGateway returns a copy of the ai-mcp-proxy plugin's
+// server block for the AI Gateway MCP server config, without mutating the
+// parsed decK config. server.tag (the listener bucket selector) is carried
+// through as-is, matching the forward direction.
 func mcpServerConfigForAIGateway(server map[string]any) map[string]any {
 	if server == nil {
 		return nil
@@ -106,10 +170,6 @@ func mcpServerConfigForAIGateway(server map[string]any) map[string]any {
 	config := make(map[string]any, len(server))
 	for key, value := range server {
 		config[key] = value
-	}
-	if tag, ok := config["tag"]; ok {
-		delete(config, "tag")
-		config["label"] = tag
 	}
 	return config
 }

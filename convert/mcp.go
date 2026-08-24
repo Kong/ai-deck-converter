@@ -120,7 +120,7 @@ func (c *Converter) wireListenerSources() {
 		if m.Type != "listener" || len(m.Config.Sources) == 0 {
 			continue
 		}
-		tag := listenerTag(m.Config.Server)
+		tag, _ := m.Config.Server["tag"].(string)
 		if tag == "" {
 			continue
 		}
@@ -132,19 +132,6 @@ func (c *Converter) wireListenerSources() {
 			plugin.Tags = addTag(plugin.Tags, tag)
 		}
 	}
-}
-
-// listenerTag returns the listener bucket selector from a server config. It
-// prefers server.tag (what the CP sets and what convert now carries through),
-// falling back to server.label so reverted documents and older hand-written
-// configs — which still use server.label — keep wiring listener/source
-// relationships and round-tripping correctly.
-func listenerTag(server map[string]any) string {
-	if tag, _ := server["tag"].(string); tag != "" {
-		return tag
-	}
-	label, _ := server["label"].(string)
-	return label
 }
 
 // addTag appends tag to tags if absent, keeping the result sorted so conversion

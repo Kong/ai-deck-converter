@@ -1,0 +1,20 @@
+mcp_servers:
+  - type: conversion-only
+    name: team-a
+    config:
+      route: {name: team-a-route, paths: [/mcp/team-a]}
+    tools:
+      - {name: team-a-report, description: Get a report, method: GET, path: /report}
+  - type: conversion-only
+    name: team-b
+    config:
+      route: {name: team-b-route, paths: [/mcp/team-b]}
+    tools:
+      - {name: team-b-report, description: Get a report, method: GET, path: /report}
+  - type: listener
+    name: aggregate
+    config:
+      route: {name: aggregate-route, paths: [/mcp/aggregate]}
+      server:
+        tag: mcp-listener:aggregate-id
+      sources: [team-a, team-b]
