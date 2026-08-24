@@ -1,0 +1,30 @@
+models:
+
+  # output plugins are repeated once per alias value
+  - name: openai-with-multiple-alias-values
+    type: model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    config:
+      route:
+        paths:
+          - /openai-with-multiple-alias-values
+        model:
+          body:
+            body_param: some_model
+          # The model has multiple alias values.
+          values:
+            - "@kong/openai"
+            - "@kong/the-openai-model"
+            - "@kong/openai-model"
+            - "@kong/chat-gpt"
+    targets:
+      - name: gpt-5
+        provider: openai-provider
+        config: {type: openai}
+
+model_providers:
+  - name: openai-provider
+    type: openai
+  - name: gemini-provider
+    type: gemini
