@@ -5,7 +5,7 @@ services:
     routes:
       - name: openai-chat
         paths:
-          - ~/openai/(?<other_group>[^:/]+)/chat/completions
+          - ~/openai/(?P<other_group>[^:/]+)/chat/completions
         methods:
           - POST
         strip_path: false
