@@ -107,6 +107,13 @@ type Reverter struct {
 	policies    []aigw.Policy
 	policyNames map[string]bool
 
+	// listener/source relationship recovered from ai-mcp-proxy tags:
+	// mcpBucketTags is the set of listener server.tag selectors (a data-plane
+	// detail, stripped from source labels), and mcpSources maps a listener MCP
+	// server name to the source MCP server names it exposes.
+	mcpBucketTags map[string]bool
+	mcpSources    map[string][]string
+
 	// auth strategies recovered from key-auth/openid-connect plugins, deduped
 	// by (type, config-without-anonymous) fingerprint.
 	authStrategies     []aigw.AuthStrategy
@@ -129,6 +136,8 @@ func newReverter(doc *kong.Document, opts Options) *Reverter {
 		providerNames:      map[string]bool{},
 		providerCounts:     map[string]int{},
 		policyNames:        map[string]bool{},
+		mcpBucketTags:      map[string]bool{},
+		mcpSources:         map[string][]string{},
 		authStrategyByFP:   map[string]string{},
 		authStrategyNames:  map[string]bool{},
 		authStrategyCounts: map[string]int{},
@@ -149,6 +158,7 @@ func (r *Reverter) warn(format string, args ...any) error {
 
 func (r *Reverter) run() error {
 	r.buildIndexes()
+	r.indexMCPListenerSources()
 	r.revertGlobalPolicies()
 	r.revertVaults()
 	r.revertCACertificates()

@@ -230,7 +230,7 @@ services:
         paths: [/mcp/team-a]
         plugins:
           - name: ai-mcp-proxy
-            tags: [aigw610:tools]
+            tags: [team:a]
             config:
               mode: conversion-only
               tools:
@@ -276,12 +276,73 @@ services:
 		byName[server.Name] = server
 	}
 
-	require.Equal(t, aigw.Labels{"aigw610": "tools"}, byName["team-a"].Labels, "plugin tags should win")
+	require.Equal(t, aigw.Labels{"team": "a"}, byName["team-a"].Labels, "plugin tags should win")
 	require.Equal(t, aigw.Labels{"fallback": "service"},
 		byName["fallback"].Labels, "service tags should remain the fallback")
-	require.Equal(t, "aigw610:tools", byName["aggregate"].Config.Server["label"])
-	_, hasDeprecatedTag := byName["aggregate"].Config.Server["tag"]
-	require.False(t, hasDeprecatedTag, "reverted server config must not contain the deprecated tag field")
+	require.Equal(t, "aigw610:tools", byName["aggregate"].Config.Server["tag"],
+		"listener server.tag is carried through as-is")
+}
+
+// TestRevertMCPListenerReconstructsSources asserts that the listener/source
+// relationship the forward converter encodes as tags is lifted back into the
+// listener's config.sources: the bucket tag on each source plugin selects it
+// into the listener's sources and is stripped from the source's labels.
+func TestRevertMCPListenerReconstructsSources(t *testing.T) {
+	in := []byte(`
+_format_version: "3.0"
+services:
+  - name: team-a
+    host: localhost
+    routes:
+      - name: team-a-route
+        paths: [/mcp/team-a]
+        plugins:
+          - name: ai-mcp-proxy
+            tags: [mcp-listener:aggregate-id, env:prod]
+            config:
+              mode: conversion-only
+              tools:
+                - {name: team-a-report, description: Get a report, method: GET, path: /report}
+  - name: team-b
+    host: localhost
+    routes:
+      - name: team-b-route
+        paths: [/mcp/team-b]
+        plugins:
+          - name: ai-mcp-proxy
+            tags: [mcp-listener:aggregate-id]
+            config:
+              mode: conversion-only
+              tools:
+                - {name: team-b-report, description: Get a report, method: GET, path: /report}
+  - name: aggregate
+    host: localhost
+    routes:
+      - name: aggregate-route
+        paths: [/mcp/aggregate]
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              mode: listener
+              server:
+                tag: mcp-listener:aggregate-id
+`)
+
+	doc, warnings, err := revertYAML(t, in, Options{Strict: true})
+	require.NoErrorf(t, err, "strict revert (warnings: %v)", warnings)
+	require.Empty(t, warnings, "want no warnings")
+
+	byName := map[string]aigw.MCPServer{}
+	for _, server := range doc.MCPServers {
+		byName[server.Name] = server
+	}
+
+	require.Equal(t, []string{"team-a", "team-b"}, byName["aggregate"].Config.Sources,
+		"listener sources reconstructed from bucket tags, sorted")
+	require.Equal(t, aigw.Labels{"env": "prod"}, byName["team-a"].Labels,
+		"bucket tag stripped from source labels, genuine labels kept")
+	require.Empty(t, byName["team-b"].Labels, "bucket-only tags leave no labels")
+	require.Empty(t, byName["team-a"].Config.Sources, "sources are populated only on listeners")
 }
 
 func TestMismatchedAliasStillWarns(t *testing.T) {
