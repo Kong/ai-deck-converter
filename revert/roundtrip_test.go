@@ -13,7 +13,11 @@ import (
 // roundTripSkip lists forward golden cases whose reverse direction is not (yet)
 // implemented, so the round-trip gate skips them instead of failing. The
 // forward golden itself is still asserted by convert's TestGolden.
-var roundTripSkip = map[string]string{}
+var roundTripSkip = map[string]string{
+	"40_model_selector_multiple_alias_values_policies": "revert splits a multi-alias model into one model per alias (KOKO-4291); " +
+		"re-converting those groups policy/ACL plugins alias-outer (per reconstructed model), while the forward " +
+		"converter emits them plugin-outer (per plugin, fanned out across aliases) for a single multi-alias model",
+}
 
 // TestRoundTrip verifies that reverting the forward converter's output and
 // converting it again reproduces the original decK config byte-for-byte, for

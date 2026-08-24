@@ -1,0 +1,123 @@
+_format_version: "3.0"
+_transform: false
+services:
+  - id: 947a4e23-b483-5a65-8165-da9aed24565b
+    name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    host: ai-gateway.upstream.local
+    port: 80
+    protocol: http
+routes:
+  - id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+    name: openai-chat
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /ai/chat/completions
+    methods:
+      - POST
+    protocols:
+      - http
+      - https
+    strip_path: false
+plugins:
+  - id: 17fa8192-4b9f-5b5a-8379-20ad8bc836a7
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+  - id: f3adc007-171c-5519-8763-3a0eef79bde3
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://env/openai-key}'
+          description: gpt-4o
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: '@kong/gpt-4o'
+            name: gpt-4o
+            provider: openai
+          route_type: llm/v1/chat
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+    model:
+      id: 53be98cf-fde9-547c-98c6-d81d2c4d06ea
+  - id: fe4129f3-2075-5492-8b59-90def2cf73ab
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://env/openai-key}'
+          description: gpt-4o
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: '@kong/gpt-4o-alias'
+            name: gpt-4o
+            provider: openai
+          route_type: llm/v1/chat
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+    model:
+      id: bf777c6f-20a3-5e30-a1e8-c0c72a4552c6
+  - id: bb045713-64c3-5c6a-ae54-3337bc34061d
+    name: ai-prompt-guard
+    config:
+      allow_patterns:
+        - ^safe
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+    model:
+      id: 53be98cf-fde9-547c-98c6-d81d2c4d06ea
+  - id: 4e64189d-1c56-51cc-8938-77b7b85233e4
+    name: ai-prompt-guard
+    config:
+      allow_patterns:
+        - ^safe
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+    model:
+      id: bf777c6f-20a3-5e30-a1e8-c0c72a4552c6
+  - id: 686423ce-18e4-505b-8697-73b683a022da
+    name: acl
+    config:
+      allow:
+        - premium-users
+      include_consumer_groups: true
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+    model:
+      id: 53be98cf-fde9-547c-98c6-d81d2c4d06ea
+  - id: 509b86a4-d650-5125-8f69-105b25bd0f9e
+    name: acl
+    config:
+      allow:
+        - premium-users
+      include_consumer_groups: true
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+    model:
+      id: bf777c6f-20a3-5e30-a1e8-c0c72a4552c6
+ai_models:
+  - id: 53be98cf-fde9-547c-98c6-d81d2c4d06ea
+    name: '@kong/gpt-4o'
+  - id: bf777c6f-20a3-5e30-a1e8-c0c72a4552c6
+    name: '@kong/gpt-4o-alias'

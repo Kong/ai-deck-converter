@@ -401,14 +401,18 @@ func (c *Converter) convertModels() error {
 			for k := range plugins {
 				p := plugins[k]
 				p.Route = kong.NewStringRef(routeName)
-				if modelScoped {
-					// TODO: only scopes to the first alias, so a policy/ACL
-					//   on a model with multiple values won't protect requests that name
-					//   a later alias. Fanning this out per alias (like the
-					//   ai-proxy-advanced plugins) needs its own golden case.
-					p.Model = kong.NewStringRef(aliases[0])
+				if !modelScoped {
+					guardPlugins = append(guardPlugins, p)
+					continue
 				}
-				guardPlugins = append(guardPlugins, p)
+				// Same ai-model identities as the ai-proxy-advanced FKs: one copy
+				// of this policy/ACL plugin per alias, so a request is protected
+				// regardless of which alias it names.
+				for _, alias := range aliases {
+					pCopy := p
+					pCopy.Model = kong.NewStringRef(alias)
+					guardPlugins = append(guardPlugins, pCopy)
+				}
 			}
 		}
 

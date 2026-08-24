@@ -1,0 +1,34 @@
+models:
+  # a model-scoped policy/ACL on a model with alias values
+  # must protect requests regardless of which alias they name.
+  - type: model
+    name: guarded-gpt
+    capabilities: [generate]
+    formats: [{type: openai}]
+    targets:
+      - name: gpt-4o
+        provider: openai-main
+        config: {type: openai}
+    policies: [pii-sanitizer]
+    access:
+      acls:
+        allow: [premium-users]
+    config:
+      route:
+        paths: [/ai]
+        model:
+          values: ["@kong/gpt-4o", "@kong/gpt-4o-alias"]
+
+model_providers:
+  - type: openai
+    name: openai-main
+    config:
+      auth:
+        type: basic
+        headers: [{name: Authorization, value: "{vault://env/openai-key}"}]
+
+policies:
+  - type: ai-prompt-guard
+    name: pii-sanitizer
+    config:
+      allow_patterns: ["^safe"]
