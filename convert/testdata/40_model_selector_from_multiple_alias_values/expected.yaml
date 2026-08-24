@@ -51,7 +51,7 @@ plugins:
       id: 8ae36805-da7a-55b9-b056-72bde6bb937d
     model:
       id: eb93e1da-5536-57b6-b50b-9a2e9d679164
-  - id: f3adc007-171c-5519-8763-3a0eef79bde3
+  - id: fe4129f3-2075-5492-8b59-90def2cf73ab
     name: ai-proxy-advanced
     config:
       balancer:
@@ -71,8 +71,8 @@ plugins:
     route:
       id: 8ae36805-da7a-55b9-b056-72bde6bb937d
     model:
-      id: <ID-1-placeholder>
-  - id: f3adc007-171c-5519-8763-3a0eef79bde3
+      id: a01edd44-3e04-5fa8-9dc5-1f6ce66eb9be
+  - id: 75ff22ed-6245-594b-895f-6a9fa36f4581
     name: ai-proxy-advanced
     config:
       balancer:
@@ -92,8 +92,8 @@ plugins:
     route:
       id: 8ae36805-da7a-55b9-b056-72bde6bb937d
     model:
-      id: <ID-2-placeholder>
-  - id: f3adc007-171c-5519-8763-3a0eef79bde3
+      id: 203e8563-8387-5504-8b40-b8dd26260d57
+  - id: 12106a5c-cbd2-5942-8432-ef9bc4adca1b
     name: ai-proxy-advanced
     config:
       balancer:
@@ -113,13 +113,13 @@ plugins:
     route:
       id: 8ae36805-da7a-55b9-b056-72bde6bb937d
     model:
-      id: <ID-3-placeholder>
+      id: 6cac97d2-377c-5381-aee4-4c05182203ee
 ai_models:
   - id: eb93e1da-5536-57b6-b50b-9a2e9d679164
     name: '@kong/openai'
-  - id: <ID-1-placeholder>
+  - id: a01edd44-3e04-5fa8-9dc5-1f6ce66eb9be
     name: '@kong/the-openai-model'
-  - id: <ID-2-placeholder>
+  - id: 203e8563-8387-5504-8b40-b8dd26260d57
     name: '@kong/openai-model'
-  - id: <ID-3-placeholder>
+  - id: 6cac97d2-377c-5381-aee4-4c05182203ee
     name: '@kong/chat-gpt'
