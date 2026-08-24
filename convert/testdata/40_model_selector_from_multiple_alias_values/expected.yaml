@@ -1,0 +1,125 @@
+_format_version: "3.0"
+_transform: false
+services:
+  - id: 947a4e23-b483-5a65-8165-da9aed24565b
+    name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    host: ai-gateway.upstream.local
+    port: 80
+    protocol: http
+routes:
+  - id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+    name: openai-chat
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /openai-with-multiple-alias-values/chat/completions
+    methods:
+      - POST
+    protocols:
+      - http
+      - https
+    strip_path: false
+plugins:
+  - id: 17fa8192-4b9f-5b5a-8379-20ad8bc836a7
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: some_model
+          source: body
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+  - id: f3adc007-171c-5519-8763-3a0eef79bde3
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - description: gpt-5
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: '@kong/openai'
+            name: gpt-5
+            provider: openai
+          route_type: llm/v1/chat
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+    model:
+      id: eb93e1da-5536-57b6-b50b-9a2e9d679164
+  - id: f3adc007-171c-5519-8763-3a0eef79bde3
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - description: gpt-5
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: '@kong/the-openai-model'
+            name: gpt-5
+            provider: openai
+          route_type: llm/v1/chat
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+    model:
+      id: <ID-1-placeholder>
+  - id: f3adc007-171c-5519-8763-3a0eef79bde3
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - description: gpt-5
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: '@kong/openai-model'
+            name: gpt-5
+            provider: openai
+          route_type: llm/v1/chat
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+    model:
+      id: <ID-2-placeholder>
+  - id: f3adc007-171c-5519-8763-3a0eef79bde3
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - description: gpt-5
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: '@kong/chat-gpt'
+            name: gpt-5
+            provider: openai
+          route_type: llm/v1/chat
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+    model:
+      id: <ID-3-placeholder>
+ai_models:
+  - id: eb93e1da-5536-57b6-b50b-9a2e9d679164
+    name: '@kong/openai'
+  - id: <ID-1-placeholder>
+    name: '@kong/the-openai-model'
+  - id: <ID-2-placeholder>
+    name: '@kong/openai-model'
+  - id: <ID-3-placeholder>
+    name: '@kong/chat-gpt'
