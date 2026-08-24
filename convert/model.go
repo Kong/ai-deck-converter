@@ -241,7 +241,10 @@ func (c *Converter) convertModels() error {
 				if err != nil {
 					return err
 				}
-				selectorCfgs := buildModelSelectorConfig(m, spec)
+				selectorCfgs, err := c.buildModelSelectorConfig(m, spec)
+				if err != nil {
+					return err
+				}
 				// The alias *value* is per-model and deliberately excluded from
 				// routeConfigKey. When targeting config.sources (Options.
 				// ModelSelectorSources), the selector *shape* (which source/field an
@@ -262,7 +265,7 @@ func (c *Converter) convertModels() error {
 				if g == nil {
 					paths := make([]string, len(bases))
 					for i, b := range bases {
-						paths[i] = aimap.RoutePath(b, spec)
+						paths[i] = aimap.RoutePath(normalizeNamedCaptures(b), spec)
 					}
 					routeName := uniqueModelRouteName(sec+"-"+spec.RouteLabel, usedRouteNames)
 					g = &routeGroup{
@@ -895,26 +898,37 @@ func bodySizeOrDefault(m *aigw.Model) int {
 // for its route, or nil if the endpoint needs no selector at all. Explicit
 // body/header/path parameters override the source. No source override leaves
 // source selection to the endpoint's format/capability default.
-func buildModelSelectorConfig(m *aigw.Model, spec aimap.EndpointSpec) []map[string]any {
+func (c *Converter) buildModelSelectorConfig(m *aigw.Model, spec aimap.EndpointSpec) ([]map[string]any, error) {
 	switch {
 	case m.Config.Route.Model.Path.PathParam != "":
 		param := m.Config.Route.Model.Path.PathParam
 		// PCRE-in-path model extraction applies only when the authored paths are regex paths that actually carry
 		// a named capture group for this param.
 		if !pathParamCaptured(m.Config.Route.Paths, param, spec.IsRegex) {
-			return []map[string]any{defaultModelSelectorConfig(m, spec)}
+			def := defaultModelSelectorConfig(m, spec)
+			// The fallback is silent and harmless only when the format's default
+			// selector still reads the model from the path (gemini/bedrock native
+			// capture). For body-default formats (openai/azure) it quietly switches
+			// path extraction to the request body, changing routing — warn (error
+			// under -strict), per KOKO-4312.
+			if defaultSourceIsBody(def) {
+				if err := c.warnPathParamNotCaptured(m, param, spec); err != nil {
+					return nil, err
+				}
+			}
+			return []map[string]any{def}, nil
 		}
 
 		sources := make([]map[string]any, len(m.Config.Route.Paths))
 		for i, sourcePath := range m.Config.Route.Paths {
 			sources[i] = map[string]any{
 				"source":                "path",
-				"pcre_pattern":          sourcePath,
+				"pcre_pattern":          normalizeNamedCaptures(sourcePath),
 				"pcre_capture_name":     param,
 				"max_request_body_size": bodySizeOrDefault(m),
 			}
 		}
-		return sources
+		return sources, nil
 
 	case m.Config.Route.Model.Body.BodyParam != "":
 		return []map[string]any{
@@ -923,17 +937,46 @@ func buildModelSelectorConfig(m *aigw.Model, spec aimap.EndpointSpec) []map[stri
 				"body_path":             m.Config.Route.Model.Body.BodyParam,
 				"max_request_body_size": bodySizeOrDefault(m),
 			},
-		}
+		}, nil
 	case m.Config.Route.Model.Header.HeaderParam != "":
 		return []map[string]any{
 			{
 				"source":      "header",
 				"header_name": m.Config.Route.Model.Header.HeaderParam,
 			},
-		}
+		}, nil
 	}
 
-	return []map[string]any{defaultModelSelectorConfig(m, spec)}
+	return []map[string]any{defaultModelSelectorConfig(m, spec)}, nil
+}
+
+// defaultSourceIsBody reports whether a fallback selector config reads the model
+// from the request body (the ai-model-selector default when no source is set).
+func defaultSourceIsBody(def map[string]any) bool {
+	if def == nil {
+		return false
+	}
+	src, _ := def["source"].(string)
+	return src == "" || src == "body"
+}
+
+// warnPathParamNotCaptured reports a path_param that names a PCRE capture group
+// the route paths do not provide, distinguishing a non-regex path (KOKO-4312
+// point 1) from a regex path missing the named group (point 2). In both cases
+// the model is read from the request body instead.
+func (c *Converter) warnPathParamNotCaptured(m *aigw.Model, param string, spec aimap.EndpointSpec) error {
+	for _, p := range m.Config.Route.Paths {
+		if !spec.IsRegex && !strings.HasPrefix(p, "~") {
+			return c.warn(
+				"model %q sets model.path.path_param %q but route path %q is not a regex path "+
+					"(it must start with %q); the model will be read from the request body instead",
+				m.Name, param, p, "~")
+		}
+	}
+	return c.warn(
+		"model %q sets model.path.path_param %q but no matching named capture group %q is present "+
+			"in its regex route paths; the model will be read from the request body instead",
+		m.Name, param, param)
 }
 
 func defaultModelSelectorConfig(m *aigw.Model, spec aimap.EndpointSpec) map[string]any {
@@ -988,34 +1031,72 @@ func pathParamCaptured(paths []string, param string, specIsRegex bool) bool {
 	if len(paths) == 0 || param == "" {
 		return false
 	}
-	needle := "(?<" + param + ">"
 	for _, p := range paths {
 		if !specIsRegex && !strings.HasPrefix(p, "~") {
 			return false
 		}
-		if !strings.Contains(p, needle) {
+		if !pathHasNamedCapture(p, param) {
 			return false
 		}
 	}
 	return true
 }
 
+// pcreNamedCaptureOpen matches the opening of a PCRE named capture group in any
+// of the three spellings PCRE accepts — "(?<name>", "(?P<name>", and "(?'name'"
+// — capturing the group name (group 1 for the angle-bracket forms, group 2 for
+// the quoted form). Konnect's route and ai-model-selector validators accept only
+// the "(?P<name>" spelling, so the converter normalizes to it.
+var pcreNamedCaptureOpen = regexp.MustCompile(`\(\?(?:P?<([A-Za-z_][A-Za-z0-9_]*)>|'([A-Za-z_][A-Za-z0-9_]*)')`)
+
+// pcreNamedGroupFull matches a whole PCRE named capture group (opening plus
+// body) in any of the three spellings, for substitution when deriving a Lua
+// path_pattern.
+var pcreNamedGroupFull = regexp.MustCompile(`\(\?(?:P?<[A-Za-z_][A-Za-z0-9_]*>|'[A-Za-z_][A-Za-z0-9_]*')[^)]*\)`)
+
+// namedCaptureName returns the group name from a pcreNamedCaptureOpen submatch.
+func namedCaptureName(m []string) string {
+	if m[1] != "" {
+		return m[1]
+	}
+	return m[2]
+}
+
+// pathHasNamedCapture reports whether s carries a PCRE named capture group named param.
+func pathHasNamedCapture(s, param string) bool {
+	for _, m := range pcreNamedCaptureOpen.FindAllStringSubmatch(s, -1) {
+		if namedCaptureName(m) == param {
+			return true
+		}
+	}
+	return false
+}
+
+// normalizeNamedCaptures rewrites every PCRE named capture group opening in s to
+// the "(?P<name>" spelling Konnect accepts, leaving the group body and the rest
+// of the pattern untouched. Already-normalized "(?P<name>" openings are left as
+// they are.
+func normalizeNamedCaptures(s string) string {
+	return pcreNamedCaptureOpen.ReplaceAllStringFunc(s, func(match string) string {
+		return "(?P<" + namedCaptureName(pcreNamedCaptureOpen.FindStringSubmatch(match)) + ">"
+	})
+}
+
 // tryConvertPCREToLua derives an ai-model-selector Lua path_pattern from
 // a model's own hand-authored base path. A base path carrying a PCRE named
-// capture group (e.g. "(?<my_openai_model>)") marks where the client-supplied
-// model alias appears.
+// capture group (e.g. "(?<my_openai_model>)", "(?P<my_openai_model>)", or
+// "(?'my_openai_model')") marks where the client-supplied model alias appears.
 func tryConvertPCREToLua(pattern string) string {
 	pattern = strings.TrimPrefix(pattern, "~")
-	pcreNamedGroup := regexp.MustCompile(`\(\?<[A-Za-z_][A-Za-z0-9_]*>[^)]*\)`)
 
 	// genericPathAliasCapture is the Lua pattern substituted for a PCRE named
 	// capture group when deriving an ai-model-selector path_pattern: it matches
 	// any alias value Kong's route path leaves for the model segment.
 	const genericPathAliasCapture = "([%w%.%-:]+)"
 
-	if !pcreNamedGroup.MatchString(pattern) {
+	if !pcreNamedGroupFull.MatchString(pattern) {
 		// Didn't work, use the default pattern
 		return aimap.OpenAIDefaultPathPattern
 	}
-	return pcreNamedGroup.ReplaceAllString(pattern, genericPathAliasCapture)
+	return pcreNamedGroupFull.ReplaceAllString(pattern, genericPathAliasCapture)
 }

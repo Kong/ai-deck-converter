@@ -5,15 +5,15 @@ services:
     routes:
       - name: openai-chat
         paths:
-          - ~/openai/(?<openai_model>[^:/]+)/chat/completions
-          - ~/alternative/path/(?<openai_model>[^:/]+)/chat/completions
+          - ~/openai/(?P<openai_model>[^:/]+)/chat/completions
+          - ~/alternative/path/(?P<openai_model>[^:/]+)/chat/completions
         methods:
           - POST
         strip_path: false
       - name: openai-responses
         paths:
-          - ~/openai/(?<openai_model>[^:/]+)/responses
-          - ~/alternative/path/(?<openai_model>[^:/]+)/responses
+          - ~/openai/(?P<openai_model>[^:/]+)/responses
+          - ~/alternative/path/(?P<openai_model>[^:/]+)/responses
         methods:
           - POST
         strip_path: false
@@ -23,10 +23,10 @@ plugins:
       max_request_body_size: 8388608
       sources:
         - pcre_capture_name: openai_model
-          pcre_pattern: ~/openai/(?<openai_model>[^:/]+)
+          pcre_pattern: ~/openai/(?P<openai_model>[^:/]+)
           source: path
         - pcre_capture_name: openai_model
-          pcre_pattern: ~/alternative/path/(?<openai_model>[^:/]+)
+          pcre_pattern: ~/alternative/path/(?P<openai_model>[^:/]+)
           source: path
     route: openai-chat
   - name: ai-proxy-advanced
@@ -57,10 +57,10 @@ plugins:
       max_request_body_size: 8388608
       sources:
         - pcre_capture_name: openai_model
-          pcre_pattern: ~/openai/(?<openai_model>[^:/]+)
+          pcre_pattern: ~/openai/(?P<openai_model>[^:/]+)
           source: path
         - pcre_capture_name: openai_model
-          pcre_pattern: ~/alternative/path/(?<openai_model>[^:/]+)
+          pcre_pattern: ~/alternative/path/(?P<openai_model>[^:/]+)
           source: path
     route: openai-responses
   - name: ai-proxy-advanced

@@ -10,6 +10,96 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+func TestConvertWarnsPathParamNotCapturedNonRegex(t *testing.T) {
+	src := []byte(`
+model_providers:
+  - {name: openai-prod, type: openai}
+models:
+  - type: model
+    name: m1
+    capabilities: [generate]
+    formats: [{type: openai}]
+    targets:
+      - name: gpt-4o
+        provider: openai-prod
+        config: {type: openai}
+    policies: []
+    access:
+      acls: {allow: [], deny: []}
+    config:
+      route:
+        paths: [/v1/chat/completions]
+        model: {path: {path_param: model_name}}
+`)
+	out, warnings, err := Convert(src, Options{})
+	require.NoError(t, err, "convert")
+	require.Contains(t, strings.Join(warnings, "\n"), "is not a regex path",
+		"expected non-regex path_param warning")
+	// The body-default fallback still produces a config in non-strict mode.
+	require.Contains(t, string(out), "source: body")
+
+	_, _, err = Convert(src, Options{Strict: true})
+	require.Error(t, err, "expected -strict to turn the warning into an error")
+}
+
+func TestConvertWarnsPathParamCaptureNameMismatch(t *testing.T) {
+	src := []byte(`
+model_providers:
+  - {name: openai-prod, type: openai}
+models:
+  - type: model
+    name: m1
+    capabilities: [generate]
+    formats: [{type: openai}]
+    targets:
+      - name: gpt-4o
+        provider: openai-prod
+        config: {type: openai}
+    policies: []
+    access:
+      acls: {allow: [], deny: []}
+    config:
+      route:
+        paths: ['~/openai/(?<other_group>[^:/]+)']
+        model: {path: {path_param: model_name}}
+`)
+	_, warnings, err := Convert(src, Options{})
+	require.NoError(t, err, "convert")
+	require.Contains(t, strings.Join(warnings, "\n"), "no matching named capture group",
+		"expected capture-name-mismatch warning")
+
+	_, _, err = Convert(src, Options{Strict: true})
+	require.Error(t, err, "expected -strict to turn the warning into an error")
+}
+
+func TestConvertGeminiPathParamFallbackDoesNotWarn(t *testing.T) {
+	// Gemini's default selector still reads the model from the path, so a
+	// path_param whose base path carries no capture is a harmless fallback, not
+	// the silent path->body switch that warrants a warning.
+	src := []byte(`
+model_providers:
+  - {name: gemini-provider, type: gemini}
+models:
+  - type: model
+    name: m1
+    capabilities: [generate]
+    formats: [{type: gemini}]
+    targets:
+      - name: gemini-2.5-pro
+        provider: gemini-provider
+        config: {type: gemini}
+    policies: []
+    access:
+      acls: {allow: [], deny: []}
+    config:
+      route:
+        paths: [/gemini-path]
+        model: {path: {path_param: model_name}}
+`)
+	_, _, err := Convert(src, Options{Strict: true})
+	require.NoError(t, err, "gemini path_param fallback must not warn even under -strict")
+}
+
 func TestConvertWarnsUnknownProvider(t *testing.T) {
 	src := []byte(`
 models:

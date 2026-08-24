@@ -29,7 +29,6 @@ plugins:
       genai_category: text/generation
       llm_format: openai
       max_request_body_size: 2097152
-      response_streaming: deny
       targets:
         - auth:
             header_name: Authorization
@@ -39,11 +38,11 @@ plugins:
             log_payloads: false
             log_statistics: true
           model:
-            model_alias: full-model
+            model_alias: alt-syntax-model
             name: gpt-4o
             provider: openai
           route_type: llm/v1/chat
     route: openai-chat
-    model: full-model
+    model: alt-syntax-model
 ai_models:
-  - name: full-model
+  - name: alt-syntax-model
