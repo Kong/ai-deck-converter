@@ -91,6 +91,14 @@ plugins:
     model: '@kong/chat-gpt'
 ai_models:
   - name: '@kong/openai'
+    tags:
+      - ai-gateway-model-alias-group:@kong/openai
   - name: '@kong/the-openai-model'
+    tags:
+      - ai-gateway-model-alias-group:@kong/openai
   - name: '@kong/openai-model'
+    tags:
+      - ai-gateway-model-alias-group:@kong/openai
   - name: '@kong/chat-gpt'
+    tags:
+      - ai-gateway-model-alias-group:@kong/openai

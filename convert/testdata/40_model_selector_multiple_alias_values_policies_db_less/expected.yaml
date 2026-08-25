@@ -119,5 +119,9 @@ plugins:
 ai_models:
   - id: 53be98cf-fde9-547c-98c6-d81d2c4d06ea
     name: '@kong/gpt-4o'
+    tags:
+      - ai-gateway-model-alias-group:@kong/gpt-4o
   - id: bf777c6f-20a3-5e30-a1e8-c0c72a4552c6
     name: '@kong/gpt-4o-alias'
+    tags:
+      - ai-gateway-model-alias-group:@kong/gpt-4o

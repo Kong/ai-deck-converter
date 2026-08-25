@@ -3,6 +3,7 @@ package revert
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
@@ -20,6 +21,11 @@ type modelGroup struct {
 	targetsSeen map[string]bool
 	aliasless   bool   // no model_alias on the targets; name is provisional
 	routeName   string // route the group was created from (for warnings)
+	// mergedFKs are the model FKs of other ai-proxy-advanced plugins folded
+	// into this group (see mergeableAliasFKs): distinct aliases of the one
+	// underlying model produced by route.model.values fan-out. Guard plugins
+	// scoped to any of these FKs belong to this model too.
+	mergedFKs []string
 }
 
 // targetFingerprint returns a stable dedup key for a reconstructed target
@@ -89,6 +95,8 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 		return entry
 	}
 
+	redirect := r.mergeableAliasFKs(findPlugins(plugins, "ai-proxy-advanced"))
+
 	for _, proxy := range findPlugins(plugins, "ai-proxy-advanced") {
 		cfg := proxy.Config
 		llmFormat := getStr(cfg, "llm_format")
@@ -99,6 +107,16 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 		fkName := ""
 		if proxy.Model != nil {
 			fkName = string(*proxy.Model)
+		}
+		// groupFK is fkName, redirected to its equivalence class's canonical FK
+		// when this plugin is one of several identical-except-alias copies of
+		// one route.model.values fan-out (see mergeableAliasFKs). modelGuards
+		// below stays keyed by the original fkName: each copy's own guard
+		// plugins must still be found and folded in (finalizeModels also visits
+		// every merged FK for the same reason).
+		groupFK := fkName
+		if canon, ok := redirect[fkName]; ok {
+			groupFK = canon
 		}
 
 		// Guard refs for this plugin's model: route-wide guards plus any scoped to
@@ -159,7 +177,7 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 				continue
 			}
 
-			g, err := r.modelGroupFor(acc, rt, fkName, alias, llmFormat, bases, cfg, nextEntry, refs, acls, idpRefs)
+			g, err := r.modelGroupFor(acc, rt, groupFK, alias, llmFormat, bases, cfg, nextEntry, refs, acls, idpRefs)
 			if err != nil {
 				return err
 			}
@@ -235,6 +253,7 @@ func (r *Reverter) modelGroupFor(
 		key = "route:" + rt.Name
 	}
 	if g, ok := acc.groups[key]; ok {
+		mergeAliasIntoGroup(g, alias, refs, acls, idpRefs)
 		return g, nil
 	}
 
@@ -294,6 +313,132 @@ func (r *Reverter) modelGroupFor(
 	acc.groups[key] = g
 	acc.order = append(acc.order, key)
 	return g, nil
+}
+
+// mergeAliasIntoGroup folds another alias of an already-built group's
+// underlying model into its Route.Model.Values, seeding the list with the
+// group's own (canonical) alias first if this is the first fold, and folds in
+// refs/acls/idpRefs (this alias's own route+model-scoped guard plugins,
+// computed by the caller from modelGuards) — those are never visited again
+// once modelGroupFor's early-return path is taken, so without this they would
+// be silently dropped for every alias but the canonical one.
+func mergeAliasIntoGroup(g *modelGroup, alias string, refs []string, acls aigw.ACLs, idpRefs []string) {
+	for _, ref := range refs {
+		if !slices.Contains(g.model.Policies, ref) {
+			g.model.Policies = append(g.model.Policies, ref)
+		}
+	}
+	for _, name := range acls.Allow {
+		if !slices.Contains(g.model.Access.ACLs.Allow, name) {
+			g.model.Access.ACLs.Allow = append(g.model.Access.ACLs.Allow, name)
+		}
+	}
+	for _, name := range acls.Deny {
+		if !slices.Contains(g.model.Access.ACLs.Deny, name) {
+			g.model.Access.ACLs.Deny = append(g.model.Access.ACLs.Deny, name)
+		}
+	}
+	for _, ref := range idpRefs {
+		if !slices.Contains(g.model.Access.AuthStrategies, ref) {
+			g.model.Access.AuthStrategies = append(g.model.Access.AuthStrategies, ref)
+		}
+	}
+
+	if alias == "" || alias == g.model.Name {
+		return
+	}
+	if slices.Contains(g.model.Config.Route.Model.Values, alias) {
+		return
+	}
+	if len(g.model.Config.Route.Model.Values) == 0 {
+		g.model.Config.Route.Model.Values = append(g.model.Config.Route.Model.Values, g.model.Name)
+	}
+	g.model.Config.Route.Model.Values = append(g.model.Config.Route.Model.Values, alias)
+	g.mergedFKs = append(g.mergedFKs, alias)
+}
+
+// mergeableAliasFKs partitions a route's ai-proxy-advanced plugins into
+// equivalence classes: plugins carrying the same convert-written
+// aimap.EncodeModelAliasGroup marker (see aiModelAliasGroup) and otherwise
+// identical config (modulo their own model FK and each target's model_alias)
+// are different aliases of the one model a route.model.values fan-out
+// produced (see convert.convertModels). The marker is required, not just a
+// tie-breaker: without it, this shape is indistinguishable from N
+// independently-authored models that happen to be config-identical
+// and merging those would silently corrupt them into one. Returns
+// a map from every non-canonical member's FK to the first-seen (canonical)
+// member's FK; members outside any multi-FK class are absent from the map.
+func (r *Reverter) mergeableAliasFKs(proxies []*kong.Plugin) map[string]string {
+	canonicalByShape := map[string]string{}
+	redirect := map[string]string{}
+	for _, proxy := range proxies {
+		if proxy.Model == nil {
+			continue
+		}
+		fkName := string(*proxy.Model)
+		group := r.aiModelAliasGroup(fkName)
+		if group == "" {
+			continue
+		}
+		shape := group + "\x00" + proxyShapeFingerprint(proxy.Config)
+		if canon, ok := canonicalByShape[shape]; ok {
+			redirect[fkName] = canon
+		} else {
+			canonicalByShape[shape] = fkName
+		}
+	}
+	return redirect
+}
+
+// aiModelAliasGroup returns the aimap.EncodeModelAliasGroup marker on name's
+// ai_models entry, or "" if the entry doesn't exist or carries no marker.
+func (r *Reverter) aiModelAliasGroup(name string) string {
+	entry, ok := r.aiModelByName[name]
+	if !ok {
+		return ""
+	}
+	group, _ := aimap.DecodeModelAliasGroup(entry.Tags)
+	return group
+}
+
+// proxyShapeFingerprint fingerprints an ai-proxy-advanced config with every
+// target's model_alias stripped, so two plugins differing only in their own
+// model FK and their target's alias fingerprint identically.
+func proxyShapeFingerprint(cfg map[string]any) string {
+	clone := make(map[string]any, len(cfg))
+	for k, v := range cfg {
+		clone[k] = v
+	}
+	if rawTargets, ok := clone["targets"].([]any); ok {
+		targets := make([]any, len(rawTargets))
+		for i, raw := range rawTargets {
+			target, ok := raw.(map[string]any)
+			if !ok {
+				targets[i] = raw
+				continue
+			}
+			tclone := make(map[string]any, len(target))
+			for k, v := range target {
+				tclone[k] = v
+			}
+			if model, ok := tclone["model"].(map[string]any); ok {
+				mclone := make(map[string]any, len(model))
+				for k, v := range model {
+					if k != "model_alias" {
+						mclone[k] = v
+					}
+				}
+				tclone["model"] = mclone
+			}
+			targets[i] = tclone
+		}
+		clone["targets"] = targets
+	}
+	b, err := json.Marshal(clone)
+	if err != nil {
+		return fmt.Sprintf("%+v", clone)
+	}
+	return string(b)
 }
 
 // setAliasField reconstructs the Route.Model field an alias round-trips into.
@@ -369,17 +514,29 @@ func (r *Reverter) finalizeModels(acc *modelAcc) error {
 			g.model.Type = "api"
 		}
 		if entry, ok := r.aiModelByName[g.model.Name]; ok {
-			g.model.Labels = r.tagsToLabels(entry.Tags)
+			_, rest := aimap.DecodeModelAliasGroup(entry.Tags)
+			g.model.Labels = r.tagsToLabels(rest)
 		}
 
-		for _, p := range r.idx.model[g.model.Name] {
-			if p.Name == "acl" {
-				g.model.Access.ACLs = aclsFromBlock(p.Config)
-				continue
-			}
-			g.model.Policies = append(g.model.Policies, r.registerPolicy(p, false).Name)
+		seenPolicy := make(map[string]bool, len(g.model.Policies))
+		for _, name := range g.model.Policies {
+			seenPolicy[name] = true
 		}
-		built[g.model.Name] = true
+		for _, fk := range append([]string{g.model.Name}, g.mergedFKs...) {
+			for _, p := range r.idx.model[fk] {
+				if p.Name == "acl" {
+					g.model.Access.ACLs = aclsFromBlock(p.Config)
+					continue
+				}
+				policyName := r.registerPolicy(p, false).Name
+				if seenPolicy[policyName] {
+					continue
+				}
+				seenPolicy[policyName] = true
+				g.model.Policies = append(g.model.Policies, policyName)
+			}
+			built[fk] = true
+		}
 		r.out.Models = append(r.out.Models, g.model)
 	}
 
@@ -401,7 +558,8 @@ func (r *Reverter) finalizeModels(acc *modelAcc) error {
 		if m.Alias != "" {
 			model.Config.Route.Model.Values = []string{m.Alias}
 		}
-		model.Labels = r.tagsToLabels(m.Tags)
+		_, rest := aimap.DecodeModelAliasGroup(m.Tags)
+		model.Labels = r.tagsToLabels(rest)
 		built[m.Name] = true
 		r.out.Models = append(r.out.Models, model)
 	}

@@ -117,9 +117,17 @@ plugins:
 ai_models:
   - id: eb93e1da-5536-57b6-b50b-9a2e9d679164
     name: '@kong/openai'
+    tags:
+      - ai-gateway-model-alias-group:@kong/openai
   - id: a01edd44-3e04-5fa8-9dc5-1f6ce66eb9be
     name: '@kong/the-openai-model'
+    tags:
+      - ai-gateway-model-alias-group:@kong/openai
   - id: 203e8563-8387-5504-8b40-b8dd26260d57
     name: '@kong/openai-model'
+    tags:
+      - ai-gateway-model-alias-group:@kong/openai
   - id: 6cac97d2-377c-5381-aee4-4c05182203ee
     name: '@kong/chat-gpt'
+    tags:
+      - ai-gateway-model-alias-group:@kong/openai

@@ -47,6 +47,19 @@ func TagsToLabels(tags []string, prefix string) (labels map[string]string, rest 
 	return labels, rest
 }
 
+// decodeTaggedValue finds the first tag carrying prefix and returns the value
+// after it, along with the remaining tags in input order.
+func decodeTaggedValue(tags []string, prefix string) (value string, rest []string) {
+	for _, tag := range tags {
+		if body, ok := strings.CutPrefix(tag, prefix); ok && value == "" {
+			value = body
+			continue
+		}
+		rest = append(rest, tag)
+	}
+	return value, rest
+}
+
 // caCertificateNameTag namespaces the tag used to preserve an AI Gateway
 // CACertificate's name across the round trip: Kong's ca_certificates entity
 // has no name field, so decK has nowhere else to keep it.
@@ -60,12 +73,25 @@ func EncodeCACertificateName(name string) string {
 // DecodeCACertificateName finds the tag written by EncodeCACertificateName and
 // returns its name, along with the remaining tags in input order.
 func DecodeCACertificateName(tags []string) (name string, rest []string) {
-	for _, tag := range tags {
-		if body, ok := strings.CutPrefix(tag, caCertificateNameTag); ok && name == "" {
-			name = body
-			continue
-		}
-		rest = append(rest, tag)
-	}
-	return name, rest
+	return decodeTaggedValue(tags, caCertificateNameTag)
+}
+
+// modelAliasGroupTag namespaces the tag marking every ai_models row/plugin a
+// single source model's route.model.values fan-out produced: decK has no way
+// to express "these N otherwise-identical entities came from one model", so
+// this tag carries that fact across the round trip. Without it, revert cannot
+// safely tell that shape apart from N independently-authored models that
+// happen to be config-identical.
+const modelAliasGroupTag = "ai-gateway-model-alias-group:"
+
+// EncodeModelAliasGroup renders sourceModelName as a tag Kong can carry.
+func EncodeModelAliasGroup(sourceModelName string) string {
+	return modelAliasGroupTag + sourceModelName
+}
+
+// DecodeModelAliasGroup finds the tag written by EncodeModelAliasGroup and
+// returns the source model name it names (or "" if absent), along with the
+// remaining tags in input order.
+func DecodeModelAliasGroup(tags []string) (group string, rest []string) {
+	return decodeTaggedValue(tags, modelAliasGroupTag)
 }

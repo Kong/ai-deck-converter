@@ -378,15 +378,28 @@ func (c *Converter) convertModels() error {
 		// properties. If config.route.model.* properties are not set then the
 		// single alias defaults to the model name. m.ID can only identify one of
 		// the N rows a multi-alias model produces, so it's kept on the first.
+		// A multi-alias model's N rows are otherwise indistinguishable on the
+		// wire from N independently-authored models that happen to be
+		// config-identical, so they carry a shared marker tag identifying their
+		// common source model; revert only merges rows carrying it. The marker
+		// is keyed by the first alias, not m.Name: m.Name never round-trips
+		// (revert has no field to recover it into and stands in the first
+		// alias for it), so keying by it would make the marker re-encode
+		// differently after a round trip. The first alias is exactly what
+		// revert reconstructs the merged model's name as, so this is stable.
 		for idx, alias := range aliases {
 			id := ""
 			if idx == 0 {
 				id = m.ID
 			}
+			tags := c.labelsToTags(m.Labels)
+			if len(aliases) > 1 {
+				tags = append(tags, aimap.EncodeModelAliasGroup(aliases[0]))
+			}
 			c.out.AIModels = append(c.out.AIModels, kong.AIModel{
 				ID:   id,
 				Name: alias,
-				Tags: c.labelsToTags(m.Labels),
+				Tags: tags,
 			})
 		}
 

@@ -218,6 +218,650 @@ ai_models:
 		"synthetic ai-models alias should not be restored into model.alias")
 }
 
+func TestMultiAliasMerge(t *testing.T) {
+	t.Run("identical plugins merge into one model with combined values", func(t *testing.T) {
+		in := []byte(`
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: openai-chat
+        paths: [/ai/chat/completions]
+        methods: [POST]
+        strip_path: false
+plugins:
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-chat
+  - name: ai-proxy-advanced
+    config:
+      balancer: {algorithm: round-robin}
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - description: gpt-5
+          model: {model_alias: alias-a, name: gpt-5, provider: openai}
+          route_type: llm/v1/chat
+    route: openai-chat
+    model: alias-a
+  - name: ai-proxy-advanced
+    config:
+      balancer: {algorithm: round-robin}
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - description: gpt-5
+          model: {model_alias: alias-b, name: gpt-5, provider: openai}
+          route_type: llm/v1/chat
+    route: openai-chat
+    model: alias-b
+ai_models:
+  - name: alias-a
+    tags: [ai-gateway-model-alias-group:source-model]
+  - name: alias-b
+    tags: [ai-gateway-model-alias-group:source-model]
+`)
+		doc, warnings, err := revertYAML(t, in, Options{Strict: true})
+		require.NoErrorf(t, err, "strict revert (warnings: %v)", warnings)
+		require.Empty(t, warnings, "want no warnings merging identical alias plugins")
+		require.Len(t, doc.Models, 1, "models = %+v", doc.Models)
+		require.Equal(t, []string{"alias-a", "alias-b"}, doc.Models[0].Config.Route.Model.Values)
+		require.Empty(t, doc.Models[0].Labels, "the marker tag must not leak into labels")
+	})
+
+	t.Run("identical plugins without the marker tag do not merge (KOKO-4291 regression)", func(t *testing.T) {
+		in := []byte(`
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: openai-chat
+        paths: [/ai/chat/completions]
+        methods: [POST]
+        strip_path: false
+plugins:
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-chat
+  - name: ai-proxy-advanced
+    config:
+      balancer: {algorithm: round-robin}
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - description: gpt-5
+          model: {model_alias: alias-a, name: gpt-5, provider: openai}
+          route_type: llm/v1/chat
+    route: openai-chat
+    model: alias-a
+  - name: ai-proxy-advanced
+    config:
+      balancer: {algorithm: round-robin}
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - description: gpt-5
+          model: {model_alias: alias-b, name: gpt-5, provider: openai}
+          route_type: llm/v1/chat
+    route: openai-chat
+    model: alias-b
+ai_models:
+  - name: alias-a
+  - name: alias-b
+`)
+		doc, warnings, err := revertYAML(t, in, Options{Strict: true})
+		require.NoErrorf(t, err, "strict revert (warnings: %v)", warnings)
+		require.Empty(t, warnings)
+		require.Len(t, doc.Models, 2, "models = %+v; two independently-authored, config-identical "+
+			"models sharing a route must stay separate without the marker tag", doc.Models)
+	})
+
+	t.Run("marker matches but targets differ: do not merge", func(t *testing.T) {
+		in := []byte(`
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: openai-chat
+        paths: [/ai/chat/completions]
+        methods: [POST]
+        strip_path: false
+plugins:
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-chat
+  - name: ai-proxy-advanced
+    config:
+      balancer: {algorithm: round-robin}
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - description: gpt-5
+          model: {model_alias: alias-a, name: gpt-5, provider: openai}
+          route_type: llm/v1/chat
+    route: openai-chat
+    model: alias-a
+  - name: ai-proxy-advanced
+    config:
+      balancer: {algorithm: round-robin}
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - description: gpt-5-mini
+          model: {model_alias: alias-b, name: gpt-5-mini, provider: openai}
+          route_type: llm/v1/chat
+    route: openai-chat
+    model: alias-b
+ai_models:
+  - name: alias-a
+    tags: [ai-gateway-model-alias-group:source-model]
+  - name: alias-b
+    tags: [ai-gateway-model-alias-group:source-model]
+`)
+		doc, warnings, err := revertYAML(t, in, Options{Strict: true})
+		require.NoErrorf(t, err, "strict revert (warnings: %v)", warnings)
+		require.Empty(t, warnings)
+		require.Len(t, doc.Models, 2, "models = %+v; the marker tag matches but the targets don't, "+
+			"so the content-shape check must still refuse to merge", doc.Models)
+		require.Equal(t, "alias-a", doc.Models[0].Name)
+		require.Empty(t, doc.Models[0].Config.Route.Model.Values, "name already equals its own alias implicitly")
+		require.Equal(t, "alias-b", doc.Models[1].Name)
+		require.Empty(t, doc.Models[1].Config.Route.Model.Values, "name already equals its own alias implicitly")
+	})
+
+	t.Run("merge also dedupes guard plugins without orphan-FK warnings", func(t *testing.T) {
+		in := []byte(`
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: openai-chat
+        paths: [/ai/chat/completions]
+        methods: [POST]
+        strip_path: false
+plugins:
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-chat
+  - name: ai-proxy-advanced
+    config:
+      balancer: {algorithm: round-robin}
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - description: gpt-5
+          model: {model_alias: alias-a, name: gpt-5, provider: openai}
+          route_type: llm/v1/chat
+    route: openai-chat
+    model: alias-a
+  - name: ai-proxy-advanced
+    config:
+      balancer: {algorithm: round-robin}
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - description: gpt-5
+          model: {model_alias: alias-b, name: gpt-5, provider: openai}
+          route_type: llm/v1/chat
+    route: openai-chat
+    model: alias-b
+  - name: ai-prompt-guard
+    config:
+      allow_patterns: [^safe]
+    route: openai-chat
+    model: alias-a
+  - name: ai-prompt-guard
+    config:
+      allow_patterns: [^safe]
+    route: openai-chat
+    model: alias-b
+  - name: acl
+    config:
+      allow: [premium-users]
+      include_consumer_groups: true
+    route: openai-chat
+    model: alias-a
+  - name: acl
+    config:
+      allow: [premium-users]
+      include_consumer_groups: true
+    route: openai-chat
+    model: alias-b
+ai_models:
+  - name: alias-a
+    tags: [ai-gateway-model-alias-group:source-model]
+  - name: alias-b
+    tags: [ai-gateway-model-alias-group:source-model]
+`)
+		doc, warnings, err := revertYAML(t, in, Options{Strict: true})
+		require.NoErrorf(t, err, "strict revert (warnings: %v)", warnings)
+		require.Empty(t, warnings, "want no orphan-FK warnings for merged-away aliases")
+		require.Len(t, doc.Models, 1, "models = %+v", doc.Models)
+		require.Equal(t, []string{"alias-a", "alias-b"}, doc.Models[0].Config.Route.Model.Values)
+		require.Equal(t, []string{"ai-prompt-guard"}, doc.Models[0].Policies)
+		require.Equal(t, []string{"premium-users"}, doc.Models[0].Access.ACLs.Allow)
+		require.Len(t, doc.Policies, 1, "top-level policies = %+v", doc.Policies)
+	})
+
+	t.Run("merge does not drop a guard plugin scoped only to a non-canonical alias", func(t *testing.T) {
+		in := []byte(`
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: openai-chat
+        paths: [/ai/chat/completions]
+        methods: [POST]
+        strip_path: false
+plugins:
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-chat
+  - name: ai-proxy-advanced
+    config:
+      balancer: {algorithm: round-robin}
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - description: gpt-5
+          model: {model_alias: alias-a, name: gpt-5, provider: openai}
+          route_type: llm/v1/chat
+    route: openai-chat
+    model: alias-a
+  - name: ai-proxy-advanced
+    config:
+      balancer: {algorithm: round-robin}
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - description: gpt-5
+          model: {model_alias: alias-b, name: gpt-5, provider: openai}
+          route_type: llm/v1/chat
+    route: openai-chat
+    model: alias-b
+  - name: ai-prompt-guard
+    config:
+      allow_patterns: [^safe]
+    route: openai-chat
+    model: alias-a
+  - name: rate-limiting
+    config:
+      minute: 100
+    route: openai-chat
+    model: alias-b
+ai_models:
+  - name: alias-a
+    tags: [ai-gateway-model-alias-group:source-model]
+  - name: alias-b
+    tags: [ai-gateway-model-alias-group:source-model]
+`)
+		doc, warnings, err := revertYAML(t, in, Options{Strict: true})
+		require.NoErrorf(t, err, "strict revert (warnings: %v)", warnings)
+		require.Empty(t, warnings)
+		require.Len(t, doc.Models, 1, "models = %+v", doc.Models)
+		require.ElementsMatch(t, []string{"ai-prompt-guard", "rate-limiting"}, doc.Models[0].Policies,
+			"alias-b's own guard plugin, scoped only to it (not alias-a), must not be dropped by the merge")
+	})
+
+	t.Run("merge does not drop an auth-strategy plugin scoped only to a non-canonical alias", func(t *testing.T) {
+		in := []byte(`
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: openai-chat
+        paths: [/ai/chat/completions]
+        methods: [POST]
+        strip_path: false
+plugins:
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-chat
+  - name: ai-proxy-advanced
+    config:
+      balancer: {algorithm: round-robin}
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - description: gpt-5
+          model: {model_alias: alias-a, name: gpt-5, provider: openai}
+          route_type: llm/v1/chat
+    route: openai-chat
+    model: alias-a
+  - name: ai-proxy-advanced
+    config:
+      balancer: {algorithm: round-robin}
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - description: gpt-5
+          model: {model_alias: alias-b, name: gpt-5, provider: openai}
+          route_type: llm/v1/chat
+    route: openai-chat
+    model: alias-b
+  - name: openid-connect
+    config:
+      anonymous: anonymous
+      issuer: https://dev-123456.okta.com/oauth2/default
+    route: openai-chat
+    model: alias-b
+ai_models:
+  - name: alias-a
+    tags: [ai-gateway-model-alias-group:source-model]
+  - name: alias-b
+    tags: [ai-gateway-model-alias-group:source-model]
+`)
+		doc, warnings, err := revertYAML(t, in, Options{Strict: true})
+		require.NoErrorf(t, err, "strict revert (warnings: %v)", warnings)
+		require.Empty(t, warnings)
+		require.Len(t, doc.Models, 1, "models = %+v", doc.Models)
+		require.Equal(t, []string{"openid-connect-1"}, doc.Models[0].Access.AuthStrategies,
+			"alias-b's own auth-strategy plugin, scoped only to it, must not be dropped by the merge")
+	})
+
+	t.Run("merge unions ACL allow/deny lists instead of dropping one alias's rules", func(t *testing.T) {
+		in := []byte(`
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: openai-chat
+        paths: [/ai/chat/completions]
+        methods: [POST]
+        strip_path: false
+plugins:
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-chat
+  - name: ai-proxy-advanced
+    config:
+      balancer: {algorithm: round-robin}
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - description: gpt-5
+          model: {model_alias: alias-a, name: gpt-5, provider: openai}
+          route_type: llm/v1/chat
+    route: openai-chat
+    model: alias-a
+  - name: ai-proxy-advanced
+    config:
+      balancer: {algorithm: round-robin}
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - description: gpt-5
+          model: {model_alias: alias-b, name: gpt-5, provider: openai}
+          route_type: llm/v1/chat
+    route: openai-chat
+    model: alias-b
+  - name: acl
+    config:
+      allow: [premium-users]
+      deny: [banned-a]
+      include_consumer_groups: true
+    route: openai-chat
+    model: alias-a
+  - name: acl
+    config:
+      allow: [beta-users]
+      deny: [banned-b]
+      include_consumer_groups: true
+    route: openai-chat
+    model: alias-b
+ai_models:
+  - name: alias-a
+    tags: [ai-gateway-model-alias-group:source-model]
+  - name: alias-b
+    tags: [ai-gateway-model-alias-group:source-model]
+`)
+		doc, warnings, err := revertYAML(t, in, Options{Strict: true})
+		require.NoErrorf(t, err, "strict revert (warnings: %v)", warnings)
+		require.Empty(t, warnings)
+		require.Len(t, doc.Models, 1, "models = %+v", doc.Models)
+		require.ElementsMatch(t, []string{"premium-users", "beta-users"}, doc.Models[0].Access.ACLs.Allow,
+			"alias-b's own allow rule must not be dropped in favor of alias-a's")
+		require.ElementsMatch(t, []string{"banned-a", "banned-b"}, doc.Models[0].Access.ACLs.Deny,
+			"alias-b's own deny rule must not be dropped in favor of alias-a's")
+	})
+
+	t.Run("three or more aliases merge into one model, in order", func(t *testing.T) {
+		in := []byte(`
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: openai-chat
+        paths: [/ai/chat/completions]
+        methods: [POST]
+        strip_path: false
+plugins:
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-chat
+  - name: ai-proxy-advanced
+    config:
+      balancer: {algorithm: round-robin}
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - description: gpt-5
+          model: {model_alias: alias-a, name: gpt-5, provider: openai}
+          route_type: llm/v1/chat
+    route: openai-chat
+    model: alias-a
+  - name: ai-proxy-advanced
+    config:
+      balancer: {algorithm: round-robin}
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - description: gpt-5
+          model: {model_alias: alias-b, name: gpt-5, provider: openai}
+          route_type: llm/v1/chat
+    route: openai-chat
+    model: alias-b
+  - name: ai-proxy-advanced
+    config:
+      balancer: {algorithm: round-robin}
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - description: gpt-5
+          model: {model_alias: alias-c, name: gpt-5, provider: openai}
+          route_type: llm/v1/chat
+    route: openai-chat
+    model: alias-c
+ai_models:
+  - name: alias-a
+    tags: [ai-gateway-model-alias-group:source-model]
+  - name: alias-b
+    tags: [ai-gateway-model-alias-group:source-model]
+  - name: alias-c
+    tags: [ai-gateway-model-alias-group:source-model]
+`)
+		doc, warnings, err := revertYAML(t, in, Options{Strict: true})
+		require.NoErrorf(t, err, "strict revert (warnings: %v)", warnings)
+		require.Empty(t, warnings)
+		require.Len(t, doc.Models, 1, "models = %+v", doc.Models)
+		require.Equal(t, []string{"alias-a", "alias-b", "alias-c"}, doc.Models[0].Config.Route.Model.Values)
+	})
+
+	t.Run("two independent multi-alias groups sharing one route merge separately", func(t *testing.T) {
+		in := []byte(`
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: openai-chat
+        paths: [/ai/chat/completions]
+        methods: [POST]
+        strip_path: false
+plugins:
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-chat
+  - name: ai-proxy-advanced
+    config:
+      balancer: {algorithm: round-robin}
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - description: gpt-5
+          model: {model_alias: a1, name: gpt-5, provider: openai}
+          route_type: llm/v1/chat
+    route: openai-chat
+    model: a1
+  - name: ai-proxy-advanced
+    config:
+      balancer: {algorithm: round-robin}
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - description: gpt-5
+          model: {model_alias: a2, name: gpt-5, provider: openai}
+          route_type: llm/v1/chat
+    route: openai-chat
+    model: a2
+  - name: ai-proxy-advanced
+    config:
+      balancer: {algorithm: round-robin}
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - description: gpt-6
+          model: {model_alias: b1, name: gpt-6, provider: openai}
+          route_type: llm/v1/chat
+    route: openai-chat
+    model: b1
+  - name: ai-proxy-advanced
+    config:
+      balancer: {algorithm: round-robin}
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - description: gpt-6
+          model: {model_alias: b2, name: gpt-6, provider: openai}
+          route_type: llm/v1/chat
+    route: openai-chat
+    model: b2
+ai_models:
+  - name: a1
+    tags: [ai-gateway-model-alias-group:group-a]
+  - name: a2
+    tags: [ai-gateway-model-alias-group:group-a]
+  - name: b1
+    tags: [ai-gateway-model-alias-group:group-b]
+  - name: b2
+    tags: [ai-gateway-model-alias-group:group-b]
+`)
+		doc, warnings, err := revertYAML(t, in, Options{Strict: true})
+		require.NoErrorf(t, err, "strict revert (warnings: %v)", warnings)
+		require.Empty(t, warnings)
+		require.Len(t, doc.Models, 2, "models = %+v; each group must merge only within itself", doc.Models)
+		require.Equal(t, []string{"a1", "a2"}, doc.Models[0].Config.Route.Model.Values)
+		require.Equal(t, []string{"b1", "b2"}, doc.Models[1].Config.Route.Model.Values)
+	})
+
+	t.Run("merges under the legacy flat ai-model-selector schema too", func(t *testing.T) {
+		in := []byte(`
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: openai-chat
+        paths: [/ai/chat/completions]
+        methods: [POST]
+        strip_path: false
+plugins:
+  - name: ai-model-selector
+    config:
+      body_path: model
+      max_request_body_size: 8388608
+      source: body
+    route: openai-chat
+  - name: ai-proxy-advanced
+    config:
+      balancer: {algorithm: round-robin}
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - description: gpt-5
+          model: {model_alias: alias-a, name: gpt-5, provider: openai}
+          route_type: llm/v1/chat
+    route: openai-chat
+    model: alias-a
+  - name: ai-proxy-advanced
+    config:
+      balancer: {algorithm: round-robin}
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - description: gpt-5
+          model: {model_alias: alias-b, name: gpt-5, provider: openai}
+          route_type: llm/v1/chat
+    route: openai-chat
+    model: alias-b
+ai_models:
+  - name: alias-a
+    tags: [ai-gateway-model-alias-group:source-model]
+  - name: alias-b
+    tags: [ai-gateway-model-alias-group:source-model]
+`)
+		doc, warnings, err := revertYAML(t, in, Options{Strict: true})
+		require.NoErrorf(t, err, "strict revert (warnings: %v)", warnings)
+		require.Empty(t, warnings)
+		require.Len(t, doc.Models, 1, "models = %+v", doc.Models)
+		require.Equal(t, []string{"alias-a", "alias-b"}, doc.Models[0].Config.Route.Model.Values)
+	})
+}
+
 func TestMCPLabelsPreferPluginTagsWithServiceFallback(t *testing.T) {
 	in := []byte(`
 _format_version: "3.0"

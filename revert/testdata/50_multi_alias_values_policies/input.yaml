@@ -59,6 +59,27 @@ plugins:
           route_type: llm/v1/chat
     route: openai-chat
     model: '@kong/gpt-4o-alias'
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://env/openai-key}'
+          description: gpt-4o
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: '@kong/unrelated-model'
+            name: gpt-4o
+            provider: openai
+          route_type: llm/v1/chat
+    route: openai-chat
+    model: '@kong/unrelated-model'
   - name: ai-prompt-guard
     config:
       allow_patterns:
@@ -92,3 +113,4 @@ ai_models:
   - name: '@kong/gpt-4o-alias'
     tags:
       - ai-gateway-model-alias-group:@kong/gpt-4o
+  - name: '@kong/unrelated-model'

@@ -1,0 +1,62 @@
+models:
+  - type: model
+    name: '@kong/gpt-4o'
+    capabilities:
+      - generate
+    formats:
+      - type: openai
+    targets:
+      - name: gpt-4o
+        provider: openai-env
+        config:
+          type: openai
+    policies:
+      - ai-prompt-guard
+    access:
+      acls:
+        allow:
+          - premium-users
+    config:
+      route:
+        paths:
+          - /ai
+        model:
+          values:
+            - '@kong/gpt-4o'
+            - '@kong/gpt-4o-alias'
+      logging:
+        payloads: false
+        statistics: true
+  - type: model
+    name: '@kong/unrelated-model'
+    capabilities:
+      - generate
+    formats:
+      - type: openai
+    targets:
+      - name: gpt-4o
+        provider: openai-env
+        config:
+          type: openai
+    config:
+      route:
+        paths:
+          - /ai
+      logging:
+        payloads: false
+        statistics: true
+model_providers:
+  - type: openai
+    name: openai-env
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: '{vault://env/openai-key}'
+policies:
+  - type: ai-prompt-guard
+    name: ai-prompt-guard
+    config:
+      allow_patterns:
+        - ^safe
