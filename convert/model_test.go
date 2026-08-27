@@ -7,20 +7,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestNormalizeNamedCaptures(t *testing.T) {
-	cases := map[string]string{
-		"~/openai/(?<m>[^/]+)":     "~/openai/(?P<m>[^/]+)",
-		"~/openai/(?P<m>[^/]+)":    "~/openai/(?P<m>[^/]+)",
-		"~/openai/(?'m'[^/]+)":     "~/openai/(?P<m>[^/]+)",
-		"~/a/(?<x>[^/]+)/(?'y'.+)": "~/a/(?P<x>[^/]+)/(?P<y>.+)",
-		"/no/captures/here":        "/no/captures/here",
-		"~/(?:non-capturing)/x":    "~/(?:non-capturing)/x",
-	}
-	for in, want := range cases {
-		require.Equal(t, want, normalizeNamedCaptures(in), "normalizeNamedCaptures(%q)", in)
-	}
-}
-
 func TestPathParamCapturedAllSyntaxes(t *testing.T) {
 	for _, path := range []string{
 		"~/openai/(?<model>[^/]+)",
