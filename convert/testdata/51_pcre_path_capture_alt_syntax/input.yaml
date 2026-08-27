@@ -1,8 +1,8 @@
 # PCRE path model extraction authored with the alternative named-capture
 # spellings Konnect also accepts on input: "(?P<name>...)" and "(?'name'...)".
-# Both must be detected and normalized to the "(?P<name>...)" form Konnect
-# accepts on the emitted route paths and pcre_pattern. Regression for KOKO-4312
-# / #150.
+# Both must be detected and kept as-is. Before KOKO-4379 (current fix) this would
+# be always normalized to the "(?P<name>...)" form, which is not required and could
+# lead to unexpected behavior on DP side.
 models:
   - name: alt-syntax-model
     type: model

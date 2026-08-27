@@ -1045,8 +1045,7 @@ func pathParamCaptured(paths []string, param string, specIsRegex bool) bool {
 // pcreNamedCaptureOpen matches the opening of a PCRE named capture group in any
 // of the three spellings PCRE accepts — "(?<name>", "(?P<name>", and "(?'name'"
 // — capturing the group name (group 1 for the angle-bracket forms, group 2 for
-// the quoted form). Konnect's route and ai-model-selector validators accept only
-// the "(?P<name>" spelling, so the converter normalizes to it.
+// the quoted form).
 var pcreNamedCaptureOpen = regexp.MustCompile(`\(\?(?:P?<([A-Za-z_][A-Za-z0-9_]*)>|'([A-Za-z_][A-Za-z0-9_]*)')`)
 
 // pcreNamedGroupFull matches a whole PCRE named capture group (opening plus
