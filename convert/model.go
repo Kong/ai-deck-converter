@@ -265,7 +265,7 @@ func (c *Converter) convertModels() error {
 				if g == nil {
 					paths := make([]string, len(bases))
 					for i, b := range bases {
-						paths[i] = aimap.RoutePath(normalizeNamedCaptures(b), spec)
+						paths[i] = aimap.RoutePath(b, spec)
 					}
 					routeName := uniqueModelRouteName(sec+"-"+spec.RouteLabel, usedRouteNames)
 					g = &routeGroup{
@@ -923,7 +923,7 @@ func (c *Converter) buildModelSelectorConfig(m *aigw.Model, spec aimap.EndpointS
 		for i, sourcePath := range m.Config.Route.Paths {
 			sources[i] = map[string]any{
 				"source":                "path",
-				"pcre_pattern":          normalizeNamedCaptures(sourcePath),
+				"pcre_pattern":          sourcePath,
 				"pcre_capture_name":     param,
 				"max_request_body_size": bodySizeOrDefault(m),
 			}
@@ -1070,16 +1070,6 @@ func pathHasNamedCapture(s, param string) bool {
 		}
 	}
 	return false
-}
-
-// normalizeNamedCaptures rewrites every PCRE named capture group opening in s to
-// the "(?P<name>" spelling Konnect accepts, leaving the group body and the rest
-// of the pattern untouched. Already-normalized "(?P<name>" openings are left as
-// they are.
-func normalizeNamedCaptures(s string) string {
-	return pcreNamedCaptureOpen.ReplaceAllStringFunc(s, func(match string) string {
-		return "(?P<" + namedCaptureName(pcreNamedCaptureOpen.FindStringSubmatch(match)) + ">"
-	})
 }
 
 // tryConvertPCREToLua derives an ai-model-selector Lua path_pattern from

@@ -5,8 +5,8 @@ services:
     routes:
       - name: openai-chat
         paths:
-          - ~/openai/(?P<openai_model>[^:/]+)/chat/completions
-          - ~/alternative/path/(?P<openai_model>[^:/]+)/chat/completions
+          - ~/openai/(?<openai_model>[^:/]+)/chat/completions
+          - ~/alternative/path/(?<openai_model>[^:/]+)/chat/completions
         methods:
           - POST
         strip_path: false
@@ -16,10 +16,10 @@ plugins:
       max_request_body_size: 8388608
       sources:
         - pcre_capture_name: openai_model
-          pcre_pattern: ~/openai/(?P<openai_model>[^:/]+)
+          pcre_pattern: ~/openai/(?<openai_model>[^:/]+)
           source: path
         - pcre_capture_name: openai_model
-          pcre_pattern: ~/alternative/path/(?P<openai_model>[^:/]+)
+          pcre_pattern: ~/alternative/path/(?<openai_model>[^:/]+)
           source: path
     route: openai-chat
   - name: ai-proxy-advanced
