@@ -189,6 +189,7 @@ mcp_servers:
 		EntityName:  "tools",
 		FieldPrefix: "config",
 		FieldMappings: []FieldMapping{
+			{GeneratedPrefix: "config.mcp_server_id", SourcePrefix: "id"},
 			{GeneratedPrefix: "config.mode", SourcePrefix: "type"},
 			{GeneratedPrefix: "config.tools", SourcePrefix: "tools"},
 			{GeneratedPrefix: "config.proxy_config", SourcePrefix: "config.proxy"},
@@ -238,6 +239,7 @@ agents:
 		EntityName:  "booking-agent",
 		FieldPrefix: "config",
 		FieldMappings: []FieldMapping{
+			{GeneratedPrefix: "config.agent_id", SourcePrefix: "id"},
 			{GeneratedPrefix: "config.proxy_config", SourcePrefix: "config.proxy"},
 			{GeneratedPrefix: "config.auth", SourcePrefix: "config.upstream.auth"},
 		},
@@ -1990,4 +1992,51 @@ model_providers:
 	if sanitizerCount != 2 {
 		t.Fatalf("expected 2 scoped ai-sanitizer plugins, got %d: %s", sanitizerCount, out)
 	}
+}
+
+func TestA2APluginEmitsAgentID(t *testing.T) {
+	a := &aigw.Agent{
+		ID:   "0f1e9c4a-6b3d-4f2e-9a17-5c8d2e7b4a10",
+		Type: "a2a",
+		Name: "agent1",
+	}
+	plugin, err := (&Converter{}).a2aPlugin(a)
+	require.NoError(t, err)
+	require.Equal(t, "0f1e9c4a-6b3d-4f2e-9a17-5c8d2e7b4a10", plugin.Config["agent_id"])
+}
+
+// An agent has no id during write-time validation, and an empty string is not a
+// valid uuid for the plugin schema, so the key must be absent rather than "".
+func TestA2APluginOmitsEmptyAgentID(t *testing.T) {
+	a := &aigw.Agent{Type: "a2a", Name: "agent1"}
+	plugin, err := (&Converter{}).a2aPlugin(a)
+	require.NoError(t, err)
+	require.NotContains(t, plugin.Config, "agent_id")
+}
+
+// The ai-mcp-proxy plugin is route-scoped in every mode, so the id must be
+// emitted for every mode, not just the listener modes.
+func TestMCPPluginEmitsServerIDForEveryMode(t *testing.T) {
+	for _, mode := range []string{
+		"conversion-only", "conversion-listener", "listener",
+		"passthrough-listener", "upstream-server",
+	} {
+		t.Run(mode, func(t *testing.T) {
+			m := &aigw.MCPServer{
+				ID:   "3d7a5b81-2c94-4e6f-8b03-9f1a6d5c8e22",
+				Type: mode,
+				Name: "mcp1",
+			}
+			plugin, err := (&Converter{}).mcpPlugin(m)
+			require.NoError(t, err)
+			require.Equal(t, "3d7a5b81-2c94-4e6f-8b03-9f1a6d5c8e22", plugin.Config["mcp_server_id"])
+		})
+	}
+}
+
+func TestMCPPluginOmitsEmptyServerID(t *testing.T) {
+	m := &aigw.MCPServer{Type: "conversion-listener", Name: "mcp1"}
+	plugin, err := (&Converter{}).mcpPlugin(m)
+	require.NoError(t, err)
+	require.NotContains(t, plugin.Config, "mcp_server_id")
 }

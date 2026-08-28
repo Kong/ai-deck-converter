@@ -83,6 +83,7 @@ func (r *Reverter) revertMCPServer(svc *kong.Service, rt *kong.Route, plugins, s
 	}
 
 	m := aigw.MCPServer{
+		ID:     getStr(cfg, "mcp_server_id"),
 		Type:   getStr(cfg, "mode"),
 		Name:   svc.Name,
 		Labels: labels,

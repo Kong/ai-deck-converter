@@ -1,0 +1,46 @@
+_format_version: "3.0"
+services:
+  - name: vendor-mcp
+    url: https://vendor-mcp.example.com/v3
+    routes:
+      - name: vendor-mcp-route
+        paths:
+          - /mcp/vendor
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              include_consumer_groups: true
+              logging:
+                log_audits: true
+                log_payloads: false
+                log_statistics: true
+              mcp_server_id: 3d7a5b81-2c94-4e6f-8b03-9f1a6d5c8e22
+              mode: conversion-listener
+              tools:
+                - description: Get a widget by ID
+                  method: GET
+                  name: get-widget-by-id
+                  parameters:
+                    - description: ID of the widget to retrieve
+                      in: path
+                      name: widgetId
+                      required: true
+                      schema:
+                        type: integer
+                  path: /mcp/vendor/widget/{widgetId}
+  - name: booking-agent
+    url: https://booking-agent.internal:8443/a2a
+    routes:
+      - name: booking-route
+        paths:
+          - /agents/booking
+        methods:
+          - POST
+        plugins:
+          - name: ai-a2a-proxy
+            config:
+              agent_id: 0f1e9c4a-6b3d-4f2e-9a17-5c8d2e7b4a10
+              logging:
+                log_payloads: false
+                log_statistics: true
+                max_payload_size: 1048576

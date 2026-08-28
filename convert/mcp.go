@@ -24,6 +24,7 @@ func (c *Converter) convertMCPServers() error {
 			return err
 		}
 		plugin.Source = source("mcp_server", m.Name, "config",
+			kong.FieldMapping{GeneratedPrefix: "config.mcp_server_id", SourcePrefix: "id"},
 			kong.FieldMapping{GeneratedPrefix: "config.mode", SourcePrefix: "type"},
 			kong.FieldMapping{GeneratedPrefix: "config.tools", SourcePrefix: "tools"},
 			kong.FieldMapping{GeneratedPrefix: "config.proxy_config", SourcePrefix: "config.proxy"},
@@ -147,6 +148,11 @@ func addTag(tags []string, tag string) []string {
 
 func (c *Converter) mcpPlugin(m *aigw.MCPServer) (kong.Plugin, error) {
 	cfg := map[string]any{"mode": m.Type}
+	// The Konnect MCP server UUID, so the DP can attribute analytics to this
+	// server. Emitted for every mode (the plugin is always route-scoped).
+	// Omitted when empty: write-time validation converts an entity that has no
+	// id yet, and an empty string is not a valid uuid for the plugin schema.
+	setIfNotEmpty(cfg, "mcp_server_id", m.ID)
 	if m.Config.MaxRequestBodySize != nil {
 		cfg["max_request_body_size"] = *m.Config.MaxRequestBodySize
 	}

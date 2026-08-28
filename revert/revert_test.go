@@ -427,3 +427,67 @@ func revertYAML(t *testing.T, in []byte, opts Options) (*aigw.Document, []string
 	require.NoErrorf(t, err, "re-parse output:\n%s", out)
 	return doc, warnings, nil
 }
+
+func TestRevertLiftsEntityIDs(t *testing.T) {
+	src := []byte(`
+_format_version: "3.0"
+services:
+  - name: booking-agent
+    url: https://agent.internal
+    routes:
+      - name: booking-agent-route
+        paths: [/agents/book]
+        plugins:
+          - name: ai-a2a-proxy
+            config:
+              agent_id: 0f1e9c4a-6b3d-4f2e-9a17-5c8d2e7b4a10
+  - name: vendor-mcp
+    url: https://vendor.internal
+    routes:
+      - name: vendor-mcp-route
+        paths: [/mcp/vendor]
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              mode: conversion-listener
+              mcp_server_id: 3d7a5b81-2c94-4e6f-8b03-9f1a6d5c8e22
+`)
+
+	out, warnings, err := Revert(src, Options{})
+	require.NoError(t, err)
+	require.Empty(t, warnings)
+	require.Contains(t, string(out), "id: 0f1e9c4a-6b3d-4f2e-9a17-5c8d2e7b4a10")
+	require.Contains(t, string(out), "id: 3d7a5b81-2c94-4e6f-8b03-9f1a6d5c8e22")
+}
+
+// A plugin config without the id must not produce an empty `id:` key, which
+// would re-convert into an invalid empty-string uuid.
+func TestRevertOmitsMissingEntityIDs(t *testing.T) {
+	src := []byte(`
+_format_version: "3.0"
+services:
+  - name: booking-agent
+    url: https://agent.internal
+    routes:
+      - name: booking-agent-route
+        paths: [/agents/book]
+        plugins:
+          - name: ai-a2a-proxy
+            config: {}
+  - name: vendor-mcp
+    url: https://vendor.internal
+    routes:
+      - name: vendor-mcp-route
+        paths: [/mcp/vendor]
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              mode: conversion-listener
+`)
+
+	out, warnings, err := Revert(src, Options{})
+	require.NoError(t, err)
+	require.Empty(t, warnings)
+	require.NotContains(t, string(out), "id: \"\"")
+	require.NotContains(t, string(out), "id: null")
+}

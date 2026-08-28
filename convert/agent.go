@@ -40,6 +40,7 @@ func (c *Converter) convertAgents() error {
 				return err
 			}
 			plugin.Source = source("agent", a.Name, "config",
+				kong.FieldMapping{GeneratedPrefix: "config.agent_id", SourcePrefix: "id"},
 				kong.FieldMapping{GeneratedPrefix: "config.proxy_config", SourcePrefix: "config.proxy"},
 				kong.FieldMapping{GeneratedPrefix: "config.auth", SourcePrefix: "config.upstream.auth"},
 			)
@@ -77,6 +78,10 @@ func (c *Converter) convertAgents() error {
 
 func (c *Converter) a2aPlugin(a *aigw.Agent) (kong.Plugin, error) {
 	cfg := map[string]any{}
+	// The Konnect agent UUID, so the DP can attribute analytics to this agent.
+	// Omitted when empty: write-time validation converts an entity that has no
+	// id yet, and an empty string is not a valid uuid for the plugin schema.
+	setIfNotEmpty(cfg, "agent_id", a.ID)
 	if logging := loggingBlock(withLoggingDefaults(a.Config.Logging, false, true)); logging != nil {
 		// log_audits is an ai-mcp-proxy field; the ai-a2a-proxy schema has no
 		// such key, so drop it to avoid emitting an unknown field.

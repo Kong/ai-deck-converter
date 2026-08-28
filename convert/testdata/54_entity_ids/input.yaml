@@ -1,0 +1,43 @@
+# Konnect Agent and MCP Server UUIDs must reach the ai-a2a-proxy / ai-mcp-proxy
+# plugin config so the data plane can attribute AI analytics to them (AG-1297).
+# The plugins are route-scoped, and Service IDs are derived from the name, so the
+# plugin config is the only place the UUID can travel.
+#
+# Shapes mirror the setup that reported the bug: an a2a agent and a
+# conversion-listener MCP server, neither declaring logging.statistics (it
+# defaults to true).
+agents:
+  - type: a2a
+    id: 0f1e9c4a-6b3d-4f2e-9a17-5c8d2e7b4a10
+    display_name: Booking Agent
+    name: booking-agent
+    policies: []
+    access:
+      acls: {allow: [], deny: []}
+    config:
+      url: https://booking-agent.internal:8443/a2a
+      route: {name: booking-route, paths: [/agents/booking], methods: [POST]}
+      logging: {payloads: false}
+mcp_servers:
+  - type: conversion-listener
+    id: 3d7a5b81-2c94-4e6f-8b03-9f1a6d5c8e22
+    display_name: Vendor MCP
+    name: vendor-mcp
+    policies: []
+    access:
+      acls: {allow: [], deny: []}
+    upstream_url: https://vendor-mcp.example.com/v3
+    config:
+      route: {name: vendor-mcp-route, paths: [/mcp/vendor]}
+      logging: {audits: true, payloads: false}
+    tools:
+      - name: get-widget-by-id
+        description: Get a widget by ID
+        method: GET
+        path: /mcp/vendor/widget/{widgetId}
+        parameters:
+          - name: widgetId
+            in: path
+            required: true
+            description: ID of the widget to retrieve
+            schema: {type: integer}

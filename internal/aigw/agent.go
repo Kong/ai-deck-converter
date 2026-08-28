@@ -5,6 +5,11 @@ import "gopkg.in/yaml.v3"
 // Agent is an AI Gateway agent. type is "a2a" (gets an ai-a2a-proxy plugin) or
 // "http" (plain proxy Service+Route). Both share the same config shape.
 type Agent struct {
+	// ID is the Konnect entity UUID. It is lowered into the ai-a2a-proxy
+	// plugin's config.agent_id so the data plane can attribute AI analytics to
+	// this agent; the plugin is route-scoped, so its config is the only place
+	// the UUID can travel.
+	ID          string            `yaml:"id,omitempty"`
 	Type        string            `yaml:"type,omitempty"`
 	DisplayName string            `yaml:"display_name,omitempty"`
 	Name        string            `yaml:"name,omitempty"`
