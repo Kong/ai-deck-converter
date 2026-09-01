@@ -1,5 +1,6 @@
 mcp_servers:
   - type: conversion-listener
+    id: 5b3e8cba-2cb7-4fd4-888e-20a6727230f2
     display_name: Flights MCP
     name: flights-mcp
     policies: []
@@ -25,6 +26,7 @@ mcp_servers:
         access:
           acls: {allow: [agents], deny: []}
   - type: passthrough-listener
+    id: 9b3e8cba-2cb7-4fd4-888e-20a6727230f2
     display_name: Vendor MCP
     name: vendor-mcp
     policies: []

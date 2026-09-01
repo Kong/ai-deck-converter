@@ -1,5 +1,6 @@
 agents:
   - type: a2a
+    id: 5b3e8cba-2cb7-4fd4-888e-20a6727230f2
     display_name: Booking Agent
     name: booking-agent
     policies: []
@@ -11,6 +12,7 @@ agents:
       max_request_body_size: 1048576
       logging: {statistics: true, payloads: false, max_payload_size: 524288}
   - type: http
+    id: 1b3e8cba-2cb7-4fd4-888e-20a6727230f2
     display_name: Weather Agent
     name: weather-agent
     policies: [require-key]
