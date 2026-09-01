@@ -136,6 +136,7 @@ type CIDRPort struct {
 type Plugin struct {
 	ID            string         `yaml:"id,omitempty"`
 	Name          string         `yaml:"name"`
+	InstanceName  string         `yaml:"instance_name,omitempty"`
 	Enabled       *bool          `yaml:"enabled,omitempty"`
 	Config        map[string]any `yaml:"config,omitempty"`
 	Service       *StringRef     `yaml:"service,omitempty"`
