@@ -41,7 +41,7 @@ plugins:
     route: openai-chat
     model: '@openai/gpt-4o-mini'
   - name: ai-proxy-advanced
-    instance_name: ai-proxy-advanced.google-gemini-2.5-flash.openai-chat
+    instance_name: ai-proxy-advanced.google-gemini-2-5-flash.openai-chat
     config:
       balancer:
         algorithm: round-robin

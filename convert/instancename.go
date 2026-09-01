@@ -8,18 +8,22 @@ import (
 	"github.com/Kong/ai-deck-converter/internal/kong"
 )
 
-// instanceNameDisallowed matches every run of characters Kong's
-// validate_utf8_name rejects (kong-ee:kong/db/schema/typedefs.lua), restricted
-// here to ASCII so callers never have to reason about the multibyte range it
-// also allows.
-var instanceNameDisallowed = regexp.MustCompile(`[^0-9A-Za-z._~-]+`)
+// instanceNameDisallowed matches every run of characters not safe to use
+// inside one sanitized instance_name segment. Kong's validate_utf8_name
+// (kong-ee:kong/db/schema/typedefs.lua) itself also allows "." and multibyte
+// UTF-8, but "." is reserved here as the inter-segment join separator
+// (buildInstanceName) and must never appear inside a segment itself, or two
+// distinct (model, route) qualifier pairs could sanitize to the same joined
+// string -- e.g. model "a.b" + route "c" and model "a" + route "b.c" would
+// otherwise both produce "a.b.c". Restricting to ASCII similarly avoids
+// callers having to reason about the multibyte range Kong allows.
+var instanceNameDisallowed = regexp.MustCompile(`[^0-9A-Za-z_~-]+`)
 
 // sanitizeInstanceNameSegment makes s safe to use as one dot-joined segment of
 // a Kong instance_name: a leading "@" is stripped (aliases are commonly
-// written "@openai/gpt-4o-mini"), every run of disallowed characters
-// collapses to a single "-", and leading/trailing "-" are trimmed. The "."
-// separator itself is excluded from the allowed set so it can never appear
-// inside a sanitized segment and be mistaken for one.
+// written "@openai/gpt-4o-mini"), every run of disallowed characters --
+// including literal "." -- collapses to a single "-", and leading/trailing
+// "-" are trimmed.
 func sanitizeInstanceNameSegment(s string) string {
 	s = strings.TrimPrefix(s, "@")
 	s = instanceNameDisallowed.ReplaceAllString(s, "-")
