@@ -1,5 +1,6 @@
 models:
   - display_name: GPT-5.2
+    id: 5b3e8cba-2cb7-4fd4-888e-20a6727230f2
     name: gpt-5-2
     type: model
     enabled: true

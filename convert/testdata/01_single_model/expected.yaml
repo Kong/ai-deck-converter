@@ -43,4 +43,5 @@ plugins:
     route: openai-chat
     model: gpt-5-2
 ai_models:
-  - name: gpt-5-2
+  - id: 5b3e8cba-2cb7-4fd4-888e-20a6727230f2
+    name: gpt-5-2

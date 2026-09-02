@@ -15,6 +15,7 @@ func (r *Reverter) revertAgent(svc *kong.Service, rt *kong.Route, name string, s
 
 	a := aigw.Agent{
 		Type:   "http",
+		ID:     svc.ID,
 		Name:   name,
 		Labels: r.tagsToLabels(svc.Tags),
 	}

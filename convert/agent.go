@@ -59,6 +59,7 @@ func (c *Converter) convertAgents() error {
 		}
 		svc := kong.Service{
 			Name:   a.Name,
+			ID:     a.ID,
 			URL:    a.Config.URL,
 			Routes: []kong.Route{route},
 			Tags:   c.labelsToTags(a.Labels),

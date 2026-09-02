@@ -6,6 +6,8 @@ import "gopkg.in/yaml.v3"
 // (conversion-only | conversion-listener | listener | passthrough-listener |
 // upstream-server), which maps to the ai-mcp-proxy plugin's config.mode.
 type MCPServer struct {
+	// ID is the Konnect entity UUID
+	ID          string          `yaml:"id,omitempty"`
 	Type        string          `yaml:"type,omitempty"`
 	DisplayName string          `yaml:"display_name,omitempty"`
 	Name        string          `yaml:"name,omitempty"`

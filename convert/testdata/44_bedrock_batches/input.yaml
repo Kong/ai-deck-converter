@@ -12,6 +12,7 @@ model_providers:
         secret_access_key: "{vault://ai/aws-secret-access-key}"
 models:
   - display_name: Bedrock Batch API
+    id: 5b3e8cba-2cb7-4fd4-888e-20a6727230f2
     name: bedrock-batch-api
     type: api
     capabilities: [batches]

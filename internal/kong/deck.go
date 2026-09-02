@@ -88,6 +88,7 @@ func NewDocument() *Document {
 // Service is a Kong Gateway Service. Routes and Plugins may be nested.
 type Service struct {
 	Name     string   `yaml:"name"`
+	ID       string   `yaml:"id,omitempty"`
 	URL      string   `yaml:"url,omitempty"`
 	Host     string   `yaml:"host,omitempty"`
 	Port     *int     `yaml:"port,omitempty"`

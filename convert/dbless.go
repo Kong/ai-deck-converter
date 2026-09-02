@@ -43,7 +43,7 @@ func (c *Converter) projectDBLess() *kong.DBLessDocument {
 	}
 
 	for _, svc := range c.out.Services {
-		ids.service[svc.Name] = stableUUID("service:" + svc.Name)
+		ids.service[svc.Name] = firstNonEmpty(svc.ID, stableUUID("service:"+svc.Name))
 		for _, route := range svc.Routes {
 			ids.route[svc.Name+"|"+route.Name] = stableUUID("route:" + svc.Name + ":" + route.Name)
 		}

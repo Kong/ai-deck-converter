@@ -1,6 +1,7 @@
 _format_version: "3.0"
 services:
   - name: flights-mcp
+    id: 5b3e8cba-2cb7-4fd4-888e-20a6727230f2
     host: localhost
     routes:
       - name: flights-mcp-route
@@ -37,6 +38,7 @@ services:
                   name: bookFlight
                   path: /flights/book
   - name: vendor-mcp
+    id: 9b3e8cba-2cb7-4fd4-888e-20a6727230f2
     url: https://vendor-mcp.example.com/mcp
     routes:
       - name: vendor-mcp-route

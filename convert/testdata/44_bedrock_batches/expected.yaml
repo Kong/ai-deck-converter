@@ -37,4 +37,5 @@ plugins:
           route_type: llm/v1/batches
     route: bedrock-batches
 ai_models:
-  - name: bedrock-batch-api
+  - id: 5b3e8cba-2cb7-4fd4-888e-20a6727230f2
+    name: bedrock-batch-api

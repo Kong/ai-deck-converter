@@ -369,6 +369,7 @@ func (r *Reverter) finalizeModels(acc *modelAcc) error {
 			g.model.Type = "api"
 		}
 		if entry, ok := r.aiModelByName[g.model.Name]; ok {
+			g.model.ID = entry.ID
 			g.model.Labels = r.tagsToLabels(entry.Tags)
 		}
 
@@ -397,7 +398,7 @@ func (r *Reverter) finalizeModels(acc *modelAcc) error {
 			m.Name); err != nil {
 			return err
 		}
-		model := aigw.Model{Type: "model", Name: m.Name}
+		model := aigw.Model{Type: "model", ID: m.ID, Name: m.Name}
 		if m.Alias != "" {
 			model.Config.Route.Model.Values = []string{m.Alias}
 		}

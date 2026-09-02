@@ -60,6 +60,7 @@ func (c *Converter) convertMCPServers() error {
 
 		service := kong.Service{
 			Name:   m.Name,
+			ID:     m.ID,
 			Routes: []kong.Route{route},
 			Tags:   c.labelsToTags(m.Labels),
 			Source: serviceURLSource("mcp_server", m.Name),
