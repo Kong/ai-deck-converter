@@ -29,7 +29,7 @@ plugins:
             aws_secret_access_key: '{vault://env/aws-secret}'
             aws_session_token: '{vault://env/aws-session-token}'
             gcp_workload_identity_federation_auth_json: '{vault://ai/gcp-auth-json}'
-            gcp_workload_identity_federation_source: aws-iam
+            gcp_workload_identity_federation_source: aws_iam
           description: gpt-4o-on-gemini
           logging:
             log_payloads: false

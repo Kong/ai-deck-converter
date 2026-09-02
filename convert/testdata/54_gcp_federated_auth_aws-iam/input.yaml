@@ -29,7 +29,7 @@ model_providers:
       auth:
         type: gcp
         workload_identity_federation:
-          source: aws-iam
+          source: aws_iam
           auth_json: "{vault://ai/gcp-auth-json}"
           aws_access_key_id: "{vault://env/aws-key-id}"
           aws_secret_access_key: "{vault://env/aws-secret}"
