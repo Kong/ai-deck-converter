@@ -82,7 +82,7 @@ type ProviderAuth struct {
 	SessionToken string `yaml:"session_token,omitempty"`
 }
 
-// GCPWorkloadIdentityFederation is the endpoint configuration for GCP models using Workload Federation
+// GCPWorkloadIdentityFederation holds auth configuration for GCP providers using Workload Identity Federation.
 type GCPWorkloadIdentityFederation struct {
 	Source   string `yaml:"source,omitempty"` // maps to gcp_workload_identity_federation_source in plugin config
 	AuthJSON string `yaml:"auth_json,omitempty"`
