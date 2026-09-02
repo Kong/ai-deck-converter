@@ -61,7 +61,7 @@ func resolveAuth(p *aigw.Provider, allowOverride *bool) map[string]any {
 		}
 		if a.UseGCPServiceAccount != nil {
 			auth["gcp_use_service_account"] = *a.UseGCPServiceAccount
-		} else if a.Type == "gcp" || a.ServiceAccountJSON != "" {
+		} else if a.Type == "gcp" && a.ServiceAccountJSON != "" {
 			auth["gcp_use_service_account"] = true
 		}
 		if a.MetadataURL != "" {
@@ -69,6 +69,26 @@ func resolveAuth(p *aigw.Provider, allowOverride *bool) map[string]any {
 		}
 		if a.OAuthTokenURL != "" {
 			auth["gcp_oauth_token_url"] = a.OAuthTokenURL
+		}
+		// gcp workload identity federation. The credentials of the federated
+		// source identity (currently only aws-iam) are exchanged for a GCP token,
+		// so they occupy the same target auth keys the AWS providers use.
+		if wif := a.WorkloadIdentityFederation; wif != nil {
+			if wif.Source != "" {
+				auth["gcp_workload_identity_federation_source"] = wif.Source
+			}
+			if wif.AuthJSON != "" {
+				auth["gcp_workload_identity_federation_auth_json"] = wif.AuthJSON
+			}
+			if wif.AWSAccessKeyID != "" {
+				auth["aws_access_key_id"] = wif.AWSAccessKeyID
+			}
+			if wif.AWSSecretAccessKey != "" {
+				auth["aws_secret_access_key"] = wif.AWSSecretAccessKey
+			}
+			if wif.AWSSessionToken != "" {
+				auth["aws_session_token"] = wif.AWSSessionToken
+			}
 		}
 		// sagemaker
 		if p.Type == "sagemaker" && a.SessionToken != "" {
@@ -282,6 +302,25 @@ func mapOptions(opts map[string]any, providerType, modelName string, provider *a
 			}
 			if provider.Config.Foundry.Domain != "" {
 				out["azure_foundry_domain"] = provider.Config.Foundry.Domain
+			}
+		}
+		// A gemini/vertex provider federating from an AWS IAM identity signs the
+		// token exchange with AWS, so its region and assume-role settings ride in
+		// the same model.options.bedrock block the bedrock provider uses.
+		if providerType == "gemini" || providerType == "vertex" {
+			if wif := provider.Config.Auth.WorkloadIdentityFederation; wif != nil {
+				if wif.AWSRegion != "" {
+					addNested("bedrock", "aws_region", wif.AWSRegion)
+				}
+				if wif.AWSAssumeRoleARN != "" {
+					addNested("bedrock", "aws_assume_role_arn", wif.AWSAssumeRoleARN)
+				}
+				if wif.AWSRoleSessionName != "" {
+					addNested("bedrock", "aws_role_session_name", wif.AWSRoleSessionName)
+				}
+				if wif.AWSSTSEndpointURL != "" {
+					addNested("bedrock", "aws_sts_endpoint_url", wif.AWSSTSEndpointURL)
+				}
 			}
 		}
 		if providerType == "bedrock" {

@@ -39,6 +39,16 @@ type defoldedTarget struct {
 	options         map[string]any
 }
 
+// federation returns the target's GCP workload identity federation config,
+// creating it on first use. defoldAuth normally populates it from the target
+// auth block; this covers a config carrying only the AWS STS options.
+func (d *defoldedTarget) federation() *aigw.GCPWorkloadIdentityFederation {
+	if d.auth.WorkloadIdentityFederation == nil {
+		d.auth.WorkloadIdentityFederation = &aigw.GCPWorkloadIdentityFederation{}
+	}
+	return d.auth.WorkloadIdentityFederation
+}
+
 // defoldAuth reverses convert's resolveAuth: it reads an ai-proxy-advanced
 // target auth block back into provider auth fields plus the target-level
 // allow_override flag, inferring the auth type from which fields are present.
@@ -51,12 +61,26 @@ func defoldAuth(auth map[string]any, providerType string) (aigw.ProviderAuth, *b
 		getStr(auth, "param_location"); name != "" || value != "" || loc != "" {
 		a.Params = []aigw.AuthParam{{Name: name, Value: value, Location: loc}}
 	}
-	a.AccessKeyID = getStr(auth, "aws_access_key_id")
-	a.SecretAccessKey = getStr(auth, "aws_secret_access_key")
-	if providerType == "sagemaker" {
-		a.SessionToken = getStr(auth, "aws_session_token")
+	// A GCP workload identity federation source claims the aws_* credential keys:
+	// they identify the federated AWS identity being exchanged for a GCP token,
+	// not the provider's own AWS credentials.
+	if source, authJSON := getStr(auth, "gcp_workload_identity_federation_source"),
+		getStr(auth, "gcp_workload_identity_federation_auth_json"); source != "" || authJSON != "" {
+		a.WorkloadIdentityFederation = &aigw.GCPWorkloadIdentityFederation{
+			Source:             source,
+			AuthJSON:           authJSON,
+			AWSAccessKeyID:     getStr(auth, "aws_access_key_id"),
+			AWSSecretAccessKey: getStr(auth, "aws_secret_access_key"),
+			AWSSessionToken:    getStr(auth, "aws_session_token"),
+		}
 	} else {
-		a.AWSSessionToken = getStr(auth, "aws_session_token")
+		a.AccessKeyID = getStr(auth, "aws_access_key_id")
+		a.SecretAccessKey = getStr(auth, "aws_secret_access_key")
+		if providerType == "sagemaker" {
+			a.SessionToken = getStr(auth, "aws_session_token")
+		} else {
+			a.AWSSessionToken = getStr(auth, "aws_session_token")
+		}
 	}
 	a.ClientID = getStr(auth, "azure_client_id")
 	a.ClientSecret = getStr(auth, "azure_client_secret")
@@ -78,7 +102,8 @@ func defoldAuth(auth map[string]any, providerType string) (aigw.ProviderAuth, *b
 		}
 	case a.ClientID != "" || a.UseManagedIdentity != nil:
 		a.Type = "azure"
-	case a.ServiceAccountJSON != "" || a.UseGCPServiceAccount != nil || a.MetadataURL != "":
+	case a.ServiceAccountJSON != "" || a.UseGCPServiceAccount != nil || a.MetadataURL != "" ||
+		a.WorkloadIdentityFederation != nil:
 		a.Type = "gcp"
 	}
 	// Forward emits gcp_use_service_account=true implicitly for gcp auth; drop
@@ -121,6 +146,25 @@ func defoldOptions(options map[string]any, providerType string, d *defoldedTarge
 					env[gk] = gv
 				}
 				out["gcp_environment"] = env
+			}
+		case (providerType == "gemini" || providerType == "vertex") && k == "bedrock":
+			// AWS STS settings for a workload identity federation token exchange
+			// (see convert's mapOptions), not target options.
+			block, _ := v.(map[string]any)
+			for bk, bv := range block {
+				s, _ := bv.(string)
+				switch bk {
+				case "aws_region":
+					d.federation().AWSRegion = s
+				case "aws_assume_role_arn":
+					d.federation().AWSAssumeRoleARN = s
+				case "aws_role_session_name":
+					d.federation().AWSRoleSessionName = s
+				case "aws_sts_endpoint_url":
+					d.federation().AWSSTSEndpointURL = s
+				default:
+					out[bk] = bv
+				}
 			}
 		case providerType == "bedrock" && k == "bedrock":
 			block, _ := v.(map[string]any)
@@ -242,6 +286,19 @@ func providerFingerprint(providerType string, d *defoldedTarget) string {
 		fmt.Sprintf("use_managed_identity=%v", ptrVal(a.UseManagedIdentity)),
 		fmt.Sprintf("use_gcp_service_account=%v", ptrVal(a.UseGCPServiceAccount)),
 	}
+	if wif := a.WorkloadIdentityFederation; wif != nil {
+		parts = append(parts,
+			"wif.source="+wif.Source,
+			"wif.auth_json="+wif.AuthJSON,
+			"wif.access_key_id="+wif.AWSAccessKeyID,
+			"wif.secret_access_key="+wif.AWSSecretAccessKey,
+			"wif.aws_session_token="+wif.AWSSessionToken,
+			"wif.aws_region="+wif.AWSRegion,
+			"wif.assume_role_arn="+wif.AWSAssumeRoleARN,
+			"wif.role_session_name="+wif.AWSRoleSessionName,
+			"wif.sts_endpoint_url="+wif.AWSSTSEndpointURL,
+		)
+	}
 	for _, h := range a.Headers {
 		parts = append(parts, "header="+h.Name+"="+h.Value)
 	}
@@ -290,6 +347,9 @@ func vaultPrefix(a aigw.ProviderAuth) string {
 	}
 	if len(a.Params) > 0 {
 		candidates = append([]string{a.Params[0].Value}, candidates...)
+	}
+	if wif := a.WorkloadIdentityFederation; wif != nil {
+		candidates = append(candidates, wif.AuthJSON, wif.AWSSecretAccessKey, wif.AWSSessionToken, wif.AWSAccessKeyID)
 	}
 	for _, v := range candidates {
 		if m := vaultRefRe.FindStringSubmatch(v); m != nil {
