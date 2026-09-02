@@ -52,7 +52,7 @@ func authStrategyPlugin(idp *aigw.AuthStrategy) kong.Plugin {
 	return kong.Plugin{
 		Name:   idp.Type,
 		Config: cfg,
-		Source: source("identity_provider", idp.Name, "config"),
+		Source: source("auth_strategy", idp.Name, "config"),
 	}
 }
 

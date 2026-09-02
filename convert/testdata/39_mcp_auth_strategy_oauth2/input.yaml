@@ -1,4 +1,4 @@
-identity_providers:
+auth_strategies:
   - display_name: Okta OIDC
     name: okta-oidc
     type: openid-connect
@@ -35,7 +35,7 @@ mcp_servers:
       route:
         paths: [/mcp/secure-flights]
     access:
-      identity_providers: [okta-oidc]
+      auth_strategies: [okta-oidc]
       metadata:
         endpoint: /mcp/secure-flights/.well-known/oauth-protected-resource
         resource: https://api.example.com/mcp/secure-flights
@@ -56,7 +56,7 @@ mcp_servers:
       route:
         paths: [/mcp/keyed]
     access:
-      identity_providers: [mcp-key-auth]
+      auth_strategies: [mcp-key-auth]
     tools:
       - name: ping
         description: Ping the server
@@ -72,7 +72,7 @@ mcp_servers:
       route:
         paths: [/mcp/vendor-proxy]
     access:
-      identity_providers: [okta-oidc]
+      auth_strategies: [okta-oidc]
       metadata:
         endpoint: /mcp/vendor-proxy/.well-known/oauth-protected-resource
         resource: https://api.example.com/mcp/vendor-proxy

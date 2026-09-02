@@ -97,7 +97,7 @@ func (c *Converter) mcpIdentityPlugins(m *aigw.MCPServer, route *kong.Route) ([]
 	for k, v := range idp.Config {
 		cfg[k] = v
 	}
-	plugin := kong.Plugin{Name: idp.Type, Config: cfg, Source: source("identity_provider", idp.Name, "config")}
+	plugin := kong.Plugin{Name: idp.Type, Config: cfg, Source: source("auth_strategy", idp.Name, "config")}
 	return []kong.Plugin{plugin}, nil
 }
 

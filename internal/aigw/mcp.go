@@ -1,7 +1,5 @@
 package aigw
 
-import "gopkg.in/yaml.v3"
-
 // MCPServer is an AI Gateway MCP Server. The discriminator `type` is the mode
 // (conversion-only | conversion-listener | listener | passthrough-listener |
 // upstream-server), which maps to the ai-mcp-proxy plugin's config.mode.
@@ -44,26 +42,6 @@ type MCPAccess struct {
 	// MCP server. When set (with an openid-connect provider), it lowers into an
 	// ai-mcp-oauth2 plugin.
 	Metadata *MCPProtectedResourceMetadata `yaml:"metadata,omitempty"`
-}
-
-// mcpAccessFields mirrors MCPAccess without its UnmarshalYAML, so the decoder
-// can populate the current keys without recursing.
-type mcpAccessFields MCPAccess
-
-// UnmarshalYAML decodes an MCPAccess, folding the deprecated
-// identity_providers key into AuthStrategies.
-func (a *MCPAccess) UnmarshalYAML(node *yaml.Node) error {
-	var fields mcpAccessFields
-	if err := node.Decode(&fields); err != nil {
-		return err
-	}
-	*a = MCPAccess(fields)
-	refs, err := appendDeprecatedAuthStrategyRefs(node, a.AuthStrategies)
-	if err != nil {
-		return err
-	}
-	a.AuthStrategies = refs
-	return nil
 }
 
 // MCPProtectedResourceMetadata is the OAuth 2.0 Protected Resource Metadata
