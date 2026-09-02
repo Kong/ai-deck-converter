@@ -72,20 +72,37 @@ type ProviderAuth struct {
 	UseManagedIdentity *bool  `yaml:"use_managed_identity,omitempty"`
 
 	// gcp
-	ServiceAccountJSON   string `yaml:"service_account_json,omitempty"`
-	MetadataURL          string `yaml:"metadata_url,omitempty"`
-	OAuthTokenURL        string `yaml:"oauth_token_url,omitempty"`
-	UseGCPServiceAccount *bool  `yaml:"use_gcp_service_account,omitempty"`
+	ServiceAccountJSON         string                         `yaml:"service_account_json,omitempty"`
+	MetadataURL                string                         `yaml:"metadata_url,omitempty"`
+	OAuthTokenURL              string                         `yaml:"oauth_token_url,omitempty"`
+	UseGCPServiceAccount       *bool                          `yaml:"use_gcp_service_account,omitempty"`
+	WorkloadIdentityFederation *GCPWorkloadIdentityFederation `yaml:"workload_identity_federation,omitempty"`
 
 	// aws (bedrock/sagemaker) — temporary IAM session token
 	SessionToken string `yaml:"session_token,omitempty"`
+}
+
+// GCPWorkloadIdentityFederation is the endpoint configuration for GCP models using Workload Federation
+type GCPWorkloadIdentityFederation struct {
+	Source   string `yaml:"source,omitempty"` // maps to gcp_workload_identity_federation_source in plugin config
+	AuthJSON string `yaml:"auth_json,omitempty"`
+
+	// aws-iam federated auth configuration
+	AWSAccessKeyID     string `yaml:"aws_access_key_id,omitempty"`
+	AWSSecretAccessKey string `yaml:"aws_secret_access_key,omitempty"`
+	AWSSessionToken    string `yaml:"aws_session_token,omitempty"`
+	AWSRegion          string `yaml:"aws_region,omitempty"`
+	AWSAssumeRoleARN   string `yaml:"aws_assume_role_arn,omitempty"`
+	AWSRoleSessionName string `yaml:"aws_role_session_name,omitempty"`
+	AWSSTSEndpointURL  string `yaml:"aws_sts_endpoint_url,omitempty"`
 }
 
 // isEmpty reports whether no auth was decoded (used to detect the flattened form).
 func (a ProviderAuth) isEmpty() bool {
 	return a.Type == "" && len(a.Headers) == 0 && len(a.Params) == 0 &&
 		a.AccessKeyID == "" && a.SessionToken == "" && a.AWSSessionToken == "" && a.ServiceAccountJSON == "" &&
-		a.ClientID == "" && a.UseManagedIdentity == nil && a.UseGCPServiceAccount == nil
+		a.ClientID == "" && a.UseManagedIdentity == nil && a.UseGCPServiceAccount == nil &&
+		a.WorkloadIdentityFederation == nil
 }
 
 // AuthHeader is a single auth header (maxItems 1 in the schema).

@@ -1,0 +1,41 @@
+models:
+  - type: model
+    display_name: Gemini federated AWS IAM
+    name: gemini-federated-aws-iam
+    capabilities: [generate]
+    formats:
+      - type: openai
+    targets:
+      - name: gpt-4o-on-gemini
+        provider: gemini-prod
+        config:
+          type: gemini
+          gcp_environment:
+            api_endpoint: us-central1-aiplatform.googleapis.com
+            location_id: us-central1
+            project_id: my-project-id
+          upstream_url: https://generativelanguage.googleapis.com
+    policies: []
+    access:
+      acls: {allow: [], deny: []}
+    config:
+      route:
+        paths: [/ai]
+model_providers:
+  - name: gemini-prod
+    type: gemini
+    display_name: Google Gemini AI (Prod)
+    config:
+      auth:
+        type: gcp
+        workload_identity_federation:
+          source: aws-iam
+          auth_json: "{vault://ai/gcp-auth-json}"
+          aws_access_key_id: "{vault://env/aws-key-id}"
+          aws_secret_access_key: "{vault://env/aws-secret}"
+          aws_session_token: "{vault://env/aws-session-token}"
+          aws_region: us-east-1
+          aws_assume_role_arn: "arn:aws:iam::123:role/bedrock"
+          aws_role_session_name: kong-session
+          aws_sts_endpoint_url: "https://sts.us-east-1.amazonaws.com"
+
