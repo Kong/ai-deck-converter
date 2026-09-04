@@ -46,6 +46,12 @@ type Options struct {
 	// keep targeting the legacy schema (config.source, one shape per route)
 	// for data planes that don't support config.sources yet.
 	ModelSelectorSources *bool `yaml:"model_selector_sources"`
+	// PluginInstanceNames stamps a deterministic instance_name on every
+	// generated plugin so Kong Manager and the Admin API can tell instances
+	// apart. Off by default: it changes generated output, and Konnect folds the
+	// converter version into its config-generation version, so flipping the
+	// default would force a resync of every AI Gateway cluster.
+	PluginInstanceNames bool `yaml:"plugin_instance_names"`
 }
 
 func (o Options) withDefaults() Options {
@@ -460,6 +466,11 @@ func (c *Converter) run() error {
 	}
 	if err := c.convertAgents(); err != nil {
 		return err
+	}
+	if c.opts.PluginInstanceNames {
+		if err := applyPluginInstanceNames(c.out); err != nil {
+			return err
+		}
 	}
 	return nil
 }

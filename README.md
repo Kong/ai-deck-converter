@@ -48,6 +48,7 @@ cat input.yaml | ./ai-deck-converter -
 | `-strict` | `false` | Treat unresolved references and unconvertible entities as errors instead of warnings. |
 | `-label-tag-prefix` | `""` | Prefix for label-derived tags, e.g. `aigw/` (prepended when converting to decK, stripped when reverting). |
 | `-model-selector-sources` | `true` | Target the `ai-model-selector` `config.sources` schema (Kong/kong-ee#20858), merging models with different selector shapes onto one shared route instead of one route per shape. Only for data planes new enough to support `config.sources` — they don't accept the legacy `config.source` it replaces. Set to `false` to keep targeting the legacy schema for data planes that don't support `config.sources` yet. |
+| `-plugin-instance-names` | `false` | Stamp a deterministic `instance_name` on every generated plugin (e.g. `ai-proxy-advanced.openai-gpt-4o-mini.openai-chat`) so Kong Manager and the Admin API can tell same-type instances apart. Off by default: it changes generated output, and Konnect folds the converter version into its config-generation version, so flipping the default would force a resync of every AI Gateway cluster. |
 
 Warnings (unresolved references, unsupported features, placeholders, dropped
 entities) are printed to stderr; the converted config still goes to stdout/`-o`.
