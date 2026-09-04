@@ -28,6 +28,9 @@ func proxyConfigBlock(p *aigw.ProxyConfig) map[string]any {
 		setIfNotEmpty(cfg, "auth_password", p.Auth.Password)
 	}
 	setIfNotEmpty(cfg, "no_proxy", p.NoProxy)
+	if p.AIGW21Demo != nil {
+		cfg["aigw_2_1_demo"] = *p.AIGW21Demo
+	}
 	if len(cfg) == 0 {
 		return nil
 	}

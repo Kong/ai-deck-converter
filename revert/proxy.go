@@ -12,6 +12,7 @@ func proxyFromConfig(cfg map[string]any) *aigw.ProxyConfig {
 	p := &aigw.ProxyConfig{
 		ProxyScheme: getStr(cfg, "proxy_scheme"),
 		NoProxy:     getStr(cfg, "no_proxy"),
+		AIGW21Demo:  getBool(cfg, "aigw_2_1_demo"),
 	}
 	if host, port := getStr(cfg, "http_proxy_host"), getInt(cfg, "http_proxy_port"); host != "" || port != nil {
 		p.HTTPProxy = &aigw.ProxyHost{Host: host, Port: port}

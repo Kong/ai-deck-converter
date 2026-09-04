@@ -10,6 +10,10 @@ type ProxyConfig struct {
 	ProxyScheme string     `yaml:"proxy_scheme,omitempty"`
 	Auth        *ProxyAuth `yaml:"auth,omitempty"`
 	NoProxy     string     `yaml:"no_proxy,omitempty"`
+	// AIGW21Demo is a deliberately optional compatibility-spike field. It
+	// verifies that fields configured on native AI entities can be carried to
+	// the generated AI plugins without an API-side direct plugin config.
+	AIGW21Demo *bool `yaml:"aigw_2_1_demo,omitempty"`
 }
 
 // ProxyHost is one proxy server address (host + port).
