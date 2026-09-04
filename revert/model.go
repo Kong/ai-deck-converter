@@ -290,7 +290,9 @@ func (r *Reverter) modelGroupFor(
 	g.model.Config.ResponseStreaming = getStr(cfg, "response_streaming")
 	g.model.Config.Proxy = proxyFromConfig(getMap(cfg, "proxy_config"))
 	g.model.Config.MaxRequestBodySize = getInt(cfg, "max_request_body_size")
-	g.model.Config.Balancer = balancerFromConfig(getMap(cfg, "balancer"), cfg["vectordb"], cfg["embeddings"])
+	g.model.Config.Balancer = balancerFromConfig(
+		getMap(cfg, "balancer"), aimap.VectorDBFromPlugin(cfg["vectordb"]), cfg["embeddings"],
+	)
 	acc.groups[key] = g
 	acc.order = append(acc.order, key)
 	return g, nil
