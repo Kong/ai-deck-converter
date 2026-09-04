@@ -2,11 +2,30 @@ package convert
 
 import (
 	"fmt"
+	"maps"
+	"reflect"
 	"slices"
 
 	"github.com/Kong/ai-deck-converter/internal/aigw"
 	"github.com/Kong/ai-deck-converter/internal/kong"
 )
+
+// mcpConversionOnly is the MCP server mode that serves no MCP traffic of its
+// own: it is a toolset exposed through the listeners that name it in
+// config.sources. Its route is protected with those listeners' access plugins
+// (see applyListenerAccess).
+const mcpConversionOnly = "conversion-only"
+
+// mcpLowering is what the per-server loop hands to the post-pass: the access
+// plugins each server produced, and which entries of c.out.Services belong to a
+// conversion-only server. The services are held by index, not by name, so
+// pruning can never remove a service that merely shares a name with one (the
+// shared model service is named aimap.GatewayServiceName, which an MCP server
+// is free to be called too).
+type mcpLowering struct {
+	access                 map[string][]kong.Plugin
+	conversionOnlyServices []int
+}
 
 // convertMCPServers translates AI Gateway MCP Servers into a Gateway Service +
 // Route with an ai-mcp-proxy plugin (config.mode = the source type, one of
@@ -15,6 +34,7 @@ import (
 // tools[].acl), not as Kong acl plugins, because ai-mcp-proxy does not support
 // consumer scoping.
 func (c *Converter) convertMCPServers() error {
+	lowered := mcpLowering{access: map[string][]kong.Plugin{}}
 	for i := range c.src.MCPServers {
 		m := &c.src.MCPServers[i]
 		route := buildRoute(m.Config.Route, m.Name)
@@ -57,6 +77,9 @@ func (c *Converter) convertMCPServers() error {
 			return err
 		}
 		route.Plugins = append(route.Plugins, authPlugins...)
+		if len(authPlugins) > 0 {
+			lowered.access[m.Name] = authPlugins
+		}
 
 		service := kong.Service{
 			Name:   m.Name,
@@ -83,10 +106,12 @@ func (c *Converter) convertMCPServers() error {
 		if m.Enabled != nil && !*m.Enabled {
 			service.Enabled = m.Enabled
 		}
+		if m.Type == mcpConversionOnly {
+			lowered.conversionOnlyServices = append(lowered.conversionOnlyServices, len(c.out.Services))
+		}
 		c.out.Services = append(c.out.Services, service)
 	}
-	c.wireListenerSources()
-	return nil
+	return c.wireListenerSources(lowered)
 }
 
 // wireListenerSources implements the listener/source relationship. A `listener`
@@ -97,13 +122,20 @@ func (c *Converter) convertMCPServers() error {
 // own tags. So for every listener we take its server.tag and add it to the tags
 // of each referenced source's ai-mcp-proxy plugin.
 //
+// It also copies the listener's access plugins onto its conversion-only
+// sources' routes (see applyListenerAccess), which is why it runs as a
+// post-pass: which listener exposes which source is only known once every
+// server has been lowered.
+//
 // A source referenced by more than one listener accumulates one tag per listener
 // (it belongs to several buckets). A referenced source that is absent from the
 // document (e.g. write-time validation of a single listener) is skipped.
-func (c *Converter) wireListenerSources() {
-	// Index each MCP server's ai-mcp-proxy plugin by service name. Pointers into
-	// c.out.Services are stable now that every service has been appended.
+func (c *Converter) wireListenerSources(lowered mcpLowering) error {
+	// Index each MCP server's ai-mcp-proxy plugin and route by service name.
+	// Pointers into c.out.Services are stable now that every service has been
+	// appended.
 	pluginByServer := make(map[string]*kong.Plugin)
+	routeByServer := make(map[string]*kong.Route)
 	for si := range c.out.Services {
 		svc := &c.out.Services[si]
 		for ri := range svc.Routes {
@@ -111,9 +143,14 @@ func (c *Converter) wireListenerSources() {
 			for pi := range route.Plugins {
 				if route.Plugins[pi].Name == "ai-mcp-proxy" {
 					pluginByServer[svc.Name] = &route.Plugins[pi]
+					routeByServer[svc.Name] = route
 				}
 			}
 		}
+	}
+	typeByServer := make(map[string]string, len(c.src.MCPServers))
+	for i := range c.src.MCPServers {
+		typeByServer[c.src.MCPServers[i].Name] = c.src.MCPServers[i].Type
 	}
 
 	for i := range c.src.MCPServers {
@@ -122,17 +159,132 @@ func (c *Converter) wireListenerSources() {
 			continue
 		}
 		tag, _ := m.Config.Server["tag"].(string)
-		if tag == "" {
+		for _, sourceName := range m.Config.Sources {
+			if plugin, ok := pluginByServer[sourceName]; ok && tag != "" {
+				plugin.Tags = addTag(plugin.Tags, tag)
+			}
+			if typeByServer[sourceName] != mcpConversionOnly {
+				continue
+			}
+			if err := c.applyListenerAccess(m, sourceName, routeByServer[sourceName], lowered.access[m.Name]); err != nil {
+				return err
+			}
+		}
+	}
+	return c.pruneUnexposedSources(lowered.conversionOnlyServices)
+}
+
+// pruneUnexposedSources drops conversion-only MCP servers that no listener in
+// the document names in config.sources. Such a server reaches no client — its
+// tools are only ever served through a listener — so its Service and Route
+// exist solely as an endpoint that answers on nobody's terms: it has no access
+// of its own (auth is rejected on non-listener modes) and no listener access to
+// inherit (applyListenerAccess).
+//
+// Association with a listener is the test, not the presence of an auth plugin:
+// a source of a listener that declares no access has no auth plugin either, but
+// removing it would break the aggregation that listener depends on.
+//
+// Note this is a whole-document judgement. A conversion-only server converted
+// on its own, with its listener in another document, has nothing here to
+// associate with and is pruned.
+func (c *Converter) pruneUnexposedSources(conversionOnlyServices []int) error {
+	exposed := map[string]bool{}
+	for i := range c.src.MCPServers {
+		m := &c.src.MCPServers[i]
+		if m.Type != "listener" {
 			continue
 		}
 		for _, sourceName := range m.Config.Sources {
-			plugin, ok := pluginByServer[sourceName]
-			if !ok {
-				continue
-			}
-			plugin.Tags = addTag(plugin.Tags, tag)
+			exposed[sourceName] = true
 		}
 	}
+
+	// Collect first, in document order, so the warnings are deterministic.
+	drop := make(map[int]bool, len(conversionOnlyServices))
+	for _, i := range conversionOnlyServices {
+		name := c.out.Services[i].Name
+		if exposed[name] {
+			continue
+		}
+		if err := c.warn(
+			"MCP server %q is conversion-only but no listener names it in config.sources; "+
+				"dropping its service and route", name); err != nil {
+			return err
+		}
+		drop[i] = true
+	}
+	if len(drop) == 0 {
+		return nil
+	}
+
+	kept := make([]kong.Service, 0, len(c.out.Services)-len(drop))
+	for i := range c.out.Services {
+		if drop[i] {
+			continue
+		}
+		kept = append(kept, c.out.Services[i])
+	}
+	c.out.Services = kept
+	return nil
+}
+
+// applyListenerAccess protects a conversion-only source's route with the access
+// plugins of the listener that exposes it. A conversion-only server serves no
+// MCP traffic of its own and cannot declare access itself (mcpIdentityPlugins
+// rejects auth on non-listener modes), so without this its route is reachable
+// on terms the listener would have rejected.
+//
+// ai-mcp-proxy executes a tool call by re-entering Kong's own proxy, so a tool
+// whose path matches its own server's route meets the plugin copied here. That
+// works because MCP key-auth is emitted with hide_credentials: false
+// (mcpIdentityPlugins): the client's key survives onto the internal request and
+// satisfies the copied plugin. Measured against kong-ai-gateway-dev:2.0.3-rc.1
+// -- with the credential hidden, the same call is answered 401.
+//
+// Only one plugin per name can live on a route, so a source exposed by several
+// listeners takes the first listener's (document order) and warns when a later
+// one disagrees.
+func (c *Converter) applyListenerAccess(
+	listener *aigw.MCPServer, sourceName string, route *kong.Route, access []kong.Plugin,
+) error {
+	if route == nil || len(access) == 0 {
+		return nil
+	}
+	for _, p := range access {
+		if existing := findRoutePlugin(route, p.Name); existing != nil {
+			if !samePluginConfig(*existing, p) {
+				if err := c.warn(
+					"MCP server %q is exposed by listeners with conflicting %q access; "+
+						"keeping the first and ignoring listener %q",
+					sourceName, p.Name, listener.Name); err != nil {
+					return err
+				}
+			}
+			continue
+		}
+		copied := p
+		copied.Config = maps.Clone(p.Config)
+		route.Plugins = append(route.Plugins, copied)
+	}
+	return nil
+}
+
+// findRoutePlugin returns the route's plugin with the given name, or nil.
+func findRoutePlugin(route *kong.Route, name string) *kong.Plugin {
+	for i := range route.Plugins {
+		if route.Plugins[i].Name == name {
+			return &route.Plugins[i]
+		}
+	}
+	return nil
+}
+
+// samePluginConfig reports whether two plugins of the same name carry the same
+// configuration, so a source exposed by several listeners can tell an identical
+// access plugin from a conflicting one.
+func samePluginConfig(a, b kong.Plugin) bool {
+	return reflect.DeepEqual(a.Config, b.Config)
 }
 
 // addTag appends tag to tags if absent, keeping the result sorted so conversion

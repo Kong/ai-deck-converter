@@ -1,0 +1,79 @@
+_format_version: "3.0"
+services:
+  - name: team-a
+    host: localhost
+    routes:
+      - name: team-a-route
+        paths:
+          - /mcp/team-a
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              include_consumer_groups: true
+              logging:
+                log_audits: false
+                log_payloads: false
+                log_statistics: true
+              mode: conversion-only
+              tools:
+                - description: Get a report
+                  method: GET
+                  name: team-a-report
+                  path: /report
+            tags:
+              - mcp-listener:aggregate-id
+          - name: key-auth
+            config:
+              hide_credentials: false
+              key_names:
+                - apikey
+  - name: team-b
+    host: localhost
+    routes:
+      - name: team-b-route
+        paths:
+          - /mcp/team-b
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              include_consumer_groups: true
+              logging:
+                log_audits: false
+                log_payloads: false
+                log_statistics: true
+              mode: conversion-only
+              tools:
+                - description: Get a report
+                  method: GET
+                  name: team-b-report
+                  path: /report
+            tags:
+              - mcp-listener:aggregate-id
+          - name: key-auth
+            config:
+              hide_credentials: false
+              key_names:
+                - apikey
+  - name: aggregate
+    host: localhost
+    routes:
+      - name: aggregate-route
+        paths:
+          - /mcp/aggregate
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              include_consumer_groups: true
+              logging:
+                log_audits: false
+                log_payloads: false
+                log_statistics: true
+              mode: listener
+              server:
+                tag: mcp-listener:aggregate-id
+              tools: []
+          - name: key-auth
+            config:
+              hide_credentials: false
+              key_names:
+                - apikey
