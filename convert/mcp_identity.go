@@ -97,6 +97,15 @@ func (c *Converter) mcpIdentityPlugins(m *aigw.MCPServer, route *kong.Route) ([]
 	for k, v := range idp.Config {
 		cfg[k] = v
 	}
+	if idp.Type == "key-auth" {
+		// An MCP listener's credential must survive the plugin: ai-mcp-proxy
+		// reads the authenticated request itself, and any propagated copy of
+		// this plugin (applyListenerAccess) has to see the same key on the
+		// sources' routes. Forced rather than defaulted, so a strategy that
+		// sets hide_credentials: true cannot silently strip it here -- the
+		// strategy may be shared with models/agents, where hiding it is fine.
+		cfg["hide_credentials"] = false
+	}
 	plugin := kong.Plugin{Name: idp.Type, Config: cfg, Source: source("identity_provider", idp.Name, "config")}
 	return []kong.Plugin{plugin}, nil
 }

@@ -1672,6 +1672,11 @@ mcp_servers:
           description: Get a report
           method: GET
           path: /report
+  - type: listener
+    name: aggregate
+    config:
+      route: {paths: [/mcp/aggregate]}
+      sources: [team-a]
 `)
 
 	out, _, err := Convert(src, Options{OutputMode: "db-less"})

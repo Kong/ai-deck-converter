@@ -2,11 +2,29 @@ package revert
 
 import (
 	"fmt"
+	"maps"
+	"reflect"
+	"slices"
 	"sort"
 
 	"github.com/Kong/ai-deck-converter/internal/aigw"
 	"github.com/Kong/ai-deck-converter/internal/kong"
 )
+
+// mcpConversionOnly mirrors convert's mode constant: such a server's route
+// carries the access plugins of the listeners that expose it (see
+// convert.applyListenerAccess), which must be recognized here so they are not
+// misread as the source's own access.
+const mcpConversionOnly = "conversion-only"
+
+// mcpAccessPluginNames are the plugin names convert emits from an MCP server's
+// access block, and therefore the ones a listener can propagate to its
+// sources' routes.
+var mcpAccessPluginNames = map[string]bool{
+	"key-auth":       true,
+	"openid-connect": true,
+	"ai-mcp-oauth2":  true,
+}
 
 // indexMCPListenerSources reconstructs the listener/source relationship the
 // forward converter encodes purely as tags (see convert.wireListenerSources): a
@@ -33,6 +51,13 @@ func (r *Reverter) indexMCPListenerSources() {
 			if getStr(mcp.Config, "mode") != "listener" {
 				continue
 			}
+			// Remember the listener's access plugins: dropListenerAccess needs
+			// them to tell propagated access from a source's own.
+			for _, p := range r.routePlugins(&svc.Routes[j]) {
+				if mcpAccessPluginNames[p.Name] {
+					r.mcpListenerAccess[svc.Name] = append(r.mcpListenerAccess[svc.Name], p)
+				}
+			}
 			if tag := getStr(getMap(mcp.Config, "server"), "tag"); tag != "" {
 				listenerByTag[tag] = svc.Name
 				r.mcpBucketTags[tag] = true
@@ -50,6 +75,12 @@ func (r *Reverter) indexMCPListenerSources() {
 	}
 	for listener := range r.mcpSources {
 		sort.Strings(r.mcpSources[listener])
+		for _, source := range r.mcpSources[listener] {
+			r.mcpListenersBySource[source] = append(r.mcpListenersBySource[source], listener)
+		}
+	}
+	for source := range r.mcpListenersBySource {
+		sort.Strings(r.mcpListenersBySource[source])
 	}
 }
 
@@ -150,7 +181,18 @@ func (r *Reverter) revertMCPServer(svc *kong.Service, rt *kong.Route, plugins, s
 	// of the route plugins (into access.auth_strategies/metadata) before the
 	// remaining plugins are reconstructed as policies.
 	allPlugins := append(append([]kong.Plugin{}, plugins...), svcPlugins...)
-	rest := r.revertMCPAccess(&m, allPlugins)
+	var rest []kong.Plugin
+	if m.Type == mcpConversionOnly {
+		// A conversion-only server may not carry access at all: lifting an auth
+		// plugin into access.auth_strategies here produces a document convert
+		// rejects outright. So strip what a listener propagated to this route
+		// (convert.applyListenerAccess) and leave anything else to policyRefs,
+		// which reconstructs it as a policy — a plugin the forward direction
+		// puts back on this same route, unlike access.
+		rest = r.dropListenerAccess(svc.Name, allPlugins)
+	} else {
+		rest = r.revertMCPAccess(&m, allPlugins)
+	}
 
 	refs, acls := r.policyRefs(rest)
 	m.Policies = refs
@@ -158,6 +200,53 @@ func (r *Reverter) revertMCPServer(svc *kong.Service, rt *kong.Route, plugins, s
 
 	r.out.MCPServers = append(r.out.MCPServers, m)
 	return nil
+}
+
+// dropListenerAccess removes from a conversion-only source's plugins the
+// access plugins that a listener exposing it also carries (see
+// convert.applyListenerAccess). Without this the source would come back with
+// access.auth_strategies of its own — which is not just a round-trip
+// difference: re-converting that document is a hard error, since auth is only
+// supported on listener modes.
+//
+// A plugin is only dropped when a listener that names this source carries the
+// identical plugin, so auth a user put on a conversion-only route by hand
+// (with a config no listener shares) still reverts as that server's access.
+func (r *Reverter) dropListenerAccess(sourceName string, plugins []kong.Plugin) []kong.Plugin {
+	listeners := r.mcpListenersBySource[sourceName]
+	if len(listeners) == 0 {
+		// The forward converter propagates access from any listener that names
+		// this source, with or without a config.server.tag, but the tag is the
+		// only thing the association can be rebuilt from here. Without one,
+		// fall back to every listener's access: a conversion-only server can
+		// never legally own access, so stripping is the convertible answer
+		// whichever listener the plugin came from.
+		if len(r.mcpListenerAccess) == 0 {
+			return plugins
+		}
+		listeners = slices.Sorted(maps.Keys(r.mcpListenerAccess))
+	}
+	out := make([]kong.Plugin, 0, len(plugins))
+	for _, p := range plugins {
+		if mcpAccessPluginNames[p.Name] && r.listenerCarriesAccess(listeners, p) {
+			continue
+		}
+		out = append(out, p)
+	}
+	return out
+}
+
+// listenerCarriesAccess reports whether any of the named listeners carries an
+// access plugin identical to p.
+func (r *Reverter) listenerCarriesAccess(listeners []string, p kong.Plugin) bool {
+	for _, listener := range listeners {
+		for _, access := range r.mcpListenerAccess[listener] {
+			if access.Name == p.Name && reflect.DeepEqual(access.Config, p.Config) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // mcpServerConfigForAIGateway returns a copy of the ai-mcp-proxy plugin's
