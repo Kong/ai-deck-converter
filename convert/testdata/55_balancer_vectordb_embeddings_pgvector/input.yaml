@@ -23,30 +23,23 @@ models:
         algorithm: semantic
         slots: 10000
         vectordb:
-          strategy: redis
+          strategy: pgvector
           distance_metric: cosine
           threshold: 0.7
           dimensions: 1024
-          cluster:
-            max_redirections: 5
-            nodes:
-              - ip: 127.0.0.1
-                port: 6379
-          connect_timeout: 2000
-          connection_is_proxied: false
-          database: 0
+          database: kong-pgvector
           host: 127.0.0.1
-          keepalive:
-            backlog: 10000
-            pool_size: 256
           password: my-password
-          port: 6379
-          read_timeout: 2000
-          send_timeout: 2000
-          server_name: my-redis-server
-          ssl: true
-          ssl_verify: true
-          username: my-username
+          port: 5432
+          ssl:
+            enabled: true
+            cert: /path/to/cert.pem
+            cert_key: /path/to/cert.key
+            required: true
+            verify: true
+            version: any
+          timeout: 5000
+          user: my-user
         embeddings:
           auth:
             header_name: Authorization

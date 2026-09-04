@@ -47,26 +47,20 @@ plugins:
       vectordb:
         dimensions: 1024
         distance_metric: cosine
-        redis:
-          cluster_max_redirections: 5
-          cluster_nodes:
-            - ip: 127.0.0.1
-              port: 6379
-          connect_timeout: 2000
-          connection_is_proxied: false
-          database: 0
+        pgvector:
+          database: kong-pgvector
           host: 127.0.0.1
-          keepalive_backlog: 10000
-          keepalive_pool_size: 256
           password: my-password
-          port: 6379
-          read_timeout: 2000
-          send_timeout: 2000
-          server_name: my-redis-server
+          port: 5432
           ssl: true
+          ssl_cert: /path/to/cert.pem
+          ssl_cert_key: /path/to/cert.key
+          ssl_required: true
           ssl_verify: true
-          username: my-username
-        strategy: redis
+          ssl_version: any
+          timeout: 5000
+          user: my-user
+        strategy: pgvector
         threshold: 0.7
     route: openai-chat
     model: semantic-lb
