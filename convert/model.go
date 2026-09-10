@@ -207,6 +207,11 @@ func (c *Converter) convertModels() error {
 			if providerType == "" && provider != nil {
 				providerType = provider.Type
 			}
+			// A target that configures a GCP environment at all is served by an
+			// actual Vertex AI deployment, which uses Vertex's project/location
+			// URL templates rather than the plain Gemini Developer API paths —
+			// even for capabilities (generate/embeddings) that Gemini also serves.
+			_, vertexMode := tm.Config.Options["gcp_environment"]
 			if providerType == "" {
 				if err := c.warn("model %q target %q has no resolvable provider type", m.Name, tm.Name); err != nil {
 					return err
@@ -221,10 +226,11 @@ func (c *Converter) convertModels() error {
 			}
 			for _, capability := range caps {
 				// The section is resolved per capability: gemini-format traffic
-				// served by Vertex renders as gemini for shared capabilities
-				// (generate/embeddings) but keeps the Vertex section for the
-				// Vertex-only image/video/rerank endpoints.
-				sec := aimap.EndpointSectionFor(llmFormat(m), providerType, capability)
+				// served by Vertex without a configured GCP environment renders
+				// as gemini for shared capabilities (generate/embeddings); with
+				// one configured (vertexMode), or for the Vertex-only
+				// image/video/rerank endpoints, it keeps the Vertex section.
+				sec := aimap.EndpointSectionFor(llmFormat(m), providerType, vertexMode, capability)
 				spec, ok := aimap.LookupEndpoint(sec, capability)
 				if !ok {
 					return c.failAt("capabilities",

@@ -52,27 +52,38 @@ func TestSectionDerivation(t *testing.T) {
 
 func TestEndpointSectionFor(t *testing.T) {
 	cases := []struct {
-		format, providerType, capability, want string
+		format, providerType string
+		vertexMode           bool
+		capability, want     string
 	}{
-		// Vertex renders shared capabilities on Gemini's client paths...
-		{"gemini", "vertex", "generate", "gemini"},
-		{"gemini", "vertex", "embeddings", "gemini"},
-		{"gemini", "vertex", "batches", "gemini"},
-		// ...but keeps the Vertex section for its exclusive capabilities.
-		{"gemini", "vertex", "image", "vertex"},
-		{"gemini", "vertex", "video", "vertex"},
-		{"gemini", "vertex", "rerank", "vertex"},
+		// Vertex without a configured GCP environment renders shared
+		// capabilities on Gemini's client paths...
+		{"gemini", "vertex", false, "generate", "gemini"},
+		{"gemini", "vertex", false, "embeddings", "gemini"},
+		{"gemini", "vertex", false, "batches", "gemini"},
+		// ...but keeps the Vertex section for its exclusive capabilities,
+		// regardless of vertexMode.
+		{"gemini", "vertex", false, "image", "vertex"},
+		{"gemini", "vertex", false, "video", "vertex"},
+		{"gemini", "vertex", false, "rerank", "vertex"},
 		// Vertex does not implement Gemini's Files API; don't map it to gemini.
-		{"gemini", "vertex", "files", "vertex"},
+		{"gemini", "vertex", false, "files", "vertex"},
+		// A configured GCP environment (vertexMode) keeps the Vertex section
+		// for shared capabilities too.
+		{"gemini", "vertex", true, "generate", "vertex"},
+		{"gemini", "vertex", true, "embeddings", "vertex"},
+		{"gemini", "vertex", true, "batches", "vertex"},
+		{"gemini", "vertex", true, "image", "vertex"},
 		// Gemini served by Gemini is unaffected.
-		{"gemini", "gemini", "generate", "gemini"},
+		{"gemini", "gemini", false, "generate", "gemini"},
+		{"gemini", "gemini", true, "generate", "gemini"},
 		// Non-rendering sections pass through regardless of capability.
-		{"openai", "openai", "generate", "openai"},
+		{"openai", "openai", false, "generate", "openai"},
 	}
 	for _, tc := range cases {
-		got := EndpointSectionFor(tc.format, tc.providerType, tc.capability)
+		got := EndpointSectionFor(tc.format, tc.providerType, tc.vertexMode, tc.capability)
 		require.Equalf(t, tc.want, got,
-			"EndpointSectionFor(%q,%q,%q)", tc.format, tc.providerType, tc.capability)
+			"EndpointSectionFor(%q,%q,%v,%q)", tc.format, tc.providerType, tc.vertexMode, tc.capability)
 	}
 }
 

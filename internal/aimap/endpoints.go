@@ -99,13 +99,17 @@ var renderingSections = map[string]string{
 // capability's route. It starts from SectionFor (which keeps a provider-specific
 // rendering like Vertex distinct so capability enumeration is accurate) but, for
 // such a rendering, prefers the base client format's section for any capability
-// that format already serves. So gemini-format traffic served by Vertex renders
-// generate/embeddings on Gemini's client paths (a Vertex backend is still
-// reached via the gcp options and the gemini provider enum), while Vertex's
-// exclusive image/video/rerank endpoints keep the Vertex project/location paths.
-func EndpointSectionFor(format, providerType, capability string) string {
+// that format already serves — unless vertexMode is set, in which case the
+// rendering section's own (project/location) paths are kept for every
+// capability. So gemini-format traffic served by Vertex without a configured
+// GCP environment renders generate/embeddings on Gemini's client paths (a
+// Vertex backend is still reached via the gcp options and the gemini provider
+// enum); with a GCP environment configured (vertexMode), it renders on Vertex's
+// own project/location paths instead. Vertex's exclusive image/video/rerank
+// endpoints always keep the Vertex project/location paths regardless.
+func EndpointSectionFor(format, providerType string, vertexMode bool, capability string) string {
 	sec := SectionFor(format, providerType)
-	if base, ok := renderingSections[sec]; ok {
+	if base, ok := renderingSections[sec]; ok && !vertexMode {
 		// Only fall back when the rendering section supports this capability too,
 		// otherwise we may accidentally enable base-only capabilities (e.g. files).
 		if _, ok := LookupEndpoint(sec, capability); ok {
