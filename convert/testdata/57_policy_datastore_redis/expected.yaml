@@ -1,0 +1,122 @@
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: openai-chat
+        paths:
+          - /redis-datastore/chat/completions
+        methods:
+          - POST
+        strip_path: false
+plugins:
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-chat
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://env/openai-key}'
+          description: gpt-4o
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: redis-datastore-model
+            name: gpt-4o
+            provider: openai
+          route_type: llm/v1/chat
+    route: openai-chat
+    model: redis-datastore-model
+  - name: ai-rag-injector
+    config:
+      embeddings:
+        auth:
+          header_name: Authorization
+          header_value: '{vault://env/openai-key}'
+        model:
+          name: text-embedding-3-small
+          provider: openai
+      vectordb:
+        dimensions: 1536
+        distance_metric: cosine
+        redis:
+          database: 2
+          host: redis-ee.internal
+          password: '{vault://env/redis-password}'
+          port: 6379
+          sentinel_master: mymaster
+          sentinel_nodes:
+            - host: sentinel-a.internal
+              port: 26379
+          ssl: true
+          ssl_verify: true
+          username: rag
+        strategy: redis
+        threshold: 0.35
+    route: openai-chat
+    model: redis-datastore-model
+  - name: ai-semantic-cache
+    config:
+      vectordb:
+        dimensions: 1536
+        distance_metric: cosine
+        redis:
+          database: 0
+          host: redis-ee-cache.internal
+          password: '{vault://env/redis-cache-password}'
+          port: 6379
+          ssl: false
+          username: cache
+        strategy: redis
+        threshold: 0.9
+    route: openai-chat
+    model: redis-datastore-model
+  - name: ai-semantic-prompt-guard
+    config:
+      vectordb:
+        dimensions: 768
+        distance_metric: euclidean
+        redis:
+          database: 1
+          host: redis-ee-guard.internal
+          password: '{vault://env/redis-guard-password}'
+          port: 6379
+          ssl: false
+          username: guard
+        strategy: redis
+        threshold: 0.5
+    route: openai-chat
+    model: redis-datastore-model
+  - name: ai-semantic-response-guard
+    config:
+      vectordb:
+        dimensions: 768
+        distance_metric: euclidean
+        redis:
+          cluster_max_redirections: 5
+          host: redis-ee.internal
+          keepalive_pool_size: 30
+          port: 6379
+        strategy: redis
+        threshold: 0.6
+    route: openai-chat
+    model: redis-datastore-model
+vaults:
+  - prefix: env-vault
+    name: env
+    description: Environment secrets
+    config:
+      prefix: KONG_
+ai_models:
+  - name: redis-datastore-model

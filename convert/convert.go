@@ -439,7 +439,9 @@ func cloneStrings(in []string) []string {
 
 func (c *Converter) run() error {
 	c.buildRegistries()
-	c.convertGlobalPolicies()
+	if err := c.convertGlobalPolicies(); err != nil {
+		return err
+	}
 	c.convertVaults()
 	c.convertCACertificates()
 	c.convertCertificates()

@@ -1,0 +1,103 @@
+models:
+  - type: model
+    display_name: PGVector Datastore Model
+    name: pgvector-datastore-model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    targets:
+      - name: gpt-4o
+        provider: openai-main
+        config: {type: openai}
+    policies: [rag-injector, semantic-cache, prompt-guard-ds, response-guard-ds]
+    config:
+      route: {paths: [/pgvector-datastore]}
+model_providers:
+  - type: openai
+    display_name: OpenAI Main
+    name: openai-main
+    config:
+      auth:
+        type: basic
+        headers: [{name: Authorization, value: "{vault://env/openai-key}"}]
+policies:
+  - type: ai-rag-injector
+    name: rag-injector
+    config:
+      vectordb:
+        dimensions: 1536
+        distance_metric: cosine
+        strategy: pgvector
+        threshold: 0.35
+      embeddings:
+        auth:
+          header_name: Authorization
+          header_value: "{vault://env/openai-key}"
+        model:
+          provider: openai
+          name: text-embedding-3-small
+    datastore:
+      type: vectordb
+      config:
+        database: kong-pgvector
+        host: pgvector.internal
+        password: "{vault://env/pgvector-password}"
+        port: 5432
+        ssl: true
+        user: kong
+  - type: ai-semantic-cache
+    name: semantic-cache
+    config:
+      vectordb:
+        dimensions: 1536
+        distance_metric: cosine
+        strategy: pgvector
+        threshold: 0.9
+    datastore:
+      type: vectordb
+      config:
+        database: kong-pgvector
+        host: pgvector.internal
+        password: "{vault://env/pgvector-password}"
+        port: 5432
+        ssl: true
+        user: kong
+  - type: ai-semantic-prompt-guard
+    name: prompt-guard-ds
+    config:
+      vectordb:
+        dimensions: 768
+        distance_metric: euclidean
+        strategy: pgvector
+        threshold: 0.5
+    datastore:
+      type: vectordb
+      config:
+        database: kong-pgvector
+        host: pgvector.internal
+        password: "{vault://env/pgvector-password}"
+        port: 5432
+        ssl_required: true
+        user: kong
+  - type: ai-semantic-response-guard
+    name: response-guard-ds
+    config:
+      vectordb:
+        dimensions: 768
+        distance_metric: euclidean
+        strategy: pgvector
+        threshold: 0.6
+    datastore:
+      type: vectordb
+      config:
+        database: kong-pgvector
+        host: pgvector.internal
+        password: "{vault://env/pgvector-password}"
+        port: 5432
+        ssl_verify: false
+        user: kong
+vaults:
+  - type: env
+    name: env-vault
+    description: Environment secrets
+    config:
+      prefix: KONG_

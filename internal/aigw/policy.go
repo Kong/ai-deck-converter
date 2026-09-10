@@ -12,4 +12,15 @@ type Policy struct {
 	Global      *bool          `yaml:"global,omitempty"`
 	Config      map[string]any `yaml:"config,omitempty"`
 	Labels      Labels         `yaml:"labels,omitempty"`
+	Datastore   *Datastore     `yaml:"datastore,omitempty"`
+}
+
+// Datastore is a shared connection resolved out-of-band (Konnect's datastore
+// API) and attached here fully resolved. Type is one of "redis-ce", "redis-ee",
+// "vectordb" (a pgvector connection, despite the name); Config carries that
+// backend's connection fields verbatim, already shaped like the Kong plugin
+// fields they will replace (see convert/policy.go's datastoreVectorDBGroup).
+type Datastore struct {
+	Type   string         `yaml:"type"`
+	Config map[string]any `yaml:"config"`
 }

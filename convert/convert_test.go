@@ -412,6 +412,37 @@ policies:
 	require.Contains(t, err.Error(), "auth_strategies")
 }
 
+func TestConvertRejectsRedisCEDatastoreOnVectorDBPolicy(t *testing.T) {
+	src := []byte(`
+models:
+  - type: model
+    name: rag-model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    targets:
+      - name: gpt-4o
+        provider: p1
+        config: {type: openai}
+    policies: [rag-injector]
+    config:
+      route: {paths: [/rag]}
+model_providers:
+  - name: p1
+    type: openai
+policies:
+  - type: ai-rag-injector
+    name: rag-injector
+    config:
+      vectordb: {strategy: redis, dimensions: 1536, distance_metric: cosine}
+    datastore:
+      type: redis-ce
+      config: {host: redis-ce.internal}
+`)
+	_, _, err := Convert(src, Options{})
+	require.Error(t, err, "vectordb-consuming plugins only support a redis-ee datastore, not redis-ce")
+	require.Contains(t, err.Error(), "redis-ee")
+}
+
 func TestConvertScopesAuthStrategiesWithoutLeakingAcrossSharedRoutes(t *testing.T) {
 	src := []byte(`
 models:
