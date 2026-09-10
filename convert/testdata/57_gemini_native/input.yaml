@@ -1,0 +1,51 @@
+model_providers:
+  - name: gemini-prod
+    type: gemini
+    display_name: Google Gemini (Prod)
+models:
+  - display_name: Gemini 2.5 Pro
+    name: gemini-2-5-pro
+    type: model
+    capabilities: [generate]
+    formats:
+      - type: gemini
+    config:
+      route:
+        paths: [/ai]
+    targets:
+      - name: gemini-2.5-pro-a
+        provider: gemini-prod
+        config:
+          type: gemini
+          max_tokens: 4096
+          temperature: 1.0
+      - name: gemini-2.5-pro-b
+        provider: gemini-prod
+        config:
+          type: gemini
+          max_tokens: 4096
+          temperature: 1.0
+    policies: []
+    access:
+      acls: {allow: [], deny: []}
+  - display_name: Text Embedding 005
+    name: text-embedding-005
+    type: model
+    capabilities: [embeddings]
+    formats:
+      - type: gemini
+    config:
+      route:
+        paths: [/ai]
+    targets:
+      - name: text-embedding-005-a
+        provider: gemini-prod
+        config:
+          type: gemini
+      - name: text-embedding-005-b
+        provider: gemini-prod
+        config:
+          type: gemini
+    policies: []
+    access:
+      acls: {allow: [], deny: []}

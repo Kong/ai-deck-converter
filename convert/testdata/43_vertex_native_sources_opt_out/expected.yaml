@@ -3,9 +3,23 @@ services:
   - name: ai-gateway
     url: http://ai-gateway.upstream.local
     routes:
+      - name: vertex-generate
+        paths:
+          - ~/ai/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/google/models/(?<model_name>[^:/]+):(?:generateContent|streamGenerateContent)
+        methods:
+          - GET
+          - POST
+        strip_path: false
       - name: gemini-generate
         paths:
           - ~/ai/v1beta/models/(?<model_name>[^:/]+):(?:generateContent|streamGenerateContent)
+        methods:
+          - GET
+          - POST
+        strip_path: false
+      - name: vertex-embeddings
+        paths:
+          - ~/ai/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/google/models/(?<model_name>[^:/]+):(?:embedContent|batchEmbedContents)
         methods:
           - GET
           - POST
@@ -23,7 +37,7 @@ plugins:
       max_request_body_size: 8388608
       path_pattern: 'models/([%w%.%-]+):'
       source: path
-    route: gemini-generate
+    route: vertex-generate
   - name: ai-proxy-advanced
     config:
       balancer:
@@ -50,6 +64,21 @@ plugins:
               temperature: 1
             provider: gemini
           route_type: llm/v1/chat
+    route: vertex-generate
+    model: vertex-gemini-2-5-pro
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      path_pattern: 'models/([%w%.%-]+):'
+      source: path
+    route: gemini-generate
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: gemini
+      targets:
         - auth:
             gcp_service_account_json: '{vault://ai/gcp-service-account-json}'
             gcp_use_service_account: true
@@ -72,7 +101,7 @@ plugins:
       max_request_body_size: 8388608
       path_pattern: 'models/([%w%.%-]+):'
       source: path
-    route: gemini-embeddings
+    route: vertex-embeddings
   - name: ai-proxy-advanced
     config:
       balancer:
@@ -98,6 +127,21 @@ plugins:
                 project_id: other-vertex-project
             provider: gemini
           route_type: llm/v1/embeddings
+    route: vertex-embeddings
+    model: vertex-text-embedding-005
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      path_pattern: 'models/([%w%.%-]+):'
+      source: path
+    route: gemini-embeddings
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/embeddings
+      llm_format: gemini
+      targets:
         - auth:
             gcp_service_account_json: '{vault://ai/gcp-service-account-json}'
             gcp_use_service_account: true
