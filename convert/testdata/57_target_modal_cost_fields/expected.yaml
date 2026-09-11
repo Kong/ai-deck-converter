@@ -37,6 +37,15 @@ plugins:
             name: gpt-5.2
             options:
               cache_read_cost: 0.125
+              cache_read_cost_list:
+                - cost: 1
+                  modal: text
+                - cost: 2
+                  modal: audio
+                - cost: 3
+                  modal: image
+                - cost: 4.5
+                  modal: video
               cache_write_cost: 1.5625
               cache_write_cost_list:
                 - cost: 1.5625
@@ -48,35 +57,26 @@ plugins:
                   input_factor: 2
                   output_factor: 1.5
               input_cost: 1.25
+              input_cost_list:
+                - cost: 1
+                  modal: text
+                - cost: 2
+                  modal: audio
+                - cost: 3
+                  modal: image
+                - cost: 4.5
+                  modal: video
               max_tokens: 1024
               output_cost: 10
-              input_cost_list:
-                - modal: text
-                  cost: 1
-                - modal: audio
-                  cost: 2
-                - modal: image
-                  cost: 3
-                - modal: video
-                  cost: 4.5
               output_cost_list:
-                - modal: text
-                  cost: 1
-                - modal: audio
-                  cost: 2
-                - modal: image
-                  cost: 3
-                - modal: video
-                  cost: 4.5
-              cache_read_cost_list:
-                - modal: text
-                  cost: 1
-                - modal: audio
-                  cost: 2
-                - modal: image
-                  cost: 3
-                - modal: video
-                  cost: 4.5
+                - cost: 1
+                  modal: text
+                - cost: 2
+                  modal: audio
+                - cost: 3
+                  modal: image
+                - cost: 4.5
+                  modal: video
               service_tier_factor:
                 - factor: 2
                   tier: priority
