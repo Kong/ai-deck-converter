@@ -37,20 +37,7 @@ policies:
         model:
           provider: openai
           name: text-embedding-3-small
-    datastore:
-      type: redis-ee
-      config:
-        database: 2
-        host: redis-ee.internal
-        password: "{vault://env/redis-password}"
-        port: 6379
-        sentinel_master: mymaster
-        sentinel_nodes:
-          - host: sentinel-a.internal
-            port: 26379
-        ssl: true
-        ssl_verify: true
-        username: rag
+    datastore: rag-redis
   - type: ai-semantic-cache
     name: semantic-cache
     config:
@@ -59,15 +46,7 @@ policies:
         distance_metric: cosine
         strategy: redis
         threshold: 0.9
-    datastore:
-      type: redis-ee
-      config:
-        database: 0
-        host: redis-ee-cache.internal
-        password: "{vault://env/redis-cache-password}"
-        port: 6379
-        ssl: false
-        username: cache
+    datastore: cache-redis
   - type: ai-semantic-prompt-guard
     name: prompt-guard-ds
     config:
@@ -76,15 +55,7 @@ policies:
         distance_metric: euclidean
         strategy: redis
         threshold: 0.5
-    datastore:
-      type: redis-ee
-      config:
-        database: 1
-        host: redis-ee-guard.internal
-        password: "{vault://env/redis-guard-password}"
-        port: 6379
-        ssl: false
-        username: guard
+    datastore: guard-redis
   - type: ai-semantic-response-guard
     name: response-guard-ds
     config:
@@ -93,13 +64,47 @@ policies:
         distance_metric: euclidean
         strategy: redis
         threshold: 0.6
-    datastore:
-      type: redis-ee
-      config:
-        cluster_max_redirections: 5
-        host: redis-ee.internal
-        keepalive_pool_size: 30
-        port: 6379
+    datastore: response-guard-redis
+datastores:
+  - type: redis-ee
+    name: rag-redis
+    config:
+      database: 2
+      host: redis-ee.internal
+      password: "{vault://env/redis-password}"
+      port: 6379
+      sentinel_master: mymaster
+      sentinel_nodes:
+        - host: sentinel-a.internal
+          port: 26379
+      ssl: true
+      ssl_verify: true
+      username: rag
+  - type: redis-ee
+    name: cache-redis
+    config:
+      database: 0
+      host: redis-ee-cache.internal
+      password: "{vault://env/redis-cache-password}"
+      port: 6379
+      ssl: false
+      username: cache
+  - type: redis-ee
+    name: guard-redis
+    config:
+      database: 1
+      host: redis-ee-guard.internal
+      password: "{vault://env/redis-guard-password}"
+      port: 6379
+      ssl: false
+      username: guard
+  - type: redis-ee
+    name: response-guard-redis
+    config:
+      cluster_max_redirections: 5
+      host: redis-ee.internal
+      keepalive_pool_size: 30
+      port: 6379
 vaults:
   - type: env
     name: env-vault

@@ -35,15 +35,7 @@ policies:
         model:
           provider: openai
           name: text-embedding-3-small
-    datastore:
-      type: vectordb
-      config:
-        database: kong-pgvector
-        host: pgvector.internal
-        password: "{vault://env/pgvector-password}"
-        port: 5432
-        ssl: true
-        user: kong
+    datastore: shared-pgvector
   - type: ai-semantic-cache
     name: semantic-cache
     config:
@@ -52,15 +44,9 @@ policies:
         distance_metric: cosine
         strategy: pgvector
         threshold: 0.9
-    datastore:
-      type: vectordb
-      config:
-        database: kong-pgvector
-        host: pgvector.internal
-        password: "{vault://env/pgvector-password}"
-        port: 5432
-        ssl: true
-        user: kong
+    # Reuses the same Datastore as rag-injector above — defined once, referenced
+    # by name from multiple policies.
+    datastore: shared-pgvector
   - type: ai-semantic-prompt-guard
     name: prompt-guard-ds
     config:
@@ -69,15 +55,7 @@ policies:
         distance_metric: euclidean
         strategy: pgvector
         threshold: 0.5
-    datastore:
-      type: vectordb
-      config:
-        database: kong-pgvector
-        host: pgvector.internal
-        password: "{vault://env/pgvector-password}"
-        port: 5432
-        ssl_required: true
-        user: kong
+    datastore: guard-pgvector
   - type: ai-semantic-response-guard
     name: response-guard-ds
     config:
@@ -86,15 +64,35 @@ policies:
         distance_metric: euclidean
         strategy: pgvector
         threshold: 0.6
-    datastore:
-      type: vectordb
-      config:
-        database: kong-pgvector
-        host: pgvector.internal
-        password: "{vault://env/pgvector-password}"
-        port: 5432
-        ssl_verify: false
-        user: kong
+    datastore: response-guard-pgvector
+datastores:
+  - type: vectordb
+    name: shared-pgvector
+    config:
+      database: kong-pgvector
+      host: pgvector.internal
+      password: "{vault://env/pgvector-password}"
+      port: 5432
+      ssl: true
+      user: kong
+  - type: vectordb
+    name: guard-pgvector
+    config:
+      database: kong-pgvector
+      host: pgvector.internal
+      password: "{vault://env/pgvector-password}"
+      port: 5432
+      ssl_required: true
+      user: kong
+  - type: vectordb
+    name: response-guard-pgvector
+    config:
+      database: kong-pgvector
+      host: pgvector.internal
+      password: "{vault://env/pgvector-password}"
+      port: 5432
+      ssl_verify: false
+      user: kong
 vaults:
   - type: env
     name: env-vault

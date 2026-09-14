@@ -11,6 +11,7 @@ type Document struct {
 	MCPServers     []MCPServer     `yaml:"mcp_servers,omitempty"`
 	Agents         []Agent         `yaml:"agents,omitempty"`
 	Policies       []Policy        `yaml:"policies,omitempty"`
+	Datastores     []Datastore     `yaml:"datastores,omitempty"`
 	AuthStrategies []AuthStrategy  `yaml:"auth_strategies,omitempty"`
 	Consumers      []Consumer      `yaml:"consumers,omitempty"`
 	ConsumerGroups []ConsumerGroup `yaml:"consumer_groups,omitempty"`

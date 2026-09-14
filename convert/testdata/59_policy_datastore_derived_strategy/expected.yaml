@@ -1,0 +1,64 @@
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: openai-chat
+        paths:
+          - /derived-strategy/chat/completions
+        methods:
+          - POST
+        strip_path: false
+plugins:
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-chat
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://env/openai-key}'
+          description: gpt-4o
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: derived-strategy-model
+            name: gpt-4o
+            provider: openai
+          route_type: llm/v1/chat
+    route: openai-chat
+    model: derived-strategy-model
+  - name: ai-semantic-cache
+    config:
+      vectordb:
+        dimensions: 1536
+        distance_metric: cosine
+        pgvector:
+          database: kong-pgvector
+          host: pgvector.internal
+          password: '{vault://env/pgvector-password}'
+          port: 5432
+          ssl: true
+          user: kong
+        strategy: pgvector
+        threshold: 0.9
+    route: openai-chat
+    model: derived-strategy-model
+vaults:
+  - prefix: env-vault
+    name: env
+    description: Environment secrets
+    config:
+      prefix: KONG_
+ai_models:
+  - name: derived-strategy-model
