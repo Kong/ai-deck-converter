@@ -131,7 +131,7 @@ type proxyGroup struct {
 	targets           []map[string]any
 	targetSources     []kong.TargetSource
 	source            *kong.Source
-	seen              map[string]bool
+	seen              map[string]int // target fingerprint -> index into targets/targetSources
 }
 
 type videoLifecycleTarget struct {
@@ -332,7 +332,7 @@ func (c *Converter) convertModels() error {
 								kong.FieldMapping{GeneratedPrefix: "config.vectordb", SourcePrefix: "config.balancer.vectordb"},
 								kong.FieldMapping{GeneratedPrefix: "config.embeddings", SourcePrefix: "config.balancer.embeddings"},
 							),
-							seen: map[string]bool{},
+							seen: map[string]int{},
 						}
 						g.proxyByOwner[ownerKey] = pg
 						g.proxies = append(g.proxies, pg)
@@ -357,15 +357,23 @@ func (c *Converter) convertModels() error {
 					// be genuinely distinct via different providers (distinct
 					// auth/options) or weights. The same (tm, provider) reached
 					// through several capabilities that share a route_type still
-					// fingerprints identically, so those collapse as before.
+					// fingerprints identically, so those collapse as before —
+					// but every capability that produced the collapsed target is
+					// still recorded (e.g. bedrock's shared invoke endpoint for
+					// "generate" and "audio/speech"), rather than only the first.
 					dedup := targetFingerprint(target)
-					if !pg.seen[dedup] {
-						pg.seen[dedup] = true
+					if idx, ok := pg.seen[dedup]; ok {
+						source := &pg.targetSources[idx]
+						if !slices.Contains(source.Capabilities, capability) {
+							source.Capabilities = append(source.Capabilities, capability)
+						}
+					} else {
+						pg.seen[dedup] = len(pg.targets)
 						pg.targets = append(pg.targets, target)
 						pg.targetSources = append(pg.targetSources, kong.TargetSource{
 							ModelName:        m.Name,
 							ModelTargetIndex: j,
-							Capability:       capability,
+							Capabilities:     []string{capability},
 						})
 					}
 				}
@@ -498,7 +506,7 @@ func (c *Converter) convertModels() error {
 			targetSources = append(targetSources, kong.TargetSource{
 				ModelName:        candidate.model.Name,
 				ModelTargetIndex: targetIndex,
-				Capability:       "video",
+				Capabilities:     []string{"video"},
 			})
 		}
 		pg := &proxyGroup{
