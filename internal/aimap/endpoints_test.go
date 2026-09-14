@@ -97,6 +97,44 @@ func TestEndpointLookupAndNormalization(t *testing.T) {
 	require.False(t, ok, "expected anthropic image to be unsupported")
 }
 
+func TestEndpointsForAndSectionEndpoints(t *testing.T) {
+	// bedrock generate is reachable via both its primary (converse) spec and
+	// the secondary (invoke) spec it shares with audio/speech.
+	specs, ok := EndpointsFor("bedrock", "generate")
+	require.True(t, ok, "bedrock generate EndpointsFor ok")
+	require.Len(t, specs, 2, "bedrock generate has a primary and one secondary spec")
+	require.Equal(t, "converse", specs[0].RouteLabel, "primary spec is converse")
+	require.Equal(t, "invoke", specs[1].RouteLabel, "secondary spec is invoke")
+	require.Equal(t, EndpointTable["bedrock"]["audio/speech"].Primary, specs[1],
+		"generate's secondary spec is reused verbatim from audio/speech")
+
+	// A capability with no secondary endpoints returns just the primary spec.
+	specs, ok = EndpointsFor("openai", "generate")
+	require.True(t, ok, "openai generate EndpointsFor ok")
+	require.Len(t, specs, 1, "openai generate has no secondary specs")
+
+	// An unsupported (section, capability) pair is still not-ok.
+	_, ok = EndpointsFor("anthropic", "image")
+	require.False(t, ok, "anthropic image EndpointsFor not ok")
+
+	// SectionEndpoints surfaces the same secondary spec alongside every
+	// primary spec in the section, so scanning callers (revert's endpoint
+	// resolution) see it as a candidate too.
+	all := SectionEndpoints("bedrock")
+	require.Len(t, all, len(EndpointTable["bedrock"])+1, "bedrock section has one secondary entry")
+	var sawSecondaryGenerate bool
+	for _, ce := range all {
+		if ce.Capability == "generate" && ce.Spec.RouteLabel == "invoke" {
+			sawSecondaryGenerate = true
+		}
+	}
+	require.True(t, sawSecondaryGenerate, "SectionEndpoints includes generate's secondary invoke spec")
+
+	// A section with no secondaries returns exactly the primary specs.
+	require.Len(t, SectionEndpoints("openai"), len(EndpointTable["openai"]),
+		"openai section has no secondary endpoints")
+}
+
 func TestRoutePath(t *testing.T) {
 	chat, _ := LookupEndpoint("openai", "generate")
 	bedrock, _ := LookupEndpoint("bedrock", "generate")
