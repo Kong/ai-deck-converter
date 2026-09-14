@@ -35,7 +35,7 @@ policies:
         model:
           provider: openai
           name: text-embedding-3-small
-    datastore: shared-pgvector
+    datastore: [shared-pgvector]
   - type: ai-semantic-cache
     name: semantic-cache
     config:
@@ -46,7 +46,7 @@ policies:
         threshold: 0.9
     # Reuses the same Datastore as rag-injector above — defined once, referenced
     # by name from multiple policies.
-    datastore: shared-pgvector
+    datastore: [shared-pgvector]
   - type: ai-semantic-prompt-guard
     name: prompt-guard-ds
     config:
@@ -55,7 +55,7 @@ policies:
         distance_metric: euclidean
         strategy: pgvector
         threshold: 0.5
-    datastore: guard-pgvector
+    datastore: [guard-pgvector]
   - type: ai-semantic-response-guard
     name: response-guard-ds
     config:
@@ -64,7 +64,7 @@ policies:
         distance_metric: euclidean
         strategy: pgvector
         threshold: 0.6
-    datastore: response-guard-pgvector
+    datastore: [response-guard-pgvector]
 datastores:
   - type: vectordb
     name: shared-pgvector

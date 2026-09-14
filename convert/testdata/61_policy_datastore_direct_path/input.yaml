@@ -1,27 +1,35 @@
 consumers:
   - name: c1
     type: api-key
-    policies: [limiter, cert-manager, cache-warmer]
+    policies: [limiter, response-limiter, cert-manager, cache-warmer]
 policies:
   # Flat path: config.redis
   - type: rate-limiting
     name: limiter
     config: {minute: 100, policy: redis}
-    datastore: limiter-redis
+    datastore: [limiter-redis]
+  # Flat path: config.redis (response-ratelimiting is redis-ce only, like rate-limiting)
+  - type: response-ratelimiting
+    name: response-limiter
+    config: {limits: {video: {minute: 10}}, policy: redis}
+    datastore: [response-limiter-redis]
   # One level nested: config.storage_config.redis
   - type: acme
     name: cert-manager
     config: {account_email: ops@example.com, storage: redis}
-    datastore: cert-redis
+    datastore: [cert-redis]
   # Two levels nested: config.resources.cache.redis
   - type: datakit
     name: cache-warmer
     config: {dsl: {}}
-    datastore: cache-redis
+    datastore: [cache-redis]
 datastores:
   - type: redis-ce
     name: limiter-redis
     config: {host: limiter-redis.internal, port: 6379}
+  - type: redis-ce
+    name: response-limiter-redis
+    config: {host: response-limiter-redis.internal, port: 6380}
   - type: redis-ce
     name: cert-redis
     config: {host: cert-redis.internal, database: 1}

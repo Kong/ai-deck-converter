@@ -27,7 +27,7 @@ policies:
         dimensions: 1536
         distance_metric: cosine
         threshold: 0.9
-    datastore: pgvector-ds
+    datastore: [pgvector-ds]
 datastores:
   - type: vectordb
     name: pgvector-ds

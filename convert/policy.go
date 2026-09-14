@@ -111,22 +111,30 @@ func (c *Converter) policyPlugin(p *aigw.Policy, tags []string, preserveID bool)
 	return plugin, nil
 }
 
-// applyDatastore expands p.Datastore (a reference by name into the top-level
+// applyDatastore expands p.Datastore (a by-name reference into the top-level
 // datastores list, resolved via c.datastores) into config, when the policy
-// type supports it. All validation happens here, before any insertion helper
-// runs: recognized plugin type and known Datastore (aimap.DatastoreSupportForPolicyType,
-// c.datastores) and an allowed Datastore type (DatastoreSupport.Allows).
-// Everything past that point is a pure merge with no further error path — for
-// the VectorDB family, vectordb.strategy is derived from the Datastore's type
-// and overwritten unconditionally, so an author-supplied strategy that
-// disagrees with it is simply replaced, not checked.
+// type supports it. p.Datastore is a list for parity with Kong's own plugin
+// schema (partials), but only ever holds at most one entry today — a second
+// one is rejected here, before any other validation. All other validation
+// happens here too, before any insertion helper runs: recognized plugin type
+// and known Datastore (aimap.DatastoreSupportForPolicyType, c.datastores) and
+// an allowed Datastore type (DatastoreSupport.Allows). Everything past that
+// point is a pure merge with no further error path — for the VectorDB family,
+// vectordb.strategy is derived from the Datastore's type and overwritten
+// unconditionally, so an author-supplied strategy that disagrees with it is
+// simply replaced, not checked.
 func (c *Converter) applyDatastore(p *aigw.Policy, config map[string]any) (map[string]any, error) {
-	if p.Datastore == "" {
+	if len(p.Datastore) == 0 {
 		return config, nil
 	}
-	ds := c.datastores[p.Datastore]
+	if len(p.Datastore) > 1 {
+		return nil, c.failAt("policies",
+			"policy %q has %d datastores (%v), but only one is allowed",
+			p.Name, len(p.Datastore), p.Datastore)
+	}
+	ds := c.datastores[p.Datastore[0]]
 	if ds == nil {
-		if err := c.warn("policy %q references unknown datastore %q", p.Name, p.Datastore); err != nil {
+		if err := c.warn("policy %q references unknown datastore %q", p.Name, p.Datastore[0]); err != nil {
 			return nil, err
 		}
 		return config, nil

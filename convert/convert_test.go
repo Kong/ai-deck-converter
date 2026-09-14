@@ -434,7 +434,7 @@ policies:
     name: rag-injector
     config:
       vectordb: {strategy: redis, dimensions: 1536, distance_metric: cosine}
-    datastore: rag-redis
+    datastore: [rag-redis]
 datastores:
   - type: redis-ce
     name: rag-redis
@@ -443,6 +443,30 @@ datastores:
 	_, _, err := Convert(src, Options{})
 	require.Error(t, err, "vectordb-consuming plugins only support a redis-ee datastore, not redis-ce")
 	require.Contains(t, err.Error(), "redis-ee")
+}
+
+func TestConvertRejectsMultipleDatastores(t *testing.T) {
+	src := []byte(`
+consumers:
+  - name: c1
+    type: api-key
+    policies: [limiter]
+policies:
+  - type: rate-limiting
+    name: limiter
+    config: {minute: 100, policy: redis}
+    datastore: [ds1, ds2]
+datastores:
+  - type: redis-ce
+    name: ds1
+    config: {host: ds1.internal}
+  - type: redis-ce
+    name: ds2
+    config: {host: ds2.internal}
+`)
+	_, _, err := Convert(src, Options{})
+	require.Error(t, err, "a policy naming more than one datastore must be rejected")
+	require.Contains(t, err.Error(), "only one is allowed")
 }
 
 func TestConvertRejectsWrongDatastoreTypeOnRateLimiting(t *testing.T) {
@@ -455,7 +479,7 @@ policies:
   - type: rate-limiting
     name: limiter
     config: {minute: 100, policy: redis}
-    datastore: wrong-type-ds
+    datastore: [wrong-type-ds]
 datastores:
   - type: redis-ee
     name: wrong-type-ds
@@ -476,7 +500,7 @@ policies:
   - type: rate-limiting
     name: limiter
     config: {minute: 100, policy: redis}
-    datastore: correct-type-ds
+    datastore: [correct-type-ds]
 datastores:
   - type: redis-ce
     name: correct-type-ds
@@ -1140,7 +1164,7 @@ policies:
     name: rag-injector
     config:
       vectordb: {strategy: redis, dimensions: 1536, distance_metric: cosine}
-    datastore: missing-datastore
+    datastore: [missing-datastore]
 `)
 	_, warnings, err := Convert(src, Options{})
 	require.NoError(t, err, "convert")

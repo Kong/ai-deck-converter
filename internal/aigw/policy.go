@@ -12,5 +12,5 @@ type Policy struct {
 	Global      *bool          `yaml:"global,omitempty"`
 	Config      map[string]any `yaml:"config,omitempty"`
 	Labels      Labels         `yaml:"labels,omitempty"`
-	Datastore   string         `yaml:"datastore,omitempty"`
+	Datastore   []string       `yaml:"datastore,omitempty"`
 }
