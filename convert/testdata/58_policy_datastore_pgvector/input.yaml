@@ -26,7 +26,6 @@ policies:
       vectordb:
         dimensions: 1536
         distance_metric: cosine
-        strategy: pgvector
         threshold: 0.35
       embeddings:
         auth:
@@ -42,7 +41,6 @@ policies:
       vectordb:
         dimensions: 1536
         distance_metric: cosine
-        strategy: pgvector
         threshold: 0.9
     # Reuses the same Datastore as rag-injector above — defined once, referenced
     # by name from multiple policies.
@@ -53,7 +51,6 @@ policies:
       vectordb:
         dimensions: 768
         distance_metric: euclidean
-        strategy: pgvector
         threshold: 0.5
     datastore: [guard-pgvector]
   - type: ai-semantic-response-guard
@@ -62,7 +59,6 @@ policies:
       vectordb:
         dimensions: 768
         distance_metric: euclidean
-        strategy: pgvector
         threshold: 0.6
     datastore: [response-guard-pgvector]
 datastores:
