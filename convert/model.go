@@ -225,143 +225,149 @@ func (c *Converter) convertModels() error {
 				// (generate/embeddings) but keeps the Vertex section for the
 				// Vertex-only image/video/rerank endpoints.
 				sec := aimap.EndpointSectionFor(llmFormat(m), providerType, capability)
-				spec, ok := aimap.LookupEndpoint(sec, capability)
+				specs, ok := aimap.EndpointsFor(sec, capability)
 				if !ok {
 					return c.failAt("capabilities",
 						"model %q: capability %q is not supported with llm_format %q for provider type %q",
 						m.Name, capability, llmFormat(m), providerType)
 				}
-				logging := modelLoggingBlock(withLoggingDefaults(m.Config.Logging, false, false), spec.SupportsLogStatistics)
-				// Authentication plugins execute before the model selector. Models
-				// with different auth-strategy sets therefore cannot share a
-				// route: a route-scoped auth plugin would otherwise protect every
-				// model on that route.
-				identityKey := authStrategyKey(m.Access.AuthStrategies)
-				routeConfigKey, err := modelRouteConfigKey(m.Config.Route)
-				if err != nil {
-					return err
-				}
-				selectorCfgs, err := c.buildModelSelectorConfig(m, spec)
-				if err != nil {
-					return err
-				}
-				// The alias *value* is per-model and deliberately excluded from
-				// routeConfigKey. When targeting config.sources (Options.
-				// ModelSelectorSources), the selector *shape* (which source/field an
-				// ai-model-selector reads) no longer forces a split: models wanting
-				// different shapes still share the route, and their shapes compact
-				// into config.sources (see routeGroup.addSelector). Otherwise the
-				// shape stays a route-level concern like auth strategies, since
-				// the legacy schema's ai-model-selector can only read one shape at
-				// a time: models wanting incompatible shapes cannot share a route.
-				key := sec + "|" +
-					spec.RouteLabel +
-					"|" + identityKey +
-					"|" + routeConfigKey
-				if !useSources {
-					key += "|" + modelSelectorShapeKey(selectorCfgs)
-				}
-				g := groups[key]
-				if g == nil {
-					paths := make([]string, len(bases))
-					for i, b := range bases {
-						paths[i] = aimap.RoutePath(b, spec)
-					}
-					routeName := uniqueModelRouteName(sec+"-"+spec.RouteLabel, usedRouteNames)
-					g = &routeGroup{
-						route: buildModelRoute(
-							m.Config.Route, routeName,
-							paths, spec.Methods),
-						proxyByOwner: map[string]*proxyGroup{},
-					}
-					g.route.Source = source("model", m.Name, "config.route")
-					groups[key] = g
-					order = append(order, key)
-				}
-
-				for _, selector := range selectorCfgs {
-					g.addSelector(selector)
-				}
-				if !routeSeen[g.route.Name] {
-					routeSeen[g.route.Name] = true
-					routeNames = append(routeNames, g.route.Name)
-				}
-
-				pg := g.proxyByOwner[ownerKey]
-				if pg == nil {
-					embeddings, err := c.resolveEmbeddings(balancerExtra(m.Config.Balancer, "embeddings"))
+				// A capability with secondary endpoints (bedrock generate, also
+				// reachable via invoke) emits one route per endpoint, each
+				// carrying this target; revert's capsSeen folds the routes back
+				// into the one capability.
+				for _, spec := range specs {
+					logging := modelLoggingBlock(withLoggingDefaults(m.Config.Logging, false, false), spec.SupportsLogStatistics)
+					// Authentication plugins execute before the model selector. Models
+					// with different auth-strategy sets therefore cannot share a
+					// route: a route-scoped auth plugin would otherwise protect every
+					// model on that route.
+					identityKey := authStrategyKey(m.Access.AuthStrategies)
+					routeConfigKey, err := modelRouteConfigKey(m.Config.Route)
 					if err != nil {
 						return err
 					}
-					// The plugin's model FK must equal ai_models.name — the string a
-					// client sends, which ai-model-selector matches on to activate this
-					// model-scoped plugin. That identity is aiModelAlias (the authored
-					// alias, or the model name when none is set), not m.Name; using
-					// m.Name would dangle the FK whenever an alias is authored.
-					modelName := ""
+					selectorCfgs, err := c.buildModelSelectorConfig(m, spec)
+					if err != nil {
+						return err
+					}
+					// The alias *value* is per-model and deliberately excluded from
+					// routeConfigKey. When targeting config.sources (Options.
+					// ModelSelectorSources), the selector *shape* (which source/field an
+					// ai-model-selector reads) no longer forces a split: models wanting
+					// different shapes still share the route, and their shapes compact
+					// into config.sources (see routeGroup.addSelector). Otherwise the
+					// shape stays a route-level concern like auth strategies, since
+					// the legacy schema's ai-model-selector can only read one shape at
+					// a time: models wanting incompatible shapes cannot share a route.
+					key := sec + "|" +
+						spec.RouteLabel +
+						"|" + identityKey +
+						"|" + routeConfigKey
+					if !useSources {
+						key += "|" + modelSelectorShapeKey(selectorCfgs)
+					}
+					g := groups[key]
+					if g == nil {
+						paths := make([]string, len(bases))
+						for i, b := range bases {
+							paths[i] = aimap.RoutePath(b, spec)
+						}
+						routeName := uniqueModelRouteName(sec+"-"+spec.RouteLabel, usedRouteNames)
+						g = &routeGroup{
+							route: buildModelRoute(
+								m.Config.Route, routeName,
+								paths, spec.Methods),
+							proxyByOwner: map[string]*proxyGroup{},
+						}
+						g.route.Source = source("model", m.Name, "config.route")
+						groups[key] = g
+						order = append(order, key)
+					}
+
+					for _, selector := range selectorCfgs {
+						g.addSelector(selector)
+					}
+					if !routeSeen[g.route.Name] {
+						routeSeen[g.route.Name] = true
+						routeNames = append(routeNames, g.route.Name)
+					}
+
+					pg := g.proxyByOwner[ownerKey]
+					if pg == nil {
+						embeddings, err := c.resolveEmbeddings(balancerExtra(m.Config.Balancer, "embeddings"))
+						if err != nil {
+							return err
+						}
+						// The plugin's model FK must equal ai_models.name — the string a
+						// client sends, which ai-model-selector matches on to activate this
+						// model-scoped plugin. That identity is aiModelAlias (the authored
+						// alias, or the model name when none is set), not m.Name; using
+						// m.Name would dangle the FK whenever an alias is authored.
+						modelName := ""
+						if modelScoped {
+							modelName = aiModelAlias
+						}
+
+						modelNameHeader := boolPtr(false)
+						if supportsModelNameHeader(spec) {
+							modelNameHeader = m.Config.Model.NameHeader
+						}
+
+						pg = &proxyGroup{
+							routeName:         g.route.Name,
+							modelName:         modelName,
+							enabled:           disabledModelPluginEnabled(m.Enabled),
+							llmFormat:         llmFormat(m),
+							genaiCategory:     spec.GenaiCategory,
+							balancer:          balancerConfig(m.Config.Balancer),
+							vectordb:          aimap.VectorDBToPlugin(balancerExtra(m.Config.Balancer, "vectordb")),
+							embeddings:        embeddings,
+							responseStreaming: m.Config.ResponseStreaming,
+							modelNameHeader:   modelNameHeader,
+							maxBodySize:       m.Config.MaxRequestBodySize,
+							proxy:             proxyConfigBlock(m.Config.Proxy),
+							source: source("model", m.Name, "config",
+								kong.FieldMapping{GeneratedPrefix: "config.proxy_config", SourcePrefix: "config.proxy"},
+								kong.FieldMapping{GeneratedPrefix: "config.model_name_header", SourcePrefix: "config.model.name_header"},
+								kong.FieldMapping{GeneratedPrefix: "config.vectordb", SourcePrefix: "config.balancer.vectordb"},
+								kong.FieldMapping{GeneratedPrefix: "config.embeddings", SourcePrefix: "config.balancer.embeddings"},
+							),
+							seen: map[string]bool{},
+						}
+						g.proxyByOwner[ownerKey] = pg
+						g.proxies = append(g.proxies, pg)
+					}
+					// A target's model_alias decides which balancer pool it joins: the DP
+					// keys pools by model_alias and puts alias-less targets in the shared
+					// "<default>" pool, routing a request to an alias pool only when the
+					// request presents that alias (its body model, or the model segment of
+					// a native URL). type:model requests always carry the model, so their
+					// targets must be aliased or a request lands in an empty "<default>"
+					// pool (404 "no model matched this request"). type:api (files/batches)
+					// requests carry no model, so their targets must stay alias-less to
+					// remain in the "<default>" pool they fall back to (else the balancer
+					// has no pool for the request: 500 "failed to get balancer instance").
+					targetModelAlias := ""
 					if modelScoped {
-						modelName = aiModelAlias
+						targetModelAlias = targetAlias
 					}
-
-					modelNameHeader := boolPtr(false)
-					if supportsModelNameHeader(spec) {
-						modelNameHeader = m.Config.Model.NameHeader
+					target := c.buildTarget(tm, provider, providerType, targetModelAlias, spec.RouteType, logging)
+					// Dedup on the built target's full shape rather than
+					// (name, route_type): two targets can share a model name yet
+					// be genuinely distinct via different providers (distinct
+					// auth/options) or weights. The same (tm, provider) reached
+					// through several capabilities that share a route_type still
+					// fingerprints identically, so those collapse as before.
+					dedup := targetFingerprint(target)
+					if !pg.seen[dedup] {
+						pg.seen[dedup] = true
+						pg.targets = append(pg.targets, target)
+						pg.targetSources = append(pg.targetSources, kong.TargetSource{
+							ModelName:        m.Name,
+							ModelTargetIndex: j,
+							Capability:       capability,
+						})
 					}
-
-					pg = &proxyGroup{
-						routeName:         g.route.Name,
-						modelName:         modelName,
-						enabled:           disabledModelPluginEnabled(m.Enabled),
-						llmFormat:         llmFormat(m),
-						genaiCategory:     spec.GenaiCategory,
-						balancer:          balancerConfig(m.Config.Balancer),
-						vectordb:          aimap.VectorDBToPlugin(balancerExtra(m.Config.Balancer, "vectordb")),
-						embeddings:        embeddings,
-						responseStreaming: m.Config.ResponseStreaming,
-						modelNameHeader:   modelNameHeader,
-						maxBodySize:       m.Config.MaxRequestBodySize,
-						proxy:             proxyConfigBlock(m.Config.Proxy),
-						source: source("model", m.Name, "config",
-							kong.FieldMapping{GeneratedPrefix: "config.proxy_config", SourcePrefix: "config.proxy"},
-							kong.FieldMapping{GeneratedPrefix: "config.model_name_header", SourcePrefix: "config.model.name_header"},
-							kong.FieldMapping{GeneratedPrefix: "config.vectordb", SourcePrefix: "config.balancer.vectordb"},
-							kong.FieldMapping{GeneratedPrefix: "config.embeddings", SourcePrefix: "config.balancer.embeddings"},
-						),
-						seen: map[string]bool{},
-					}
-					g.proxyByOwner[ownerKey] = pg
-					g.proxies = append(g.proxies, pg)
-				}
-				// A target's model_alias decides which balancer pool it joins: the DP
-				// keys pools by model_alias and puts alias-less targets in the shared
-				// "<default>" pool, routing a request to an alias pool only when the
-				// request presents that alias (its body model, or the model segment of
-				// a native URL). type:model requests always carry the model, so their
-				// targets must be aliased or a request lands in an empty "<default>"
-				// pool (404 "no model matched this request"). type:api (files/batches)
-				// requests carry no model, so their targets must stay alias-less to
-				// remain in the "<default>" pool they fall back to (else the balancer
-				// has no pool for the request: 500 "failed to get balancer instance").
-				targetModelAlias := ""
-				if modelScoped {
-					targetModelAlias = targetAlias
-				}
-				target := c.buildTarget(tm, provider, providerType, targetModelAlias, spec.RouteType, logging)
-				// Dedup on the built target's full shape rather than
-				// (name, route_type): two targets can share a model name yet
-				// be genuinely distinct via different providers (distinct
-				// auth/options) or weights. The same (tm, provider) reached
-				// through several capabilities that share a route_type still
-				// fingerprints identically, so those collapse as before.
-				dedup := targetFingerprint(target)
-				if !pg.seen[dedup] {
-					pg.seen[dedup] = true
-					pg.targets = append(pg.targets, target)
-					pg.targetSources = append(pg.targetSources, kong.TargetSource{
-						ModelName:        m.Name,
-						ModelTargetIndex: j,
-						Capability:       capability,
-					})
 				}
 			}
 		}
