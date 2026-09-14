@@ -6,7 +6,7 @@ package aimap
 const (
 	DatastoreTypeRedisCE  = "redis-ce"
 	DatastoreTypeRedisEE  = "redis-ee"
-	DatastoreTypeVectorDB = "vectordb" // despite the name, this Datastore type is specifically pgvector; see datastoreTypeVectorDBMap.
+	DatastoreTypeVectorDB = "vectordb" // despite the name, always pgvector; see datastoreTypeVectorDBMap.
 )
 
 // datastoreTypeVectorDBMap maps a Datastore's `type` discriminator to the

@@ -488,39 +488,6 @@ datastores:
 	require.Contains(t, string(out), "host: redis-ce.internal", "expected the datastore's config inserted at config.redis")
 }
 
-func TestConvertRejectsMismatchedVectorDBStrategyAndDatastore(t *testing.T) {
-	src := []byte(`
-models:
-  - type: model
-    name: rag-model
-    capabilities: [generate]
-    formats: [{type: openai}]
-    targets:
-      - name: gpt-4o
-        provider: p1
-        config: {type: openai}
-    policies: [rag-injector]
-    config:
-      route: {paths: [/rag]}
-model_providers:
-  - name: p1
-    type: openai
-policies:
-  - type: ai-rag-injector
-    name: rag-injector
-    config:
-      vectordb: {strategy: redis, dimensions: 1536, distance_metric: cosine}
-    datastore: rag-pgvector
-datastores:
-  - type: vectordb
-    name: rag-pgvector
-    config: {host: pgvector.internal, database: kong-pgvector}
-`)
-	_, _, err := Convert(src, Options{})
-	require.Error(t, err, "a redis strategy paired with a pgvector datastore must be rejected")
-	require.Contains(t, err.Error(), "vectordb.strategy")
-}
-
 func TestConvertScopesAuthStrategiesWithoutLeakingAcrossSharedRoutes(t *testing.T) {
 	src := []byte(`
 models:

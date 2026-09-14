@@ -115,10 +115,11 @@ func (c *Converter) policyPlugin(p *aigw.Policy, tags []string, preserveID bool)
 // datastores list, resolved via c.datastores) into config, when the policy
 // type supports it. All validation happens here, before any insertion helper
 // runs: recognized plugin type and known Datastore (aimap.DatastoreSupportForPolicyType,
-// c.datastores), an allowed Datastore type (DatastoreSupport.Allows), and,
-// for the VectorDB family, a vectordb.strategy consistent with the sub-block
-// the Datastore's type feeds. Everything past that point is a pure merge with
-// no further error path.
+// c.datastores) and an allowed Datastore type (DatastoreSupport.Allows).
+// Everything past that point is a pure merge with no further error path — for
+// the VectorDB family, vectordb.strategy is derived from the Datastore's type
+// and overwritten unconditionally, so an author-supplied strategy that
+// disagrees with it is simply replaced, not checked.
 func (c *Converter) applyDatastore(p *aigw.Policy, config map[string]any) (map[string]any, error) {
 	if p.Datastore == "" {
 		return config, nil
@@ -140,16 +141,6 @@ func (c *Converter) applyDatastore(p *aigw.Policy, config map[string]any) (map[s
 	case "vectordb":
 		strategy, _ := aimap.VectorDBStrategyForDatastoreType(ds.Type)
 		vectordbConfig, _ := config["vectordb"].(map[string]any)
-		if existingStrategy, ok := vectordbConfig["strategy"].(string); ok && existingStrategy != strategy {
-			// The Datastore's type picks which sub-block (redis/pgvector) we're
-			// about to insert; a vectordb.strategy naming the other one would
-			// leave the plugin with a strategy and a connection block for two
-			// different backends. Fail rather than silently overwrite the
-			// author's strategy.
-			return nil, c.failAt("policies",
-				"policy %q's vectordb.strategy %q doesn't match its %s datastore (type %q)",
-				p.Name, existingStrategy, strategy, ds.Type)
-		}
 		return applyVectorDBDatastore(config, vectordbConfig, strategy, ds.Config), nil
 	case "redis":
 		return applyRedisDatastore(config, ds.Config), nil
@@ -186,10 +177,13 @@ func applyRedisDatastore(config map[string]any, dsConfig map[string]any) map[str
 // own doc comment in the source API spec — is left untouched. Never mutates
 // pluginConfig or vectordbConfig in place, so a reusable source Policy is
 // never mutated.
-func applyVectorDBDatastore(pluginConfig, vectordbConfig map[string]any, strategy string, dsConfig map[string]any) map[string]any {
+func applyVectorDBDatastore(
+	pluginConfig, vectordbConfig map[string]any, strategy string, dsConfig map[string]any,
+) map[string]any {
 	out := make(map[string]any, len(pluginConfig)+1)
 	maps.Copy(out, pluginConfig)
-	vectordb := make(map[string]any, len(vectordbConfig)+2)
+	const newVectorDBKeys = 2 // "strategy" and the redis/pgvector sub-block, both set below.
+	vectordb := make(map[string]any, len(vectordbConfig)+newVectorDBKeys)
 	maps.Copy(vectordb, vectordbConfig)
 	vectordb["strategy"] = strategy
 	vectordb[strategy] = dsConfig
