@@ -1,0 +1,26 @@
+# A bedrock "generate" model is reachable via both Converse and InvokeModel;
+# the converter emits a route for each, both carrying the same target.
+model_providers:
+  - name: bedrock-prod
+    type: bedrock
+    display_name: Bedrock Prod
+    config:
+      auth:
+        type: aws
+        access_key_id: "{vault://ai/aws-access-key-id}"
+        secret_access_key: "{vault://ai/aws-secret-access-key}"
+models:
+  - display_name: Claude Bedrock
+    name: claude-bedrock
+    type: model
+    capabilities: [generate]
+    formats: [{type: bedrock}]
+    config:
+      route: {paths: [/ai]}
+    targets:
+      - name: anthropic.claude-3-5-sonnet
+        provider: bedrock-prod
+        config: {type: bedrock, region: us-east-1, max_tokens: 1024}
+    policies: []
+    access:
+      acls: {allow: [], deny: []}

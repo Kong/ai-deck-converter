@@ -46,23 +46,23 @@ func specRegex(suffix string) *regexp.Regexp {
 // A filter only applies when it leaves at least one candidate, so generic
 // configs that break one convention still resolve via the others.
 func resolveEndpoint(section, routeType, genaiCategory, routeName, routePath string) (endpointMatch, bool) {
-	caps := aimap.EndpointTable[section]
+	caps := aimap.SectionEndpoints(section)
 	var cands []endpointMatch
-	for capability, spec := range caps {
-		if spec.RouteType == routeType {
-			cands = append(cands, endpointMatch{capability, spec})
+	for _, ce := range caps {
+		if ce.Spec.RouteType == routeType {
+			cands = append(cands, endpointMatch{ce.Capability, ce.Spec})
 		}
 	}
 	if len(cands) == 0 {
 		// Generic configs may carry a route_type the table doesn't use for
 		// this section; fall back to specs positively identified by the
 		// conventional route name or by the path shape.
-		for capability, spec := range caps {
-			byName := routeName == section+"-"+spec.RouteLabel ||
-				strings.HasSuffix(routeName, "-"+spec.RouteLabel)
-			_, byPath := basePathFor(routePath, spec)
+		for _, ce := range caps {
+			byName := routeName == section+"-"+ce.Spec.RouteLabel ||
+				strings.HasSuffix(routeName, "-"+ce.Spec.RouteLabel)
+			_, byPath := basePathFor(routePath, ce.Spec)
 			if byName || byPath {
-				cands = append(cands, endpointMatch{capability, spec})
+				cands = append(cands, endpointMatch{ce.Capability, ce.Spec})
 			}
 		}
 	}

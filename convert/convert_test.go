@@ -1,6 +1,7 @@
 package convert
 
 import (
+	"os"
 	"strings"
 	"testing"
 
@@ -152,8 +153,8 @@ models:
 			TargetIndex:      0,
 			ModelName:        "local-llama",
 			ModelTargetIndex: 0,
-			Capability:       "generate",
-			CapabilityLabel:  "Chat completions",
+			Capabilities:     []string{"generate"},
+			CapabilityLabels: []string{"Chat completions"},
 		},
 		{
 			PluginIndex:      3,
@@ -161,10 +162,36 @@ models:
 			TargetIndex:      0,
 			ModelName:        "local-llama",
 			ModelTargetIndex: 0,
-			Capability:       "agentic",
-			CapabilityLabel:  "Responses",
+			Capabilities:     []string{"agentic"},
+			CapabilityLabels: []string{"Responses"},
 		},
 	}, metadata.PluginTargets)
+}
+
+func TestWithMetadataMergesCapabilitiesOnCollapsedTarget(t *testing.T) {
+	// Bedrock's invoke endpoint for "generate" is field-for-field identical to
+	// "audio/speech"'s endpoint, so a model declaring both collapses onto one
+	// bedrock-invoke target (see testdata/58_bedrock_generate_and_speech).
+	// The target-fingerprint dedup in convertModels must attribute both
+	// capabilities to that shared target instead of silently dropping one.
+	src, err := os.ReadFile("testdata/58_bedrock_generate_and_speech/input.yaml")
+	require.NoError(t, err)
+
+	_, metadata, warnings, err := WithMetadata(src, Options{OutputMode: "db-less"})
+	require.NoError(t, err)
+	require.Empty(t, warnings)
+
+	var invokeTarget *PluginTargetSource
+	for i := range metadata.PluginTargets {
+		pt := &metadata.PluginTargets[i]
+		if pt.Location == "plugins[3]" { // bedrock-invoke route's ai-proxy-advanced plugin
+			invokeTarget = pt
+		}
+	}
+	require.NotNil(t, invokeTarget, "expected a plugin target for the bedrock-invoke route")
+	require.Equal(t, []string{"generate", "audio/speech"}, invokeTarget.Capabilities,
+		"the shared bedrock-invoke target must retain both capabilities that produced it")
+	require.Equal(t, []string{"Chat completions", "audio/speech"}, invokeTarget.CapabilityLabels)
 }
 
 func TestWithMetadataTracksMCPGeneratedEntities(t *testing.T) {

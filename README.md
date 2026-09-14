@@ -132,6 +132,19 @@ vertex) emit regex routes (`~/ai/...`); capabilities that share an upstream
 endpoint (e.g. bedrock embeddings/image/audio/video → `/invoke`) collapse into
 one route with multiple targets.
 
+Most capabilities map to a single canonical endpoint, but a few are reachable
+through more than one and get a route per endpoint: bedrock `generate` emits
+both `bedrock-converse` (Converse) and `bedrock-invoke` (InvokeModel), each
+carrying the model's target(s). These extra endpoints live in the capability's
+own `internal/aimap.EndpointTable` entry, as `EndpointEntry.Secondary`
+alongside the canonical `Primary` spec — read both together via
+`aimap.EndpointsFor` / `aimap.SectionEndpoints` — never look up a capability's
+endpoint(s) any other way, or the two directions can drift. Bedrock's invoke
+spec for `generate` is reused verbatim from `audio/speech` (the same
+endpoint), so a model declaring both capabilities gets only one
+`bedrock-invoke` route/target, not two; see "Multi-modal routes" below for the
+resulting revert-side ambiguity.
+
 ## Reverse direction (decK → AI Gateway)
 
 The `revert` package lifts a decK config back into the entity model. It is
@@ -185,12 +198,20 @@ and `formats` beyond the first.
 - **Shared gateway Service.** All model routes nest under one `ai-gateway`
   Service with the nominal url `http://ai-gateway.upstream.local`;
   `ai-proxy-advanced` overrides the real upstream per target.
-- **One primary endpoint per capability.** Each (section, capability) maps to a
-  single canonical endpoint. `rerank` has no OpenAI-format `route_type`
-  (native-only) and falls back to `llm/v1/chat`.
+- **Mostly one endpoint per capability.** Each (section, capability) maps to an
+  `aimap.EndpointEntry` with a primary canonical endpoint, plus any secondaries
+  in its `Secondary` field (currently just bedrock `generate`, also served by
+  `/invoke`). `rerank` has no OpenAI-format `route_type` (native-only) and
+  falls back to `llm/v1/chat`.
 - **Multi-modal routes.** When several capabilities share one upstream endpoint
   (e.g. bedrock `/invoke`), the route's `genai_category` is taken from the first
-  contributor (a plugin-level field can hold only one value).
+  contributor (a plugin-level field can hold only one value). Bedrock's
+  `generate` invoke spec is identical to `audio/speech`'s, so on revert a
+  `bedrock-invoke` route/target with no other distinguishing signal comes back
+  as `audio/speech` (alphabetically first), even if it was originally created
+  by a `generate` capability — see `convert/testdata/58_bedrock_generate_and_speech`.
+  This never breaks round-tripping a converter-produced config, since re-
+  converting the recovered model reproduces the same route/target either way.
 - **Credentials.** Only `api-key` (`keyauth_credentials`) is generated; other
   credential types are warned about and skipped.
 - **MCP upstream.** Passthrough MCP servers without an `upstream_url` get a

@@ -72,6 +72,20 @@ func TestResolveEndpointDisambiguation(t *testing.T) {
 		"bedrock-invoke", "~/ai/model/(?<model_name>[^/]+)/invoke(?:-with-response-stream)?")
 	require.True(t, ok, "bedrock invoke audio ok")
 	require.Equal(t, "audio/speech", m.capability, "bedrock invoke audio-speech capability")
+	// generate's secondary (invoke) spec is a candidate here too, but it's
+	// indistinguishable from audio/speech's primary spec on every signal this
+	// call provides (same route_type, RouteLabel, and genai_category), so the
+	// alphabetical tie-break still lands on audio/speech — the documented
+	// caveat for a model that declares both capabilities (see
+	// convert/testdata/58_bedrock_generate_and_speech).
+	//
+	// bedrock-converse is unambiguous: only generate's primary spec carries
+	// that RouteLabel, so the invoke-labeled candidates (generate's secondary
+	// and audio/speech's primary) are narrowed out by route name.
+	m, ok = resolveEndpoint("bedrock", "llm/v1/chat", "text/generation",
+		"bedrock-converse", "~/ai/model/(?<model_name>[^/]+)/converse(?:-stream)?")
+	require.True(t, ok, "bedrock converse generate ok")
+	require.Equal(t, "generate", m.capability, "bedrock converse generate capability")
 	// A route_type the section's table doesn't use still resolves via the
 	// route name / path shape.
 	m, ok = resolveEndpoint("anthropic", "llm/v1/completions", "", "anthropic-messages", "/ai/v1/messages")

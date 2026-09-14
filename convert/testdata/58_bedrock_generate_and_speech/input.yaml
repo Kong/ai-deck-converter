@@ -1,0 +1,30 @@
+# A model declaring both "generate" and "audio/speech" on bedrock: generate's
+# invoke endpoint is field-for-field identical to audio/speech's, so the two
+# capabilities collapse onto the same bedrock-invoke route/target instead of
+# doubling it up. Only bedrock-converse (generate's other endpoint) is
+# distinct. See CLAUDE.md's endpoint-table section for the revert-side caveat
+# this produces (the invoke route reverts as audio/speech, not generate).
+model_providers:
+  - name: bedrock-prod
+    type: bedrock
+    display_name: Bedrock Prod
+    config:
+      auth:
+        type: aws
+        access_key_id: "{vault://ai/aws-access-key-id}"
+        secret_access_key: "{vault://ai/aws-secret-access-key}"
+models:
+  - display_name: Claude Bedrock
+    name: claude-bedrock
+    type: model
+    capabilities: [generate, audio/speech]
+    formats: [{type: bedrock}]
+    config:
+      route: {paths: [/ai]}
+    targets:
+      - name: anthropic.claude-3-5-sonnet
+        provider: bedrock-prod
+        config: {type: bedrock, region: us-east-1, max_tokens: 1024}
+    policies: []
+    access:
+      acls: {allow: [], deny: []}

@@ -165,13 +165,18 @@ type FieldMapping struct {
 	SourcePrefix    string
 }
 
-// TargetSource identifies the AI Gateway model target and capability that
-// produced an ai-proxy-advanced target. It is conversion-only metadata and is
-// deliberately never emitted in a Kong declarative configuration.
+// TargetSource identifies the AI Gateway model target and the capability or
+// capabilities that produced an ai-proxy-advanced target. It is
+// conversion-only metadata and is deliberately never emitted in a Kong
+// declarative configuration. Capabilities holds more than one entry when
+// distinct capabilities build an identical target that collapses into one
+// (e.g. bedrock "generate"'s secondary invoke endpoint and "audio/speech"
+// share a spec) — every capability that produced the target is kept rather
+// than only the first.
 type TargetSource struct {
 	ModelName        string
 	ModelTargetIndex int
-	Capability       string
+	Capabilities     []string
 }
 
 // Consumer is a Kong Gateway Consumer. Credentials and scoped plugins may be nested.

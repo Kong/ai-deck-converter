@@ -24,6 +24,18 @@ type EndpointSpec struct {
 	SupportsLogStatistics      bool            // whether the endpoint supports log statistics
 }
 
+// EndpointEntry is EndpointTable's value: every Kong route that serves a given
+// (section, capability). Primary is the canonical endpoint; Secondary holds
+// extra specs for the rare capability reachable through more than one
+// endpoint (bedrock "generate" is also served by InvokeModel, besides
+// Converse). Read an entry through EndpointsFor or SectionEndpoints rather
+// than indexing EndpointTable's fields directly, so callers that only expect
+// one endpoint don't silently ignore a Secondary one.
+type EndpointEntry struct {
+	Primary   EndpointSpec
+	Secondary []EndpointSpec
+}
+
 const (
 	catTextGen    = "text/generation"
 	catEmbeddings = "text/embeddings"
@@ -198,152 +210,270 @@ var bedrockPathModelSelectorConfig = map[string]any{
 	"path_pattern": BedrockDefaultPathPattern,
 }
 
-// EndpointTable maps section -> capability -> endpoint spec, derived from
-// ref/supported-endpoints.md and the reference kong.yaml examples.
-var EndpointTable = map[string]map[string]EndpointSpec{
+// bedrockInvokeChatSpec is bedrock's InvokeModel endpoint as seen by its
+// llm/v1/chat-typed capabilities: audio/speech's only endpoint, and the
+// endpoint "generate" is also reachable through besides Converse. Defined
+// once so the two EndpointTable entries that use it can never drift.
+var bedrockInvokeChatSpec = EndpointSpec{
+	"invoke", "model/(?<model_name>[^/]+)/invoke(?:-with-response-stream)?",
+	true, mGetPost, "llm/v1/chat", catTextGen, &bedrockPathModelSelectorConfig, true,
+}
+
+// EndpointTable maps section -> capability -> EndpointEntry, derived from
+// ref/supported-endpoints.md and the reference kong.yaml examples. Almost
+// every entry sets only Primary; Secondary is for the rare capability served
+// by more than one endpoint (bedrock "generate").
+var EndpointTable = map[string]map[string]EndpointEntry{
 	"openai": {
 		"generate": {
-			"chat", "/chat/completions", false, mPost, "llm/v1/chat", catTextGen,
-			&defaultBodyModelSelectorConfig, true,
+			Primary: EndpointSpec{
+				"chat", "/chat/completions", false, mPost, "llm/v1/chat", catTextGen,
+				&defaultBodyModelSelectorConfig, true,
+			},
 		},
 		"agentic": {
-			"responses", "/responses", false, mPost, "llm/v1/responses", catTextGen,
-			&defaultBodyModelSelectorConfig, true,
+			Primary: EndpointSpec{
+				"responses", "/responses", false, mPost, "llm/v1/responses", catTextGen,
+				&defaultBodyModelSelectorConfig, true,
+			},
 		},
 		"realtime": {
-			"realtime", "/realtime", false, mGetPost, "realtime/v1/realtime", catRealtime,
-			&defaultBodyModelSelectorConfig, true,
+			Primary: EndpointSpec{
+				"realtime", "/realtime", false, mGetPost, "realtime/v1/realtime", catRealtime,
+				&defaultBodyModelSelectorConfig, true,
+			},
 		},
 		"embeddings": {
-			"embeddings", "/embeddings", false, mPost, "llm/v1/embeddings", catEmbeddings,
-			&defaultBodyModelSelectorConfig, true,
+			Primary: EndpointSpec{
+				"embeddings", "/embeddings", false, mPost, "llm/v1/embeddings", catEmbeddings,
+				&defaultBodyModelSelectorConfig, true,
+			},
 		},
 		"image": {
-			"images", "/images/generations", false, mPost, "image/v1/images/generations", catImage,
-			&defaultBodyModelSelectorConfig, true,
+			Primary: EndpointSpec{
+				"images", "/images/generations", false, mPost, "image/v1/images/generations", catImage,
+				&defaultBodyModelSelectorConfig, true,
+			},
 		},
 		"audio/speech": {
-			"audio-speech", "/audio/speech", false, mPost, "audio/v1/audio/speech", catSpeech,
-			&defaultBodyModelSelectorConfig, false,
+			Primary: EndpointSpec{
+				"audio-speech", "/audio/speech", false, mPost, "audio/v1/audio/speech", catSpeech,
+				&defaultBodyModelSelectorConfig, false,
+			},
 		},
 		"audio/transcription": {
-			"audio-transcribe", "/audio/transcriptions", false, mPost, "audio/v1/audio/transcriptions",
-			catTranscript, &defaultBodyModelSelectorConfig, false,
+			Primary: EndpointSpec{
+				"audio-transcribe", "/audio/transcriptions", false, mPost, "audio/v1/audio/transcriptions",
+				catTranscript, &defaultBodyModelSelectorConfig, false,
+			},
 		},
 		"audio/translation": {
-			"audio-translate", "/audio/translations", false, mPost, "audio/v1/audio/translations",
-			catTranscript, &defaultBodyModelSelectorConfig, false,
+			Primary: EndpointSpec{
+				"audio-translate", "/audio/translations", false, mPost, "audio/v1/audio/translations",
+				catTranscript, &defaultBodyModelSelectorConfig, false,
+			},
 		},
 		"video": {
-			"videos", "/videos", false, mPost, "video/v1/videos/generations", catVideo, &defaultBodyModelSelectorConfig, true,
+			Primary: EndpointSpec{
+				"videos", "/videos", false, mPost, "video/v1/videos/generations", catVideo,
+				&defaultBodyModelSelectorConfig, true,
+			},
 		},
-		"batches": {"batches", "/batches", false, mGetPost, "llm/v1/batches", catTextGen, nil, false},
+		"batches": {
+			Primary: EndpointSpec{"batches", "/batches", false, mGetPost, "llm/v1/batches", catTextGen, nil, false},
+		},
 		"files": {
-			"files", "/files", false, []string{"GET", "POST", "DELETE"}, "llm/v1/files", catTextGen, nil, true,
+			Primary: EndpointSpec{
+				"files", "/files", false, []string{"GET", "POST", "DELETE"}, "llm/v1/files", catTextGen, nil, true,
+			},
 		},
 	},
 	"anthropic": {
 		"generate": {
-			"messages", "/v1/messages", false, mPost, "llm/v1/chat", catTextGen,
-			&defaultBodyModelSelectorConfig, true,
+			Primary: EndpointSpec{
+				"messages", "/v1/messages", false, mPost, "llm/v1/chat", catTextGen,
+				&defaultBodyModelSelectorConfig, true,
+			},
 		},
 		"batches": {
-			"batches", "/v1/messages/batches", false, mGetPost, "llm/v1/batches", catTextGen, nil, false,
+			Primary: EndpointSpec{
+				"batches", "/v1/messages/batches", false, mGetPost, "llm/v1/batches", catTextGen, nil, false,
+			},
 		},
 	},
 	"bedrock": {
 		"generate": {
-			"converse", "model/(?<model_name>[^/]+)/converse(?:-stream)?",
-			true, mGetPost, "llm/v1/chat", catTextGen, &bedrockPathModelSelectorConfig, true,
+			Primary: EndpointSpec{
+				"converse", "model/(?<model_name>[^/]+)/converse(?:-stream)?",
+				true, mGetPost, "llm/v1/chat", catTextGen, &bedrockPathModelSelectorConfig, true,
+			},
+			// Also reachable through InvokeModel — the same endpoint
+			// audio/speech uses — so a generate-capable model gets both
+			// routes. Reusing the spec verbatim means the two capabilities
+			// are indistinguishable on revert when a route/target carries no
+			// other signal (see convert/testdata/58_bedrock_generate_and_speech).
+			Secondary: []EndpointSpec{bedrockInvokeChatSpec},
 		},
 		"agentic": {
-			"retrieve", "model/(?<model_name>[^/]+)/retrieveAndGenerate(?:Stream)?",
-			true, mGetPost, "llm/v1/chat", catTextGen, &bedrockPathModelSelectorConfig, true,
+			Primary: EndpointSpec{
+				"retrieve", "model/(?<model_name>[^/]+)/retrieveAndGenerate(?:Stream)?",
+				true, mGetPost, "llm/v1/chat", catTextGen, &bedrockPathModelSelectorConfig, true,
+			},
 		},
 		"embeddings": {
-			"invoke", "model/(?<model_name>[^/]+)/invoke(?:-with-response-stream)?",
-			true, mGetPost, "llm/v1/embeddings", catEmbeddings, &bedrockPathModelSelectorConfig, true,
+			Primary: EndpointSpec{
+				"invoke", "model/(?<model_name>[^/]+)/invoke(?:-with-response-stream)?",
+				true, mGetPost, "llm/v1/embeddings", catEmbeddings, &bedrockPathModelSelectorConfig, true,
+			},
 		},
 		"image": {
-			"invoke", "model/(?<model_name>[^/]+)/invoke(?:-with-response-stream)?",
-			true, mGetPost, "image/v1/images/generations", catImage, &bedrockPathModelSelectorConfig, false,
+			Primary: EndpointSpec{
+				"invoke", "model/(?<model_name>[^/]+)/invoke(?:-with-response-stream)?",
+				true, mGetPost, "image/v1/images/generations", catImage, &bedrockPathModelSelectorConfig, false,
+			},
 		},
-		"audio/speech": {
-			"invoke", "model/(?<model_name>[^/]+)/invoke(?:-with-response-stream)?",
-			true, mGetPost, "llm/v1/chat", catTextGen, &bedrockPathModelSelectorConfig, true,
-		},
+		"audio/speech": {Primary: bedrockInvokeChatSpec},
 		"video": {
-			"invoke", "model/(?<model_name>[^/]+)/invoke(?:-with-response-stream)?",
-			true, mGetPost, "video/v1/videos/generations", catVideo, &bedrockPathModelSelectorConfig, true,
+			Primary: EndpointSpec{
+				"invoke", "model/(?<model_name>[^/]+)/invoke(?:-with-response-stream)?",
+				true, mGetPost, "video/v1/videos/generations", catVideo, &bedrockPathModelSelectorConfig, true,
+			},
 		},
 		"rerank": {
-			"rerank", "model/(?<model_name>[^/]+)/rerank",
-			true, mGetPost, "llm/v1/chat", catTextGen, &bedrockPathModelSelectorConfig, true,
+			Primary: EndpointSpec{
+				"rerank", "model/(?<model_name>[^/]+)/rerank",
+				true, mGetPost, "llm/v1/chat", catTextGen, &bedrockPathModelSelectorConfig, true,
+			},
 		},
 		// Bedrock batch inference is the model-invocation-job lifecycle API, not
 		// async-invoke (async-invoke is single-request asynchronous inference,
 		// which the DP classifies as video generation). These paths carry no
 		// model, so the route is route-only with no ai-model-selector.
 		"batches": {
-			"batches", "model-invocation-jobs?(?:/[^/]+(?:/stop)?)?",
-			true, mGetPost, "llm/v1/batches", catTextGen, nil, true,
+			Primary: EndpointSpec{
+				"batches", "model-invocation-jobs?(?:/[^/]+(?:/stop)?)?",
+				true, mGetPost, "llm/v1/batches", catTextGen, nil, true,
+			},
 		},
 	},
 	"gemini": {
 		"generate": {
-			"generate", "v1beta/models/(?<model_name>[^:/]+):(?:generateContent|streamGenerateContent)",
-			true, mGetPost, "llm/v1/chat", catTextGen, &geminiPathModelSelectorConfig, true,
+			Primary: EndpointSpec{
+				"generate", "v1beta/models/(?<model_name>[^:/]+):(?:generateContent|streamGenerateContent)",
+				true, mGetPost, "llm/v1/chat", catTextGen, &geminiPathModelSelectorConfig, true,
+			},
 		},
 		"embeddings": {
-			"embeddings", "v1beta/models/(?<model_name>[^:/]+):(?:embedContent|batchEmbedContents)",
-			true, mGetPost, "llm/v1/embeddings", catEmbeddings, &geminiPathModelSelectorConfig, true,
+			Primary: EndpointSpec{
+				"embeddings", "v1beta/models/(?<model_name>[^:/]+):(?:embedContent|batchEmbedContents)",
+				true, mGetPost, "llm/v1/embeddings", catEmbeddings, &geminiPathModelSelectorConfig, true,
+			},
 		},
-		"batches": {"batches", "/v1beta/batches", false, mGetPost, "llm/v1/batches", catTextGen, nil, true},
-		"files":   {"files", "(?:upload/)?v1beta/files", true, mGetPost, "llm/v1/chat", catTextGen, nil, true},
+		"batches": {
+			Primary: EndpointSpec{"batches", "/v1beta/batches", false, mGetPost, "llm/v1/batches", catTextGen, nil, true},
+		},
+		"files": {
+			Primary: EndpointSpec{"files", "(?:upload/)?v1beta/files", true, mGetPost, "llm/v1/chat", catTextGen, nil, true},
+		},
 	},
 	"vertex": {
 		"generate": {
-			"generate",
-			"v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/google/models/" +
-				"(?<model_name>[^:/]+):(?:generateContent|streamGenerateContent)",
-			true, mGetPost, "llm/v1/chat", catTextGen, &geminiPathModelSelectorConfig, true,
+			Primary: EndpointSpec{
+				"generate",
+				"v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/google/models/" +
+					"(?<model_name>[^:/]+):(?:generateContent|streamGenerateContent)",
+				true, mGetPost, "llm/v1/chat", catTextGen, &geminiPathModelSelectorConfig, true,
+			},
 		},
 		"embeddings": {
-			"embeddings",
-			"v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/google/models/" +
-				"(?<model_name>[^:/]+):(?:embedContent|batchEmbedContents)",
-			true, mGetPost, "llm/v1/embeddings", catEmbeddings, &geminiPathModelSelectorConfig, true,
+			Primary: EndpointSpec{
+				"embeddings",
+				"v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/google/models/" +
+					"(?<model_name>[^:/]+):(?:embedContent|batchEmbedContents)",
+				true, mGetPost, "llm/v1/embeddings", catEmbeddings, &geminiPathModelSelectorConfig, true,
+			},
 		},
 		"image": {
-			"predict-long-running",
-			"v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/google/models/" +
-				"(?<model_name>[^:/]+):predictLongRunning",
-			true, mGetPost, "image/v1/images/generations", catImage, &geminiPathModelSelectorConfig, true,
+			Primary: EndpointSpec{
+				"predict-long-running",
+				"v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/google/models/" +
+					"(?<model_name>[^:/]+):predictLongRunning",
+				true, mGetPost, "image/v1/images/generations", catImage, &geminiPathModelSelectorConfig, true,
+			},
 		},
 		"video": {
-			"predict-long-running",
-			"v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/google/models/" +
-				"(?<model_name>[^:/]+):predictLongRunning",
-			true, mGetPost, "video/v1/videos/generations", catVideo, &geminiPathModelSelectorConfig, true,
+			Primary: EndpointSpec{
+				"predict-long-running",
+				"v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/google/models/" +
+					"(?<model_name>[^:/]+):predictLongRunning",
+				true, mGetPost, "video/v1/videos/generations", catVideo, &geminiPathModelSelectorConfig, true,
+			},
 		},
 		"rerank": {
-			"ranking",
-			"v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/rankingConfigs/" +
-				"(?<ranking_config>[^:/]+):rank",
-			true, mGetPost, "llm/v1/chat", catTextGen, nil, true,
+			Primary: EndpointSpec{
+				"ranking",
+				"v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/rankingConfigs/" +
+					"(?<ranking_config>[^:/]+):rank",
+				true, mGetPost, "llm/v1/chat", catTextGen, nil, true,
+			},
 		},
 		"batches": {
-			"batches",
-			"v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/batchPredictionJobs",
-			true, mGetPost, "llm/v1/batches", catTextGen, nil, true,
+			Primary: EndpointSpec{
+				"batches",
+				"v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/batchPredictionJobs",
+				true, mGetPost, "llm/v1/batches", catTextGen, nil, true,
+			},
 		},
 	},
 	"cohere": {
-		"rerank": {"rerank", "/v2/rerank", false, mPost, "llm/v1/chat", catTextGen, &defaultBodyModelSelectorConfig, true},
+		"rerank": {
+			Primary: EndpointSpec{
+				"rerank", "/v2/rerank", false, mPost, "llm/v1/chat", catTextGen, &defaultBodyModelSelectorConfig, true,
+			},
+		},
 	},
 	"huggingface": {
-		"generate": {"generate", "/generate", false, mPost, "llm/v1/chat", catTextGen, &defaultBodyModelSelectorConfig, true},
+		"generate": {
+			Primary: EndpointSpec{
+				"generate", "/generate", false, mPost, "llm/v1/chat", catTextGen, &defaultBodyModelSelectorConfig, true,
+			},
+		},
 	},
+}
+
+// EndpointsFor returns every endpoint spec that serves a (section, capability)
+// pair: the entry's Primary spec plus any Secondary specs, primary first. ok
+// is false when the section/capability combination is unsupported.
+func EndpointsFor(section, capability string) (specs []EndpointSpec, ok bool) {
+	entry, ok := EndpointTable[section][capability]
+	if !ok {
+		return nil, false
+	}
+	specs = append(specs, entry.Primary)
+	specs = append(specs, entry.Secondary...)
+	return specs, true
+}
+
+// CapabilityEndpoint pairs a capability with one of the endpoint specs that serve it.
+type CapabilityEndpoint struct {
+	Capability string
+	Spec       EndpointSpec
+}
+
+// SectionEndpoints returns every (capability, spec) pair served in a section —
+// each entry's Primary spec plus every Secondary spec — for callers that need
+// to scan a whole section (e.g. revert's endpoint resolution, which must
+// consider secondary specs as candidates too).
+func SectionEndpoints(section string) []CapabilityEndpoint {
+	entries := EndpointTable[section]
+	out := make([]CapabilityEndpoint, 0, len(entries))
+	for capability, entry := range entries {
+		out = append(out, CapabilityEndpoint{capability, entry.Primary})
+		for _, spec := range entry.Secondary {
+			out = append(out, CapabilityEndpoint{capability, spec})
+		}
+	}
+	return out
 }
 
 // CapabilityAliases maps loose capability spellings to canonical keys.
@@ -364,14 +494,14 @@ func NormalizeCapability(c string) []string {
 	return []string{c}
 }
 
-// LookupEndpoint returns the endpoint spec for a section + canonical capability.
+// LookupEndpoint returns the primary endpoint spec for a section + canonical capability.
 func LookupEndpoint(sec, capability string) (EndpointSpec, bool) {
 	caps, ok := EndpointTable[sec]
 	if !ok {
 		return EndpointSpec{}, false
 	}
-	spec, ok := caps[capability]
-	return spec, ok
+	entry, ok := caps[capability]
+	return entry.Primary, ok
 }
 
 // RoutePath builds the full route path for a spec under the given base path.

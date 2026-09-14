@@ -76,15 +76,16 @@ type ConversionMetadata struct {
 }
 
 // PluginTargetSource identifies one target in the converted plugin list and
-// the source model target and capability that produced it.
+// the source model target and capability (or capabilities, when distinct
+// capabilities collapse onto the same target) that produced it.
 type PluginTargetSource struct {
 	PluginIndex      int
 	Location         string
 	TargetIndex      int
 	ModelName        string
 	ModelTargetIndex int
-	Capability       string
-	CapabilityLabel  string
+	Capabilities     []string
+	CapabilityLabels []string
 }
 
 // GeneratedEntitySource identifies the source API entity for a generated
@@ -262,14 +263,18 @@ func appendPluginMetadata(metadata *ConversionMetadata, index int, location stri
 		metadata.Plugins = append(metadata.Plugins, generatedEntitySource(index, location, plugin.Source))
 	}
 	for targetIndex, targetSource := range plugin.TargetSources {
+		labels := make([]string, len(targetSource.Capabilities))
+		for i, capability := range targetSource.Capabilities {
+			labels[i] = aimap.CapabilityLabel(capability)
+		}
 		metadata.PluginTargets = append(metadata.PluginTargets, PluginTargetSource{
 			PluginIndex:      index,
 			Location:         location,
 			TargetIndex:      targetIndex,
 			ModelName:        targetSource.ModelName,
 			ModelTargetIndex: targetSource.ModelTargetIndex,
-			Capability:       targetSource.Capability,
-			CapabilityLabel:  aimap.CapabilityLabel(targetSource.Capability),
+			Capabilities:     targetSource.Capabilities,
+			CapabilityLabels: labels,
 		})
 	}
 }
