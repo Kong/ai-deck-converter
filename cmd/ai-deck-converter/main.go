@@ -37,6 +37,9 @@ func run() error {
 				"different selector shapes onto one route; requires a data plane that supports config.sources. "+
 				"Set to false to keep targeting the legacy config.source schema (one shape per route) for data "+
 				"planes that don't support config.sources yet")
+		pluginInstanceNames = flag.Bool("plugin-instance-names", false,
+			"stamp a deterministic instance_name on every generated plugin so Kong Manager and the Admin API "+
+				"can tell instances apart")
 	)
 	flag.Parse()
 
@@ -62,6 +65,7 @@ func run() error {
 			LabelTagPrefix:       *tagPrefix,
 			OutputMode:           "deck",
 			ModelSelectorSources: modelSelectorSources,
+			PluginInstanceNames:  *pluginInstanceNames,
 		})
 	case "to-dbless":
 		out, warnings, err = convert.Convert(in, convert.Options{
@@ -69,6 +73,7 @@ func run() error {
 			LabelTagPrefix:       *tagPrefix,
 			OutputMode:           "db-less",
 			ModelSelectorSources: modelSelectorSources,
+			PluginInstanceNames:  *pluginInstanceNames,
 		})
 	case "from-deck":
 		out, warnings, err = revert.Revert(in, revert.Options{

@@ -1,0 +1,56 @@
+# Three models share one /ai route via the body model selector: two
+# single-target models plus a two-provider balanced model. Proves the basic
+# naming scheme -- <plugin>.<model>.<route> -- disambiguates every generated
+# ai-proxy-advanced instance, and the shared ai-model-selector is named from
+# the route alone.
+model_providers:
+  - name: openai-prod
+    type: openai
+    config:
+      auth:
+        type: basic
+        headers: [{name: Authorization, value: "{vault://env/openai-token}"}]
+  - name: gemini-prod
+    type: gemini
+    config:
+      auth:
+        type: basic
+        params: [{name: key, value: "{vault://env/gemini-token}", location: query}]
+models:
+  - name: gpt-4o-mini
+    type: model
+    capabilities: [chat]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/ai], model: {values: ["@openai/gpt-4o-mini"]}}
+    targets:
+      - name: gpt-4o-mini
+        provider: openai-prod
+        config: {type: openai}
+  - name: gemini-2-5-flash
+    type: model
+    capabilities: [chat]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/ai], model: {values: ["@google/gemini-2.5-flash"]}}
+    targets:
+      - name: gemini-2.5-flash
+        provider: gemini-prod
+        config: {type: gemini}
+  - name: chat-balanced
+    type: model
+    capabilities: [chat]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/ai], model: {values: ["@bco/chat-balanced"]}}
+      balancer:
+        algorithm: round-robin
+    targets:
+      - name: gpt-4o-mini
+        provider: openai-prod
+        weight: 70
+        config: {type: openai}
+      - name: gemini-2.5-flash
+        provider: gemini-prod
+        weight: 30
+        config: {type: gemini}

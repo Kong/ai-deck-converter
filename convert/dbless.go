@@ -219,6 +219,7 @@ func toDBLessPlugin(plugin kong.Plugin, id string, scope scopeRef) kong.DBLessPl
 	return kong.DBLessPlugin{
 		ID:            id,
 		Name:          plugin.Name,
+		InstanceName:  plugin.InstanceName,
 		Enabled:       plugin.Enabled,
 		Config:        plugin.Config,
 		Service:       toDBLessFK(scope.service),

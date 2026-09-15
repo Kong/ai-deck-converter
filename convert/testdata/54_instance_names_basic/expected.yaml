@@ -1,0 +1,106 @@
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: openai-chat
+        paths:
+          - /ai/chat/completions
+        methods:
+          - POST
+        strip_path: false
+plugins:
+  - name: ai-model-selector
+    instance_name: ai-model-selector.openai-chat
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-chat
+  - name: ai-proxy-advanced
+    instance_name: ai-proxy-advanced.openai-gpt-4o-mini.openai-chat
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://env/openai-token}'
+          description: gpt-4o-mini
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: '@openai/gpt-4o-mini'
+            name: gpt-4o-mini
+            provider: openai
+          route_type: llm/v1/chat
+    route: openai-chat
+    model: '@openai/gpt-4o-mini'
+  - name: ai-proxy-advanced
+    instance_name: ai-proxy-advanced.google-gemini-2-5-flash.openai-chat
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            param_location: query
+            param_name: key
+            param_value: '{vault://env/gemini-token}'
+          description: gemini-2.5-flash
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: '@google/gemini-2.5-flash'
+            name: gemini-2.5-flash
+            provider: gemini
+          route_type: llm/v1/chat
+    route: openai-chat
+    model: '@google/gemini-2.5-flash'
+  - name: ai-proxy-advanced
+    instance_name: ai-proxy-advanced.bco-chat-balanced.openai-chat
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://env/openai-token}'
+          description: gpt-4o-mini
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: '@bco/chat-balanced'
+            name: gpt-4o-mini
+            provider: openai
+          route_type: llm/v1/chat
+          weight: 70
+        - auth:
+            param_location: query
+            param_name: key
+            param_value: '{vault://env/gemini-token}'
+          description: gemini-2.5-flash
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: '@bco/chat-balanced'
+            name: gemini-2.5-flash
+            provider: gemini
+          route_type: llm/v1/chat
+          weight: 30
+    route: openai-chat
+    model: '@bco/chat-balanced'
+ai_models:
+  - name: '@openai/gpt-4o-mini'
+  - name: '@google/gemini-2.5-flash'
+  - name: '@bco/chat-balanced'
