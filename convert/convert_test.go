@@ -439,6 +439,108 @@ policies:
 	require.Contains(t, err.Error(), "auth_strategies")
 }
 
+func TestConvertRejectsRedisCEDatastoreOnVectorDBPolicy(t *testing.T) {
+	src := []byte(`
+models:
+  - type: model
+    name: rag-model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    targets:
+      - name: gpt-4o
+        provider: p1
+        config: {type: openai}
+    policies: [rag-injector]
+    config:
+      route: {paths: [/rag]}
+model_providers:
+  - name: p1
+    type: openai
+policies:
+  - type: ai-rag-injector
+    name: rag-injector
+    config:
+      vectordb: {strategy: redis, dimensions: 1536, distance_metric: cosine}
+    datastores: [{name: rag-redis}]
+datastores:
+  - type: redis-ce
+    name: rag-redis
+    config: {host: redis-ce.internal}
+`)
+	_, _, err := Convert(src, Options{})
+	require.Error(t, err, "vectordb-consuming plugins only support a redis-ee datastore, not redis-ce")
+	require.Contains(t, err.Error(), "ai-rag-injector")
+	require.Contains(t, err.Error(), "redis-ce")
+}
+
+func TestConvertRejectsMultipleDatastores(t *testing.T) {
+	src := []byte(`
+consumers:
+  - name: c1
+    type: api-key
+    policies: [limiter]
+policies:
+  - type: rate-limiting
+    name: limiter
+    config: {minute: 100, policy: redis}
+    datastores: [{name: ds1}, {name: ds2}]
+datastores:
+  - type: redis-ce
+    name: ds1
+    config: {host: ds1.internal}
+  - type: redis-ce
+    name: ds2
+    config: {host: ds2.internal}
+`)
+	_, _, err := Convert(src, Options{})
+	require.Error(t, err, "a policy naming more than one datastore must be rejected")
+	require.Contains(t, err.Error(), "only one is allowed")
+}
+
+func TestConvertRejectsWrongDatastoreTypeOnRateLimiting(t *testing.T) {
+	src := []byte(`
+consumers:
+  - name: c1
+    type: api-key
+    policies: [limiter]
+policies:
+  - type: rate-limiting
+    name: limiter
+    config: {minute: 100, policy: redis}
+    datastores: [{name: wrong-type-ds}]
+datastores:
+  - type: redis-ee
+    name: wrong-type-ds
+    config: {host: redis-ee.internal}
+`)
+	_, _, err := Convert(src, Options{})
+	require.Error(t, err, "rate-limiting only supports a redis-ce datastore, not redis-ee")
+	require.Contains(t, err.Error(), "rate-limiting")
+	require.Contains(t, err.Error(), "redis-ee")
+}
+
+func TestConvertInsertsDatastoreAtConfigPathOnNonVectorDBPlugin(t *testing.T) {
+	src := []byte(`
+consumers:
+  - name: c1
+    type: api-key
+    policies: [limiter]
+policies:
+  - type: rate-limiting
+    name: limiter
+    config: {minute: 100, policy: redis}
+    datastores: [{name: correct-type-ds}]
+datastores:
+  - type: redis-ce
+    name: correct-type-ds
+    config: {host: redis-ce.internal}
+`)
+	out, warnings, err := Convert(src, Options{})
+	require.NoError(t, err, "a correctly-typed datastore reference on a recognized non-vectordb plugin must not error")
+	require.Empty(t, warnings, "expected no warnings")
+	require.Contains(t, string(out), "host: redis-ce.internal", "expected the datastore's config inserted at config.redis")
+}
+
 func TestConvertScopesAuthStrategiesWithoutLeakingAcrossSharedRoutes(t *testing.T) {
 	src := []byte(`
 models:
@@ -1067,6 +1169,36 @@ consumers:
 	require.NoError(t, err, "convert")
 	require.Contains(t, strings.Join(warnings, "\n"), "unknown policy",
 		"expected unknown-policy warning")
+}
+
+func TestConvertWarnsUnknownDatastore(t *testing.T) {
+	src := []byte(`
+models:
+  - type: model
+    name: rag-model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    targets:
+      - name: gpt-4o
+        provider: p1
+        config: {type: openai}
+    policies: [rag-injector]
+    config:
+      route: {paths: [/rag]}
+model_providers:
+  - name: p1
+    type: openai
+policies:
+  - type: ai-rag-injector
+    name: rag-injector
+    config:
+      vectordb: {strategy: redis, dimensions: 1536, distance_metric: cosine}
+    datastores: [{name: missing-datastore}]
+`)
+	_, warnings, err := Convert(src, Options{})
+	require.NoError(t, err, "convert")
+	require.Contains(t, strings.Join(warnings, "\n"), "unknown datastore",
+		"expected unknown-datastore warning")
 }
 
 func TestConvertWarnsMCPToolMissingDescription(t *testing.T) {

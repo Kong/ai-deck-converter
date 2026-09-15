@@ -12,4 +12,14 @@ type Policy struct {
 	Global      *bool          `yaml:"global,omitempty"`
 	Config      map[string]any `yaml:"config,omitempty"`
 	Labels      Labels         `yaml:"labels,omitempty"`
+	Datastores  []DatastoreRef `yaml:"datastores,omitempty"`
+}
+
+// DatastoreRef references a top-level datastore by name. It is always a
+// mapping: `datastore: [{name: my-redis}]`.
+//
+// Path is reserved and not honored yet.
+type DatastoreRef struct {
+	Name string  `yaml:"name"`
+	Path *string `yaml:"path,omitempty"`
 }

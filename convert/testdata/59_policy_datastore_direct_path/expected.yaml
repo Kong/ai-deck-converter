@@ -1,0 +1,36 @@
+_format_version: "3.0"
+consumers:
+  - username: c1
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 100
+          policy: redis
+          redis:
+            host: limiter-redis.internal
+            port: 6379
+      - name: response-ratelimiting
+        config:
+          limits:
+            video:
+              minute: 10
+          policy: redis
+          redis:
+            host: response-limiter-redis.internal
+            port: 6380
+      - name: acme
+        config:
+          account_email: ops@example.com
+          storage: redis
+          storage_config:
+            redis:
+              database: 1
+              host: cert-redis.internal
+      - name: datakit
+        config:
+          dsl: {}
+          resources:
+            cache:
+              redis:
+                cluster_max_redirections: 5
+                host: cache-redis.internal

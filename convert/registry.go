@@ -18,4 +18,8 @@ func (c *Converter) buildRegistries() {
 		g := &c.src.ConsumerGroups[i]
 		c.consumerGroups[g.Name] = g
 	}
+	for i := range c.src.Datastores {
+		d := &c.src.Datastores[i]
+		c.datastores[d.Name] = d
+	}
 }

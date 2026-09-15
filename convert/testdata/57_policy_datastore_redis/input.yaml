@@ -1,0 +1,109 @@
+models:
+  - type: model
+    display_name: Redis Datastore Model
+    name: redis-datastore-model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    targets:
+      - name: gpt-4o
+        provider: openai-main
+        config: {type: openai}
+    policies: [rag-injector, semantic-cache, prompt-guard-ds, response-guard-ds]
+    config:
+      route: {paths: [/redis-datastore]}
+model_providers:
+  - type: openai
+    display_name: OpenAI Main
+    name: openai-main
+    config:
+      auth:
+        type: basic
+        headers: [{name: Authorization, value: "{vault://env/openai-key}"}]
+policies:
+  - type: ai-rag-injector
+    name: rag-injector
+    config:
+      vectordb:
+        dimensions: 1536
+        distance_metric: cosine
+        redis:
+          host: placeholder.invalid
+        threshold: 0.35
+      embeddings:
+        auth:
+          header_name: Authorization
+          header_value: "{vault://env/openai-key}"
+        model:
+          provider: openai
+          name: text-embedding-3-small
+    datastores: [{name: rag-redis}]
+  - type: ai-semantic-cache
+    name: semantic-cache
+    config:
+      vectordb:
+        dimensions: 1536
+        distance_metric: cosine
+        threshold: 0.9
+    datastores: [{name: cache-redis}]
+  - type: ai-semantic-prompt-guard
+    name: prompt-guard-ds
+    config:
+      vectordb:
+        dimensions: 768
+        distance_metric: euclidean
+        threshold: 0.5
+    datastores: [{name: guard-redis}]
+  - type: ai-semantic-response-guard
+    name: response-guard-ds
+    config:
+      vectordb:
+        dimensions: 768
+        distance_metric: euclidean
+        threshold: 0.6
+    datastores: [{name: response-guard-redis}]
+datastores:
+  - type: redis-ee
+    name: rag-redis
+    config:
+      database: 2
+      host: redis-ee.internal
+      password: "{vault://env/redis-password}"
+      port: 6379
+      sentinel_master: mymaster
+      sentinel_nodes:
+        - host: sentinel-a.internal
+          port: 26379
+      ssl: true
+      ssl_verify: true
+      username: rag
+  - type: redis-ee
+    name: cache-redis
+    config:
+      database: 0
+      host: redis-ee-cache.internal
+      password: "{vault://env/redis-cache-password}"
+      port: 6379
+      ssl: false
+      username: cache
+  - type: redis-ee
+    name: guard-redis
+    config:
+      database: 1
+      host: redis-ee-guard.internal
+      password: "{vault://env/redis-guard-password}"
+      port: 6379
+      ssl: false
+      username: guard
+  - type: redis-ee
+    name: response-guard-redis
+    config:
+      cluster_max_redirections: 5
+      host: redis-ee.internal
+      keepalive_pool_size: 30
+      port: 6379
+vaults:
+  - type: env
+    name: env-vault
+    description: Environment secrets
+    config:
+      prefix: KONG_

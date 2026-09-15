@@ -332,6 +332,7 @@ type Converter struct {
 	policies       map[string]*aigw.Policy
 	authStrategies map[string]*aigw.AuthStrategy
 	consumerGroups map[string]*aigw.ConsumerGroup
+	datastores     map[string]*aigw.Datastore
 
 	warnings []string
 }
@@ -345,6 +346,7 @@ func newConverter(doc *aigw.Document, opts Options) *Converter {
 		policies:       map[string]*aigw.Policy{},
 		authStrategies: map[string]*aigw.AuthStrategy{},
 		consumerGroups: map[string]*aigw.ConsumerGroup{},
+		datastores:     map[string]*aigw.Datastore{},
 	}
 }
 
@@ -444,7 +446,9 @@ func cloneStrings(in []string) []string {
 
 func (c *Converter) run() error {
 	c.buildRegistries()
-	c.convertGlobalPolicies()
+	if err := c.convertGlobalPolicies(); err != nil {
+		return err
+	}
 	c.convertVaults()
 	c.convertCACertificates()
 	c.convertCertificates()
