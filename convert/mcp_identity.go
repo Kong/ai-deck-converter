@@ -198,6 +198,21 @@ func (c *Converter) mcpOAuth2Plugin(
 	setIfNotEmpty(cfg, "metadata_endpoint", meta.Endpoint)
 	setIfNotEmpty(cfg, "metadata_discovery_endpoint", meta.DiscoveryEndpoint)
 	if idp != nil {
+		// token_exchange has no representation in ai-mcp-oauth2: the two schemas
+		// differ and ai-mcp-oauth2 requires a token_endpoint the openid-connect
+		// strategy does not carry (see internal/aimap/mcp_oauth2.go, where
+		// token_exchange is deliberately excluded from OIDCToMCPOAuth2Fields).
+		// Dropping it would silently remove a security control (the caller's
+		// token forwarded verbatim, no exchange), so fail rather than emit a
+		// plugin that quietly omits it.
+		if te, ok := idp.Config["token_exchange"]; ok && !isEmptyConfigValue(te) {
+			return kong.Plugin{}, c.failAt("access.auth_strategies",
+				"MCP server %q auth strategy %q sets config.token_exchange, which ai-mcp-oauth2 "+
+					"cannot represent; the token exchange would NOT be applied and the caller's token "+
+					"forwarded verbatim. Remove access.metadata to keep an openid-connect plugin, "+
+					"or drop token_exchange from the strategy.",
+				m.Name, idp.Name)
+		}
 		applyOIDCFieldsToOAuth2(cfg, idp.Config)
 		proxyConfig, err := oidcProxyConfig(idp.Config)
 		if err != nil {
@@ -358,6 +373,22 @@ func configString(config map[string]any, key string) string {
 // enforces a token audience (audience_required is set and non-empty).
 func oidcRequiresAudience(idp *aigw.AuthStrategy) bool {
 	return idp != nil && len(configStrings(idp.Config, "audience_required")) > 0
+}
+
+// isEmptyConfigValue reports whether a decoded config value carries no data:
+// nil, or an empty map/slice. Used to tell "token_exchange present" from an
+// absent or blank block so the drop warning only fires when a control is real.
+func isEmptyConfigValue(v any) bool {
+	switch t := v.(type) {
+	case nil:
+		return true
+	case map[string]any:
+		return len(t) == 0
+	case []any:
+		return len(t) == 0
+	default:
+		return false
+	}
 }
 
 // applyOIDCFieldsToOAuth2 lowers an openid-connect auth strategy's config
