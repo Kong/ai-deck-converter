@@ -1,7 +1,6 @@
 package convert
 
 import (
-	"maps"
 	"strings"
 
 	"github.com/Kong/ai-deck-converter/internal/aigw"
@@ -111,18 +110,10 @@ func (c *Converter) policyPlugin(p *aigw.Policy, tags []string, preserveID bool)
 	return plugin, nil
 }
 
-// applyDatastore expands p.Datastore (a by-name reference into the top-level
-// datastores list, resolved via c.datastores) into config, when the policy
-// type supports it. p.Datastore is a list for parity with Kong's own plugin
-// schema (partials), but only ever holds at most one entry today — a second
-// one is rejected here, before any other validation. All other validation
-// happens here too, before any insertion helper runs: recognized plugin type
-// and known Datastore (aimap.DatastoreSupportForPolicyType, c.datastores) and
-// an allowed Datastore type (DatastoreSupport.Allows). Everything past that
-// point is a pure merge with no further error path — for the VectorDB family,
-// vectordb.strategy is derived from the Datastore's type and overwritten
-// unconditionally, so an author-supplied strategy that disagrees with it is
-// simply replaced, not checked.
+// applyDatastore resolves p.Datastore (a by-name reference into the top-level
+// datastores list) and hands the connection to aimap.ApplyDatastore, which
+// decides where in the plugin config it lands. p.Datastore is a list for
+// parity with Kong's plugin schema (partials) but holds at most one entry.
 func (c *Converter) applyDatastore(p *aigw.Policy, config map[string]any) (map[string]any, error) {
 	if len(p.Datastore) == 0 {
 		return config, nil
@@ -139,98 +130,11 @@ func (c *Converter) applyDatastore(p *aigw.Policy, config map[string]any) (map[s
 		}
 		return config, nil
 	}
-	datastoreSupport, allowed := aimap.DatastoreSupportForPolicyType(p.Type, ds.Type)
-	if !allowed {
-		return nil, c.failAt("policies",
-			"policy %q's plugin type %q only supports a %v datastore, got %q",
-			p.Name, p.Type, datastoreSupport.AllowedTypes, ds.Type)
+	out, err := aimap.ApplyDatastore(config, p.Type, ds.Type, ds.Config)
+	if err != nil {
+		return nil, c.failAt("policies", "policy %q's %v", p.Name, err)
 	}
-	switch datastoreSupport.ConfigPath {
-	case "vectordb":
-		strategy, _ := aimap.VectorDBStrategyForDatastoreType(ds.Type)
-		vectordbConfig, _ := config["vectordb"].(map[string]any)
-		return applyVectorDBDatastore(config, vectordbConfig, strategy, ds.Config), nil
-	case "redis":
-		return applyRedisDatastore(config, ds.Config), nil
-	case "storage_config.redis":
-		return applyAcmeDatastore(config, ds.Config), nil
-	case "resources.cache.redis":
-		return applyDatakitDatastore(config, ds.Config), nil
-	default:
-		return nil, c.failAt("policies",
-			"policy %q's plugin type %q has an unhandled Datastore config path %q",
-			p.Name, p.Type, datastoreSupport.ConfigPath)
-	}
-}
-
-// applyRedisDatastore assigns dsConfig at config["redis"] — the flat,
-// no-strategy case shared by most of DatastoreSupport's plugins
-// (rate-limiting, ai-rate-limiting-advanced, proxy-cache-advanced, etc.).
-// Never mutates config in place, so a reusable source Policy is never
-// mutated.
-func applyRedisDatastore(config map[string]any, dsConfig map[string]any) map[string]any {
-	out := make(map[string]any, len(config)+1)
-	maps.Copy(out, config)
-	out["redis"] = dsConfig
-	return out
-}
-
-// applyVectorDBDatastore merges dsConfig into pluginConfig's vectordb block
-// at strategy — already validated by the caller (a recognized, allowed
-// Datastore type resolving to strategy, with vectordb.strategy consistent
-// with it). The connection sub-block named by strategy (config.vectordb.redis
-// or .pgvector) is replaced wholesale; every other key already in
-// vectordbConfig — the common fields (strategy, dimensions, distance_metric,
-// threshold) a policy or model authors itself, per VectorDBDatastoreConfig's
-// own doc comment in the source API spec — is left untouched. Never mutates
-// pluginConfig or vectordbConfig in place, so a reusable source Policy is
-// never mutated.
-func applyVectorDBDatastore(
-	pluginConfig, vectordbConfig map[string]any, strategy string, dsConfig map[string]any,
-) map[string]any {
-	out := make(map[string]any, len(pluginConfig)+1)
-	maps.Copy(out, pluginConfig)
-	const newVectorDBKeys = 2 // "strategy" and the redis/pgvector sub-block, both set below.
-	vectordb := make(map[string]any, len(vectordbConfig)+newVectorDBKeys)
-	maps.Copy(vectordb, vectordbConfig)
-	vectordb["strategy"] = strategy
-	vectordb[strategy] = dsConfig
-	out["vectordb"] = vectordb
-	return out
-}
-
-// applyAcmeDatastore assigns dsConfig at config["storage_config"]["redis"] —
-// acme's one dot-path, one level deeper than the flat "redis" case. Never
-// mutates config or its nested storage_config in place, so a reusable source
-// Policy is never mutated.
-func applyAcmeDatastore(config map[string]any, dsConfig map[string]any) map[string]any {
-	out := make(map[string]any, len(config)+1)
-	maps.Copy(out, config)
-	storageConfig, _ := out["storage_config"].(map[string]any)
-	newStorageConfig := make(map[string]any, len(storageConfig)+1)
-	maps.Copy(newStorageConfig, storageConfig)
-	newStorageConfig["redis"] = dsConfig
-	out["storage_config"] = newStorageConfig
-	return out
-}
-
-// applyDatakitDatastore assigns dsConfig at
-// config["resources"]["cache"]["redis"] — datakit's one dot-path, two levels
-// deeper than the flat "redis" case. Never mutates config or its nested
-// resources/cache in place, so a reusable source Policy is never mutated.
-func applyDatakitDatastore(config map[string]any, dsConfig map[string]any) map[string]any {
-	out := make(map[string]any, len(config)+1)
-	maps.Copy(out, config)
-	resources, _ := out["resources"].(map[string]any)
-	newResources := make(map[string]any, len(resources)+1)
-	maps.Copy(newResources, resources)
-	cache, _ := newResources["cache"].(map[string]any)
-	newCache := make(map[string]any, len(cache)+1)
-	maps.Copy(newCache, cache)
-	newCache["redis"] = dsConfig
-	newResources["cache"] = newCache
-	out["resources"] = newResources
-	return out
+	return out, nil
 }
 
 // normalizeRateLimitingProviderMatches lowers AI Gateway model-provider entity

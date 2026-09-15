@@ -1,5 +1,10 @@
 package aimap
 
+import (
+	"fmt"
+	"maps"
+)
+
 // Datastore type discriminators (aigw.Datastore.Type values). Named here,
 // where they're actually validated and interpreted, so nothing compares
 // against a bare string literal.
@@ -130,4 +135,102 @@ func DatastoreSupportForPolicyType(policyType, datastoreType string) (support Da
 		return DatastoreSupport{}, false
 	}
 	return support, support.Allows(datastoreType)
+}
+
+// ApplyDatastore substitutes a Datastore's connection config into a policy
+// plugin's config, at the dot-path policyType declares in
+// datastoreSupportedPolicyTypes. It rejects a plugin type that supports no
+// datastore or does not accept datastoreType.
+func ApplyDatastore(
+	config map[string]any, policyType, datastoreType string, datastoreConfig map[string]any,
+) (map[string]any, error) {
+	support, allowed := DatastoreSupportForPolicyType(policyType, datastoreType)
+	if !allowed {
+		return nil, fmt.Errorf("plugin type %q does not support a %q datastore",
+			policyType, datastoreType)
+	}
+	switch support.ConfigPath {
+	case "vectordb":
+		strategy, _ := VectorDBStrategyForDatastoreType(datastoreType)
+		vectordbConfig, _ := config["vectordb"].(map[string]any)
+		return applyVectorDBDatastore(config, vectordbConfig, strategy, datastoreConfig), nil
+	case "redis":
+		return applyRedisDatastore(config, datastoreConfig), nil
+	case "storage_config.redis":
+		return applyAcmeDatastore(config, datastoreConfig), nil
+	case "resources.cache.redis":
+		return applyDatakitDatastore(config, datastoreConfig), nil
+	default:
+		return nil, fmt.Errorf("unhandled Datastore config path %q", support.ConfigPath)
+	}
+}
+
+// applyRedisDatastore assigns dsConfig at config["redis"] — the flat,
+// no-strategy case shared by most of DatastoreSupport's plugins
+// (rate-limiting, ai-rate-limiting-advanced, proxy-cache-advanced, etc.).
+// Never mutates config in place, so a reusable source Policy is never
+// mutated.
+func applyRedisDatastore(config map[string]any, dsConfig map[string]any) map[string]any {
+	out := make(map[string]any, len(config)+1)
+	maps.Copy(out, config)
+	out["redis"] = dsConfig
+	return out
+}
+
+// applyAcmeDatastore assigns dsConfig at config["storage_config"]["redis"] —
+// acme's one dot-path, one level deeper than the flat "redis" case. Never
+// mutates config or its nested storage_config in place, so a reusable source
+// Policy is never mutated.
+func applyAcmeDatastore(config map[string]any, dsConfig map[string]any) map[string]any {
+	out := make(map[string]any, len(config)+1)
+	maps.Copy(out, config)
+	storageConfig, _ := out["storage_config"].(map[string]any)
+	newStorageConfig := make(map[string]any, len(storageConfig)+1)
+	maps.Copy(newStorageConfig, storageConfig)
+	newStorageConfig["redis"] = dsConfig
+	out["storage_config"] = newStorageConfig
+	return out
+}
+
+// applyDatakitDatastore assigns dsConfig at
+// config["resources"]["cache"]["redis"] — datakit's one dot-path, two levels
+// deeper than the flat "redis" case. Never mutates config or its nested
+// resources/cache in place, so a reusable source Policy is never mutated.
+func applyDatakitDatastore(config map[string]any, dsConfig map[string]any) map[string]any {
+	out := make(map[string]any, len(config)+1)
+	maps.Copy(out, config)
+	resources, _ := out["resources"].(map[string]any)
+	newResources := make(map[string]any, len(resources)+1)
+	maps.Copy(newResources, resources)
+	cache, _ := newResources["cache"].(map[string]any)
+	newCache := make(map[string]any, len(cache)+1)
+	maps.Copy(newCache, cache)
+	newCache["redis"] = dsConfig
+	newResources["cache"] = newCache
+	out["resources"] = newResources
+	return out
+}
+
+// applyVectorDBDatastore merges dsConfig into pluginConfig's vectordb block
+// at strategy — already validated by the caller (a recognized, allowed
+// Datastore type resolving to strategy, with vectordb.strategy consistent
+// with it). The connection sub-block named by strategy (config.vectordb.redis
+// or .pgvector) is replaced wholesale; every other key already in
+// vectordbConfig — the common fields (strategy, dimensions, distance_metric,
+// threshold) a policy or model authors itself, per VectorDBDatastoreConfig's
+// own doc comment in the source API spec — is left untouched. Never mutates
+// pluginConfig or vectordbConfig in place, so a reusable source Policy is
+// never mutated.
+func applyVectorDBDatastore(
+	pluginConfig, vectordbConfig map[string]any, strategy string, dsConfig map[string]any,
+) map[string]any {
+	out := make(map[string]any, len(pluginConfig)+1)
+	maps.Copy(out, pluginConfig)
+	const newVectorDBKeys = 2 // "strategy" and the redis/pgvector sub-block, both set below.
+	vectordb := make(map[string]any, len(vectordbConfig)+newVectorDBKeys)
+	maps.Copy(vectordb, vectordbConfig)
+	vectordb["strategy"] = strategy
+	vectordb[strategy] = dsConfig
+	out["vectordb"] = vectordb
+	return out
 }

@@ -469,7 +469,8 @@ datastores:
 `)
 	_, _, err := Convert(src, Options{})
 	require.Error(t, err, "vectordb-consuming plugins only support a redis-ee datastore, not redis-ce")
-	require.Contains(t, err.Error(), "redis-ee")
+	require.Contains(t, err.Error(), "ai-rag-injector")
+	require.Contains(t, err.Error(), "redis-ce")
 }
 
 func TestConvertRejectsMultipleDatastores(t *testing.T) {
@@ -514,7 +515,8 @@ datastores:
 `)
 	_, _, err := Convert(src, Options{})
 	require.Error(t, err, "rate-limiting only supports a redis-ce datastore, not redis-ee")
-	require.Contains(t, err.Error(), "redis-ce")
+	require.Contains(t, err.Error(), "rate-limiting")
+	require.Contains(t, err.Error(), "redis-ee")
 }
 
 func TestConvertInsertsDatastoreAtConfigPathOnNonVectorDBPlugin(t *testing.T) {
