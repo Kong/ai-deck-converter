@@ -268,3 +268,70 @@ func TestMCPOAuth2DerivesAudienceAndPassthrough(t *testing.T) {
 	// audience_required is only a signal; its value is not carried to the plugin.
 	require.NotContains(t, s, "audience_required")
 }
+
+// input: one openid-connect strategy carrying token_exchange, referenced by an
+// MCP server WITH access.metadata (which lowers to ai-mcp-oauth2, a plugin that
+// cannot represent token_exchange). The control must not be dropped silently.
+const mcpTokenExchangeDropInput = `
+identity_providers:
+  - display_name: Okta OIDC
+    name: okta-oidc-te
+    type: openid-connect
+    config:
+      issuer: https://dev-123456.okta.com/oauth2/default
+      client_id: [mcp-client]
+      client_secret: ["{vault://ai-vault/okta-client-secret}"]
+      cache_tokens_salt: pepper
+      token_exchange:
+        subject_token_issuers:
+          - issuer: https://dev-123456.okta.com/oauth2/default
+            conditions:
+              has_audience: [mcp-api]
+            verify_signature: true
+        request:
+          audience: [mcp-api]
+        cache:
+          enabled: true
+          ttl: 3600
+mcp_servers:
+  - type: conversion-listener
+    display_name: MCP with metadata
+    name: mcp-with-metadata
+    config:
+      route:
+        paths: [/mcp/with-meta]
+    access:
+      identity_providers: [okta-oidc-te]
+      metadata:
+        endpoint: /mcp/with-meta/.well-known/oauth-protected-resource
+        resource: https://api.example.com/mcp/with-meta
+        authorization_servers:
+          - https://dev-123456.okta.com/oauth2/default
+    tools:
+      - name: echo
+        description: echo
+        method: GET
+        path: /anything
+        scheme: https
+        host: httpbin.internal
+`
+
+// TestMCPMetadataDropsTokenExchange pins the security invariant: lowering an
+// openid-connect strategy that configures token_exchange into an ai-mcp-oauth2
+// plugin (triggered by access.metadata) must not silently drop the exchange.
+// ai-mcp-oauth2 cannot represent token_exchange, so rather than emit a plugin
+// that quietly omits it the conversion fails hard — in every mode.
+func TestMCPMetadataDropsTokenExchange(t *testing.T) {
+	t.Run("fails by default", func(t *testing.T) {
+		_, _, err := Convert([]byte(mcpTokenExchangeDropInput), Options{})
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "token_exchange")
+		require.Contains(t, err.Error(), "mcp-with-metadata")
+	})
+
+	t.Run("fails under strict", func(t *testing.T) {
+		_, _, err := Convert([]byte(mcpTokenExchangeDropInput), Options{Strict: true})
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "token_exchange")
+	})
+}

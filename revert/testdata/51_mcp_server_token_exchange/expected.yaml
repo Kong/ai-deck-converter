@@ -1,0 +1,46 @@
+mcp_servers:
+  - type: conversion-listener
+    name: mcp-no-metadata
+    config:
+      route:
+        paths:
+          - /mcp/no-meta
+      logging:
+        payloads: false
+        statistics: true
+        audits: false
+    tools:
+      - name: echo
+        description: echo
+        method: GET
+        path: /anything
+        scheme: https
+        host: httpbin.internal
+    access:
+      auth_strategies:
+        - openid-connect-1
+auth_strategies:
+  - type: openid-connect
+    name: openid-connect-1
+    config:
+      cache_tokens_salt: pepper
+      client_auth:
+        - client_secret_post
+      client_id:
+        - mcp-client
+      client_secret:
+        - '{vault://ai-vault/okta-client-secret}'
+      issuer: https://dev-123456.okta.com/oauth2/default
+      token_exchange:
+        cache:
+          enabled: true
+          ttl: 3600
+        request:
+          audience:
+            - mcp-api
+        subject_token_issuers:
+          - conditions:
+              has_audience:
+                - mcp-api
+            issuer: https://dev-123456.okta.com/oauth2/default
+            verify_signature: true
