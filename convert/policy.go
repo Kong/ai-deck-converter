@@ -115,17 +115,17 @@ func (c *Converter) policyPlugin(p *aigw.Policy, tags []string, preserveID bool)
 // decides where in the plugin config it lands. p.Datastore is a list for
 // parity with Kong's plugin schema (partials) but holds at most one entry.
 func (c *Converter) applyDatastore(p *aigw.Policy, config map[string]any) (map[string]any, error) {
-	if len(p.Datastore) == 0 {
+	if len(p.Datastores) == 0 {
 		return config, nil
 	}
-	if len(p.Datastore) > 1 {
+	if len(p.Datastores) > 1 {
 		return nil, c.failAt("policies",
 			"policy %q has %d datastores, but only one is allowed",
-			p.Name, len(p.Datastore))
+			p.Name, len(p.Datastores))
 	}
-	ds := c.datastores[p.Datastore[0].Name]
+	ds := c.datastores[p.Datastores[0].Name]
 	if ds == nil {
-		if err := c.warn("policy %q references unknown datastore %q", p.Name, p.Datastore[0].Name); err != nil {
+		if err := c.warn("policy %q references unknown datastore %q", p.Name, p.Datastores[0].Name); err != nil {
 			return nil, err
 		}
 		return config, nil

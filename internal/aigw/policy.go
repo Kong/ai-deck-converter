@@ -12,7 +12,7 @@ type Policy struct {
 	Global      *bool          `yaml:"global,omitempty"`
 	Config      map[string]any `yaml:"config,omitempty"`
 	Labels      Labels         `yaml:"labels,omitempty"`
-	Datastore   []DatastoreRef `yaml:"datastore,omitempty"`
+	Datastores  []DatastoreRef `yaml:"datastores,omitempty"`
 }
 
 // DatastoreRef references a top-level datastore by name. It is always a
