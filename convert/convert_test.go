@@ -1120,6 +1120,169 @@ policies:
 	require.Contains(t, strings.Join(warnings, "\n"), "unknown datastore")
 }
 
+func TestConvertRejectsRedisCEDatastoreOnModel(t *testing.T) {
+	src := []byte(`
+models:
+  - type: model
+    name: m1
+    capabilities: [generate]
+    formats: [{type: openai}]
+    targets:
+      - name: gpt-4o
+        provider: p1
+        config: {type: openai}
+    datastores: [{name: ds}]
+    config:
+      route: {paths: [/ai]}
+      balancer:
+        algorithm: semantic
+        vectordb: {strategy: redis, dimensions: 1536, distance_metric: cosine}
+model_providers:
+  - name: p1
+    type: openai
+datastores:
+  - type: redis-ce
+    name: ds
+    config: {host: redis-ce.internal}
+`)
+	_, _, err := Convert(src, Options{})
+	require.Error(t, err, "models never accept a redis-ce datastore")
+	require.Contains(t, err.Error(), "m1")
+	require.Contains(t, err.Error(), "redis-ce")
+}
+
+func TestConvertRejectsMultipleDatastoresOnModel(t *testing.T) {
+	src := []byte(`
+models:
+  - type: model
+    name: m1
+    capabilities: [generate]
+    formats: [{type: openai}]
+    targets:
+      - name: gpt-4o
+        provider: p1
+        config: {type: openai}
+    datastores: [{name: ds1}, {name: ds2}]
+    config:
+      route: {paths: [/ai]}
+      balancer: {algorithm: semantic}
+model_providers:
+  - name: p1
+    type: openai
+datastores:
+  - type: vectordb
+    name: ds1
+    config: {host: pg.internal}
+  - type: vectordb
+    name: ds2
+    config: {host: pg2.internal}
+`)
+	_, _, err := Convert(src, Options{})
+	require.Error(t, err, "convert")
+	require.Contains(t, err.Error(), "only one is allowed")
+}
+
+func TestConvertRejectsDatastoreOnNonSemanticModel(t *testing.T) {
+	src := []byte(`
+models:
+  - type: model
+    name: m1
+    capabilities: [generate]
+    formats: [{type: openai}]
+    targets:
+      - name: gpt-4o
+        provider: p1
+        config: {type: openai}
+    datastores: [{name: ds}]
+    config:
+      route: {paths: [/ai]}
+model_providers:
+  - name: p1
+    type: openai
+datastores:
+  - type: vectordb
+    name: ds
+    config: {host: pg.internal}
+`)
+	_, _, err := Convert(src, Options{})
+	require.Error(t, err, "a datastore needs the semantic balancer's vector store")
+	require.Contains(t, err.Error(), "semantic")
+}
+
+func TestConvertRejectsUnknownDatastoreOnModel(t *testing.T) {
+	src := []byte(`
+models:
+  - type: model
+    name: m1
+    capabilities: [generate]
+    formats: [{type: openai}]
+    targets:
+      - name: gpt-4o
+        provider: p1
+        config: {type: openai}
+    datastores: [{name: missing-datastore}]
+    config:
+      route: {paths: [/ai]}
+      balancer:
+        algorithm: semantic
+        vectordb: {strategy: pgvector, dimensions: 1024, distance_metric: cosine}
+model_providers:
+  - name: p1
+    type: openai
+`)
+	_, _, err := Convert(src, Options{})
+	require.Error(t, err, "a dangling datastore ref must fail so write-time validation returns a field error")
+	require.Contains(t, err.Error(), "unknown datastore")
+}
+
+func TestConvertModelDatastoreReplacesInlineConnection(t *testing.T) {
+	src := []byte(`
+models:
+  - type: model
+    name: m1
+    capabilities: [generate]
+    formats: [{type: openai}]
+    targets:
+      - name: gpt-4o
+        provider: p1
+        config: {type: openai}
+    datastores: [{name: ds}]
+    config:
+      route: {paths: [/ai]}
+      balancer:
+        algorithm: semantic
+        vectordb:
+          strategy: pgvector
+          dimensions: 1024
+          distance_metric: cosine
+          threshold: 0.7
+          host: placeholder.invalid
+model_providers:
+  - name: p1
+    type: openai
+datastores:
+  - type: vectordb
+    name: ds
+    config: {host: pg.internal, port: 5432}
+`)
+	doc, err := publicaigw.Parse(src)
+	require.NoError(t, err, "parse source")
+	out, _, err := ConvertDocument(doc, Options{})
+	require.NoError(t, err, "convert")
+	var plugin map[string]any
+	for _, p := range out.Plugins {
+		if p.Name == "ai-proxy-advanced" {
+			plugin = p.Config
+			break
+		}
+	}
+	require.NotNil(t, plugin, "ai-proxy-advanced plugin emitted")
+	vectordb := plugin["vectordb"].(map[string]any)
+	require.Equal(t, 1024, vectordb["dimensions"], "common keys stay on the model")
+	require.Equal(t, map[string]any{"host": "pg.internal", "port": 5432},
+		vectordb["pgvector"], "datastore connection replaces the inline one")
+}
+
 func TestConvertWarnsMCPToolMissingDescription(t *testing.T) {
 	src := []byte(`
 mcp_servers:
