@@ -129,12 +129,12 @@ func (c *Converter) applyDatastore(p *aigw.Policy, config map[string]any) (map[s
 	}
 	if len(p.Datastore) > 1 {
 		return nil, c.failAt("policies",
-			"policy %q has %d datastores (%v), but only one is allowed",
-			p.Name, len(p.Datastore), p.Datastore)
+			"policy %q has %d datastores, but only one is allowed",
+			p.Name, len(p.Datastore))
 	}
-	ds := c.datastores[p.Datastore[0]]
+	ds := c.datastores[p.Datastore[0].Name]
 	if ds == nil {
-		if err := c.warn("policy %q references unknown datastore %q", p.Name, p.Datastore[0]); err != nil {
+		if err := c.warn("policy %q references unknown datastore %q", p.Name, p.Datastore[0].Name); err != nil {
 			return nil, err
 		}
 		return config, nil

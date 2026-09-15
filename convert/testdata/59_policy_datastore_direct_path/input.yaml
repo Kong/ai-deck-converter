@@ -7,22 +7,22 @@ policies:
   - type: rate-limiting
     name: limiter
     config: {minute: 100, policy: redis}
-    datastore: [limiter-redis]
+    datastore: [{name: limiter-redis}]
   # Flat path: config.redis (response-ratelimiting is redis-ce only, like rate-limiting)
   - type: response-ratelimiting
     name: response-limiter
     config: {limits: {video: {minute: 10}}, policy: redis}
-    datastore: [response-limiter-redis]
+    datastore: [{name: response-limiter-redis}]
   # One level nested: config.storage_config.redis
   - type: acme
     name: cert-manager
     config: {account_email: ops@example.com, storage: redis}
-    datastore: [cert-redis]
+    datastore: [{name: cert-redis}]
   # Two levels nested: config.resources.cache.redis
   - type: datakit
     name: cache-warmer
     config: {dsl: {}}
-    datastore: [cache-redis]
+    datastore: [{name: cache-redis}]
 datastores:
   - type: redis-ce
     name: limiter-redis

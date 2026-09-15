@@ -461,7 +461,7 @@ policies:
     name: rag-injector
     config:
       vectordb: {strategy: redis, dimensions: 1536, distance_metric: cosine}
-    datastore: [rag-redis]
+    datastore: [{name: rag-redis}]
 datastores:
   - type: redis-ce
     name: rag-redis
@@ -482,7 +482,7 @@ policies:
   - type: rate-limiting
     name: limiter
     config: {minute: 100, policy: redis}
-    datastore: [ds1, ds2]
+    datastore: [{name: ds1}, {name: ds2}]
 datastores:
   - type: redis-ce
     name: ds1
@@ -506,7 +506,7 @@ policies:
   - type: rate-limiting
     name: limiter
     config: {minute: 100, policy: redis}
-    datastore: [wrong-type-ds]
+    datastore: [{name: wrong-type-ds}]
 datastores:
   - type: redis-ee
     name: wrong-type-ds
@@ -527,7 +527,7 @@ policies:
   - type: rate-limiting
     name: limiter
     config: {minute: 100, policy: redis}
-    datastore: [correct-type-ds]
+    datastore: [{name: correct-type-ds}]
 datastores:
   - type: redis-ce
     name: correct-type-ds
@@ -1191,7 +1191,7 @@ policies:
     name: rag-injector
     config:
       vectordb: {strategy: redis, dimensions: 1536, distance_metric: cosine}
-    datastore: [missing-datastore]
+    datastore: [{name: missing-datastore}]
 `)
 	_, warnings, err := Convert(src, Options{})
 	require.NoError(t, err, "convert")
