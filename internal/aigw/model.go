@@ -6,18 +6,19 @@ import "gopkg.in/yaml.v3"
 // (synchronous generative APIs) or "api" (files/batches); both share the same
 // shape and differ only in their allowed capabilities, so one struct covers both.
 type Model struct {
-	ID           string        `yaml:"id,omitempty"`
-	Type         string        `yaml:"type,omitempty"`
-	DisplayName  string        `yaml:"display_name,omitempty"`
-	Name         string        `yaml:"name,omitempty"`
-	Enabled      *bool         `yaml:"enabled,omitempty"`
-	Capabilities []string      `yaml:"capabilities,omitempty"`
-	Formats      []Format      `yaml:"formats,omitempty"`
-	TargetModels []TargetModel `yaml:"targets,omitempty"`
-	Policies     []string      `yaml:"policies,omitempty"`
-	Access       ModelAccess   `yaml:"access,omitempty"`
-	Config       ModelConfig   `yaml:"config,omitempty"`
-	Labels       Labels        `yaml:"labels,omitempty"`
+	ID           string         `yaml:"id,omitempty"`
+	Type         string         `yaml:"type,omitempty"`
+	DisplayName  string         `yaml:"display_name,omitempty"`
+	Name         string         `yaml:"name,omitempty"`
+	Enabled      *bool          `yaml:"enabled,omitempty"`
+	Capabilities []string       `yaml:"capabilities,omitempty"`
+	Formats      []Format       `yaml:"formats,omitempty"`
+	TargetModels []TargetModel  `yaml:"targets,omitempty"`
+	Policies     []string       `yaml:"policies,omitempty"`
+	Datastores   []DatastoreRef `yaml:"datastores,omitempty"`
+	Access       ModelAccess    `yaml:"access,omitempty"`
+	Config       ModelConfig    `yaml:"config,omitempty"`
+	Labels       Labels         `yaml:"labels,omitempty"`
 }
 
 // ModelAccess is the access-control configuration for a Model: auth strategies
