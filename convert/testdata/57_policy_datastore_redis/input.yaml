@@ -36,7 +36,7 @@ policies:
         model:
           provider: openai
           name: text-embedding-3-small
-    datastore: [{name: rag-redis}]
+    datastores: [{name: rag-redis}]
   - type: ai-semantic-cache
     name: semantic-cache
     config:
@@ -44,7 +44,7 @@ policies:
         dimensions: 1536
         distance_metric: cosine
         threshold: 0.9
-    datastore: [{name: cache-redis}]
+    datastores: [{name: cache-redis}]
   - type: ai-semantic-prompt-guard
     name: prompt-guard-ds
     config:
@@ -52,7 +52,7 @@ policies:
         dimensions: 768
         distance_metric: euclidean
         threshold: 0.5
-    datastore: [{name: guard-redis}]
+    datastores: [{name: guard-redis}]
   - type: ai-semantic-response-guard
     name: response-guard-ds
     config:
@@ -60,7 +60,7 @@ policies:
         dimensions: 768
         distance_metric: euclidean
         threshold: 0.6
-    datastore: [{name: response-guard-redis}]
+    datastores: [{name: response-guard-redis}]
 datastores:
   - type: redis-ee
     name: rag-redis
