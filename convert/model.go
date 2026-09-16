@@ -127,6 +127,7 @@ type proxyGroup struct {
 	genaiCategory     string
 	balancer          map[string]any
 	vectordb          any
+	datastoreName     string // datastore whose connection was injected into vectordb; empty when authored inline
 	embeddings        any
 	responseStreaming string
 	modelNameHeader   *bool
@@ -306,14 +307,26 @@ func (c *Converter) convertModels() error {
 					}
 
 					pg := g.proxyByOwner[ownerKey]
-					if pg != nil && !modelScoped && ds != nil {
+					if pg != nil && !modelScoped {
 						// type:"api" models on one route share a single route-scoped
 						// ai-proxy-advanced; only the creating model contributes
-						// vectordb, so a later model's datastore would be dropped.
-						if err := c.warn(
-							"model %q's datastore %q is ignored: it shares an ai-proxy-advanced plugin with other api models on route %q",
-							m.Name, ds.Name, g.route.Name); err != nil {
-							return err
+						// vectordb. Warn on either direction of a datastore mismatch:
+						// a model's own datastore being dropped, or a model without
+						// one silently inheriting another model's connection.
+						switch {
+						case ds != nil && ds.Name != pg.datastoreName:
+							if err := c.warn(
+								"model %q's datastore %q is ignored: it shares an ai-proxy-advanced plugin with other api models on route %q",
+								m.Name, ds.Name, g.route.Name); err != nil {
+								return err
+							}
+						case ds == nil && pg.datastoreName != "":
+							if err := c.warn(
+								"model %q has no datastore but inherits the vectordb connection of datastore %q "+
+									"shared by other api models on route %q",
+								m.Name, pg.datastoreName, g.route.Name); err != nil {
+								return err
+							}
 						}
 					}
 					if pg == nil {
@@ -324,6 +337,10 @@ func (c *Converter) convertModels() error {
 						vectordb, err := c.modelVectorDB(m, ds)
 						if err != nil {
 							return err
+						}
+						datastoreName := ""
+						if ds != nil {
+							datastoreName = ds.Name
 						}
 						// Each plugin's model FK must equal an ai_models.name — the string a
 						// client sends, which ai-model-selector matches on to activate this
@@ -348,6 +365,7 @@ func (c *Converter) convertModels() error {
 							genaiCategory:     spec.GenaiCategory,
 							balancer:          balancerConfig(m.Config.Balancer),
 							vectordb:          vectordb,
+							datastoreName:     datastoreName,
 							embeddings:        embeddings,
 							responseStreaming: m.Config.ResponseStreaming,
 							modelNameHeader:   modelNameHeader,
