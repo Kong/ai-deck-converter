@@ -74,6 +74,7 @@ type DBLessCIDRPort struct {
 type DBLessPlugin struct {
 	ID            string            `yaml:"id"`
 	Name          string            `yaml:"name"`
+	InstanceName  string            `yaml:"instance_name,omitempty"`
 	Enabled       *bool             `yaml:"enabled,omitempty"`
 	Config        map[string]any    `yaml:"config,omitempty"`
 	Service       map[string]string `yaml:"service,omitempty"`
