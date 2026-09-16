@@ -95,11 +95,11 @@ func (c *Converter) policyPlugin(p *aigw.Policy, tags []string, preserveID bool)
 		return kong.Plugin{}, err
 	}
 	plugin := kong.Plugin{
-		Name:   p.Type,
+		Name:      p.Type,
 		Condition: p.Condition,
-		Config: config,
-		Tags:   tags,
-		Source: source("policy", p.Name, "config"),
+		Config:    config,
+		Tags:      tags,
+		Source:    source("policy", p.Name, "config"),
 	}
 	if preserveID {
 		plugin.ID = p.ID
