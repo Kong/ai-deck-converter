@@ -309,24 +309,22 @@ func (c *Converter) convertModels() error {
 					pg := g.proxyByOwner[ownerKey]
 					if pg != nil && !modelScoped {
 						// type:"api" models on one route share a single route-scoped
-						// ai-proxy-advanced; only the creating model contributes
-						// vectordb. Warn on either direction of a datastore mismatch:
-						// a model's own datastore being dropped, or a model without
-						// one silently inheriting another model's connection.
-						switch {
-						case ds != nil && ds.Name != pg.datastoreName:
-							if err := c.warn(
-								"model %q's datastore %q is ignored: it shares an ai-proxy-advanced plugin with other api models on route %q",
-								m.Name, ds.Name, g.route.Name); err != nil {
-								return err
+						// ai-proxy-advanced, so any datastore mismatch would either drop
+						// one model's datastore or make another silently inherit it.
+						if (ds == nil) != (pg.datastoreName == "") ||
+							(ds != nil && ds.Name != pg.datastoreName) {
+							current := "no datastore"
+							if ds != nil {
+								current = fmt.Sprintf("datastore %q", ds.Name)
 							}
-						case ds == nil && pg.datastoreName != "":
-							if err := c.warn(
-								"model %q has no datastore but inherits the vectordb connection of datastore %q "+
-									"shared by other api models on route %q",
-								m.Name, pg.datastoreName, g.route.Name); err != nil {
-								return err
+							existing := "no datastore"
+							if pg.datastoreName != "" {
+								existing = fmt.Sprintf("datastore %q", pg.datastoreName)
 							}
+							return c.failAt("models",
+								"model %q cannot share route %q with another api model: shared "+
+									"route-scoped ai-proxy-advanced would mix %s and %s",
+								m.Name, g.route.Name, existing, current)
 						}
 					}
 					if pg == nil {

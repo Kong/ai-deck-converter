@@ -1235,11 +1235,15 @@ model_providers:
 	require.Contains(t, err.Error(), "unknown datastore")
 }
 
-func TestConvertWarnsAPIDatastoreInheritance(t *testing.T) {
-	src := []byte(`
+func TestConvertRejectsMixedAPIDatastoresOnSharedRoute(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		src  []byte
+	}{
+		{
+			name: "datastore then none",
+			src: []byte(`
 models:
-  # First api model on the route creates the shared route-only
-  # ai-proxy-advanced and its datastore supplies its vectordb.
   - type: api
     name: files-api
     capabilities: [files]
@@ -1252,8 +1256,6 @@ models:
     config:
       route: {paths: [/v1]}
       balancer: {algorithm: semantic}
-  # Second api model on the same route has no datastore but would reuse the
-  # shared plugin — it must not silently inherit the first model's vectordb.
   - type: api
     name: files-api-2
     capabilities: [files]
@@ -1271,11 +1273,90 @@ datastores:
   - type: vectordb
     name: ds
     config: {host: pg.internal}
-`)
-	_, warnings, err := Convert(src, Options{})
-	require.NoError(t, err, "convert")
-	require.Contains(t, strings.Join(warnings, "\n"), "inherits the vectordb connection",
-		"expected datastore-inheritance warning on the shared api plugin")
+`),
+		},
+		{
+			name: "none then datastore",
+			src: []byte(`
+models:
+  - type: api
+    name: files-api
+    capabilities: [files]
+    formats: [{type: openai}]
+    targets:
+      - name: files
+        provider: p1
+        config: {type: openai}
+    config:
+      route: {paths: [/v1]}
+  - type: api
+    name: files-api-2
+    capabilities: [files]
+    formats: [{type: openai}]
+    targets:
+      - name: files-2
+        provider: p1
+        config: {type: openai}
+    datastores: [{name: ds}]
+    config:
+      route: {paths: [/v1]}
+      balancer: {algorithm: semantic}
+model_providers:
+  - name: p1
+    type: openai
+datastores:
+  - type: vectordb
+    name: ds
+    config: {host: pg.internal}
+`),
+		},
+		{
+			name: "different datastores",
+			src: []byte(`
+models:
+  - type: api
+    name: files-api
+    capabilities: [files]
+    formats: [{type: openai}]
+    targets:
+      - name: files
+        provider: p1
+        config: {type: openai}
+    datastores: [{name: ds1}]
+    config:
+      route: {paths: [/v1]}
+      balancer: {algorithm: semantic}
+  - type: api
+    name: files-api-2
+    capabilities: [files]
+    formats: [{type: openai}]
+    targets:
+      - name: files-2
+        provider: p1
+        config: {type: openai}
+    datastores: [{name: ds2}]
+    config:
+      route: {paths: [/v1]}
+      balancer: {algorithm: semantic}
+model_providers:
+  - name: p1
+    type: openai
+datastores:
+  - type: vectordb
+    name: ds1
+    config: {host: pg-1.internal}
+  - type: redis-ee
+    name: ds2
+    config: {host: redis.internal}
+`),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, _, err := Convert(tc.src, Options{})
+			require.Error(t, err, "convert must reject datastore mixing on a shared route-only api plugin")
+			require.Contains(t, err.Error(), "cannot share route")
+		})
+	}
 }
 
 func TestConvertModelDatastoreReplacesInlineConnection(t *testing.T) {
