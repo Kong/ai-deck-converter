@@ -1,0 +1,36 @@
+models:
+  - type: model
+    display_name: Guarded GPT
+    name: guarded-gpt
+    capabilities: [generate]
+    formats: [{type: openai}]
+    targets:
+      - name: gpt-4o
+        provider: openai-main
+        config: {type: openai}
+    policies: [prompt-guard]
+    config:
+      route: {paths: [/ai]}
+model_providers:
+  - type: openai
+    display_name: OpenAI Main
+    name: openai-main
+    config:
+      auth:
+        type: basic
+        headers: [{name: Authorization, value: "{vault://env/openai-key}"}]
+policies:
+  # Model-scoped policy carrying a condition expression.
+  - type: ai-prompt-guard
+    name: prompt-guard
+    condition: "http.request.headers.x_tier == \"premium\""
+    config:
+      allow_patterns: ["^safe"]
+  # Global policy carrying a condition expression.
+  - type: rate-limiting
+    name: org-wide-limit
+    global: true
+    condition: "http.request.path ~ \"^/ai\""
+    config:
+      minute: 1000
+      policy: local

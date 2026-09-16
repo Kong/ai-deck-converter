@@ -12,7 +12,7 @@ type Policy struct {
 	Global      *bool          `yaml:"global,omitempty"`
 	Config      map[string]any `yaml:"config,omitempty"`
 	Labels      Labels         `yaml:"labels,omitempty"`
-	Condition string `yaml:"condition,omitempty"`
+	Condition   string         `yaml:"condition,omitempty"`
 	Datastores  []DatastoreRef `yaml:"datastores,omitempty"`
 }
 
