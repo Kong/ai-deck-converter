@@ -1,12 +1,10 @@
 package aimap
 
 import (
-	"errors"
 	"testing"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/Kong/ai-deck-converter/internal/aigw"
+	"github.com/stretchr/testify/require"
 )
 
 func TestPolicyTypeSupportsDatastore(t *testing.T) {
@@ -174,7 +172,7 @@ func TestApplyDatastoreReportsUnknownReferenceWithConfigIntact(t *testing.T) {
 	got, err := ApplyDatastore(config, "rate-limiting", refs("missing"), registry(nil))
 
 	var unknown *UnknownDatastoreError
-	require.True(t, errors.As(err, &unknown), "a dangling reference must be distinguishable, not a bare error")
+	require.ErrorAs(t, err, &unknown, "a dangling reference must be distinguishable, not a bare error")
 	require.Equal(t, "missing", unknown.Name)
 	require.EqualError(t, err, `references unknown datastore "missing"`)
 	require.Equal(t, config, got, "config is returned intact so a tolerant caller can carry on")
