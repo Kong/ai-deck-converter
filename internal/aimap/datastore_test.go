@@ -21,34 +21,40 @@ func TestPolicyTypeSupportsDatastore(t *testing.T) {
 func TestDatastoreSupportForPolicyType(t *testing.T) {
 	t.Parallel()
 
-	tests := map[string]struct {
+	tests := []struct {
+		name           string
 		policyType     string
 		datastoreType  string
 		wantAllowed    bool
 		wantConfigPath string
 	}{
-		"unrecognized plugin": {
+		{
+			name:       "unrecognized plugin",
 			policyType: "request-transformer", datastoreType: DatastoreTypeRedisCE,
 		},
-		"recognized plugin, wrong type": {
+		{
+			name:       "recognized plugin, wrong type",
 			policyType: "rate-limiting", datastoreType: DatastoreTypeRedisEE,
 			wantConfigPath: "redis",
 		},
-		"vectordb plugin takes pgvector": {
+		{
+			name:       "vectordb plugin takes pgvector",
 			policyType: "ai-rag-injector", datastoreType: DatastoreTypeVectorDB,
 			wantAllowed: true, wantConfigPath: "vectordb",
 		},
-		"vectordb plugin takes redis-ee": {
+		{
+			name:       "vectordb plugin takes redis-ee",
 			policyType: "ai-semantic-cache", datastoreType: DatastoreTypeRedisEE,
 			wantAllowed: true, wantConfigPath: "vectordb",
 		},
-		"vectordb plugin never takes redis-ce": {
+		{
+			name:       "vectordb plugin never takes redis-ce",
 			policyType: "ai-rag-injector", datastoreType: DatastoreTypeRedisCE,
 			wantConfigPath: "vectordb",
 		},
 	}
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
 			support, allowed := DatastoreSupportForPolicyType(tc.policyType, tc.datastoreType)
@@ -83,42 +89,48 @@ func refs(names ...string) []aigw.DatastoreRef {
 func TestApplyDatastoreRejects(t *testing.T) {
 	t.Parallel()
 
-	tests := map[string]struct {
+	tests := []struct {
+		name       string
 		policyType string
 		refs       []aigw.DatastoreRef
 		registry   map[string]*aigw.Datastore
 		wantErr    string
 	}{
-		"plugin type consumes no datastore": {
+		{
+			name:       "plugin type consumes no datastore",
 			policyType: "request-transformer", refs: refs("ds1"),
 			registry: registry(map[string]string{"ds1": DatastoreTypeRedisCE}),
 			wantErr:  `plugin type "request-transformer" does not support datastores`,
 		},
-		"more than one datastore": {
+		{
+			name:       "more than one datastore",
 			policyType: "rate-limiting", refs: refs("ds1", "ds2"),
 			registry: registry(map[string]string{"ds1": DatastoreTypeRedisCE, "ds2": DatastoreTypeRedisCE}),
 			wantErr:  "a policy may reference at most one datastore",
 		},
-		// Both rules are violated; the plugin type wins, so trimming the list
-		// is not offered as a fix that would not work.
-		"no support outranks cardinality": {
+		{
+			// Both rules are violated; the plugin type wins, so trimming the
+			// list is not offered as a fix that would not work.
+			name:       "no support outranks cardinality",
 			policyType: "request-transformer", refs: refs("ds1", "ds2"),
 			registry: registry(map[string]string{"ds1": DatastoreTypeRedisCE, "ds2": DatastoreTypeRedisCE}),
 			wantErr:  `plugin type "request-transformer" does not support datastores`,
 		},
-		"wrong datastore type": {
+		{
+			name:       "wrong datastore type",
 			policyType: "rate-limiting", refs: refs("ds1"),
 			registry: registry(map[string]string{"ds1": DatastoreTypeRedisEE}),
 			wantErr:  `plugin type "rate-limiting" does not support a "redis-ee" datastore`,
 		},
-		"vectordb plugin rejects redis-ce": {
+		{
+			name:       "vectordb plugin rejects redis-ce",
 			policyType: "ai-rag-injector", refs: refs("ds1"),
 			registry: registry(map[string]string{"ds1": DatastoreTypeRedisCE}),
 			wantErr:  `plugin type "ai-rag-injector" does not support a "redis-ce" datastore`,
 		},
 	}
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
 			got, err := ApplyDatastore(map[string]any{"minute": 100}, tc.policyType, tc.refs, tc.registry)
@@ -153,22 +165,26 @@ func TestApplyDatastoreReportsUnknownReferenceWithConfigIntact(t *testing.T) {
 func TestApplyDatastoreSubstitutesAtConfigPath(t *testing.T) {
 	t.Parallel()
 
-	tests := map[string]struct {
+	tests := []struct {
+		name          string
 		policyType    string
 		datastoreType string
 		want          map[string]any
 	}{
-		"flat redis": {
+		{
+			name:       "flat redis",
 			policyType: "rate-limiting", datastoreType: DatastoreTypeRedisCE,
 			want: map[string]any{"redis": map[string]any{"host": "ds1.internal"}},
 		},
-		"acme nests under storage_config": {
+		{
+			name:       "acme nests under storage_config",
 			policyType: "acme", datastoreType: DatastoreTypeRedisCE,
 			want: map[string]any{
 				"storage_config": map[string]any{"redis": map[string]any{"host": "ds1.internal"}},
 			},
 		},
-		"datakit nests under resources.cache": {
+		{
+			name:       "datakit nests under resources.cache",
 			policyType: "datakit", datastoreType: DatastoreTypeRedisEE,
 			want: map[string]any{
 				"resources": map[string]any{
@@ -176,7 +192,8 @@ func TestApplyDatastoreSubstitutesAtConfigPath(t *testing.T) {
 				},
 			},
 		},
-		"vectordb picks the pgvector sub-block": {
+		{
+			name:       "vectordb picks the pgvector sub-block",
 			policyType: "ai-rag-injector", datastoreType: DatastoreTypeVectorDB,
 			want: map[string]any{
 				"vectordb": map[string]any{
@@ -185,7 +202,8 @@ func TestApplyDatastoreSubstitutesAtConfigPath(t *testing.T) {
 				},
 			},
 		},
-		"vectordb picks the redis sub-block": {
+		{
+			name:       "vectordb picks the redis sub-block",
 			policyType: "ai-semantic-cache", datastoreType: DatastoreTypeRedisEE,
 			want: map[string]any{
 				"vectordb": map[string]any{
@@ -195,8 +213,8 @@ func TestApplyDatastoreSubstitutesAtConfigPath(t *testing.T) {
 			},
 		},
 	}
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
 			got, err := ApplyDatastore(
