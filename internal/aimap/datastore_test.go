@@ -22,35 +22,42 @@ func TestDatastoreSupportForPolicyType(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name           string
-		policyType     string
-		datastoreType  string
-		wantAllowed    bool
-		wantConfigPath string
+		name          string
+		policyType    string
+		datastoreType string
+		allowed       bool
+		configPath    string
 	}{
 		{
-			name:       "unrecognized plugin",
-			policyType: "request-transformer", datastoreType: DatastoreTypeRedisCE,
+			name:          "unrecognized plugin",
+			policyType:    "request-transformer",
+			datastoreType: DatastoreTypeRedisCE,
 		},
 		{
-			name:       "recognized plugin, wrong type",
-			policyType: "rate-limiting", datastoreType: DatastoreTypeRedisEE,
-			wantConfigPath: "redis",
+			name:          "recognized plugin, wrong type",
+			policyType:    "rate-limiting",
+			datastoreType: DatastoreTypeRedisEE,
+			configPath:    "redis",
 		},
 		{
-			name:       "vectordb plugin takes pgvector",
-			policyType: "ai-rag-injector", datastoreType: DatastoreTypeVectorDB,
-			wantAllowed: true, wantConfigPath: "vectordb",
+			name:          "vectordb plugin takes pgvector",
+			policyType:    "ai-rag-injector",
+			datastoreType: DatastoreTypeVectorDB,
+			allowed:       true,
+			configPath:    "vectordb",
 		},
 		{
-			name:       "vectordb plugin takes redis-ee",
-			policyType: "ai-semantic-cache", datastoreType: DatastoreTypeRedisEE,
-			wantAllowed: true, wantConfigPath: "vectordb",
+			name:          "vectordb plugin takes redis-ee",
+			policyType:    "ai-semantic-cache",
+			datastoreType: DatastoreTypeRedisEE,
+			allowed:       true,
+			configPath:    "vectordb",
 		},
 		{
-			name:       "vectordb plugin never takes redis-ce",
-			policyType: "ai-rag-injector", datastoreType: DatastoreTypeRedisCE,
-			wantConfigPath: "vectordb",
+			name:          "vectordb plugin never takes redis-ce",
+			policyType:    "ai-rag-injector",
+			datastoreType: DatastoreTypeRedisCE,
+			configPath:    "vectordb",
 		},
 	}
 	for _, tc := range tests {
@@ -58,8 +65,8 @@ func TestDatastoreSupportForPolicyType(t *testing.T) {
 			t.Parallel()
 
 			support, allowed := DatastoreSupportForPolicyType(tc.policyType, tc.datastoreType)
-			require.Equal(t, tc.wantAllowed, allowed)
-			require.Equal(t, tc.wantConfigPath, support.ConfigPath)
+			require.Equal(t, tc.allowed, allowed)
+			require.Equal(t, tc.configPath, support.ConfigPath)
 		})
 	}
 }
@@ -98,35 +105,46 @@ func TestApplyDatastoreRejects(t *testing.T) {
 	}{
 		{
 			name:       "plugin type consumes no datastore",
-			policyType: "request-transformer", refs: refs("ds1"),
-			registry: registry(map[string]string{"ds1": DatastoreTypeRedisCE}),
-			wantErr:  `plugin type "request-transformer" does not support datastores`,
+			policyType: "request-transformer",
+			refs:       refs("ds1"),
+			registry:   registry(map[string]string{"ds1": DatastoreTypeRedisCE}),
+			wantErr:    `plugin type "request-transformer" does not support datastores`,
 		},
 		{
 			name:       "more than one datastore",
-			policyType: "rate-limiting", refs: refs("ds1", "ds2"),
-			registry: registry(map[string]string{"ds1": DatastoreTypeRedisCE, "ds2": DatastoreTypeRedisCE}),
-			wantErr:  "a policy may reference at most one datastore",
+			policyType: "rate-limiting",
+			refs:       refs("ds1", "ds2"),
+			registry: registry(map[string]string{
+				"ds1": DatastoreTypeRedisCE,
+				"ds2": DatastoreTypeRedisCE,
+			}),
+			wantErr: "a policy may reference at most one datastore",
 		},
 		{
 			// Both rules are violated; the plugin type wins, so trimming the
 			// list is not offered as a fix that would not work.
 			name:       "no support outranks cardinality",
-			policyType: "request-transformer", refs: refs("ds1", "ds2"),
-			registry: registry(map[string]string{"ds1": DatastoreTypeRedisCE, "ds2": DatastoreTypeRedisCE}),
-			wantErr:  `plugin type "request-transformer" does not support datastores`,
+			policyType: "request-transformer",
+			refs:       refs("ds1", "ds2"),
+			registry: registry(map[string]string{
+				"ds1": DatastoreTypeRedisCE,
+				"ds2": DatastoreTypeRedisCE,
+			}),
+			wantErr: `plugin type "request-transformer" does not support datastores`,
 		},
 		{
 			name:       "wrong datastore type",
-			policyType: "rate-limiting", refs: refs("ds1"),
-			registry: registry(map[string]string{"ds1": DatastoreTypeRedisEE}),
-			wantErr:  `plugin type "rate-limiting" does not support a "redis-ee" datastore`,
+			policyType: "rate-limiting",
+			refs:       refs("ds1"),
+			registry:   registry(map[string]string{"ds1": DatastoreTypeRedisEE}),
+			wantErr:    `plugin type "rate-limiting" does not support a "redis-ee" datastore`,
 		},
 		{
 			name:       "vectordb plugin rejects redis-ce",
-			policyType: "ai-rag-injector", refs: refs("ds1"),
-			registry: registry(map[string]string{"ds1": DatastoreTypeRedisCE}),
-			wantErr:  `plugin type "ai-rag-injector" does not support a "redis-ce" datastore`,
+			policyType: "ai-rag-injector",
+			refs:       refs("ds1"),
+			registry:   registry(map[string]string{"ds1": DatastoreTypeRedisCE}),
+			wantErr:    `plugin type "ai-rag-injector" does not support a "redis-ce" datastore`,
 		},
 	}
 	for _, tc := range tests {
@@ -172,29 +190,39 @@ func TestApplyDatastoreSubstitutesAtConfigPath(t *testing.T) {
 		want          map[string]any
 	}{
 		{
-			name:       "flat redis",
-			policyType: "rate-limiting", datastoreType: DatastoreTypeRedisCE,
-			want: map[string]any{"redis": map[string]any{"host": "ds1.internal"}},
-		},
-		{
-			name:       "acme nests under storage_config",
-			policyType: "acme", datastoreType: DatastoreTypeRedisCE,
+			name:          "flat redis",
+			policyType:    "rate-limiting",
+			datastoreType: DatastoreTypeRedisCE,
 			want: map[string]any{
-				"storage_config": map[string]any{"redis": map[string]any{"host": "ds1.internal"}},
+				"redis": map[string]any{"host": "ds1.internal"},
 			},
 		},
 		{
-			name:       "datakit nests under resources.cache",
-			policyType: "datakit", datastoreType: DatastoreTypeRedisEE,
+			name:          "acme nests under storage_config",
+			policyType:    "acme",
+			datastoreType: DatastoreTypeRedisCE,
 			want: map[string]any{
-				"resources": map[string]any{
-					"cache": map[string]any{"redis": map[string]any{"host": "ds1.internal"}},
+				"storage_config": map[string]any{
+					"redis": map[string]any{"host": "ds1.internal"},
 				},
 			},
 		},
 		{
-			name:       "vectordb picks the pgvector sub-block",
-			policyType: "ai-rag-injector", datastoreType: DatastoreTypeVectorDB,
+			name:          "datakit nests under resources.cache",
+			policyType:    "datakit",
+			datastoreType: DatastoreTypeRedisEE,
+			want: map[string]any{
+				"resources": map[string]any{
+					"cache": map[string]any{
+						"redis": map[string]any{"host": "ds1.internal"},
+					},
+				},
+			},
+		},
+		{
+			name:          "vectordb picks the pgvector sub-block",
+			policyType:    "ai-rag-injector",
+			datastoreType: DatastoreTypeVectorDB,
 			want: map[string]any{
 				"vectordb": map[string]any{
 					"strategy": "pgvector",
@@ -203,8 +231,9 @@ func TestApplyDatastoreSubstitutesAtConfigPath(t *testing.T) {
 			},
 		},
 		{
-			name:       "vectordb picks the redis sub-block",
-			policyType: "ai-semantic-cache", datastoreType: DatastoreTypeRedisEE,
+			name:          "vectordb picks the redis sub-block",
+			policyType:    "ai-semantic-cache",
+			datastoreType: DatastoreTypeRedisEE,
 			want: map[string]any{
 				"vectordb": map[string]any{
 					"strategy": "redis",
