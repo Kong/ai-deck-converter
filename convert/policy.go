@@ -1,6 +1,7 @@
 package convert
 
 import (
+	"errors"
 	"strings"
 
 	"github.com/Kong/ai-deck-converter/internal/aigw"
@@ -111,33 +112,25 @@ func (c *Converter) policyPlugin(p *aigw.Policy, tags []string, preserveID bool)
 	return plugin, nil
 }
 
-// applyDatastore validates p.Datastores as the author wrote it, then resolves
-// the one reference it permits against the top-level datastores list and hands
-// the connection to aimap.ApplyDatastore, which decides where in the plugin
-// config it lands. Shape is checked before resolution so a dangling reference
-// cannot shrink the list past the cardinality rule.
+// applyDatastore hands p's datastore references, and the registry to resolve
+// them against, to aimap.ApplyDatastore, which owns every rule about the
+// pairing. Only the treatment of a dangling reference stays here: warning
+// versus failing is -strict policy, which aimap deliberately does not model.
 func (c *Converter) applyDatastore(p *aigw.Policy, config map[string]any) (map[string]any, error) {
 	if len(p.Datastores) == 0 {
 		return config, nil
 	}
-	// Support before cardinality: a plugin type that consumes no datastore takes
-	// none rather than one, so reporting the ceiling first would send the author
-	// back to trim the list and fail again.
-	if !aimap.PolicyTypeSupportsDatastore(p.Type) {
-		return nil, c.failAt("policies", "plugin type %q does not support datastores", p.Type)
-	}
-	if len(p.Datastores) > 1 {
-		return nil, c.failAt("policies", "a policy may reference at most one datastore")
-	}
-	ds := c.datastores[p.Datastores[0].Name]
-	if ds == nil {
-		if err := c.warn("policy %q references unknown datastore %q", p.Name, p.Datastores[0].Name); err != nil {
+	out, err := aimap.ApplyDatastore(config, p.Type, p.Datastores, c.datastores)
+	var unknown *aimap.UnknownDatastoreError
+	switch {
+	case errors.As(err, &unknown):
+		// aimap returns config untouched on this path, so the policy still
+		// converts, just without a connection.
+		if err := c.warn("policy %q %v", p.Name, unknown); err != nil {
 			return nil, err
 		}
-		return config, nil
-	}
-	out, err := aimap.ApplyDatastore(config, p.Type, ds.Type, ds.Config)
-	if err != nil {
+		return out, nil
+	case err != nil:
 		return nil, c.failAt("policies", "policy %q: %v", p.Name, err)
 	}
 	return out, nil
