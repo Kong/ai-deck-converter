@@ -175,6 +175,9 @@ func ApplyDatastore(
 	config map[string]any, policyType string, refs []aigw.DatastoreRef,
 	registry map[string]*aigw.Datastore,
 ) (map[string]any, error) {
+	if len(refs) == 0 {
+		return config, nil
+	}
 	if !PolicyTypeSupportsDatastore(policyType) {
 		return nil, fmt.Errorf("plugin type %q does not support datastores", policyType)
 	}
