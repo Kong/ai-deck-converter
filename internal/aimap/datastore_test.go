@@ -163,7 +163,7 @@ func TestApplyDatastoreWithNoReferencesLeavesConfigUntouched(t *testing.T) {
 
 	config := map[string]any{"minute": 100}
 	got, err := ApplyDatastore(config, "request-transformer", nil, nil)
-	require.NoError(t, err, "referencing no datastore is not an error, whatever the plugin type")
+	require.NoError(t, err)
 	require.Equal(t, config, got)
 }
 
