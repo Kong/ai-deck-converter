@@ -494,7 +494,55 @@ datastores:
 `)
 	_, _, err := Convert(src, Options{})
 	require.Error(t, err, "a policy naming more than one datastore must be rejected")
-	require.Contains(t, err.Error(), "only one is allowed")
+	require.Contains(t, err.Error(), "may reference at most one")
+}
+
+func TestConvertRejectsDatastoreOnPluginWithNoDatastoreSupport(t *testing.T) {
+	src := []byte(`
+consumers:
+  - name: c1
+    type: api-key
+    policies: [transformer]
+policies:
+  - type: request-transformer
+    name: transformer
+    config: {add: {headers: ["x-tenant:acme"]}}
+    datastores: [{name: ds1}]
+datastores:
+  - type: redis-ce
+    name: ds1
+    config: {host: ds1.internal}
+`)
+	_, _, err := Convert(src, Options{})
+	require.Error(t, err, "a plugin type that consumes no datastore must reject a datastore reference")
+	require.Contains(t, err.Error(), "request-transformer")
+	require.Contains(t, err.Error(), "does not support datastores")
+}
+
+func TestConvertReportsNoDatastoreSupportAheadOfCardinality(t *testing.T) {
+	src := []byte(`
+consumers:
+  - name: c1
+    type: api-key
+    policies: [transformer]
+policies:
+  - type: request-transformer
+    name: transformer
+    config: {add: {headers: ["x-tenant:acme"]}}
+    datastores: [{name: ds1}, {name: ds2}]
+datastores:
+  - type: redis-ce
+    name: ds1
+    config: {host: ds1.internal}
+  - type: redis-ce
+    name: ds2
+    config: {host: ds2.internal}
+`)
+	_, _, err := Convert(src, Options{})
+	require.Error(t, err)
+	// Both rules are violated; the plugin type takes precedence.
+	require.Contains(t, err.Error(), "does not support datastores")
+	require.NotContains(t, err.Error(), "at most one datastore")
 }
 
 func TestConvertRejectsWrongDatastoreTypeOnRateLimiting(t *testing.T) {

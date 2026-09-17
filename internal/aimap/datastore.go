@@ -125,10 +125,18 @@ var datastoreSupportedPolicyTypes = map[string]DatastoreSupport{
 	},
 }
 
+// PolicyTypeSupportsDatastore reports whether policyType consumes a Datastore
+// at all, for callers with no concrete Datastore type yet to check.
+func PolicyTypeSupportsDatastore(policyType string) bool {
+	_, known := datastoreSupportedPolicyTypes[policyType]
+	return known
+}
+
 // DatastoreSupportForPolicyType returns how the given policy plugin type
 // consumes a Datastore, and whether datastoreType is one it accepts. An
 // unrecognized policyType returns a zero DatastoreSupport (ConfigPath == "")
-// and allowed == false.
+// and allowed == false; callers that need to tell that apart from a recognized
+// plugin rejecting this one type ask PolicyTypeSupportsDatastore.
 func DatastoreSupportForPolicyType(policyType, datastoreType string) (support DatastoreSupport, allowed bool) {
 	support, ok := datastoreSupportedPolicyTypes[policyType]
 	if !ok {
@@ -139,8 +147,9 @@ func DatastoreSupportForPolicyType(policyType, datastoreType string) (support Da
 
 // ApplyDatastore substitutes a Datastore's connection config into a policy
 // plugin's config, at the dot-path policyType declares in
-// datastoreSupportedPolicyTypes. It rejects a plugin type that supports no
-// datastore or does not accept datastoreType.
+// datastoreSupportedPolicyTypes. It rejects a plugin type that does not accept
+// datastoreType; callers screen out a plugin type that consumes no Datastore at
+// all with PolicyTypeSupportsDatastore, which reports it precisely.
 func ApplyDatastore(
 	config map[string]any, policyType, datastoreType string, datastoreConfig map[string]any,
 ) (map[string]any, error) {
