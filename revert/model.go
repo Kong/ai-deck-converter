@@ -95,9 +95,10 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 		return entry
 	}
 
-	redirect := r.mergeableAliasFKs(findPlugins(plugins, "ai-proxy-advanced"))
+	routeProxies := findPlugins(plugins, "ai-proxy-advanced")
+	redirect := r.mergeableAliasFKs(routeProxies)
 
-	for _, proxy := range findPlugins(plugins, "ai-proxy-advanced") {
+	for _, proxy := range routeProxies {
 		cfg := proxy.Config
 		llmFormat := getStr(cfg, "llm_format")
 		if llmFormat == "" {
@@ -330,16 +331,7 @@ func mergeAliasIntoGroup(g *modelGroup, alias string, refs []string, acls aigw.A
 			g.model.Policies = append(g.model.Policies, ref)
 		}
 	}
-	for _, name := range acls.Allow {
-		if !slices.Contains(g.model.Access.ACLs.Allow, name) {
-			g.model.Access.ACLs.Allow = append(g.model.Access.ACLs.Allow, name)
-		}
-	}
-	for _, name := range acls.Deny {
-		if !slices.Contains(g.model.Access.ACLs.Deny, name) {
-			g.model.Access.ACLs.Deny = append(g.model.Access.ACLs.Deny, name)
-		}
-	}
+	mergeACLs(&g.model.Access.ACLs, acls)
 	for _, ref := range idpRefs {
 		if !slices.Contains(g.model.Access.AuthStrategies, ref) {
 			g.model.Access.AuthStrategies = append(g.model.Access.AuthStrategies, ref)
@@ -357,6 +349,23 @@ func mergeAliasIntoGroup(g *modelGroup, alias string, refs []string, acls aigw.A
 	}
 	g.model.Config.Route.Model.Values = append(g.model.Config.Route.Model.Values, alias)
 	g.mergedFKs = append(g.mergedFKs, alias)
+}
+
+// mergeACLs folds src into dst, appending allow/deny entries in first-seen
+// order with dedup, so ACL rules carried by several of a model's aliases (or
+// by several model-scoped acl plugins) union instead of overwriting each
+// other.
+func mergeACLs(dst *aigw.ACLs, src aigw.ACLs) {
+	for _, name := range src.Allow {
+		if !slices.Contains(dst.Allow, name) {
+			dst.Allow = append(dst.Allow, name)
+		}
+	}
+	for _, name := range src.Deny {
+		if !slices.Contains(dst.Deny, name) {
+			dst.Deny = append(dst.Deny, name)
+		}
+	}
 }
 
 // mergeableAliasFKs partitions a route's ai-proxy-advanced plugins into
@@ -531,7 +540,9 @@ func (r *Reverter) finalizeModels(acc *modelAcc) error {
 		for _, fk := range append([]string{g.model.Name}, g.mergedFKs...) {
 			for _, p := range r.idx.model[fk] {
 				if p.Name == "acl" {
-					g.model.Access.ACLs = aclsFromBlock(p.Config)
+					// Multiple model-scoped acl plugins (one per merged alias)
+					// union their allow/deny lists; the last must not win.
+					mergeACLs(&g.model.Access.ACLs, aclsFromBlock(p.Config))
 					continue
 				}
 				policyName := r.registerPolicy(p, false).Name

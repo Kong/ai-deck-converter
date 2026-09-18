@@ -186,7 +186,10 @@ func (c *Converter) convertModels() error {
 		// own ai-proxy-advanced plugin (see the emission loop), since
 		// ai-model-selector can only match a request to one ai-models row at a
 		// time.
-		aliases := extractModelAliases(m)
+		aliases, err := c.extractModelAliases(m)
+		if err != nil {
+			return err
+		}
 
 		// ownerKey groups targets into ai-proxy-advanced plugins: per source model
 		// for type "model" (each carries its own ai-model FK), shared for type
@@ -944,13 +947,37 @@ func disabledModelPluginEnabled(enabled *bool) *bool {
 
 // extractModelAliases returns the source model's authored aliases, or its name
 // when none is authored. Values do not override the selector source. Always
-// returns at least one alias.
-func extractModelAliases(m *aigw.Model) []string {
-	if len(m.Config.Route.Model.Values) > 0 {
-		return m.Config.Route.Model.Values
+// returns at least one alias. Duplicate values collapse to their first
+// occurrence — Kong requires unique ai_models names, so a duplicated value
+// would otherwise fan out into invalid, identically-named entities (reported
+// as a warning, an error under -strict).
+func (c *Converter) extractModelAliases(m *aigw.Model) ([]string, error) {
+	values := m.Config.Route.Model.Values
+	if len(values) == 0 {
+		return []string{m.Name}, nil
 	}
 
-	return []string{m.Name}
+	seen := make(map[string]bool, len(values))
+	unique := make([]string, 0, len(values))
+	var dupes []string
+	for _, v := range values {
+		if seen[v] {
+			if !slices.Contains(dupes, v) {
+				dupes = append(dupes, v)
+			}
+			continue
+		}
+		seen[v] = true
+		unique = append(unique, v)
+	}
+	if len(dupes) > 0 {
+		if err := c.warn(
+			"model %q drops duplicate alias values in config.route.model.values: %s",
+			m.Name, strings.Join(dupes, ", ")); err != nil {
+			return nil, err
+		}
+	}
+	return unique, nil
 }
 
 func llmFormat(m *aigw.Model) string {

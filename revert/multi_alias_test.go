@@ -255,3 +255,82 @@ func revertToDoc(t *testing.T, src []byte, opts Options) (*aigw.Document, []stri
 	require.NoError(t, yaml.Unmarshal(out, &doc), "unmarshal reverted document")
 	return &doc, warnings
 }
+
+func TestRevertMultiAliasValuesMergesRoutelessACLS(t *testing.T) {
+	// Route-less, model-only acl plugins (no route FK) are folded per merged
+	// alias FK in finalizeModels; their allow/deny lists must merge across
+	// aliases, not overwrite each other.
+	src := []byte(`
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: openai-chat
+        paths:
+          - /ai/chat/completions
+        methods:
+          - POST
+        strip_path: false
+plugins:
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-chat
+  - name: ai-proxy-advanced
+    config:
+      llm_format: openai
+      targets:
+        - model:
+            model_alias: '@kong/gpt-4o'
+            name: gpt-4o
+            provider: openai
+          route_type: llm/v1/chat
+    route: openai-chat
+    model: '@kong/gpt-4o'
+  - name: ai-proxy-advanced
+    config:
+      llm_format: openai
+      targets:
+        - model:
+            model_alias: '@kong/gpt-4o-alias'
+            name: gpt-4o
+            provider: openai
+          route_type: llm/v1/chat
+    route: openai-chat
+    model: '@kong/gpt-4o-alias'
+  - name: acl
+    config:
+      allow:
+        - premium-users
+    model: '@kong/gpt-4o'
+  - name: acl
+    config:
+      allow:
+        - enterprise-users
+      deny:
+        - suspended-users
+    model: '@kong/gpt-4o-alias'
+ai_models:
+  - name: '@kong/gpt-4o'
+    tags:
+      - ai-gateway-model-alias-group:@kong/gpt-4o
+  - name: '@kong/gpt-4o-alias'
+    tags:
+      - ai-gateway-model-alias-group:@kong/gpt-4o
+`)
+
+	doc, warnings := revertToDoc(t, src, Options{})
+	require.Empty(t, warnings, "no warnings expected")
+	require.Len(t, doc.Models, 1, "fan-out copies merge into one model")
+
+	m := doc.Models[0]
+	require.Equal(t, aigw.ACLs{
+		Allow: []string{"premium-users", "enterprise-users"},
+		Deny:  []string{"suspended-users"},
+	}, m.Access.ACLs,
+		"route-less acl plugins from every merged alias merge, none is dropped")
+}

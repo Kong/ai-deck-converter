@@ -1,6 +1,7 @@
 package convert
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -169,4 +170,48 @@ func entryTags(t *testing.T, entry map[string]any) []string {
 		tags = append(tags, s)
 	}
 	return tags
+}
+
+func TestConvertMultiAliasValuesDeduplicates(t *testing.T) {
+	src := `
+model_providers:
+  - name: openai-provider
+    type: openai
+models:
+  - name: dup-alias-model
+    type: model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    config:
+      route:
+        paths: [/ai]
+        model:
+          values: ["@kong/a", "@kong/a", "@kong/b"]
+    targets:
+      - name: gpt-5
+        provider: openai-provider
+        config: {type: openai}
+`
+	out, warnings, err := Convert([]byte(src), Options{})
+	require.NoError(t, err, "convert")
+	require.Contains(t, strings.Join(warnings, "\n"), "duplicate alias values",
+		"duplicate route.model.values entries are reported")
+
+	var got map[string]any
+	require.NoError(t, yaml.Unmarshal(out, &got), "unmarshal output")
+
+	// Duplicates collapse: unique names only, or decK/Kong would reject the
+	// ai_models entity names.
+	aiModels := got["ai_models"].([]any)
+	require.Len(t, aiModels, 2, "duplicate alias values collapse")
+	require.Equal(t, "@kong/a", aiModels[0].(map[string]any)["name"])
+	require.Equal(t, "@kong/b", aiModels[1].(map[string]any)["name"])
+
+	proxies := 0
+	for _, raw := range got["plugins"].([]any) {
+		if raw.(map[string]any)["name"] == "ai-proxy-advanced" {
+			proxies++
+		}
+	}
+	require.Equal(t, 2, proxies, "one ai-proxy-advanced per unique alias")
 }
