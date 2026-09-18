@@ -116,8 +116,12 @@ func (g *routeGroup) selectorConfig(useSources bool) map[string]any {
 // single source model on a route (type "model", scoped to route+ai-model), or
 // every target on a route (type "api", scoped route-only and merged).
 type proxyGroup struct {
-	routeName         string
-	modelName         string // ai-model FK; empty scopes the plugin route-only
+	routeName string
+	// aliases are the ai-model FKs this proxy group's targets are emitted
+	// under; empty scopes the plugin route-only (type "api"). One
+	// ai-proxy-advanced plugin is emitted per alias (see the emission loop),
+	// each with its targets' model_alias set to that alias.
+	aliases           []string
 	enabled           *bool
 	llmFormat         string
 	genaiCategory     string
@@ -174,13 +178,18 @@ func (c *Converter) convertModels() error {
 		bases := basePaths(m)
 		caps := c.expandCapabilities(m)
 
-		// extractModelAlias yields the name a client uses to select this model: an
-		// authored alias, or the model name when none is authored. It seeds both the
-		// ai-models entity identity (aiModelAlias) and each type:model target's
-		// model_alias (targetAlias); type:api targets stay alias-less — see the gate
-		// at the buildTarget call below.
-		targetAlias := extractModelAlias(m)
-		aiModelAlias := targetAlias
+		// extractModelAliases yields the name(s) a client uses to select this
+		// model: authored aliases, or the model name when none is authored. They
+		// seed both the ai-models entity identities and each type:model target's
+		// model_alias; type:api targets stay alias-less — see the gate at the
+		// buildTarget call below. Each alias gets its own ai-models entry and its
+		// own ai-proxy-advanced plugin (see the emission loop), since
+		// ai-model-selector can only match a request to one ai-models row at a
+		// time.
+		aliases, err := c.extractModelAliases(m)
+		if err != nil {
+			return err
+		}
 
 		// ownerKey groups targets into ai-proxy-advanced plugins: per source model
 		// for type "model" (each carries its own ai-model FK), shared for type
@@ -298,14 +307,14 @@ func (c *Converter) convertModels() error {
 						if err != nil {
 							return err
 						}
-						// The plugin's model FK must equal ai_models.name — the string a
+						// Each plugin's model FK must equal an ai_models.name — the string a
 						// client sends, which ai-model-selector matches on to activate this
-						// model-scoped plugin. That identity is aiModelAlias (the authored
-						// alias, or the model name when none is set), not m.Name; using
+						// model-scoped plugin. Those identities are aliases (the authored
+						// aliases, or the model name when none is set), not m.Name; using
 						// m.Name would dangle the FK whenever an alias is authored.
-						modelName := ""
+						var pluginAliases []string
 						if modelScoped {
-							modelName = aiModelAlias
+							pluginAliases = aliases
 						}
 
 						modelNameHeader := boolPtr(false)
@@ -315,7 +324,7 @@ func (c *Converter) convertModels() error {
 
 						pg = &proxyGroup{
 							routeName:         g.route.Name,
-							modelName:         modelName,
+							aliases:           pluginAliases,
 							enabled:           disabledModelPluginEnabled(m.Enabled),
 							llmFormat:         llmFormat(m),
 							genaiCategory:     spec.GenaiCategory,
@@ -347,11 +356,10 @@ func (c *Converter) convertModels() error {
 					// requests carry no model, so their targets must stay alias-less to
 					// remain in the "<default>" pool they fall back to (else the balancer
 					// has no pool for the request: 500 "failed to get balancer instance").
-					targetModelAlias := ""
-					if modelScoped {
-						targetModelAlias = targetAlias
-					}
-					target := c.buildTarget(tm, provider, providerType, targetModelAlias, spec.RouteType, logging)
+					// The alias itself is baked in per plugin copy at emission time (see
+					// withModelAlias), since a type:model target list is cloned once per
+					// alias.
+					target := c.buildTarget(tm, provider, providerType, spec.RouteType, logging)
 					// Dedup on the built target's full shape rather than
 					// (name, route_type): two targets can share a model name yet
 					// be genuinely distinct via different providers (distinct
@@ -380,16 +388,38 @@ func (c *Converter) convertModels() error {
 			}
 		}
 
-		// ai-models entry (one per source model).
-		c.out.AIModels = append(c.out.AIModels, kong.AIModel{
-			ID: m.ID,
-			// note: name is set to alias and alias is intentionally unset to be compatible with
-			// the AI Gateway 2.0.0 dataplane behavior. By setting name to alias, the AI Gateway will
-			// route requests to the alias that is set in the Model's config.route.model.* properties.
-			// If config.route.model.* properties are not set then aiModelAlias defaults to the model name.
-			Name: aiModelAlias,
-			Tags: c.labelsToTags(m.Labels),
-		})
+		// ai-models entries (one per alias, so ai-model-selector can match a
+		// request against any of them). note: name is set to alias and alias is
+		// intentionally unset to be compatible with the AI Gateway 2.0.0
+		// dataplane behavior. By setting name to alias, the AI Gateway will route
+		// requests to the alias that is set in the Model's config.route.model.*
+		// properties. If config.route.model.* properties are not set then the
+		// single alias defaults to the model name. m.ID can only identify one of
+		// the N rows a multi-alias model produces, so it's kept on the first.
+		// A multi-alias model's N rows are otherwise indistinguishable on the
+		// wire from N independently-authored models that happen to be
+		// config-identical, so they carry a shared marker tag identifying their
+		// common source model; revert only merges rows carrying it. The marker
+		// is keyed by the first alias, not m.Name: m.Name never round-trips
+		// (revert has no field to recover it into and stands in the first
+		// alias for it), so keying by it would make the marker re-encode
+		// differently after a round trip. The first alias is exactly what
+		// revert reconstructs the merged model's name as, so this is stable.
+		for idx, alias := range aliases {
+			id := ""
+			if idx == 0 {
+				id = m.ID
+			}
+			tags := c.labelsToTags(m.Labels)
+			if len(aliases) > 1 {
+				tags = append(tags, aimap.EncodeModelAliasGroup(aliases[0]))
+			}
+			c.out.AIModels = append(c.out.AIModels, kong.AIModel{
+				ID:   id,
+				Name: alias,
+				Tags: tags,
+			})
+		}
 
 		// Model policy and ACL plugins scope to each route the model produces, plus
 		// the ai-model entity for type "model".
@@ -402,12 +432,18 @@ func (c *Converter) convertModels() error {
 			for k := range plugins {
 				p := plugins[k]
 				p.Route = kong.NewStringRef(routeName)
-				if modelScoped {
-					// Same ai-model identity as the ai-proxy-advanced FK (aiModelAlias),
-					// so policy/ACL plugins scope to the entity the selector resolves.
-					p.Model = kong.NewStringRef(aiModelAlias)
+				if !modelScoped {
+					guardPlugins = append(guardPlugins, p)
+					continue
 				}
-				guardPlugins = append(guardPlugins, p)
+				// Same ai-model identities as the ai-proxy-advanced FKs: one copy
+				// of this policy/ACL plugin per alias, so a request is protected
+				// regardless of which alias it names.
+				for _, alias := range aliases {
+					pCopy := p
+					pCopy.Model = kong.NewStringRef(alias)
+					guardPlugins = append(guardPlugins, pCopy)
+				}
 			}
 		}
 
@@ -466,18 +502,34 @@ func (c *Converter) convertModels() error {
 			})
 		}
 		for _, pg := range g.proxies {
-			plugin := kong.Plugin{
-				Name:          "ai-proxy-advanced",
-				Enabled:       pg.enabled,
-				Route:         kong.NewStringRef(pg.routeName),
-				Config:        pg.proxyConfig(),
-				TargetSources: pg.targetSources,
-				Source:        pg.source,
+			if len(pg.aliases) == 0 {
+				c.out.Plugins = append(c.out.Plugins, kong.Plugin{
+					Name:          "ai-proxy-advanced",
+					Enabled:       pg.enabled,
+					Route:         kong.NewStringRef(pg.routeName),
+					Config:        pg.proxyConfig(),
+					TargetSources: pg.targetSources,
+					Source:        pg.source,
+				})
+				continue
 			}
-			if pg.modelName != "" {
-				plugin.Model = kong.NewStringRef(pg.modelName)
+			// One plugin per alias: ai-model-selector activates a model-scoped
+			// plugin by matching the request's model string against a single
+			// ai_models row, so each alias needs its own plugin/FK, with its
+			// targets' model_alias set to that same alias.
+			for _, alias := range pg.aliases {
+				cfg := pg.proxyConfig()
+				cfg["targets"] = withModelAlias(pg.targets, alias)
+				c.out.Plugins = append(c.out.Plugins, kong.Plugin{
+					Name:          "ai-proxy-advanced",
+					Enabled:       pg.enabled,
+					Route:         kong.NewStringRef(pg.routeName),
+					Config:        cfg,
+					Model:         kong.NewStringRef(alias),
+					TargetSources: pg.targetSources,
+					Source:        pg.source,
+				})
 			}
-			c.out.Plugins = append(c.out.Plugins, plugin)
 		}
 	}
 	for _, candidate := range lifecycleCandidates {
@@ -497,9 +549,6 @@ func (c *Converter) convertModels() error {
 				lifecycleTarget.target,
 				lifecycleTarget.provider,
 				lifecycleTarget.providerType,
-				// Lifecycle requests identify a video by ID and do not carry a
-				// model alias. Keep these targets in the balancer's default pool.
-				"",
 				candidate.spec.RouteType,
 				logging,
 			))
@@ -752,17 +801,16 @@ func modelLoggingBlock(l *aigw.Logging, supportsLogStatistics bool) map[string]a
 
 // buildTarget builds one ai-proxy-advanced target from a target model. The
 // model-level logging block (if any) is applied to every target, since
-// ai-proxy-advanced carries logging per target rather than per plugin.
+// ai-proxy-advanced carries logging per target rather than per plugin. The
+// target's model_alias is not set here: a multi-alias model's target list is
+// cloned once per alias at emission time (see withModelAlias).
 func (c *Converter) buildTarget(
 	tm *aigw.TargetModel, provider *aigw.Provider,
-	providerType, alias, routeType string, logging map[string]any,
+	providerType, routeType string, logging map[string]any,
 ) map[string]any {
 	model := map[string]any{
 		"provider": aimap.PluginProvider(providerType),
 		"name":     tm.Name,
-	}
-	if alias != "" {
-		model["model_alias"] = alias
 	}
 	if opts := mapOptions(tm.Config.Options, providerType, tm.Name, provider); opts != nil {
 		model["options"] = opts
@@ -787,6 +835,24 @@ func (c *Converter) buildTarget(
 		target["logging"] = logging
 	}
 	return target
+}
+
+// withModelAlias clones each target (and its nested "model" map) with
+// model_alias set to alias, so the N ai-proxy-advanced plugins emitted for a
+// multi-alias model don't share mutable map state.
+func withModelAlias(targets []map[string]any, alias string) []map[string]any {
+	out := make([]map[string]any, len(targets))
+	for i, t := range targets {
+		clone := make(map[string]any, len(t))
+		maps.Copy(clone, t)
+		model, _ := t["model"].(map[string]any)
+		modelClone := make(map[string]any, len(model)+1)
+		maps.Copy(modelClone, model)
+		modelClone["model_alias"] = alias
+		clone["model"] = modelClone
+		out[i] = clone
+	}
+	return out
 }
 
 // targetFingerprint returns a stable dedup key for a built ai-proxy-advanced
@@ -879,14 +945,39 @@ func disabledModelPluginEnabled(enabled *bool) *bool {
 	return nil
 }
 
-// extractModelAlias returns the source model's authored alias, or its name when
-// none is authored. Values do not override the selector source.
-func extractModelAlias(m *aigw.Model) string {
-	if len(m.Config.Route.Model.Values) > 0 {
-		return m.Config.Route.Model.Values[0]
+// extractModelAliases returns the source model's authored aliases, or its name
+// when none is authored. Values do not override the selector source. Always
+// returns at least one alias. Duplicate values collapse to their first
+// occurrence — Kong requires unique ai_models names, so a duplicated value
+// would otherwise fan out into invalid, identically-named entities (reported
+// as a warning, an error under -strict).
+func (c *Converter) extractModelAliases(m *aigw.Model) ([]string, error) {
+	values := m.Config.Route.Model.Values
+	if len(values) == 0 {
+		return []string{m.Name}, nil
 	}
 
-	return m.Name
+	seen := make(map[string]bool, len(values))
+	unique := make([]string, 0, len(values))
+	var dupes []string
+	for _, v := range values {
+		if seen[v] {
+			if !slices.Contains(dupes, v) {
+				dupes = append(dupes, v)
+			}
+			continue
+		}
+		seen[v] = true
+		unique = append(unique, v)
+	}
+	if len(dupes) > 0 {
+		if err := c.warn(
+			"model %q drops duplicate alias values in config.route.model.values: %s",
+			m.Name, strings.Join(dupes, ", ")); err != nil {
+			return nil, err
+		}
+	}
+	return unique, nil
 }
 
 func llmFormat(m *aigw.Model) string {

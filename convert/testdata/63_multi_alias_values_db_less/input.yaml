@@ -1,0 +1,21 @@
+models:
+  # The db-less projection of the multi-alias fan-out: one plugin per alias.
+  - name: multi-alias-model
+    type: model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    config:
+      route:
+        paths: [/ai]
+        model:
+          values:
+            - "@kong/openai"
+            - "@kong/the-openai-model"
+    targets:
+      - name: gpt-5
+        provider: openai-provider
+        config: {type: openai}
+
+model_providers:
+  - name: openai-provider
+    type: openai
