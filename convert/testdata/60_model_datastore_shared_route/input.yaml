@@ -1,0 +1,86 @@
+# Two semantic models share one route (same route config and selector shape)
+# but each keeps its own model-scoped ai-proxy-advanced — and therefore its
+# own datastore-resolved vectordb connection. One model references a
+# vectordb-typed datastore, the other a redis-ee one.
+models:
+  - type: model
+    display_name: Semantic A
+    name: semantic-a
+    capabilities: [generate]
+    formats:
+      - type: openai
+    targets:
+      - name: gpt-4o
+        provider: openai-main
+        config:
+          type: openai
+    policies: []
+    access:
+      acls: {allow: [], deny: []}
+    datastores:
+      - name: shared-pgvector
+    config:
+      route:
+        paths: [/ai]
+      balancer:
+        algorithm: semantic
+        slots: 10000
+        vectordb:
+          strategy: pgvector
+          dimensions: 1024
+          distance_metric: cosine
+          threshold: 0.7
+  - type: model
+    display_name: Semantic B
+    name: semantic-b
+    capabilities: [generate]
+    formats:
+      - type: openai
+    targets:
+      - name: gpt-4o
+        provider: openai-main
+        config:
+          type: openai
+    policies: []
+    access:
+      acls: {allow: [], deny: []}
+    datastores:
+      - name: shared-redis
+    config:
+      route:
+        paths: [/ai]
+      balancer:
+        algorithm: semantic
+        slots: 10000
+        vectordb:
+          strategy: redis
+          dimensions: 1536
+          distance_metric: cosine
+          threshold: 0.8
+model_providers:
+  - type: openai
+    display_name: OpenAI Main
+    name: openai-main
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://env/openai-key}"
+datastores:
+  - type: vectordb
+    name: shared-pgvector
+    config:
+      host: pg.internal
+      port: 5432
+      database: kong-pgvector
+      user: postgres
+      password: "{vault://env/pg-password}"
+  - type: redis-ee
+    name: shared-redis
+    config:
+      host: redis-ee.internal
+      port: 6379
+      database: 2
+      username: semantic
+      password: "{vault://env/redis-password}"
