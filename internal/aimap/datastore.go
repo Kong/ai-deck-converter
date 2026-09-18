@@ -1,8 +1,11 @@
 package aimap
 
 import (
+	"errors"
 	"fmt"
 	"maps"
+
+	"github.com/Kong/ai-deck-converter/internal/aigw"
 )
 
 // Datastore type discriminators (aigw.Datastore.Type values). Named here,
@@ -125,10 +128,18 @@ var datastoreSupportedPolicyTypes = map[string]DatastoreSupport{
 	},
 }
 
+// PolicyTypeSupportsDatastore reports whether policyType consumes a Datastore
+// at all, for callers with no concrete Datastore type yet to check.
+func PolicyTypeSupportsDatastore(policyType string) bool {
+	_, known := datastoreSupportedPolicyTypes[policyType]
+	return known
+}
+
 // DatastoreSupportForPolicyType returns how the given policy plugin type
 // consumes a Datastore, and whether datastoreType is one it accepts. An
 // unrecognized policyType returns a zero DatastoreSupport (ConfigPath == "")
-// and allowed == false.
+// and allowed == false; callers that need to tell that apart from a recognized
+// plugin rejecting this one type ask PolicyTypeSupportsDatastore.
 func DatastoreSupportForPolicyType(policyType, datastoreType string) (support DatastoreSupport, allowed bool) {
 	support, ok := datastoreSupportedPolicyTypes[policyType]
 	if !ok {
@@ -137,13 +148,47 @@ func DatastoreSupportForPolicyType(policyType, datastoreType string) (support Da
 	return support, support.Allows(datastoreType)
 }
 
-// ApplyDatastore substitutes a Datastore's connection config into a policy
-// plugin's config, at the dot-path policyType declares in
-// datastoreSupportedPolicyTypes. It rejects a plugin type that supports no
-// datastore or does not accept datastoreType.
+// UnknownDatastoreError reports a reference to a name absent from the registry.
+// ApplyDatastore returns it alongside the unchanged config rather than a bare
+// error, so a caller that tolerates dangling references — converting a
+// hand-written config without -strict — can warn and carry on. Whether a
+// dangling reference is fatal is the caller's decision, not this package's.
+type UnknownDatastoreError struct {
+	Name string
+}
+
+func (e *UnknownDatastoreError) Error() string {
+	return fmt.Sprintf("references unknown datastore %q", e.Name)
+}
+
+// ApplyDatastore validates a policy's Datastore references and substitutes the
+// named connection into the plugin's config, at the dot-path policyType
+// declares in datastoreSupportedPolicyTypes. refs is the policy's reference
+// list as the author wrote it, resolved against registry; referencing none is
+// not an error.
+//
+// Support is checked before the at-most-one ceiling: a plugin taking no
+// Datastore would still fail after the author trims the list to one. A name
+// missing from registry yields *UnknownDatastoreError together with the
+// unchanged config.
 func ApplyDatastore(
-	config map[string]any, policyType, datastoreType string, datastoreConfig map[string]any,
+	config map[string]any, policyType string, refs []aigw.DatastoreRef,
+	registry map[string]*aigw.Datastore,
 ) (map[string]any, error) {
+	if len(refs) == 0 {
+		return config, nil
+	}
+	if !PolicyTypeSupportsDatastore(policyType) {
+		return nil, fmt.Errorf("plugin type %q does not support datastores", policyType)
+	}
+	if len(refs) > 1 {
+		return nil, errors.New("a policy may reference at most one datastore")
+	}
+	datastore := registry[refs[0].Name]
+	if datastore == nil {
+		return config, &UnknownDatastoreError{Name: refs[0].Name}
+	}
+	datastoreType, datastoreConfig := datastore.Type, datastore.Config
 	support, allowed := DatastoreSupportForPolicyType(policyType, datastoreType)
 	if !allowed {
 		return nil, fmt.Errorf("plugin type %q does not support a %q datastore",
