@@ -1,0 +1,39 @@
+mcp_servers:
+  - type: conversion-only
+    name: team-a
+    config:
+      route: {name: team-a-route, paths: [/mcp/team-a]}
+    tools:
+      - {name: team-a-report, description: Get a report, method: GET, path: report} #/mcp/team-a/report
+  - type: conversion-only
+    name: team-b
+    config:
+      route: {name: team-b-route, paths: [/mcp/team-b]}
+    tools:
+      - {name: team-b-report, description: Get a report, method: GET, path: report}
+  - type: listener
+    name: aggregate
+    config:
+      route: {name: aggregate-route, paths: [/mcp/aggregate]}
+      server:
+        tag: mcp-listener:aggregate-id
+      sources: [team-a, team-b]
+    access:
+      auth_strategies: [mcp-key-auth]
+
+# key-auth on the listener: the only client-facing MCP endpoint here. The
+# conversion-only sources are not listeners, so they take no auth strategy.
+auth_strategies:
+  - name: mcp-key-auth
+    type: key-auth
+    display_name: MCP Key Auth
+    config:
+      key_names: [apikey]
+
+consumers:
+  - name: mcp-client
+    type: api-key
+    credentials:
+      - name: mcp-client-key
+        type: api-key
+        api_key: mcp-e2e-secret
