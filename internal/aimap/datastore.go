@@ -171,42 +171,47 @@ func (e *UnknownDatastoreError) Error() string {
 // Datastore would still fail after the author trims the list to one. A name
 // missing from registry yields *UnknownDatastoreError together with the
 // unchanged config.
+//
+// configPaths lists the dot-paths under config that belong to the Datastore
+// rather than the policy, empty when nothing was substituted. A vectordb
+// plugin reports both sub-blocks, not just the one its type selected.
 func ApplyDatastore(
 	config map[string]any, policyType string, refs []aigw.DatastoreRef,
 	registry map[string]*aigw.Datastore,
-) (map[string]any, error) {
+) (out map[string]any, configPaths []string, err error) {
 	if len(refs) == 0 {
-		return config, nil
+		return config, nil, nil
 	}
 	if !PolicyTypeSupportsDatastore(policyType) {
-		return nil, fmt.Errorf("plugin type %q does not support datastores", policyType)
+		return nil, nil, fmt.Errorf("plugin type %q does not support datastores", policyType)
 	}
 	if len(refs) > 1 {
-		return nil, errors.New("a policy may reference at most one datastore")
+		return nil, nil, errors.New("a policy may reference at most one datastore")
 	}
 	datastore := registry[refs[0].Name]
 	if datastore == nil {
-		return config, &UnknownDatastoreError{Name: refs[0].Name}
+		return config, nil, &UnknownDatastoreError{Name: refs[0].Name}
 	}
 	datastoreType, datastoreConfig := datastore.Type, datastore.Config
 	support, allowed := DatastoreSupportForPolicyType(policyType, datastoreType)
 	if !allowed {
-		return nil, fmt.Errorf("plugin type %q does not support a %q datastore",
+		return nil, nil, fmt.Errorf("plugin type %q does not support a %q datastore",
 			policyType, datastoreType)
 	}
 	switch support.ConfigPath {
 	case "vectordb":
 		strategy, _ := VectorDBStrategyForDatastoreType(datastoreType)
 		vectordbConfig, _ := config["vectordb"].(map[string]any)
-		return applyVectorDBDatastore(config, vectordbConfig, strategy, datastoreConfig), nil
+		return applyVectorDBDatastore(config, vectordbConfig, strategy, datastoreConfig),
+			[]string{"vectordb.redis", "vectordb.pgvector"}, nil
 	case "redis":
-		return applyRedisDatastore(config, datastoreConfig), nil
+		return applyRedisDatastore(config, datastoreConfig), []string{support.ConfigPath}, nil
 	case "storage_config.redis":
-		return applyAcmeDatastore(config, datastoreConfig), nil
+		return applyAcmeDatastore(config, datastoreConfig), []string{support.ConfigPath}, nil
 	case "resources.cache.redis":
-		return applyDatakitDatastore(config, datastoreConfig), nil
+		return applyDatakitDatastore(config, datastoreConfig), []string{support.ConfigPath}, nil
 	default:
-		return nil, fmt.Errorf("unhandled Datastore config path %q", support.ConfigPath)
+		return nil, nil, fmt.Errorf("unhandled Datastore config path %q", support.ConfigPath)
 	}
 }
 

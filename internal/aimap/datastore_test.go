@@ -149,9 +149,12 @@ func TestApplyDatastoreRejects(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := ApplyDatastore(map[string]any{"minute": 100}, tc.policyType, tc.refs, tc.registry)
+			got, configPaths, err := ApplyDatastore(
+				map[string]any{"minute": 100}, tc.policyType, tc.refs, tc.registry,
+			)
 			require.EqualError(t, err, tc.wantErr)
 			require.Nil(t, got)
+			require.Empty(t, configPaths, "nothing was substituted, so there are no paths to report")
 		})
 	}
 }
@@ -160,17 +163,19 @@ func TestApplyDatastoreWithNoReferencesLeavesConfigUntouched(t *testing.T) {
 	t.Parallel()
 
 	config := map[string]any{"minute": 100}
-	got, err := ApplyDatastore(config, "request-transformer", nil, nil)
+	got, configPaths, err := ApplyDatastore(config, "request-transformer", nil, nil)
 	require.NoError(t, err)
 	require.Equal(t, config, got)
+	require.Empty(t, configPaths, "nothing was substituted, so there are no paths to report")
 }
 
 func TestApplyDatastoreReportsUnknownReferenceWithConfigIntact(t *testing.T) {
 	t.Parallel()
 
 	config := map[string]any{"minute": 100}
-	got, err := ApplyDatastore(config, "rate-limiting", refs("missing"), registry(nil))
+	got, configPaths, err := ApplyDatastore(config, "rate-limiting", refs("missing"), registry(nil))
 
+	require.Empty(t, configPaths, "a dangling reference substitutes nothing, so there are no paths")
 	var unknown *UnknownDatastoreError
 	require.ErrorAs(t, err, &unknown, "a dangling reference must be distinguishable, not a bare error")
 	require.Equal(t, "missing", unknown.Name)
@@ -186,6 +191,7 @@ func TestApplyDatastoreSubstitutesAtConfigPath(t *testing.T) {
 		policyType    string
 		datastoreType string
 		want          map[string]any
+		wantPaths     []string
 	}{
 		{
 			name:          "flat redis",
@@ -194,6 +200,7 @@ func TestApplyDatastoreSubstitutesAtConfigPath(t *testing.T) {
 			want: map[string]any{
 				"redis": map[string]any{"host": "ds1.internal"},
 			},
+			wantPaths: []string{"redis"},
 		},
 		{
 			name:          "acme nests under storage_config",
@@ -204,6 +211,7 @@ func TestApplyDatastoreSubstitutesAtConfigPath(t *testing.T) {
 					"redis": map[string]any{"host": "ds1.internal"},
 				},
 			},
+			wantPaths: []string{"storage_config.redis"},
 		},
 		{
 			name:          "datakit nests under resources.cache",
@@ -216,6 +224,7 @@ func TestApplyDatastoreSubstitutesAtConfigPath(t *testing.T) {
 					},
 				},
 			},
+			wantPaths: []string{"resources.cache.redis"},
 		},
 		{
 			name:          "vectordb picks the pgvector sub-block",
@@ -227,6 +236,8 @@ func TestApplyDatastoreSubstitutesAtConfigPath(t *testing.T) {
 					"pgvector": map[string]any{"host": "ds1.internal"},
 				},
 			},
+			// Both sub-blocks, though only pgvector was written.
+			wantPaths: []string{"vectordb.redis", "vectordb.pgvector"},
 		},
 		{
 			name:          "vectordb picks the redis sub-block",
@@ -238,17 +249,19 @@ func TestApplyDatastoreSubstitutesAtConfigPath(t *testing.T) {
 					"redis":    map[string]any{"host": "ds1.internal"},
 				},
 			},
+			wantPaths: []string{"vectordb.redis", "vectordb.pgvector"},
 		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := ApplyDatastore(
+			got, configPaths, err := ApplyDatastore(
 				map[string]any{"minute": 100}, tc.policyType, refs("ds1"),
 				registry(map[string]string{"ds1": tc.datastoreType}),
 			)
 			require.NoError(t, err)
+			require.Equal(t, tc.wantPaths, configPaths)
 
 			want := map[string]any{"minute": 100}
 			for key, value := range tc.want {
