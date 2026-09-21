@@ -1,0 +1,53 @@
+models:
+  # A semantic-balancer model references a top-level Datastore by name. The
+  # model authors only the common vectordb fields (dimensions,
+  # distance_metric, threshold); the connection lives entirely in the
+  # datastore and is substituted into config.vectordb.pgvector.
+  - type: model
+    display_name: Semantic PGVector
+    name: semantic-pgvector
+    capabilities: [generate]
+    formats:
+      - type: openai
+    targets:
+      - name: gpt-4o
+        provider: openai-main
+        config:
+          type: openai
+    policies: []
+    access:
+      acls: {allow: [], deny: []}
+    datastores:
+      - name: shared-pgvector
+    config:
+      route:
+        paths: [/ai]
+      balancer:
+        algorithm: semantic
+        slots: 10000
+        vectordb:
+          strategy: pgvector
+          dimensions: 1024
+          distance_metric: cosine
+          threshold: 0.7
+model_providers:
+  - type: openai
+    display_name: OpenAI Main
+    name: openai-main
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://env/openai-key}"
+datastores:
+  - type: vectordb
+    name: shared-pgvector
+    config:
+      host: pg.internal
+      port: 5432
+      database: kong-pgvector
+      user: postgres
+      password: "{vault://env/pg-password}"
+      ssl_required: true
+      ssl_verify: true

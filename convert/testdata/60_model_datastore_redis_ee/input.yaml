@@ -1,0 +1,68 @@
+models:
+  # The model authors an inline AI Gateway-shaped connection (nested
+  # sentinel/ssl groups). The redis-ee Datastore replaces that connection
+  # wholesale with its own plugin-shaped config — the datastore wins — while
+  # the common fields (dimensions, distance_metric, threshold) stay.
+  - type: model
+    display_name: Semantic Redis
+    name: semantic-redis
+    capabilities: [generate]
+    formats:
+      - type: openai
+    targets:
+      - name: gpt-4o
+        provider: openai-main
+        config:
+          type: openai
+    policies: []
+    access:
+      acls: {allow: [], deny: []}
+    datastores:
+      - name: semantic-redis-ee
+    config:
+      route:
+        paths: [/ai]
+      balancer:
+        algorithm: semantic
+        slots: 10000
+        vectordb:
+          strategy: redis
+          dimensions: 1536
+          distance_metric: cosine
+          threshold: 0.8
+          host: placeholder.invalid
+          port: 6379
+          database: 0
+          sentinel:
+            master: mymaster
+            nodes:
+              - host: placeholder.invalid
+                port: 26379
+          ssl:
+            enabled: true
+            verify: true
+model_providers:
+  - type: openai
+    display_name: OpenAI Main
+    name: openai-main
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://env/openai-key}"
+datastores:
+  - type: redis-ee
+    name: semantic-redis-ee
+    config:
+      host: redis-ee.internal
+      port: 6379
+      database: 2
+      username: semantic
+      password: "{vault://env/redis-password}"
+      sentinel_master: mymaster
+      sentinel_nodes:
+        - host: sentinel-a.internal
+          port: 26379
+      ssl: true
+      ssl_verify: true
