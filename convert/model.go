@@ -127,6 +127,7 @@ type proxyGroup struct {
 	genaiCategory     string
 	balancer          map[string]any
 	vectordb          any
+	datastoreName     string // datastore whose connection was injected into vectordb; empty when authored inline
 	embeddings        any
 	responseStreaming string
 	modelNameHeader   *bool
@@ -204,6 +205,10 @@ func (c *Converter) convertModels() error {
 		ownerKey := ""
 		if modelScoped {
 			ownerKey = m.Name
+		}
+		ds, err := c.resolveModelDatastore(m)
+		if err != nil {
+			return err
 		}
 
 		var routeNames []string
@@ -302,10 +307,38 @@ func (c *Converter) convertModels() error {
 					}
 
 					pg := g.proxyByOwner[ownerKey]
+					if pg != nil && !modelScoped {
+						// type:"api" models on one route share a single route-scoped
+						// ai-proxy-advanced, so any datastore mismatch would either drop
+						// one model's datastore or make another silently inherit it.
+						if (ds == nil) != (pg.datastoreName == "") ||
+							(ds != nil && ds.Name != pg.datastoreName) {
+							current := "no datastore"
+							if ds != nil {
+								current = fmt.Sprintf("datastore %q", ds.Name)
+							}
+							existing := "no datastore"
+							if pg.datastoreName != "" {
+								existing = fmt.Sprintf("datastore %q", pg.datastoreName)
+							}
+							return c.failAt("models",
+								"model %q cannot share route %q with another api model: shared "+
+									"route-scoped ai-proxy-advanced would mix %s and %s",
+								m.Name, g.route.Name, existing, current)
+						}
+					}
 					if pg == nil {
 						embeddings, err := c.resolveEmbeddings(balancerExtra(m.Config.Balancer, "embeddings"))
 						if err != nil {
 							return err
+						}
+						vectordb, err := c.modelVectorDB(m, ds)
+						if err != nil {
+							return err
+						}
+						datastoreName := ""
+						if ds != nil {
+							datastoreName = ds.Name
 						}
 						// Each plugin's model FK must equal an ai_models.name — the string a
 						// client sends, which ai-model-selector matches on to activate this
@@ -329,7 +362,8 @@ func (c *Converter) convertModels() error {
 							llmFormat:         llmFormat(m),
 							genaiCategory:     spec.GenaiCategory,
 							balancer:          balancerConfig(m.Config.Balancer),
-							vectordb:          aimap.VectorDBToPlugin(balancerExtra(m.Config.Balancer, "vectordb")),
+							vectordb:          vectordb,
+							datastoreName:     datastoreName,
 							embeddings:        embeddings,
 							responseStreaming: m.Config.ResponseStreaming,
 							modelNameHeader:   modelNameHeader,
@@ -558,13 +592,21 @@ func (c *Converter) convertModels() error {
 				Capabilities:     []string{"video"},
 			})
 		}
+		lifecycleDS, err := c.resolveModelDatastore(candidate.model)
+		if err != nil {
+			return err
+		}
+		lifecycleVectorDB, err := c.modelVectorDB(candidate.model, lifecycleDS)
+		if err != nil {
+			return err
+		}
 		pg := &proxyGroup{
 			routeName:         routeName,
 			enabled:           disabledModelPluginEnabled(candidate.model.Enabled),
 			llmFormat:         llmFormat(candidate.model),
 			genaiCategory:     candidate.spec.GenaiCategory,
 			balancer:          balancerConfig(candidate.model.Config.Balancer),
-			vectordb:          aimap.VectorDBToPlugin(balancerExtra(candidate.model.Config.Balancer, "vectordb")),
+			vectordb:          lifecycleVectorDB,
 			responseStreaming: candidate.model.Config.ResponseStreaming,
 			modelNameHeader:   boolPtr(false),
 			maxBodySize:       candidate.model.Config.MaxRequestBodySize,
@@ -907,6 +949,54 @@ func balancerExtra(b *aigw.Balancer, key string) any {
 		return nil
 	}
 	return b.Fields[key]
+}
+
+// resolveModelDatastore resolves m.Datastores (by-name references into the
+// top-level datastores list): at most one reference, and — mirroring
+// convert/policy.go's applyDatastore — an unknown name only warns, so a
+// hand-written config with a dangling reference still converts (without the
+// connection) outside -strict.
+func (c *Converter) resolveModelDatastore(m *aigw.Model) (*aigw.Datastore, error) {
+	if len(m.Datastores) == 0 {
+		return nil, nil
+	}
+	if len(m.Datastores) > 1 {
+		return nil, c.failAt("models",
+			"model %q has %d datastores, but only one is allowed",
+			m.Name, len(m.Datastores))
+	}
+	if m.Config.Balancer == nil || m.Config.Balancer.Algorithm != "semantic" {
+		return nil, c.failAt("models",
+			"model %q references datastore %q, but datastores require the semantic balancer "+
+				"(set config.balancer.algorithm: semantic)",
+			m.Name, m.Datastores[0].Name)
+	}
+	ds := c.datastores[m.Datastores[0].Name]
+	if ds == nil {
+		if err := c.warn("model %q references unknown datastore %q", m.Name, m.Datastores[0].Name); err != nil {
+			return nil, err
+		}
+		return nil, nil
+	}
+	return ds, nil
+}
+
+// modelVectorDB lowers the model's balancer.vectordb to plugin shape, then
+// injects the datastore's connection. The ordering is load-bearing: ds.Config
+// already carries plugin-shaped keys (ssl_verify, sentinel_nodes, ...), so it
+// is substituted after VectorDBToPlugin and lands verbatim in the strategy
+// sub-block, replacing any inline connection ("the datastore wins") while the
+// common fields the model authors itself are preserved.
+func (c *Converter) modelVectorDB(m *aigw.Model, ds *aigw.Datastore) (any, error) {
+	vectordb := aimap.VectorDBToPlugin(balancerExtra(m.Config.Balancer, "vectordb"))
+	if ds == nil {
+		return vectordb, nil
+	}
+	out, err := aimap.ApplyModelDatastore(vectordb, ds.Type, ds.Config)
+	if err != nil {
+		return nil, c.failAt("models", "model %q's datastore %q: %v", m.Name, ds.Name, err)
+	}
+	return out, nil
 }
 
 func basePaths(m *aigw.Model) []string {

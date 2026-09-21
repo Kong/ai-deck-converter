@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"slices"
 
 	"github.com/Kong/ai-deck-converter/internal/aigw"
 )
@@ -276,11 +277,45 @@ func applyVectorDBDatastore(
 ) map[string]any {
 	out := make(map[string]any, len(pluginConfig)+1)
 	maps.Copy(out, pluginConfig)
+	out["vectordb"] = mergeVectorDBDatastore(vectordbConfig, strategy, dsConfig)
+	return out
+}
+
+// mergeVectorDBDatastore returns a copy of vectordbConfig with strategy set
+// and the connection sub-block named by strategy replaced wholesale with
+// dsConfig. vectordbConfig may be nil, in which case the block is built from
+// the datastore alone. Never mutates its inputs.
+func mergeVectorDBDatastore(vectordbConfig map[string]any, strategy string, dsConfig map[string]any) map[string]any {
 	const newVectorDBKeys = 2 // "strategy" and the redis/pgvector sub-block, both set below.
 	vectordb := make(map[string]any, len(vectordbConfig)+newVectorDBKeys)
 	maps.Copy(vectordb, vectordbConfig)
 	vectordb["strategy"] = strategy
 	vectordb[strategy] = dsConfig
-	out["vectordb"] = vectordb
-	return out
+	return vectordb
+}
+
+// modelDatastoreTypes are the Datastore types a semantic-balancer model can
+// reference: the same set the VectorDB policy family accepts — redis-ee or
+// vectordb, never redis-ce.
+var modelDatastoreTypes = map[string]struct{}{
+	DatastoreTypeRedisEE:  {},
+	DatastoreTypeVectorDB: {},
+}
+
+// ApplyModelDatastore substitutes a Datastore's connection config into a
+// model's vectordb block that VectorDBToPlugin has ALREADY lowered to plugin
+// shape — dsConfig carries flat plugin keys (ssl_verify, sentinel_nodes, ...)
+// and must not be lowered again. It rejects a Datastore type no model accepts;
+// the strategy (and with it the connection sub-block) always follows the
+// Datastore's type, while the common fields the model authors itself
+// (dimensions, distance_metric, threshold) are preserved.
+func ApplyModelDatastore(vectordb any, datastoreType string, dsConfig map[string]any) (any, error) {
+	supportedDatastoreTypes := slices.Collect(maps.Keys(modelDatastoreTypes))
+	if _, ok := modelDatastoreTypes[datastoreType]; !ok {
+		return nil, fmt.Errorf("a model does not support a %q datastore; use one of %v instead",
+			datastoreType, supportedDatastoreTypes)
+	}
+	strategy, _ := VectorDBStrategyForDatastoreType(datastoreType)
+	block, _ := vectordb.(map[string]any)
+	return mergeVectorDBDatastore(block, strategy, dsConfig), nil
 }

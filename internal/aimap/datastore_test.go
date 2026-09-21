@@ -271,3 +271,29 @@ func TestApplyDatastoreSubstitutesAtConfigPath(t *testing.T) {
 		})
 	}
 }
+
+func TestApplyModelDatastoreRejectsUnsupportedTypeListsAllSupportedTypes(t *testing.T) {
+	t.Parallel()
+
+	_, err := ApplyModelDatastore(nil, DatastoreTypeRedisCE, map[string]any{"host": "x"})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), DatastoreTypeRedisCE, "should name the rejected type")
+	// Assert against modelDatastoreTypes itself, not a hardcoded list of type
+	// names — this is exactly what the error message's extensibility change is
+	// for: adding a third supported type shouldn't require touching this test,
+	// since both the message and this assertion derive from the same map.
+	for supported := range modelDatastoreTypes {
+		require.Contains(t, err.Error(), supported, "message should list every currently-supported type")
+	}
+}
+
+func TestApplyModelDatastoreRejectsUnknownTypeListsAllSupportedTypes(t *testing.T) {
+	t.Parallel()
+
+	_, err := ApplyModelDatastore(nil, "not-a-real-type", map[string]any{"host": "x"})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "not-a-real-type")
+	for supported := range modelDatastoreTypes {
+		require.Contains(t, err.Error(), supported)
+	}
+}
