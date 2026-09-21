@@ -4,7 +4,7 @@ set -euo pipefail
 CONTAINER="test-ai-gateway-container"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/../../.." && pwd)"
-AI_GATEWAY_IMAGE="${AI_GATEWAY_IMAGE:-kong/kong-ai-gateway-dev:2.1.0-rc.3}"
+AI_GATEWAY_IMAGE="${AI_GATEWAY_IMAGE:-kong/kong-ai-gateway:2.0.3}"
 
 RESP_HEADERS="$(mktemp)"
 RESP_BODY="$(mktemp)"
