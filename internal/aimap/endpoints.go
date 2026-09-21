@@ -439,6 +439,18 @@ var EndpointTable = map[string]map[string]EndpointEntry{
 			},
 		},
 	},
+	// typesafe models are served through TypeSafe's own built-in path routing:
+	// the decisions endpoint lives at a fixed suffix under the model's base
+	// path, and the route is regex-marked so TypeSafe's backend can continue
+	// matching sub-paths of it.
+	"typesafe": {
+		"decisions": {
+			Primary: EndpointSpec{
+				"decisions", "v1/systemone", true, mPost, "llm/v1/decisions", catTextGen,
+				&defaultBodyModelSelectorConfig, true,
+			},
+		},
+	},
 }
 
 // EndpointsFor returns every endpoint spec that serves a (section, capability)
