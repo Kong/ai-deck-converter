@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"slices"
 
 	"github.com/Kong/ai-deck-converter/internal/aigw"
 )
@@ -304,9 +305,10 @@ var modelDatastoreTypes = map[string]struct{}{
 // Datastore's type, while the common fields the model authors itself
 // (dimensions, distance_metric, threshold) are preserved.
 func ApplyModelDatastore(vectordb any, datastoreType string, dsConfig map[string]any) (any, error) {
+	supportedDatastoreTypes := slices.Collect(maps.Keys(modelDatastoreTypes))
 	if _, ok := modelDatastoreTypes[datastoreType]; !ok {
-		return nil, fmt.Errorf("a model does not support a %q datastore; use %q or %q",
-			datastoreType, DatastoreTypeRedisEE, DatastoreTypeVectorDB)
+		return nil, fmt.Errorf("a model does not support a %q datastore; use one of %v instead",
+			datastoreType, supportedDatastoreTypes)
 	}
 	strategy, _ := VectorDBStrategyForDatastoreType(datastoreType)
 	block, _ := vectordb.(map[string]any)
