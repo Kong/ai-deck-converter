@@ -952,11 +952,10 @@ func balancerExtra(b *aigw.Balancer, key string) any {
 }
 
 // resolveModelDatastore resolves m.Datastores (by-name references into the
-// top-level datastores list): at most one reference, and every reference
-// must resolve — unlike the policy path, which only warns on an unknown
-// name — because koko's write-time validation converts the submitted model
-// and maps converter errors to field errors, so a dangling ref must fail
-// here to become a 400 instead of a degraded config push.
+// top-level datastores list): at most one reference, and — mirroring
+// convert/policy.go's applyDatastore — an unknown name only warns, so a
+// hand-written config with a dangling reference still converts (without the
+// connection) outside -strict.
 func (c *Converter) resolveModelDatastore(m *aigw.Model) (*aigw.Datastore, error) {
 	if len(m.Datastores) == 0 {
 		return nil, nil
@@ -974,9 +973,10 @@ func (c *Converter) resolveModelDatastore(m *aigw.Model) (*aigw.Datastore, error
 	}
 	ds := c.datastores[m.Datastores[0].Name]
 	if ds == nil {
-		return nil, c.failAt("models",
-			"model %q references unknown datastore %q",
-			m.Name, m.Datastores[0].Name)
+		if err := c.warn("model %q references unknown datastore %q", m.Name, m.Datastores[0].Name); err != nil {
+			return nil, err
+		}
+		return nil, nil
 	}
 	return ds, nil
 }

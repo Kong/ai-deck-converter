@@ -1209,7 +1209,7 @@ datastores:
 	require.Contains(t, err.Error(), "semantic")
 }
 
-func TestConvertRejectsUnknownDatastoreOnModel(t *testing.T) {
+func TestConvertWarnsUnknownDatastoreOnModel(t *testing.T) {
 	src := []byte(`
 models:
   - type: model
@@ -1230,9 +1230,42 @@ model_providers:
   - name: p1
     type: openai
 `)
-	_, _, err := Convert(src, Options{})
-	require.Error(t, err, "a dangling datastore ref must fail so write-time validation returns a field error")
-	require.Contains(t, err.Error(), "unknown datastore")
+	_, warnings, err := Convert(src, Options{})
+	require.NoError(t, err, "convert")
+	require.Contains(t, strings.Join(warnings, "\n"), "unknown datastore",
+		"expected unknown-datastore warning")
+}
+
+// Mirrors TestConvertFailsUnknownDatastoreInStrictMode: the model path uses
+// the same c.warn, so it turns into a failure under -strict too.
+func TestConvertFailsUnknownDatastoreOnModelInStrictMode(t *testing.T) {
+	src := []byte(`
+models:
+  - type: model
+    name: m1
+    capabilities: [generate]
+    formats: [{type: openai}]
+    targets:
+      - name: gpt-4o
+        provider: p1
+        config: {type: openai}
+    datastores: [{name: missing-datastore}]
+    config:
+      route: {paths: [/ai]}
+      balancer:
+        algorithm: semantic
+        vectordb: {strategy: pgvector, dimensions: 1024, distance_metric: cosine}
+model_providers:
+  - name: p1
+    type: openai
+`)
+	_, _, err := Convert(src, Options{Strict: true})
+	require.Error(t, err, "strict mode turns the unknown-datastore warning into a failure")
+	require.Contains(t, err.Error(), `references unknown datastore "missing-datastore"`)
+
+	_, warnings, err := Convert(src, Options{})
+	require.NoError(t, err, "the same source converts without -strict")
+	require.Contains(t, strings.Join(warnings, "\n"), "unknown datastore")
 }
 
 func TestConvertRejectsMixedAPIDatastoresOnSharedRoute(t *testing.T) {
