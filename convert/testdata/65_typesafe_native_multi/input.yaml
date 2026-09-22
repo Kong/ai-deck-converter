@@ -1,0 +1,42 @@
+model_providers:
+  - name: jev-typesafe
+    type: typesafe
+    display_name: Jev hosted on TypeSafe (built-in path routing)
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://ai/typesafe-token}"
+  - name: jev-openrouter
+    type: typesafe
+    display_name: Jev hosted on OpenRouter (built-in path routing)
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://ai/openrouter-token}"
+models:
+  - display_name: TypeSafe Jev LATEST
+    name: jev-hosted-on-two-places
+    type: model
+    capabilities: [decisions]
+    formats:
+      - type: typesafe
+    config:
+      route:
+        paths: [/ai]
+    targets:
+      - name: jev-latest
+        provider: jev-typesafe
+        config:
+          type: typesafe
+      - name: typesafe/jev-1.13-20260917
+        provider: jev-openrouter
+        config:
+          type: typesafe
+          upstream_url: https://openrouter.ai/api/alpha/decisions
+    policies: []
+    access:
+      acls: {allow: [], deny: []}
