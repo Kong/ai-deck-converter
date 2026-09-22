@@ -71,7 +71,7 @@ func stripSyntheticAuthFields(pluginName string, config map[string]any) map[stri
 	if config == nil {
 		return nil
 	}
-	drop := make(map[string]bool, 3)
+	drop := make(map[string]bool, 3) //nolint:mnd
 	for _, k := range syntheticAuthFields[pluginName] {
 		drop[k] = true
 	}
