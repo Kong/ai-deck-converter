@@ -184,7 +184,7 @@ func lowerEmbeddingsModel(emb map[string]any, provider *aigw.Provider) {
 		}
 	}
 	name, _ := model["name"].(string)
-	options := mapOptions(opts, providerType, name, provider)
+	options := mapOptions(opts, providerType, name, provider, false)
 	if providerType == "azure" {
 		options = nestAzureEmbeddingsOptions(options)
 	}
@@ -216,8 +216,13 @@ func nestAzureEmbeddingsOptions(options map[string]any) map[string]any {
 // mapOptions translates a target model's option map into an ai-proxy-advanced
 // model.options map. It renames/nests provider-specific keys per provider type
 // and folds in provider-level fields (azure instance, gemini project id, bedrock
-// assume-role auth). Keys not handled specially pass through flat.
-func mapOptions(opts map[string]any, providerType, modelName string, provider *aigw.Provider) map[string]any {
+// assume-role auth). Keys not handled specially pass through flat. passthrough
+// drops the defaults the plugin only needs when it rewrites the request: a
+// passthrough target forwards the client's body as it stands, so the client
+// supplies them.
+func mapOptions(
+	opts map[string]any, providerType, modelName string, provider *aigw.Provider, passthrough bool,
+) map[string]any {
 	out := map[string]any{}
 	nested := map[string]map[string]any{}
 	addNested := func(prov, key string, val any) {
@@ -284,10 +289,14 @@ func mapOptions(opts map[string]any, providerType, modelName string, provider *a
 	}
 
 	if provider != nil {
-		if providerType == "anthropic" && out["anthropic_version"] == nil {
+		// anthropic_version is the header the plugin sets when it builds the upstream
+		// request; in passthrough the client's own request carries it, and the schema
+		// stops requiring the field there, so defaulting it would override the client.
+		if providerType == "anthropic" && out["anthropic_version"] == nil && !passthrough {
 			out["anthropic_version"] = "2023-06-01"
 		}
-		if providerType == "bedrock" && isBedrockAnthropicModelName(modelName) && out["anthropic_version"] == nil {
+		if providerType == "bedrock" && isBedrockAnthropicModelName(modelName) &&
+			out["anthropic_version"] == nil && !passthrough {
 			out["anthropic_version"] = "bedrock-2023-05-31"
 		}
 		if providerType == "azure" && provider.Config.Instance != "" {

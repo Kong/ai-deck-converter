@@ -196,15 +196,48 @@ func (c *Converter) convertModels() error {
 		// for type "model" (each carries its own ai-model FK), shared for type
 		// "api" (route-only, all targets merged into one plugin).
 		modelScoped := isModelType(m)
+		// A passthrough model has no ai-model identity on the data plane. Its route carries
+		// no ai-model-selector, so nothing sets ctx.ai_model and a model-scoped plugin would never
+		// be selected. Every plugin such a model produces is route-scoped instead, exactly as
+		// a type "api" model's is. The ai_models row stays: it is the model's identity, and
+		// revert recovers the ID and labels from it.
+		passthrough := isPassthrough(m)
+		fkScoped := modelScoped && !passthrough
+		if passthrough {
+			// Passthrough is a property of the whole model's traffic, not one wire
+			// format among several a route could accept.
+			if len(m.Formats) > 1 {
+				return c.failAt("formats",
+					"model %q: the passthrough format cannot be combined with other formats", m.Name)
+			}
+			if err := c.warnPassthroughPolicies(m); err != nil {
+				return err
+			}
+			// ai-proxy-advanced refuses the semantic algorithm alongside a passthrough
+			// target: choosing semantically means reading a request body whose shape
+			// passthrough does not define.
+			if balancerAlgorithm(m.Config.Balancer) == "semantic" {
+				return c.failAt("config.balancer.algorithm",
+					"model %q: the passthrough format cannot use the semantic balancer algorithm",
+					m.Name)
+			}
+		}
 		// API models share route-only ai-proxy-advanced plugins, so disabling one
 		// plugin could disable other models on the same route. Exclude explicitly
 		// disabled API models until they can be represented with independent scopes.
-		if !modelScoped && m.Enabled != nil && !*m.Enabled {
+		// A passthrough model never shares its plugin, so it is exempt.
+		if !modelScoped && !passthrough && m.Enabled != nil && !*m.Enabled {
 			continue
 		}
 		ownerKey := ""
-		if modelScoped {
+		if modelScoped || passthrough {
 			ownerKey = m.Name
+		}
+		// A passthrough model forwards every request under its base path, so its
+		// capabilities are irrelevant: it serves one route, PassthroughEndpoint,
+		// whatever it declares. The empty capability stands for that route.
+		if passthrough {
+			caps = []string{""}
 		}
 		ds, err := c.resolveModelDatastore(m)
 		if err != nil {
@@ -233,17 +266,33 @@ func (c *Converter) convertModels() error {
 					return err
 				}
 			}
+			// Databricks has no fixed host: the plugin builds it from
+			// workspace_instance_id only when it builds the request, which
+			// passthrough never does, so the upstream must be spelled out.
+			if passthrough && providerType == "databricks" && tm.Config.Options["upstream_url"] == nil {
+				return c.failAt(fmt.Sprintf("targets[%d].config.upstream_url", j),
+					"model %q target %q: the passthrough format requires upstream_url for databricks",
+					m.Name, tm.Name)
+			}
 			for _, capability := range caps {
-				// The section is resolved per capability: gemini-format traffic
-				// served by Vertex renders as gemini for shared capabilities
-				// (generate/embeddings) but keeps the Vertex section for the
-				// Vertex-only image/video/rerank endpoints.
-				sec := aimap.EndpointSectionFor(llmFormat(m), providerType, capability)
-				specs, ok := aimap.EndpointsFor(sec, capability)
-				if !ok {
-					return c.failAt("capabilities",
-						"model %q: capability %q is not supported with llm_format %q for provider type %q",
-						m.Name, capability, llmFormat(m), providerType)
+				var sec string
+				var specs []aimap.EndpointSpec
+				if passthrough {
+					sec = aimap.SectionFor(aimap.PassthroughFormat, providerType)
+					specs = []aimap.EndpointSpec{aimap.PassthroughEndpoint}
+				} else {
+					// The section is resolved per capability: gemini-format traffic
+					// served by Vertex renders as gemini for shared capabilities
+					// (generate/embeddings) but keeps the Vertex section for the
+					// Vertex-only image/video/rerank endpoints.
+					sec = aimap.EndpointSectionFor(llmFormat(m, providerType), providerType, capability)
+					var ok bool
+					specs, ok = aimap.EndpointsFor(sec, capability)
+					if !ok {
+						return c.failAt("capabilities",
+							"model %q: capability %q is not supported with llm_format %q for provider type %q",
+							m.Name, capability, llmFormat(m, providerType), providerType)
+					}
 				}
 				// A capability with secondary endpoints (bedrock generate, also
 				// reachable via invoke) emits one route per endpoint, each
@@ -260,9 +309,12 @@ func (c *Converter) convertModels() error {
 					if err != nil {
 						return err
 					}
-					selectorCfgs, err := c.buildModelSelectorConfig(m, spec)
-					if err != nil {
-						return err
+					var selectorCfgs []map[string]any
+					if !passthrough {
+						selectorCfgs, err = c.buildModelSelectorConfig(m, spec)
+						if err != nil {
+							return err
+						}
 					}
 					// The alias *value* is per-model and deliberately excluded from
 					// routeConfigKey. When targeting config.sources (Options.
@@ -273,7 +325,14 @@ func (c *Converter) convertModels() error {
 					// shape stays a route-level concern like auth strategies, since
 					// the legacy schema's ai-model-selector can only read one shape at
 					// a time: models wanting incompatible shapes cannot share a route.
-					key := sec + "|" +
+					// A passthrough model's route is its base path whatever its targets'
+					// providers, so the section stays out of its key: targets on
+					// different providers still share the one route.
+					keySection := sec
+					if passthrough {
+						keySection = ""
+					}
+					key := keySection + "|" +
 						spec.RouteLabel +
 						"|" + identityKey +
 						"|" + routeConfigKey
@@ -328,6 +387,17 @@ func (c *Converter) convertModels() error {
 						}
 					}
 					if pg == nil {
+						// Kong allows one plugin of a name per route, and without a selector
+						// nothing tells two ai-proxy-advanced plugins on one route apart, so
+						// a passthrough model cannot share its route with another model. Only
+						// another passthrough model can land on it: no other spec matches
+						// the bare base path.
+						if passthrough && len(g.proxies) > 0 {
+							return c.failAt("formats",
+								"model %q: a passthrough model cannot share route %q with another model",
+								m.Name, g.route.Name)
+						}
+
 						embeddings, err := c.resolveEmbeddings(balancerExtra(m.Config.Balancer, "embeddings"))
 						if err != nil {
 							return err
@@ -346,7 +416,7 @@ func (c *Converter) convertModels() error {
 						// aliases, or the model name when none is set), not m.Name; using
 						// m.Name would dangle the FK whenever an alias is authored.
 						var pluginAliases []string
-						if modelScoped {
+						if fkScoped {
 							pluginAliases = aliases
 						}
 
@@ -359,7 +429,7 @@ func (c *Converter) convertModels() error {
 							routeName:         g.route.Name,
 							aliases:           pluginAliases,
 							enabled:           disabledModelPluginEnabled(m.Enabled),
-							llmFormat:         llmFormat(m),
+							llmFormat:         llmFormat(m, providerType),
 							genaiCategory:     spec.GenaiCategory,
 							balancer:          balancerConfig(m.Config.Balancer),
 							vectordb:          vectordb,
@@ -393,6 +463,8 @@ func (c *Converter) convertModels() error {
 					// The alias itself is baked in per plugin copy at emission time (see
 					// withModelAlias), since a type:model target list is cloned once per
 					// alias.
+					// A passthrough target carries no model_alias either (the plugin refuses
+					// it): fkScoped leaves pluginAliases empty, so emission never stamps one.
 					target := c.buildTarget(tm, provider, providerType, spec.RouteType, logging)
 					// Dedup on the built target's full shape rather than
 					// (name, route_type): two targets can share a model name yet
@@ -406,16 +478,20 @@ func (c *Converter) convertModels() error {
 					dedup := targetFingerprint(target)
 					if idx, ok := pg.seen[dedup]; ok {
 						source := &pg.targetSources[idx]
-						if !slices.Contains(source.Capabilities, capability) {
+						if capability != "" && !slices.Contains(source.Capabilities, capability) {
 							source.Capabilities = append(source.Capabilities, capability)
 						}
 					} else {
+						var sourceCaps []string
+						if capability != "" {
+							sourceCaps = []string{capability}
+						}
 						pg.seen[dedup] = len(pg.targets)
 						pg.targets = append(pg.targets, target)
 						pg.targetSources = append(pg.targetSources, kong.TargetSource{
 							ModelName:        m.Name,
 							ModelTargetIndex: j,
-							Capabilities:     []string{capability},
+							Capabilities:     sourceCaps,
 						})
 					}
 				}
@@ -466,7 +542,7 @@ func (c *Converter) convertModels() error {
 			for k := range plugins {
 				p := plugins[k]
 				p.Route = kong.NewStringRef(routeName)
-				if !modelScoped {
+				if !fkScoped {
 					guardPlugins = append(guardPlugins, p)
 					continue
 				}
@@ -603,7 +679,7 @@ func (c *Converter) convertModels() error {
 		pg := &proxyGroup{
 			routeName:         routeName,
 			enabled:           disabledModelPluginEnabled(candidate.model.Enabled),
-			llmFormat:         llmFormat(candidate.model),
+			llmFormat:         llmFormat(candidate.model, ""),
 			genaiCategory:     candidate.spec.GenaiCategory,
 			balancer:          balancerConfig(candidate.model.Config.Balancer),
 			vectordb:          lifecycleVectorDB,
@@ -682,7 +758,9 @@ func (c *Converter) videoLifecycleCandidates() ([]videoLifecycleCandidate, error
 
 	for i := range c.src.Models {
 		m := &c.src.Models[i]
-		if !slices.Contains(c.expandCapabilities(m), "video") {
+		// A passthrough model's base-path route already forwards the lifecycle
+		// requests; it declares no video endpoint of its own.
+		if isPassthrough(m) || !slices.Contains(c.expandCapabilities(m), "video") {
 			continue
 		}
 		if len(m.TargetModels) == 0 {
@@ -694,7 +772,7 @@ func (c *Converter) videoLifecycleCandidates() ([]videoLifecycleCandidate, error
 			continue
 		}
 
-		section := aimap.SectionFor(llmFormat(m), "")
+		section := aimap.SectionFor(llmFormat(m, ""), "")
 		if section != "openai" {
 			continue
 		}
@@ -854,7 +932,8 @@ func (c *Converter) buildTarget(
 		"provider": aimap.PluginProvider(providerType),
 		"name":     tm.Name,
 	}
-	if opts := mapOptions(tm.Config.Options, providerType, tm.Name, provider); opts != nil {
+	passthrough := routeType == aimap.PassthroughRouteType
+	if opts := mapOptions(tm.Config.Options, providerType, tm.Name, provider, passthrough); opts != nil {
 		model["options"] = opts
 	}
 
@@ -1070,11 +1149,57 @@ func (c *Converter) extractModelAliases(m *aigw.Model) ([]string, error) {
 	return unique, nil
 }
 
-func llmFormat(m *aigw.Model) string {
+// llmFormat returns the ai-proxy-advanced llm_format for a model. providerType
+// is only consulted for the passthrough format, which renders as the provider's
+// own native wire format; pass "" where no single provider applies.
+func llmFormat(m *aigw.Model, providerType string) string {
 	if len(m.Formats) > 0 && m.Formats[0].Type != "" {
-		return aimap.NormalizeFormat(m.Formats[0].Type)
+		return aimap.ClientFormat(m.Formats[0].Type, providerType)
 	}
 	return aimap.DefaultLLMFormat
+}
+
+// balancerAlgorithm returns the algorithm a model's balancer selects, defaulted as
+// balancerConfig defaults it.
+func balancerAlgorithm(b *aigw.Balancer) string {
+	if b == nil || b.Algorithm == "" {
+		return "round-robin"
+	}
+	return b.Algorithm
+}
+
+// warnPassthroughPolicies reports the policies reaching a passthrough model -- its own and the
+// global ones -- that read the normalized LLM shape. They still load on the data plane, so this
+// is a warning rather than a rejection: the configuration is valid, those policies just cannot
+// see what they look for.
+func (c *Converter) warnPassthroughPolicies(m *aigw.Model) error {
+	refs := slices.Clone(m.Policies)
+	for _, p := range c.src.Policies {
+		if p.Global != nil && *p.Global && !slices.Contains(refs, p.Name) {
+			refs = append(refs, p.Name)
+		}
+	}
+	for _, ref := range refs {
+		policy := c.policies[ref]
+		if policy == nil || !aimap.PromptReadingPolicies[policy.Type] {
+			continue
+		}
+		if err := c.warn(
+			"model %q uses the passthrough format, so policy %q (%s) cannot read the request or "+
+				"response: the body reaches the provider unchanged, in the provider's own shape",
+			m.Name, ref, policy.Type); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// isPassthrough reports whether a model forwards request bodies unchanged. The
+// format is a whole-model property (convertModels rejects it alongside any other
+// format), so every target of the model is passthrough or none is — which is
+// also what ai-proxy-advanced requires of one plugin's targets.
+func isPassthrough(m *aigw.Model) bool {
+	return slices.ContainsFunc(m.Formats, func(f aigw.Format) bool { return f.Type == aimap.PassthroughFormat })
 }
 
 // bodySizeOrDefault returns the ai-model-selector's max_request_body_size: at

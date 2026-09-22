@@ -1,0 +1,28 @@
+# Passthrough has no wire format of its own: it renders as the provider's native
+# one, so an anthropic provider gets llm_format anthropic (and no defaulted
+# anthropic_version), not the openai one a passthrough openai provider gets.
+# Capabilities are irrelevant to passthrough, so none need be declared: the
+# model serves one route on its bare base path.
+models:
+  - name: claude-native
+    type: model
+    capabilities: []
+    formats:
+      - type: passthrough
+    config:
+      route:
+        paths: [/ai]
+    targets:
+      - name: claude-sonnet-4-5
+        provider: anthropic-prod
+        config:
+          type: anthropic
+model_providers:
+  - name: anthropic-prod
+    type: anthropic
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: x-api-key
+            value: "{vault://ai/anthropic-token}"
