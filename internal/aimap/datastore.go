@@ -232,13 +232,12 @@ func ApplyDatastore(
 	}
 }
 
-// applyRedisDatastore assigns dsConfig at config["redis"] — the flat,
-// no-strategy case shared by most of DatastoreSupport's plugins
-// (rate-limiting, ai-rate-limiting-advanced, proxy-cache-advanced, etc.).
-// Never mutates config in place, so a reusable source Policy is never
-// mutated.
+// applyRedisDatastore assigns dsConfig at config["redis"] — the flat case
+// shared by most of DatastoreSupport's plugins (rate-limiting,
+// ai-rate-limiting-advanced, proxy-cache-advanced, etc.). Never mutates
+// config in place, so a reusable source Policy is never mutated.
 func applyRedisDatastore(config, dsConfig map[string]any, strategyField string) map[string]any {
-	out := make(map[string]any, len(config)+2)
+	out := make(map[string]any, len(config)+1)
 	maps.Copy(out, config)
 	out["redis"] = dsConfig
 	if strategyField != "" {
@@ -252,7 +251,7 @@ func applyRedisDatastore(config, dsConfig map[string]any, strategyField string) 
 // mutates config or its nested storage_config in place, so a reusable source
 // Policy is never mutated.
 func applyAcmeDatastore(config, dsConfig map[string]any, strategyField string) map[string]any {
-	out := make(map[string]any, len(config)+2)
+	out := make(map[string]any, len(config)+1)
 	maps.Copy(out, config)
 	storageConfig, _ := out["storage_config"].(map[string]any)
 	newStorageConfig := make(map[string]any, len(storageConfig)+1)
@@ -270,7 +269,7 @@ func applyAcmeDatastore(config, dsConfig map[string]any, strategyField string) m
 // deeper than the flat "redis" case. Never mutates config or its nested
 // resources/cache in place, so a reusable source Policy is never mutated.
 func applyDatakitDatastore(config, dsConfig map[string]any, strategyField string) map[string]any {
-	out := make(map[string]any, len(config)+2)
+	out := make(map[string]any, len(config)+1)
 	maps.Copy(out, config)
 	resources, _ := out["resources"].(map[string]any)
 	newResources := make(map[string]any, len(resources)+1)
