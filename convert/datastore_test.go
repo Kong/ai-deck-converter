@@ -54,3 +54,18 @@ func TestDatastorePathsForPolicyType(t *testing.T) {
 		})
 	}
 }
+
+// Mirrors what ApplyDatastore accepts, so a caller checking ahead of a
+// conversion and the conversion itself cannot disagree.
+func TestDatastoreSupported(t *testing.T) {
+	t.Parallel()
+
+	require.True(t, DatastoreSupported("rate-limiting", "redis-ce"))
+	require.True(t, DatastoreSupported("ai-rag-injector", "redis-ee"))
+	require.True(t, DatastoreSupported("ai-rag-injector", "vectordb"))
+
+	require.False(t, DatastoreSupported("rate-limiting", "redis-ee"))
+	require.False(t, DatastoreSupported("ai-rag-injector", "redis-ce"))
+	require.False(t, DatastoreSupported("acl", "redis-ce"))
+	require.False(t, DatastoreSupported("", ""))
+}
