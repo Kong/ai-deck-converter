@@ -91,16 +91,18 @@ func (c *Converter) scopedPlugins(entityKind string, refs []string, acls aigw.AC
 }
 
 func (c *Converter) policyPlugin(p *aigw.Policy, tags []string, preserveID bool) (kong.Plugin, error) {
-	config, err := c.applyDatastore(p, c.normalizeRateLimitingProviderMatches(p))
+	config, datastorePaths, err := c.applyDatastore(p, c.normalizeRateLimitingProviderMatches(p))
 	if err != nil {
 		return kong.Plugin{}, err
 	}
+	pluginSource := source("policy", p.Name, "config")
+	pluginSource.DatastoreConfigPaths = datastorePaths
 	plugin := kong.Plugin{
 		Name:      p.Type,
 		Condition: p.Condition,
 		Config:    config,
 		Tags:      tags,
-		Source:    source("policy", p.Name, "config"),
+		Source:    pluginSource,
 	}
 	if preserveID {
 		plugin.ID = p.ID
@@ -116,24 +118,26 @@ func (c *Converter) policyPlugin(p *aigw.Policy, tags []string, preserveID bool)
 // them against, to aimap.ApplyDatastore, which owns every rule about the
 // pairing. Only the treatment of a dangling reference stays here: warning
 // versus failing is -strict policy, which aimap deliberately does not model.
-func (c *Converter) applyDatastore(p *aigw.Policy, config map[string]any) (map[string]any, error) {
+func (c *Converter) applyDatastore(
+	p *aigw.Policy, config map[string]any,
+) (out map[string]any, configPaths []string, err error) {
 	if len(p.Datastores) == 0 {
-		return config, nil
+		return config, nil, nil
 	}
-	out, err := aimap.ApplyDatastore(config, p.Type, p.Datastores, c.datastores)
+	out, configPaths, err = aimap.ApplyDatastore(config, p.Type, p.Datastores, c.datastores)
 	var unknown *aimap.UnknownDatastoreError
 	switch {
 	case errors.As(err, &unknown):
 		// aimap returns config untouched on this path, so the policy still
 		// converts, just without a connection.
 		if err := c.warn("policy %q %v", p.Name, unknown); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		return out, nil
+		return out, configPaths, nil
 	case err != nil:
-		return nil, c.failAt("policies", "policy %q: %v", p.Name, err)
+		return nil, nil, c.failAt("policies", "policy %q: %v", p.Name, err)
 	}
-	return out, nil
+	return out, configPaths, nil
 }
 
 // normalizeRateLimitingProviderMatches lowers AI Gateway model-provider entity

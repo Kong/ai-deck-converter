@@ -155,10 +155,11 @@ type Plugin struct {
 // FieldMappings translate fields whose generated names or nesting differ from
 // the source API model.
 type Source struct {
-	EntityType    string
-	EntityName    string
-	FieldPrefix   string
-	FieldMappings []FieldMapping
+	EntityType           string
+	EntityName           string
+	FieldPrefix          string
+	DatastoreConfigPaths []string
+	FieldMappings        []FieldMapping
 }
 
 type FieldMapping struct {

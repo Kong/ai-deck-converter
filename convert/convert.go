@@ -91,13 +91,17 @@ type PluginTargetSource struct {
 // GeneratedEntitySource identifies the source API entity for a generated
 // plugin, route, or service. FieldPrefix is used for direct field mappings;
 // FieldMappings handle generated field names that differ from the API model.
+//
+// DatastoreConfigPaths are the config dot-paths owned by a referenced
+// Datastore rather than the entity named here.
 type GeneratedEntitySource struct {
-	Index         int
-	Location      string
-	EntityType    string
-	EntityName    string
-	FieldPrefix   string
-	FieldMappings []FieldMapping
+	Index                int
+	Location             string
+	EntityType           string
+	EntityName           string
+	FieldPrefix          string
+	DatastoreConfigPaths []string
+	FieldMappings        []FieldMapping
 }
 
 type FieldMapping struct {
@@ -281,11 +285,12 @@ func appendPluginMetadata(metadata *ConversionMetadata, index int, location stri
 
 func generatedEntitySource(index int, location string, source *kong.Source) GeneratedEntitySource {
 	result := GeneratedEntitySource{
-		Index:       index,
-		Location:    location,
-		EntityType:  source.EntityType,
-		EntityName:  source.EntityName,
-		FieldPrefix: source.FieldPrefix,
+		Index:                index,
+		Location:             location,
+		EntityType:           source.EntityType,
+		EntityName:           source.EntityName,
+		FieldPrefix:          source.FieldPrefix,
+		DatastoreConfigPaths: source.DatastoreConfigPaths,
 	}
 	for _, mapping := range source.FieldMappings {
 		result.FieldMappings = append(result.FieldMappings, FieldMapping{

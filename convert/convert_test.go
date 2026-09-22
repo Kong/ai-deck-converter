@@ -168,6 +168,89 @@ models:
 	}, metadata.PluginTargets)
 }
 
+func TestWithMetadataTracksSubstitutedDatastorePaths(t *testing.T) {
+	src := []byte(`
+policies:
+  - type: rate-limiting-advanced
+    name: rl
+    global: true
+    config:
+      limit: [100]
+      window_size: [60]
+    datastores: [{name: shared-redis}]
+datastores:
+  - type: redis-ee
+    name: shared-redis
+    config:
+      host: redis-ee.internal
+      port: 6379
+`)
+
+	_, metadata, warnings, err := WithMetadata(src, Options{})
+	require.NoError(t, err)
+	require.Empty(t, warnings)
+
+	require.Equal(t, []GeneratedEntitySource{{
+		Index:                0,
+		Location:             "plugins[0]",
+		EntityType:           "policy",
+		EntityName:           "rl",
+		FieldPrefix:          "config",
+		DatastoreConfigPaths: []string{"redis"},
+	}}, metadata.Plugins)
+}
+
+// Paths must name the sub-blocks, not "vectordb", whose siblings the policy
+// authors. db-less rebuilds metadata from projected plugins, so assert there.
+func TestWithMetadataTracksVectorDBDatastoreSubBlocksInDBLess(t *testing.T) {
+	src := []byte(`
+policies:
+  - type: ai-rag-injector
+    name: rag
+    global: true
+    config:
+      vectordb:
+        strategy: redis
+        dimensions: 1024
+        distance_metric: cosine
+      embeddings:
+        model:
+          provider: openai
+          name: text-embedding-3-large
+    datastores: [{name: shared-redis}]
+datastores:
+  - type: redis-ee
+    name: shared-redis
+    config:
+      host: redis-ee.internal
+      port: 6379
+`)
+
+	_, metadata, warnings, err := WithMetadata(src, Options{OutputMode: "db-less"})
+	require.NoError(t, err)
+	require.Empty(t, warnings)
+
+	require.Len(t, metadata.Plugins, 1)
+	require.Equal(t,
+		[]string{"vectordb.redis", "vectordb.pgvector"},
+		metadata.Plugins[0].DatastoreConfigPaths)
+}
+
+func TestWithMetadataLeavesDatastorePathsEmptyWithoutOne(t *testing.T) {
+	src := []byte(`
+policies:
+  - type: rate-limiting-advanced
+    name: rl
+    global: true
+    config: {limit: [100], window_size: [60]}
+`)
+
+	_, metadata, _, err := WithMetadata(src, Options{})
+	require.NoError(t, err)
+	require.Len(t, metadata.Plugins, 1, "the plugin is emitted; only the datastore paths are empty")
+	require.Empty(t, metadata.Plugins[0].DatastoreConfigPaths)
+}
+
 func TestWithMetadataMergesCapabilitiesOnCollapsedTarget(t *testing.T) {
 	// Bedrock's invoke endpoint for "generate" is field-for-field identical to
 	// "audio/speech"'s endpoint, so a model declaring both collapses onto one
