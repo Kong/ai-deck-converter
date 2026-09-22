@@ -188,11 +188,22 @@ func TestApplyDatastoreSubstitutesAtConfigPath(t *testing.T) {
 		want          map[string]any
 	}{
 		{
+			// policy, not strategy: the switch is named per plugin.
 			name:          "flat redis",
 			policyType:    "rate-limiting",
 			datastoreType: DatastoreTypeRedisCE,
 			want: map[string]any{
-				"redis": map[string]any{"host": "ds1.internal"},
+				"policy": "redis",
+				"redis":  map[string]any{"host": "ds1.internal"},
+			},
+		},
+		{
+			name:          "strategy plugin",
+			policyType:    "ai-rate-limiting-advanced",
+			datastoreType: DatastoreTypeRedisEE,
+			want: map[string]any{
+				"strategy": "redis",
+				"redis":    map[string]any{"host": "ds1.internal"},
 			},
 		},
 		{
@@ -200,12 +211,14 @@ func TestApplyDatastoreSubstitutesAtConfigPath(t *testing.T) {
 			policyType:    "acme",
 			datastoreType: DatastoreTypeRedisCE,
 			want: map[string]any{
+				"storage": "redis",
 				"storage_config": map[string]any{
 					"redis": map[string]any{"host": "ds1.internal"},
 				},
 			},
 		},
 		{
+			// datakit has no backend switch, so nothing beyond the connection.
 			name:          "datakit nests under resources.cache",
 			policyType:    "datakit",
 			datastoreType: DatastoreTypeRedisEE,
