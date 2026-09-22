@@ -1,0 +1,57 @@
+_format_version: "3.0"
+services:
+  # key-auth carrying the synthetic/DP-injected fields (anonymous fallback,
+  # realm, identity_realms) that must NOT surface on the AI Gateway strategy.
+  - name: keyed-mcp
+    host: localhost
+    routes:
+      - name: keyed-mcp-route
+        paths:
+          - /mcp/keyed
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              mode: listener
+              tools:
+                - description: Ping the server
+                  host: keyed.internal
+                  method: GET
+                  name: ping
+                  path: /ping
+                  scheme: https
+          - name: key-auth
+            config:
+              key_names:
+                - apikey
+              anonymous: anonymous
+              realm: my-realm
+              identity_realms:
+                - region: null
+                  scope: cp
+                  id: null
+  # openid-connect carrying the synthetic anonymous fallback.
+  - name: oidc-mcp
+    host: localhost
+    routes:
+      - name: oidc-mcp-route
+        paths:
+          - /mcp/oidc
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              mode: listener
+              tools:
+                - description: Fetch a record
+                  host: oidc.internal
+                  method: GET
+                  name: fetch
+                  path: /record
+                  scheme: https
+          - name: openid-connect
+            config:
+              issuer: https://dev-123456.okta.com/oauth2/default
+              client_id:
+                - mcp-client
+              client_secret:
+                - '{vault://ai-vault/okta-client-secret}'
+              anonymous: anonymous
