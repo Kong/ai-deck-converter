@@ -1,9 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-CONTAINER="test-ai-gateway-container"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+
+# Shared e2e setup: ensures the Kong license is in place before anything runs
+# (from e2e-tests/license.json, $KONG_LICENSE, or $KONG_LICENSE_DATA).
+source "$SCRIPT_DIR/../../setup.sh"
+
+CONTAINER="test-ai-gateway-container"
 AI_GATEWAY_IMAGE="${AI_GATEWAY_IMAGE:-kong/kong-ai-gateway-dev:2.1.0-rc.3}"
 
 # Step 0: Stop the docker image if it is already running from a previous test
