@@ -446,7 +446,7 @@ var EndpointTable = map[string]map[string]EndpointEntry{
 	"typesafe": {
 		"decisions": {
 			Primary: EndpointSpec{
-				"decisions", "v1/systemone", true, mPost, "llm/v1/decisions", catTextGen,
+				"decisions", "v1/systemone", true, mPost, "llm/v1/chat", catTextGen,
 				&defaultBodyModelSelectorConfig, true,
 			},
 		},

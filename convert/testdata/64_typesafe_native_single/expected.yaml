@@ -35,7 +35,7 @@ plugins:
             model_alias: jev-hosted-on-typesafe
             name: jev-latest
             provider: typesafe
-          route_type: llm/v1/decisions
+          route_type: llm/v1/chat
     route: typesafe-decisions
     model: jev-hosted-on-typesafe
 ai_models:
