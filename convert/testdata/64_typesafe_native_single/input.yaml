@@ -1,0 +1,28 @@
+model_providers:
+  - name: jev-typesafe
+    type: typesafe
+    display_name: Jev hosted on TypeSafe (built-in path routing)
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://ai/typesafe-token}"
+models:
+  - display_name: TypeSafe Jev LATEST
+    name: jev-hosted-on-typesafe
+    type: model
+    capabilities: [decisions]
+    formats:
+      - type: typesafe
+    config:
+      route:
+        paths: [/ai]
+    targets:
+      - name: jev-latest
+        provider: jev-typesafe
+        config:
+          type: typesafe
+    policies: []
+    access:
+      acls: {allow: [], deny: []}

@@ -1,0 +1,56 @@
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: typesafe-decisions
+        paths:
+          - ~/ai/v1/systemone
+        methods:
+          - POST
+        strip_path: false
+plugins:
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: typesafe-decisions
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: typesafe
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/typesafe-token}'
+          description: jev-latest
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: jev-hosted-on-two-places
+            name: jev-latest
+            provider: typesafe
+          route_type: llm/v1/chat
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openrouter-token}'
+          description: typesafe/jev-1.13-20260917
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: jev-hosted-on-two-places
+            name: typesafe/jev-1.13-20260917
+            options:
+              upstream_url: https://openrouter.ai/api/alpha/decisions
+            provider: typesafe
+          route_type: llm/v1/chat
+    route: typesafe-decisions
+    model: jev-hosted-on-two-places
+ai_models:
+  - name: jev-hosted-on-two-places
