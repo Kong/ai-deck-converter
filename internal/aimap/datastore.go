@@ -18,6 +18,12 @@ const (
 	DatastoreTypeVectorDB = "vectordb" // despite the name, always pgvector; see datastoreTypeVectorDBMap.
 )
 
+const (
+	VectorDBConfigPath       = "vectordb"
+	VectorDBStrategyRedis    = "redis"
+	VectorDBStrategyPGVector = "pgvector"
+)
+
 // datastoreTypeVectorDBMap maps a Datastore's `type` discriminator to the
 // vectordb-consuming plugins' sub-block name that carries connection config
 // for that engine. redis-ce and redis-ee are tracked as distinct Datastore
@@ -31,9 +37,9 @@ const (
 // despite the name) speaks the "pgvector" sub-block. Shared by convert and
 // revert so the two directions can't drift.
 var datastoreTypeVectorDBMap = map[string]string{
-	DatastoreTypeRedisCE:  "redis",
-	DatastoreTypeRedisEE:  "redis",
-	DatastoreTypeVectorDB: "pgvector",
+	DatastoreTypeRedisCE:  VectorDBStrategyRedis,
+	DatastoreTypeRedisEE:  VectorDBStrategyRedis,
+	DatastoreTypeVectorDB: VectorDBStrategyPGVector,
 }
 
 // VectorDBStrategyForDatastoreType returns the vectordb plugin sub-block name
