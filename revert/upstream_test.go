@@ -67,3 +67,33 @@ services:
 	_, _, err = Revert(src, Options{Strict: true})
 	require.Error(t, err)
 }
+
+// auth.provider token_vault lifts into the MCP server's top-level token_vault
+// field, not config.upstream.auth; a missing token_vault block (which the
+// plugin's own schema forbids) warns and leaves nothing behind.
+func TestRevertTokenVaultProviderWithoutBlock(t *testing.T) {
+	src := []byte(`
+_format_version: "3.0"
+services:
+  - name: secure-mcp
+    url: https://mcp.internal
+    routes:
+      - name: secure-mcp-route
+        paths:
+          - /mcp/secure
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              mode: passthrough-listener
+              auth:
+                provider: token_vault
+`)
+
+	out, warnings, err := Revert(src, Options{})
+	require.NoError(t, err)
+	require.Contains(t, strings.Join(warnings, "\n"), "token_vault block is missing")
+	require.NotContains(t, string(out), "token_vault:")
+
+	_, _, err = Revert(src, Options{Strict: true})
+	require.Error(t, err)
+}

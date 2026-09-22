@@ -22,6 +22,7 @@
    ```sh
    bash models/single_model_multiple_aliases/test_script.sh
    bash mcp-server/reusable_toolsets_have_authenticated_routes/test_script.sh
+   bash mcp-server/token_vault_gates_tools_and_enrolls/test_script.sh
    ```
 
    Each script's `kong/kong-ai-gateway-dev` image tag can be overridden via the
