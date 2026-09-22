@@ -1,0 +1,55 @@
+mcp_servers:
+  - type: listener
+    name: keyed-mcp
+    config:
+      route:
+        paths:
+          - /mcp/keyed
+      logging:
+        payloads: false
+        statistics: true
+        audits: false
+    tools:
+      - name: ping
+        description: Ping the server
+        method: GET
+        path: /ping
+        scheme: https
+        host: keyed.internal
+    access:
+      auth_strategies:
+        - key-auth-1
+  - type: listener
+    name: oidc-mcp
+    config:
+      route:
+        paths:
+          - /mcp/oidc
+      logging:
+        payloads: false
+        statistics: true
+        audits: false
+    tools:
+      - name: fetch
+        description: Fetch a record
+        method: GET
+        path: /record
+        scheme: https
+        host: oidc.internal
+    access:
+      auth_strategies:
+        - openid-connect-1
+auth_strategies:
+  - type: key-auth
+    name: key-auth-1
+    config:
+      key_names:
+        - apikey
+  - type: openid-connect
+    name: openid-connect-1
+    config:
+      client_id:
+        - mcp-client
+      client_secret:
+        - '{vault://ai-vault/okta-client-secret}'
+      issuer: https://dev-123456.okta.com/oauth2/default
