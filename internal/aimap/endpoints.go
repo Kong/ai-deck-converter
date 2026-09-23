@@ -692,4 +692,5 @@ var GeminiOptionKeys = map[string]bool{
 var BedrockOptionKeys = map[string]bool{
 	"region": true, "embeddings_normalize": true, "video_output_s3_uri": true,
 	"batch_bucket_prefix": true, "batch_role_arn": true, "performance_config_latency": true,
+	"vpc_endpoint": true,
 }
