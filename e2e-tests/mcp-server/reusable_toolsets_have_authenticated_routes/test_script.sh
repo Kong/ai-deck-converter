@@ -18,7 +18,7 @@ docker rm -f "$CONTAINER"
 cd "$ROOT_DIR" && make build
 
 # Step 2: generate the DB-less gateway config.
-./ai-deck-converter -direction to-dbless "$SCRIPT_DIR/input.yaml" > "$SCRIPT_DIR/converted.yaml"
+#./ai-deck-converter -direction to-dbless "$SCRIPT_DIR/input.yaml" > "$SCRIPT_DIR/converted.yaml"
 
 # Step 3: start the image
 docker run -d --name "$CONTAINER" \
