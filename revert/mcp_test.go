@@ -225,4 +225,12 @@ func TestUntaggedPreFunctionOnSourceIsAPolicy(t *testing.T) {
 	// Only the tagged gate is generated; a user's own pre-function survives.
 	require.Equal(t, "conversion-only", source.Type)
 	require.Len(t, source.Policies, 1)
+
+	// Faithful, but not convertible: convert would have to put the gate next
+	// to this policy, and Kong allows one pre-function per route, so it refuses
+	// rather than emit a config Kong rejects.
+	out, _, err := Revert([]byte(mcpHandWrittenPreFunctionDeck), Options{})
+	require.NoError(t, err)
+	_, _, err = convert.Convert(out, convert.Options{})
+	require.ErrorContains(t, err, `MCP server "toolset-a" is conversion-only`)
 }

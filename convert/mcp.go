@@ -70,6 +70,17 @@ func (c *Converter) convertMCPServers() error {
 		}
 		route.Plugins = append(route.Plugins, authPlugins...)
 		if m.Type == mcpConversionOnly {
+			// Kong allows one plugin per name on a route, so a policy of the
+			// gate's type would collide with it; neither can be dropped without
+			// either opening the route or losing the user's plugin.
+			if slices.ContainsFunc(route.Plugins, func(p kong.Plugin) bool {
+				return p.Name == aimap.MCPToolsetGatePlugin
+			}) {
+				return c.failAt("policies",
+					"MCP server %q is conversion-only, so its route carries a generated %q gate; "+
+						"it cannot also have a %q policy",
+					m.Name, aimap.MCPToolsetGatePlugin, aimap.MCPToolsetGatePlugin)
+			}
 			route.Plugins = append(route.Plugins, mcpToolsetGate(m))
 		}
 

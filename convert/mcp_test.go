@@ -1,6 +1,7 @@
 package convert
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/Kong/ai-deck-converter/internal/aigw"
@@ -164,6 +165,49 @@ mcp_servers:
     access:
       auth_strategies: [key-b]
 `
+
+// mcpPreFunctionPolicy gives a conversion-only source a policy of the gate's
+// own plugin type, route-scoped or global.
+const mcpPreFunctionPolicy = `
+policies:
+  - name: my-pre-function
+    type: pre-function
+    global: %t
+    config:
+      access: ['kong.log.notice("hello")']
+mcp_servers:
+  - type: conversion-only
+    name: toolset-a
+    config:
+      route: {paths: [/mcp/a]}
+    policies: [my-pre-function]
+    tools:
+      - {name: report-a, description: Get a report, method: GET, path: /report}
+  - type: listener
+    name: aggregate
+    config:
+      route: {paths: [/mcp/aggregate]}
+      sources: [toolset-a]
+`
+
+func TestConversionOnlySourceRejectsPreFunctionPolicy(t *testing.T) {
+	// Kong allows one plugin per name on a route: emitting the policy next to
+	// the gate would produce a config Kong refuses to load. It is a hard error
+	// even outside -strict, since dropping either plugin changes behavior.
+	_, _, err := Convert([]byte(fmt.Sprintf(mcpPreFunctionPolicy, false)), Options{})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), `MCP server "toolset-a" is conversion-only`)
+	conversionErr, ok := AsConversionError(err)
+	require.True(t, ok)
+	require.Equal(t, "policies", conversionErr.Diagnostics[0].Field)
+
+	// A global pre-function is a top-level plugin, not on the route, so it
+	// does not collide with the gate.
+	out, warnings := convertMCP(t, fmt.Sprintf(mcpPreFunctionPolicy, true))
+	require.Empty(t, warnings)
+	require.Equal(t, []string{"ai-mcp-proxy", "pre-function"}, pluginNames(t, out, "toolset-a"))
+	require.Equal(t, []string{aimap.MCPToolsetGateTag}, routePlugins(t, out, "toolset-a")[1].Tags)
+}
 
 func TestSourceSharedByListenersWithDifferentAccess(t *testing.T) {
 	// Nothing is copied from either listener, so their differing access no
