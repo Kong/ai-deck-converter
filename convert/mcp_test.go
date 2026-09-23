@@ -373,3 +373,33 @@ mcp_servers:
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "encryption_secrets is required")
 }
+
+// A present but empty token_vault block (or one missing its required
+// directory/provider) would lower to auth.token_vault: {} — the plugin schema
+// rejects that, so convert must too, rather than emitting it silently.
+func TestTokenVaultRequiresDirectoryAndProvider(t *testing.T) {
+	for _, tt := range []struct {
+		name  string
+		block string
+	}{
+		{name: "empty block", block: "    token_vault: {}"},
+		{name: "missing provider", block: "    token_vault:\n      directory: my-directory"},
+		{name: "missing directory", block: "    token_vault:\n      provider: my-upstream-provider"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			doc, err := aigw.Parse([]byte(`
+mcp_servers:
+  - type: passthrough-listener
+    name: hollow
+    upstream_url: https://mcp.internal
+` + tt.block + `
+    tools:
+      - {name: report, description: Get a report}
+`))
+			require.NoError(t, err)
+			_, _, err = ConvertDocument(doc, Options{})
+			require.Error(t, err)
+			require.Contains(t, err.Error(), "token_vault requires directory and provider")
+		})
+	}
+}

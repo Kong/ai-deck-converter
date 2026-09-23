@@ -332,6 +332,14 @@ func (c *Converter) mcpPlugin(m *aigw.MCPServer) (kong.Plugin, error) {
 		return kong.Plugin{}, c.failAt("token_vault.encryption_secrets",
 			"MCP server %q: token_vault.encryption_secrets is required when token_vault.redis is configured", m.Name)
 	}
+	// A present but empty token_vault block would otherwise lower to
+	// auth.token_vault: {} — the plugin schema requires directory and provider
+	// when provider is token_vault, so reject it the same way. (After this the
+	// lowered block can never be empty.)
+	if tv := m.TokenVault; tv != nil && (tv.Directory == "" || tv.Provider == "") {
+		return kong.Plugin{}, c.failAt("token_vault",
+			"MCP server %q: token_vault requires directory and provider", m.Name)
+	}
 	// Token Vault credential resolution (auth.provider: token_vault); only
 	// emitted when set.
 	if tv := m.TokenVault; tv != nil {
