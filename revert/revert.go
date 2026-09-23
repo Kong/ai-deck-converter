@@ -113,11 +113,6 @@ type Reverter struct {
 	// server name to the source MCP server names it exposes.
 	mcpBucketTags map[string]bool
 	mcpSources    map[string][]string
-	// mcpListenersBySource is mcpSources inverted, and mcpListenerAccess holds
-	// each listener's access plugins, so a source's route can be told which
-	// access was propagated to it rather than declared on it.
-	mcpListenersBySource map[string][]string
-	mcpListenerAccess    map[string][]kong.Plugin
 
 	// auth strategies recovered from key-auth/openid-connect plugins, deduped
 	// by (type, config-without-anonymous) fingerprint.
@@ -131,23 +126,21 @@ type Reverter struct {
 
 func newReverter(doc *kong.Document, opts Options) *Reverter {
 	return &Reverter{
-		opts:                 opts,
-		src:                  doc,
-		out:                  &aigw.Document{},
-		aiModelByAlias:       map[string]string{},
-		aiModelByName:        map[string]kong.AIModel{},
-		aiModelUsed:          map[string]bool{},
-		providerByFP:         map[string]string{},
-		providerNames:        map[string]bool{},
-		providerCounts:       map[string]int{},
-		policyNames:          map[string]bool{},
-		mcpBucketTags:        map[string]bool{},
-		mcpSources:           map[string][]string{},
-		mcpListenersBySource: map[string][]string{},
-		mcpListenerAccess:    map[string][]kong.Plugin{},
-		authStrategyByFP:     map[string]string{},
-		authStrategyNames:    map[string]bool{},
-		authStrategyCounts:   map[string]int{},
+		opts:               opts,
+		src:                doc,
+		out:                &aigw.Document{},
+		aiModelByAlias:     map[string]string{},
+		aiModelByName:      map[string]kong.AIModel{},
+		aiModelUsed:        map[string]bool{},
+		providerByFP:       map[string]string{},
+		providerNames:      map[string]bool{},
+		providerCounts:     map[string]int{},
+		policyNames:        map[string]bool{},
+		mcpBucketTags:      map[string]bool{},
+		mcpSources:         map[string][]string{},
+		authStrategyByFP:   map[string]string{},
+		authStrategyNames:  map[string]bool{},
+		authStrategyCounts: map[string]int{},
 	}
 }
 

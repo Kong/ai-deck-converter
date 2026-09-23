@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/Kong/ai-deck-converter/internal/aigw"
+	"github.com/Kong/ai-deck-converter/internal/aimap"
 	"github.com/Kong/ai-deck-converter/internal/kong"
 	"github.com/stretchr/testify/require"
 )
@@ -83,33 +84,33 @@ func pluginNames(t *testing.T, doc *kong.Document, service string) []string {
 	return names
 }
 
-func TestListenerAccessPropagatesToConversionOnlySources(t *testing.T) {
+func TestConversionOnlySourcesAreGated(t *testing.T) {
 	out, warnings := convertMCP(t, mcpListenerWithAccess)
 	require.Len(t, warnings, 1)
 	require.Contains(t, warnings[0], `MCP server "unexposed" is conversion-only but no listener names it`)
 
-	// The exposed sources are protected on the listener's terms; the listener
-	// keeps its own plugin; an unexposed source gets nothing to copy.
-	require.Equal(t, []string{"ai-mcp-proxy", "key-auth"}, pluginNames(t, out, "toolset-a"))
-	require.Equal(t, []string{"ai-mcp-proxy", "key-auth"}, pluginNames(t, out, "toolset-b"))
+	// The exposed sources are closed to clients by the gate rather than
+	// carrying a copy of the listener's auth; the listener keeps its own.
+	require.Equal(t, []string{"ai-mcp-proxy", "pre-function"}, pluginNames(t, out, "toolset-a"))
+	require.Equal(t, []string{"ai-mcp-proxy", "pre-function"}, pluginNames(t, out, "toolset-b"))
 	require.Equal(t, []string{"ai-mcp-proxy", "key-auth"}, pluginNames(t, out, "aggregate"))
 	// "unexposed" is named by no listener, so it is dropped rather than
-	// published as an endpoint nothing protects.
+	// published as an endpoint nothing reaches.
 	require.NotContains(t, serviceNames(out), "unexposed")
 
-	// The propagated plugin carries the listener's config, in its own map so
-	// the two routes cannot alias one another.
-	listener := routePlugins(t, out, "aggregate")[1]
-	source := routePlugins(t, out, "toolset-a")[1]
-	require.Equal(t, listener.Config, source.Config)
-	require.Equal(t, map[string]any{"key_names": []any{"apikey"}, "hide_credentials": false}, source.Config)
-	source.Config["key_names"] = []any{"changed"}
-	require.Equal(t, []any{"apikey"}, listener.Config["key_names"])
+	gateA := routePlugins(t, out, "toolset-a")[1]
+	require.Equal(t, []string{aimap.MCPToolsetGateTag}, gateA.Tags)
+	require.Equal(t, map[string]any{"access": []any{aimap.MCPToolsetGateAccess}}, gateA.Config)
+
+	// Each route's gate has its own config, so the two cannot alias.
+	gateB := routePlugins(t, out, "toolset-b")[1]
+	gateA.Config["access"] = []any{"changed"}
+	require.Equal(t, []any{aimap.MCPToolsetGateAccess}, gateB.Config["access"])
 }
 
-func TestListenerWithoutAccessLeavesSourcesOpen(t *testing.T) {
-	// No access on the listener: nothing to propagate, and no plugin is
-	// invented for the source.
+func TestListenerWithoutAccessStillGatesSources(t *testing.T) {
+	// No access on the listener: the source is gated all the same, since its
+	// tools are only ever meant to be reached through the listener.
 	out, warnings := convertMCP(t, `
 mcp_servers:
   - type: conversion-only
@@ -125,7 +126,8 @@ mcp_servers:
       sources: [toolset-a]
 `)
 	require.Empty(t, warnings)
-	require.Equal(t, []string{"ai-mcp-proxy"}, pluginNames(t, out, "toolset-a"))
+	require.Equal(t, []string{"ai-mcp-proxy", "pre-function"}, pluginNames(t, out, "toolset-a"))
+	require.Equal(t, []string{"ai-mcp-proxy"}, pluginNames(t, out, "aggregate"))
 }
 
 // mcpConflictingListeners exposes one source from two listeners whose key-auth
@@ -163,21 +165,22 @@ mcp_servers:
       auth_strategies: [key-b]
 `
 
-func TestConflictingListenerAccessWarnsAndKeepsFirst(t *testing.T) {
+func TestSourceSharedByListenersWithDifferentAccess(t *testing.T) {
+	// Nothing is copied from either listener, so their differing access no
+	// longer conflicts: each keeps its own, and the shared source gets one gate.
 	out, warnings := convertMCP(t, mcpConflictingListeners)
-	require.Len(t, warnings, 1)
-	require.Contains(t, warnings[0], `MCP server "shared" is exposed by listeners with conflicting "key-auth" access`)
-	require.Contains(t, warnings[0], `ignoring listener "second"`)
+	require.Empty(t, warnings)
 
-	// Only one plugin per name may live on a route: the first listener wins.
-	require.Equal(t, []string{"ai-mcp-proxy", "key-auth"}, pluginNames(t, out, "shared"))
+	require.Equal(t, []string{"ai-mcp-proxy", "pre-function"}, pluginNames(t, out, "shared"))
 	require.Equal(t,
 		map[string]any{"key_names": []any{"apikey"}, "hide_credentials": false},
-		routePlugins(t, out, "shared")[1].Config)
+		routePlugins(t, out, "first")[1].Config)
+	require.Equal(t,
+		map[string]any{"key_names": []any{"other-key"}, "hide_credentials": false},
+		routePlugins(t, out, "second")[1].Config)
 
-	// In strict mode the conflict is an error rather than a warning.
 	_, _, err := Convert([]byte(mcpConflictingListeners), Options{Strict: true})
-	require.Error(t, err)
+	require.NoError(t, err)
 }
 
 // mcpHiddenCredentials has a listener whose key-auth strategy asks to hide the
@@ -209,13 +212,11 @@ func TestMCPKeyAuthNeverHidesCredentials(t *testing.T) {
 	out, warnings := convertMCP(t, mcpHiddenCredentials)
 	require.Empty(t, warnings)
 
-	// Forced to false on the listener, and on the copy propagated to the
-	// source's route -- a strategy asking to hide it does not win here.
-	for _, service := range []string{"aggregate", "toolset-a"} {
-		keyAuth := routePlugins(t, out, service)[1]
-		require.Equal(t, "key-auth", keyAuth.Name, service)
-		require.Equal(t, false, keyAuth.Config["hide_credentials"], service)
-	}
+	// Forced to false on the listener -- a strategy asking to hide it does
+	// not win here.
+	keyAuth := routePlugins(t, out, "aggregate")[1]
+	require.Equal(t, "key-auth", keyAuth.Name)
+	require.Equal(t, false, keyAuth.Config["hide_credentials"])
 }
 
 // mcpUnexposedSources has a conversion-only server no listener names, next to
@@ -250,7 +251,7 @@ func TestUnexposedConversionOnlySourcesAreDropped(t *testing.T) {
 
 	// A source a listener does name survives even though that listener
 	// declares no access: association is the test, not the auth plugin.
-	require.Equal(t, []string{"ai-mcp-proxy"}, pluginNames(t, out, "exposed"))
+	require.Equal(t, []string{"ai-mcp-proxy", "pre-function"}, pluginNames(t, out, "exposed"))
 
 	// The drop is a lost entity, so -strict refuses it rather than warning.
 	_, _, err := Convert([]byte(mcpUnexposedSources), Options{Strict: true})

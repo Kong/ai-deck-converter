@@ -18,7 +18,7 @@ docker rm -f "$CONTAINER"
 cd "$ROOT_DIR" && make build
 
 # Step 2: generate the DB-less gateway config.
-#./ai-deck-converter -direction to-dbless "$SCRIPT_DIR/input.yaml" > "$SCRIPT_DIR/converted.yaml"
+./ai-deck-converter -direction to-dbless "$SCRIPT_DIR/input.yaml" > "$SCRIPT_DIR/converted.yaml"
 
 # Step 3: start the image
 docker run -d --name "$CONTAINER" \
@@ -166,13 +166,9 @@ for tool in team-a-report team-b-report; do
   fi
 done
 
-# Step 6: the conversion-only sources carry the listener's key-auth, copied
-# there by the converter: they serve no MCP traffic of their own and cannot
-# declare access themselves, so without it their routes would be reachable on
-# terms the listener rejects. Unauthenticated must fail; authenticated gets
-# past auth and reaches ai-mcp-proxy.
+# Step 6: the conversion-only routes should not be accessible
 echo
-echo "checking conversion-only routes inherit the listener's access..."
+echo "checking conversion-only routes are not exposed..."
 for server in team-a team-b; do
   echo
   echo "--> POST http://localhost:8000/mcp/$server (no apikey)"
@@ -183,12 +179,12 @@ for server in team-a team-b; do
     -d '{"jsonrpc": "2.0", "id": 3, "method": "tools/list"}')"
   cat "$RESP_BODY"
   echo
-  if [ "$status" != "401" ]; then
-    echo "FAIL: $server: unauthenticated request returned $status, expected 401" >&2
+  if [ "$status" != "404" ]; then
+    echo "FAIL: $server: external request returned $status, expected 404" >&2
     docker logs --tail 50 "$CONTAINER" >&2
     exit 1
   fi
-  echo "PASS: $server rejects unauthenticated requests with 401"
+  echo "PASS: $server rejects external requests without auth credential with 404"
 
   echo "--> POST http://localhost:8000/mcp/$server (with apikey)"
   status="$(curl -sS -o "$RESP_BODY" -w '%{http_code}' \
@@ -199,12 +195,12 @@ for server in team-a team-b; do
     -d '{"jsonrpc": "2.0", "id": 3, "method": "tools/list"}')"
   cat "$RESP_BODY"
   echo
-  if [ "$status" = "401" ]; then
-    echo "FAIL: $server: the listener's own credential was rejected" >&2
+  if [ "$status" != "404" ]; then
+    echo "FAIL: $server: external request returned $status, expected 404" >&2
+    docker logs --tail 50 "$CONTAINER" >&2
     exit 1
   fi
-  echo "INFO: $server authenticated request returned $status (conversion-only mode;" \
-       "what happens past auth is up to ai-mcp-proxy and the Gateway Service upstream)"
+  echo "PASS: $server rejects external requests without auth credential with 404"
 done
 
 rm -f "$RESP_HEADERS" "$RESP_BODY"

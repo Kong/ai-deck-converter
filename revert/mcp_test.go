@@ -8,10 +8,11 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// mcpPropagatedAccessDeck is what the forward converter emits for a key-auth
-// protected listener over one conversion-only source: the same key-auth plugin
-// on both routes, joined by the listener's bucket tag.
-const mcpPropagatedAccessDeck = `
+// mcpGatedSourceDeck is what the forward converter emits for a key-auth
+// protected listener over one conversion-only source: the listener carries the
+// key-auth, the source only the generated toolset gate, joined by the
+// listener's bucket tag.
+const mcpGatedSourceDeck = `
 _format_version: "3.0"
 services:
   - name: toolset-a
@@ -29,9 +30,15 @@ services:
                   method: GET
                   path: /report
             tags: [mcp-listener:aggregate-id]
-          - name: key-auth
+          - name: pre-function
             config:
-              key_names: [apikey]
+              access:
+                - |
+                  local addr = ngx.var.server_addr or ""
+                  if addr:sub(1, 5) ~= "unix:" then
+                    return ngx.exit(ngx.HTTP_NOT_FOUND)
+                  end
+            tags: [aigw-generated:mcp-toolset-gate]
   - name: aggregate
     host: localhost
     routes:
@@ -72,8 +79,8 @@ func revertMCPDoc(t *testing.T, deck string) revertedMCP {
 	return doc
 }
 
-func TestPropagatedListenerAccessIsNotTheSourcesOwn(t *testing.T) {
-	doc := revertMCPDoc(t, mcpPropagatedAccessDeck)
+func TestToolsetGateIsNotAPolicy(t *testing.T) {
+	doc := revertMCPDoc(t, mcpGatedSourceDeck)
 	require.Len(t, doc.MCPServers, 2)
 
 	byName := map[string]int{}
@@ -83,18 +90,17 @@ func TestPropagatedListenerAccessIsNotTheSourcesOwn(t *testing.T) {
 	source := doc.MCPServers[byName["toolset-a"]]
 	listener := doc.MCPServers[byName["aggregate"]]
 
-	// Auth belongs to the listener only. Leaving it on the conversion-only
-	// source would not just break the round trip -- re-converting it is a hard
-	// error, since only listener modes may declare access.
+	// The gate is derived from the conversion-only type, so it comes back as
+	// nothing at all; convert puts it back on the route.
 	require.Equal(t, "conversion-only", source.Type)
 	require.Empty(t, source.Access.AuthStrategies)
-	require.Empty(t, source.Policies, "propagated access must not become a policy either")
+	require.Empty(t, source.Policies, "the generated gate must not become a policy")
 	require.Len(t, listener.Access.AuthStrategies, 1)
-	require.Len(t, doc.AuthStrategies, 1, "one auth strategy, not one per route")
 }
 
 // mcpSourceOwnAuthDeck is a hand-written config: the conversion-only source
-// carries a key-auth no listener shares, so nothing propagated it.
+// carries a key-auth of its own. (Configs from older converter versions, which
+// copied the listener's access onto its sources, have the same shape.)
 const mcpSourceOwnAuthDeck = `
 _format_version: "3.0"
 services:
@@ -170,10 +176,9 @@ func TestSourceOwnAuthBecomesAPolicyNotAccess(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// mcpUntaggedListenerDeck is what convert emits for a listener that declares
-// sources and access but no config.server.tag: the access plugin is propagated
-// to the source's route, but no bucket tag ties the two together.
-const mcpUntaggedListenerDeck = `
+// mcpHandWrittenPreFunctionDeck is a hand-written config: the conversion-only
+// source carries a pre-function without the gate's tag.
+const mcpHandWrittenPreFunctionDeck = `
 _format_version: "3.0"
 services:
   - name: toolset-a
@@ -190,10 +195,11 @@ services:
                   description: Get a report
                   method: GET
                   path: /report
-          - name: key-auth
+            tags: [mcp-listener:aggregate-id]
+          - name: pre-function
             config:
-              key_names: [apikey]
-              hide_credentials: false
+              access:
+                - kong.log.notice("hello")
   - name: aggregate
     host: localhost
     routes:
@@ -203,14 +209,12 @@ services:
           - name: ai-mcp-proxy
             config:
               mode: listener
-          - name: key-auth
-            config:
-              key_names: [apikey]
-              hide_credentials: false
+              server:
+                tag: mcp-listener:aggregate-id
 `
 
-func TestPropagatedAccessStrippedWithoutABucketTag(t *testing.T) {
-	doc := revertMCPDoc(t, mcpUntaggedListenerDeck)
+func TestUntaggedPreFunctionOnSourceIsAPolicy(t *testing.T) {
+	doc := revertMCPDoc(t, mcpHandWrittenPreFunctionDeck)
 
 	byName := map[string]int{}
 	for i, m := range doc.MCPServers {
@@ -218,11 +222,7 @@ func TestPropagatedAccessStrippedWithoutABucketTag(t *testing.T) {
 	}
 	source := doc.MCPServers[byName["toolset-a"]]
 
-	// No tag means no listener/source association to rebuild, but the access
-	// must still be recognized as propagated. Lifting it onto a
-	// conversion-only server produces a document convert rejects outright.
+	// Only the tagged gate is generated; a user's own pre-function survives.
 	require.Equal(t, "conversion-only", source.Type)
-	require.Empty(t, source.Access.AuthStrategies)
-	require.Empty(t, source.Policies)
-	require.Len(t, doc.MCPServers[byName["aggregate"]].Access.AuthStrategies, 1)
+	require.Len(t, source.Policies, 1)
 }
