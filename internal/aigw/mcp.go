@@ -22,6 +22,106 @@ type MCPServer struct {
 	// Not part of the strict schema (passthrough proxies to the Gateway Service
 	// upstream), but accepted here so the converter can build the Kong Service.
 	UpstreamURL string `yaml:"upstream_url,omitempty"`
+	// TokenVault resolves the upstream credential per request via Kong's Token
+	// Vault instead of a static credential. It lowers into the ai-mcp-proxy
+	// plugin's auth record (auth.provider: token_vault), so it is mutually
+	// exclusive with config.upstream.auth.
+	TokenVault *TokenVaultConfig `yaml:"token_vault,omitempty"`
+}
+
+// TokenVaultConfig mirrors the AIGatewayTokenVault schema. It resolves an
+// upstream credential per request via Kong's Token Vault: exchanged
+// credentials are cached per node and, when Redis is configured, shared
+// across the cluster (encrypted). Lowered into the ai-mcp-proxy plugin's
+// auth.token_vault record.
+type TokenVaultConfig struct {
+	// Directory is the directory name segment of the vault token endpoint.
+	Directory string `yaml:"directory,omitempty"`
+	// Provider is the upstream credential provider registered in the Token
+	// Vault directory.
+	Provider string `yaml:"provider,omitempty"`
+	// Redis shares exchanged credentials across the cluster.
+	Redis *RedisCloudConfig `yaml:"redis,omitempty"`
+	// EncryptionSecrets encrypt exchanged credentials before they are cached
+	// in Redis. Required when Redis is configured. Referenceable
+	// ({vault://...} references pass through verbatim).
+	EncryptionSecrets []string `yaml:"encryption_secrets,omitempty"`
+}
+
+// RedisCloudConfig mirrors the AIGatewayRedisCloudConfiguration schema: the
+// connection settings for a Redis instance backing the Token Vault's
+// cross-node credential cache. It is translated into the flat field surface
+// of the Kong redis-ee config schema (aimap.TokenVaultRedisToPlugin) — the
+// nested keepalive/sentinel/cluster/cloud_authentication blocks flatten to
+// prefixed keys there.
+type RedisCloudConfig struct {
+	Host                string                    `yaml:"host,omitempty"`
+	Port                *int                      `yaml:"port,omitempty"`
+	Database            *int                      `yaml:"database,omitempty"`
+	Username            string                    `yaml:"username,omitempty"`
+	Password            string                    `yaml:"password,omitempty"`
+	SSL                 *bool                     `yaml:"ssl,omitempty"`
+	SSLVerify           *bool                     `yaml:"ssl_verify,omitempty"`
+	ServerName          string                    `yaml:"server_name,omitempty"`
+	ConnectionIsProxied *bool                     `yaml:"connection_is_proxied,omitempty"`
+	ConnectTimeout      *int                      `yaml:"connect_timeout,omitempty"`
+	ReadTimeout         *int                      `yaml:"read_timeout,omitempty"`
+	SendTimeout         *int                      `yaml:"send_timeout,omitempty"`
+	Keepalive           *RedisKeepaliveConfig     `yaml:"keepalive,omitempty"`
+	Sentinel            *RedisSentinelConfig      `yaml:"sentinel,omitempty"`
+	Cluster             *RedisClusterConfig       `yaml:"cluster,omitempty"`
+	CloudAuthentication *RedisCloudAuthentication `yaml:"cloud_authentication,omitempty"`
+}
+
+// RedisKeepaliveConfig is the connection-pool tuning of a Redis connection.
+type RedisKeepaliveConfig struct {
+	PoolSize *int `yaml:"pool_size,omitempty"`
+	Backlog  *int `yaml:"backlog,omitempty"`
+}
+
+// RedisSentinelConfig configures Redis Sentinel discovery.
+type RedisSentinelConfig struct {
+	Master   string      `yaml:"master,omitempty"`
+	Role     string      `yaml:"role,omitempty"`
+	Username string      `yaml:"username,omitempty"`
+	Password string      `yaml:"password,omitempty"`
+	Nodes    []RedisNode `yaml:"nodes,omitempty"`
+}
+
+// RedisClusterConfig configures Redis Cluster discovery.
+type RedisClusterConfig struct {
+	MaxRedirections *int        `yaml:"max_redirections,omitempty"`
+	Nodes           []RedisNode `yaml:"nodes,omitempty"`
+}
+
+// RedisNode is one address in a sentinel.nodes / cluster.nodes list. Sentinel
+// nodes address the host by `host`, cluster nodes by `ip`; the plugin schema
+// uses the same split (sentinel_nodes[].host vs cluster_nodes[].ip), while the
+// API model reuses one shape for both.
+type RedisNode struct {
+	Host string `yaml:"host,omitempty"`
+	IP   string `yaml:"ip,omitempty"`
+	Port *int   `yaml:"port,omitempty"`
+}
+
+// RedisCloudAuthentication carries the cloud-provider credentials for a
+// managed Redis instance (AWS ElastiCache, Azure Cache, GCP Memorystore).
+// Type is the discriminator (aws | azure | gcp); the remaining fields are the
+// selected variant's. Lowered to the plugin's auth_provider + prefixed-key
+// shape (aimap.TokenVaultRedisToPlugin).
+type RedisCloudAuthentication struct {
+	Type               string `yaml:"type,omitempty"`
+	AccessKeyID        string `yaml:"access_key_id,omitempty"`
+	SecretAccessKey    string `yaml:"secret_access_key,omitempty"`
+	CacheName          string `yaml:"cache_name,omitempty"`
+	IsServerless       *bool  `yaml:"is_serverless,omitempty"`
+	Region             string `yaml:"region,omitempty"`
+	AssumeRoleARN      string `yaml:"assume_role_arn,omitempty"`
+	RoleSessionName    string `yaml:"role_session_name,omitempty"`
+	ClientID           string `yaml:"client_id,omitempty"`
+	ClientSecret       string `yaml:"client_secret,omitempty"`
+	TenantID           string `yaml:"tenant_id,omitempty"`
+	ServiceAccountJSON string `yaml:"service_account_json,omitempty"`
 }
 
 // MCPAccess is the access-control configuration for an MCP Server: the ACL

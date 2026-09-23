@@ -302,3 +302,104 @@ func TestPruneRemovesOnlyTheMCPServersOwnService(t *testing.T) {
 		require.NotContains(t, rt.Paths, "/mcp/x", "the MCP route is the one that goes")
 	}
 }
+
+func TestTokenVaultLowersIntoAuthRecord(t *testing.T) {
+	out, _ := convertMCP(t, `
+mcp_servers:
+  - type: passthrough-listener
+    name: vaulted
+    upstream_url: https://mcp.internal
+    token_vault:
+      directory: my-directory
+      provider: my-upstream-provider
+      encryption_secrets: ["{vault://env/enc}"]
+      redis: {host: redis.internal, port: 6379, database: 0}
+    tools:
+      - {name: report, description: Get a report}
+`)
+	plugins := routePlugins(t, out, "vaulted")
+	require.Len(t, plugins, 1)
+	require.Equal(t, map[string]any{
+		"provider": "token_vault",
+		"token_vault": map[string]any{
+			"directory":          "my-directory",
+			"provider":           "my-upstream-provider",
+			"encryption_secrets": []string{"{vault://env/enc}"},
+			"redis": map[string]any{
+				"host":     "redis.internal",
+				"port":     6379,
+				"database": 0,
+			},
+		},
+	}, plugins[0].Config["auth"])
+}
+
+func TestTokenVaultConflictsWithUpstreamAuth(t *testing.T) {
+	doc, err := aigw.Parse([]byte(`
+mcp_servers:
+  - type: passthrough-listener
+    name: both
+    upstream_url: https://mcp.internal
+    token_vault:
+      directory: my-directory
+      provider: my-upstream-provider
+    config:
+      upstream:
+        auth: {type: aws, region: us-west-2}
+    tools:
+      - {name: report, description: Get a report}
+`))
+	require.NoError(t, err)
+	_, _, err = ConvertDocument(doc, Options{})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "mutually exclusive")
+}
+
+func TestTokenVaultRedisRequiresEncryptionSecrets(t *testing.T) {
+	doc, err := aigw.Parse([]byte(`
+mcp_servers:
+  - type: passthrough-listener
+    name: no-secrets
+    upstream_url: https://mcp.internal
+    token_vault:
+      directory: my-directory
+      provider: my-upstream-provider
+      redis: {host: redis.internal, port: 6379}
+    tools:
+      - {name: report, description: Get a report}
+`))
+	require.NoError(t, err)
+	_, _, err = ConvertDocument(doc, Options{})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "encryption_secrets is required")
+}
+
+// A present but empty token_vault block (or one missing its required
+// directory/provider) would lower to auth.token_vault: {} — the plugin schema
+// rejects that, so convert must too, rather than emitting it silently.
+func TestTokenVaultRequiresDirectoryAndProvider(t *testing.T) {
+	for _, tt := range []struct {
+		name  string
+		block string
+	}{
+		{name: "empty block", block: "    token_vault: {}"},
+		{name: "missing provider", block: "    token_vault:\n      directory: my-directory"},
+		{name: "missing directory", block: "    token_vault:\n      provider: my-upstream-provider"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			doc, err := aigw.Parse([]byte(`
+mcp_servers:
+  - type: passthrough-listener
+    name: hollow
+    upstream_url: https://mcp.internal
+` + tt.block + `
+    tools:
+      - {name: report, description: Get a report}
+`))
+			require.NoError(t, err)
+			_, _, err = ConvertDocument(doc, Options{})
+			require.Error(t, err)
+			require.Contains(t, err.Error(), "token_vault requires directory and provider")
+		})
+	}
+}

@@ -1,0 +1,41 @@
+mcp_servers:
+  # passthrough MCP server resolving its upstream credential per request via
+  # Kong's Token Vault, with Redis-backed cross-node caching of the exchanged
+  # (encrypted) credentials.
+  - type: passthrough-listener
+    display_name: Vaulted Vendor MCP
+    name: vaulted-vendor-mcp
+    upstream_url: https://mcp.internal.kongair.com
+    token_vault:
+      directory: my-directory
+      provider: my-upstream-provider
+      encryption_secrets:
+        - "{vault://env/TOKEN_VAULT_ENC_SECRET}"
+        - "{vault://env/TOKEN_VAULT_ENC_SECRET_OLD}"
+      redis:
+        host: redis.internal
+        port: 6379
+        database: 0
+        connect_timeout: 2000
+        keepalive:
+          pool_size: 256
+        sentinel:
+          master: mymaster
+          role: any
+          nodes:
+            - {host: sentinel-1.internal, port: 6379}
+    tools:
+      - name: vendorTool
+        description: A vendor tool
+  # bare token_vault (no redis, no secrets): exchanged credentials are cached
+  # per node only.
+  - type: passthrough-listener
+    display_name: Bare Vaulted Vendor MCP
+    name: bare-vaulted-vendor-mcp
+    upstream_url: https://bare-mcp.internal.kongair.com
+    token_vault:
+      directory: my-directory
+      provider: my-other-upstream-provider
+    tools:
+      - name: bareVendorTool
+        description: A bare vendor tool

@@ -105,7 +105,7 @@ See `convert/testdata/*/input.yaml` for worked examples.
 |---|---|
 | Model | One **route per (provider endpoint, capability)** under a single shared `ai-gateway` Service, with the path derived from the model's `formats[0].type` (llm_format) + capability via the endpoint table. Each route gets an `ai-proxy-advanced` plugin (`route:` FK) — models that resolve to the same endpoint share one route, contributing one `targets[]` entry each. Body-model routes also get an `ai-model-selector` plugin. One `ai-models` entry (`name` + `alias`) is emitted per model — one per `config.route.model.values` entry when the model declares several aliases, each with its own `ai-proxy-advanced` (and policy/ACL) copy scoped to that alias, so requests naming any alias select the model. |
 | Provider | Not a standalone entity. Its `type` and `config.auth` populate each referencing target's `model.provider`, `model.options`, and `auth`. |
-| MCP Server | Service + Route + `ai-mcp-proxy` (`config.mode` = source type). Server ACLs / per-tool ACLs are written into the plugin config (`default_acl`, `tools[].acl`), not Kong `acl` plugins. `access.auth_strategies` + `access.metadata` (openid-connect) add an `ai-mcp-oauth2` plugin and append `metadata.endpoint` to the route (listener / conversion-listener / passthrough-listener only); a `key-auth` strategy adds a `key-auth` plugin (and is rejected if `metadata` is set). `config.upstream.auth` (AWS SigV4) lowers to the plugin's `auth` record. A `conversion-only` server serves no MCP traffic of its own and cannot declare `access` itself, so each listener that names it in `config.sources` copies its own access plugin onto the source's route (first listener wins, with a warning on conflict; stripped again on revert, where leaving it would produce an unconvertible document). A `conversion-only` server that no listener names is dropped entirely, with a warning: it reaches no client and would publish an endpoint with no access on it. `key-auth` access on an MCP server is always emitted with `hide_credentials: false`, so the client's key survives onto the internal request `ai-mcp-proxy` issues when executing a tool. |
+| MCP Server | Service + Route + `ai-mcp-proxy` (`config.mode` = source type). Server ACLs / per-tool ACLs are written into the plugin config (`default_acl`, `tools[].acl`), not Kong `acl` plugins. `access.auth_strategies` + `access.metadata` (openid-connect) add an `ai-mcp-oauth2` plugin and append `metadata.endpoint` to the route (listener / conversion-listener / passthrough-listener only); a `key-auth` strategy adds a `key-auth` plugin (and is rejected if `metadata` is set). `config.upstream.auth` (AWS SigV4) and the top-level `token_vault` lower to the plugin's `auth` record (mutually exclusive). A `conversion-only` server serves no MCP traffic of its own and cannot declare `access` itself, so each listener that names it in `config.sources` copies its own access plugin onto the source's route (first listener wins, with a warning on conflict; stripped again on revert, where leaving it would produce an unconvertible document). A `conversion-only` server that no listener names is dropped entirely, with a warning: it reaches no client and would publish an endpoint with no access on it. `key-auth` access on an MCP server is always emitted with `hide_credentials: false`, so the client's key survives onto the internal request `ai-mcp-proxy` issues when executing a tool. |
 | Agent (`a2a`) | Service (`config.url`) + Route + `ai-a2a-proxy` plugin (logging). `config.upstream.auth` (AWS SigV4) lowers to the plugin's `auth` record, and `config.proxy` to `proxy_config`. |
 | Agent (`http`) | Service (`config.url`) + Route, no AI plugin. |
 | Policy | Kong plugin (`name` = policy `type`, config passed through). `global: true` -> one top-level plugin; otherwise instantiated per referencing entity. |
@@ -222,6 +222,18 @@ and `formats` beyond the first.
   record (`provider: aws_iam`, nested `aws_iam` options). Unsupported auth types
   are warned about and dropped. The plugin's `aws_iam.bearer_token` has no AI
   Gateway representation, so the reverse direction warns and drops it.
+- **Token Vault.** An MCP Server's top-level `token_vault` (`directory`,
+  `provider`, optional `redis` + `encryption_secrets`) lowers to the
+  `ai-mcp-proxy` `auth` record (`provider: token_vault`, nested `token_vault`
+  options) and round-trips in both directions. The nested
+  `redis` block (Konnect's `AIGatewayRedisCloudConfiguration` shape) flattens
+  into the plugin redis config's prefixed keys (`keepalive.pool_size` →
+  `keepalive_pool_size`, `sentinel.master` → `sentinel_master`,
+  `cluster.nodes` → `cluster_nodes`, `cloud_authentication.type` →
+  `auth_provider` with provider-prefixed fields, …). `token_vault` and
+  `config.upstream.auth` are mutually exclusive (both lower to the same plugin
+  auth record) — declaring both is a hard error, as is `redis` without
+  `encryption_secrets` (the plugin's own entity check).
 - **MCP OAuth2.** MCP `access.auth_strategies` / `access.metadata` round-trips
   in both directions. An openid-connect auth strategy lowers its client credentials
   plus the identically-typed / unambiguous fields onto the `ai-mcp-oauth2`

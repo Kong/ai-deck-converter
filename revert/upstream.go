@@ -55,3 +55,21 @@ func (r *Reverter) upstreamFromConfig(auth map[string]any, entity string) (*aigw
 	}
 	return &aigw.UpstreamConfig{Auth: a}, nil
 }
+
+// tokenVaultFromConfig lifts the ai-mcp-proxy plugin's auth.token_vault record
+// back into the MCP Server's top-level token_vault field (its position in the
+// AI Gateway schema; the reverse of convert's emit in mcpPlugin). The
+// directory/provider/redis/encryption_secrets fields are recovered via the
+// shared aimap table. Returns nil when the block is missing (the plugin's own
+// schema forbids provider token_vault without it); warns, since there is
+// nothing to lift. Mirrors convert's upstreamAuthBlock/tokenVault lowering.
+//
+// entity is used only for warning messages (e.g. `MCP server "foo"`).
+func (r *Reverter) tokenVaultFromConfig(auth map[string]any, entity string) (*aigw.TokenVaultConfig, error) {
+	tv := aimap.TokenVaultFromPlugin(getMap(auth, "token_vault"))
+	if tv == nil {
+		return nil, r.warn("%s: auth.provider is %q but the token_vault block is missing; nothing to lift",
+			entity, aimap.UpstreamAuthProviderTokenVault)
+	}
+	return tv, nil
+}
