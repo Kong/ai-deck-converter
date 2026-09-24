@@ -10,10 +10,9 @@ gitignored).
 
 - Docker running locally.
 - A Kong Enterprise license, any of the following (checked in this order):
-  1. a populated `e2e/license.json` (the value of the "Monthly Kong Gateway
-     Enterprise License" secret in 1password),
-  2. the `KONG_LICENSE` environment variable set to the license JSON, or
-  3. the `KONG_LICENSE_DATA` environment variable set to the license JSON.
+    1. the `KONG_LICENSE` environment variable set to the license JSON, or
+    2. the `KONG_LICENSE_DATA` environment variable set to the license JSON, or
+    3. a populated `e2e/license.json` (the value of the "Monthly Kong Gateway Enterprise License secret" in 1password).
 
   Without a license the cases are **skipped**, not failed.
 - No build step: the harness converts in-process with the same `convert`

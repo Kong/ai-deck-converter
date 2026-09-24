@@ -75,6 +75,7 @@ func startGateway(t *testing.T, opts GatewayOptions) *Gateway {
 		"-e", "KONG_PROXY_LISTEN=0.0.0.0:8000",
 		"-e", "KONG_ADMIN_LISTEN=0.0.0.0:8001",
 		"-e", "KONG_LOG_LEVEL=info",
+		"--add-host", "host.docker.internal:host-gateway",
 		"-p", fmt.Sprintf("%d:8000", proxyPort),
 		"-p", fmt.Sprintf("%d:8001", adminPort),
 	}
