@@ -118,11 +118,24 @@ models:
     config:
       route: {paths: [/chat]}
       model: {}
+  # No config.type and an unknown provider: the skills passthrough guard cannot
+  # judge the pairing, so it must not escalate this into its hard failure.
+  - type: api
+    name: skills-api
+    capabilities: [skills]
+    formats: [{type: openai}]
+    targets:
+      - name: gpt-5.6
+        provider: missing-provider
+    config:
+      route: {paths: [/ai]}
 `)
 	_, warnings, err := Convert(src, Options{})
 	require.NoError(t, err, "convert")
 	require.Contains(t, strings.Join(warnings, "\n"), "unknown provider",
 		"expected unknown-provider warning")
+	require.Contains(t, strings.Join(warnings, "\n"),
+		`model "skills-api" target "gpt-5.6" has no resolvable provider type`)
 }
 
 func TestWithMetadataTracksGeneratedTargetSources(t *testing.T) {

@@ -151,8 +151,10 @@ func Formats() []string {
 // anthropic on anthropic). ai-proxy-advanced's schema rejects every other pairing.
 var nativeFormatCapabilities = map[string]bool{"skills": true}
 
-// RequiresNativeFormat reports whether capability is passthrough-only, so a model declaring it
-// must be served by a provider rendering that model's own client format.
+// RequiresNativeFormat reports whether capability is passthrough-only. Callers enforce it on the
+// provider enum ai-proxy-advanced will carry, which is narrower than format rendering: Kong
+// restricts these route types to the openai and anthropic provider enums, so an azure provider
+// fails even though its traffic renders the openai format.
 func RequiresNativeFormat(capability string) bool { return nativeFormatCapabilities[capability] }
 
 // CapabilitiesFor returns the capabilities a model of the given client format may declare when
@@ -306,10 +308,6 @@ var EndpointTable = map[string]map[string]EndpointEntry{
 				"files", "/files", false, mGetPostDelete, "llm/v1/files", catTextGen, nil, true,
 			},
 		},
-		// The Skills API is a CRUD surface (create/list/get/delete a skill and
-		// its versions, download a bundle), so it carries no model and gets its
-		// own route, like files/batches. OpenAI's SDK appends "/skills" to the
-		// base URL, so the client path ends at the base path's "/skills".
 		"skills": {
 			Primary: EndpointSpec{
 				"skills", "/skills", false, mGetPostDelete, "llm/v1/skills", catTextGen, nil, false,
@@ -328,8 +326,6 @@ var EndpointTable = map[string]map[string]EndpointEntry{
 				"batches", "/v1/messages/batches", false, mGetPost, "llm/v1/batches", catTextGen, nil, false,
 			},
 		},
-		// Anthropic's Skills API keeps the /v1 prefix of its other restful
-		// surfaces (see batches above); the SDK resolves it under /v1/skills.
 		"skills": {
 			Primary: EndpointSpec{
 				"skills", "/v1/skills", false, mGetPostDelete, "llm/v1/skills", catTextGen, nil, false,
