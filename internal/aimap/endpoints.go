@@ -65,8 +65,9 @@ const (
 )
 
 var (
-	mPost    = []string{"POST"}
-	mGetPost = []string{"GET", "POST"}
+	mPost          = []string{"POST"}
+	mGetPost       = []string{"GET", "POST"}
+	mGetPostDelete = []string{"GET", "POST", "DELETE"}
 )
 
 // SectionFor selects the endpoint section from the model's llm_format (the
@@ -144,25 +145,43 @@ func Formats() []string {
 	return out
 }
 
+// nativeFormatCapabilities are the capabilities Kong serves only as passthrough: unlike
+// generate/image/... there is no request/response conversion between wire formats for them, so the
+// serving provider has to render the model's own format (openai model on an openai provider,
+// anthropic on anthropic). ai-proxy-advanced's schema rejects every other pairing.
+var nativeFormatCapabilities = map[string]bool{"skills": true}
+
+// RequiresNativeFormat reports whether capability is passthrough-only, so a model declaring it
+// must be served by a provider rendering that model's own client format.
+func RequiresNativeFormat(capability string) bool { return nativeFormatCapabilities[capability] }
+
 // CapabilitiesFor returns the capabilities a model of the given client format may declare when
 // served by the given provider type, resolved through the same section routing the converter uses
 // (SectionFor) — so the gemini format served by Vertex reports the Vertex-only image, video, and
-// rerank capabilities, while served by Gemini it does not. "generate" is listed first when
+// rerank capabilities, while served by Gemini it does not, and a passthrough-only capability is
+// left out unless the provider renders the model's own format. "generate" is listed first when
 // present, the rest sorted. An unknown format, or a rendering section passed as a format, yields
 // nil — keeping parity with Formats, which excludes those sections.
 func CapabilitiesFor(format, providerType string) []string {
 	if _, rendering := renderingSections[format]; rendering {
 		return nil
 	}
-	caps, ok := EndpointTable[SectionFor(format, providerType)]
+	section := SectionFor(format, providerType)
+	caps, ok := EndpointTable[section]
 	if !ok {
 		return nil
 	}
+	provider := PluginProvider(providerType)
 	rest := make([]string, 0, len(caps))
 	hasGenerate := false
 	for c := range caps {
 		if c == "generate" {
 			hasGenerate = true
+			continue
+		}
+		// A passthrough-only capability is only reachable when the provider's own format is the
+		// one the client speaks, which is exactly the section it was looked up in.
+		if nativeFormatCapabilities[c] && section != provider {
 			continue
 		}
 		rest = append(rest, c)
@@ -284,7 +303,16 @@ var EndpointTable = map[string]map[string]EndpointEntry{
 		},
 		"files": {
 			Primary: EndpointSpec{
-				"files", "/files", false, []string{"GET", "POST", "DELETE"}, "llm/v1/files", catTextGen, nil, true,
+				"files", "/files", false, mGetPostDelete, "llm/v1/files", catTextGen, nil, true,
+			},
+		},
+		// The Skills API is a CRUD surface (create/list/get/delete a skill and
+		// its versions, download a bundle), so it carries no model and gets its
+		// own route, like files/batches. OpenAI's SDK appends "/skills" to the
+		// base URL, so the client path ends at the base path's "/skills".
+		"skills": {
+			Primary: EndpointSpec{
+				"skills", "/skills", false, mGetPostDelete, "llm/v1/skills", catTextGen, nil, false,
 			},
 		},
 	},
@@ -298,6 +326,13 @@ var EndpointTable = map[string]map[string]EndpointEntry{
 		"batches": {
 			Primary: EndpointSpec{
 				"batches", "/v1/messages/batches", false, mGetPost, "llm/v1/batches", catTextGen, nil, false,
+			},
+		},
+		// Anthropic's Skills API keeps the /v1 prefix of its other restful
+		// surfaces (see batches above); the SDK resolves it under /v1/skills.
+		"skills": {
+			Primary: EndpointSpec{
+				"skills", "/v1/skills", false, mGetPostDelete, "llm/v1/skills", catTextGen, nil, false,
 			},
 		},
 	},

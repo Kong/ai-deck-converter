@@ -407,6 +407,34 @@ model_providers:
 	}
 }
 
+// The skills API is served only as passthrough, so Kong rejects a llm/v1/skills
+// target whose provider renders a different wire format: there is no
+// cross-format conversion to fall back on. An openai-format model on an
+// anthropic provider is such a pairing; an unresolvable provider type is left to
+// the usual warning instead.
+func TestConvertRejectsSkillsWithCrossFormatProvider(t *testing.T) {
+	src := []byte(`
+models:
+  - type: api
+    name: skills-api
+    capabilities: [skills]
+    formats: [{type: openai}]
+    targets:
+      - name: gpt-5.6
+        provider: anthropic-prod
+        config: {type: anthropic}
+    config:
+      route: {paths: [/ai]}
+model_providers:
+  - name: anthropic-prod
+    type: anthropic
+`)
+	_, _, err := Convert(src, Options{})
+	require.Error(t, err, "skills on a provider rendering another format must be rejected")
+	require.Contains(t, err.Error(), "passthrough-only")
+	require.Contains(t, err.Error(), "llm_format")
+}
+
 // A model's policies list must not reference an authentication policy
 // (key-auth/openid-connect) directly: those require anonymous fallback and a
 // companion anonymous consumer, which only the auth_strategies mechanism

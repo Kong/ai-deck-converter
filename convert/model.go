@@ -245,6 +245,16 @@ func (c *Converter) convertModels() error {
 						"model %q: capability %q is not supported with llm_format %q for provider type %q",
 						m.Name, capability, llmFormat(m), providerType)
 				}
+				// Passthrough-only capabilities have no cross-format converter, so a
+				// provider rendering another format can never serve them: Kong's schema
+				// rejects the pairing. An unresolvable provider type is left to the
+				// warning above rather than escalated here.
+				if aimap.RequiresNativeFormat(capability) && providerType != "" &&
+					aimap.PluginProvider(providerType) != llmFormat(m) {
+					return c.failAt("capabilities",
+						"model %q: capability %q is passthrough-only, so provider type %q cannot serve llm_format %q",
+						m.Name, capability, providerType, llmFormat(m))
+				}
 				// A capability with secondary endpoints (bedrock generate, also
 				// reachable via invoke) emits one route per endpoint, each
 				// carrying this target; revert's capsSeen folds the routes back
@@ -1012,12 +1022,13 @@ func basePaths(m *aigw.Model) []string {
 	return out
 }
 
-// The assistants, batches, and files endpoints do not route by model,
+// The assistants, batches, files, and skills endpoints do not route by model,
 // as a result, they do not support the model name header.
 func supportsModelNameHeader(spec aimap.EndpointSpec) bool {
 	return spec.RouteType != "llm/v1/assistants" &&
 		spec.RouteType != "llm/v1/batches" &&
-		spec.RouteType != "llm/v1/files"
+		spec.RouteType != "llm/v1/files" &&
+		spec.RouteType != "llm/v1/skills"
 }
 
 // isModelType reports whether a model is a synchronous "model" entity (as
