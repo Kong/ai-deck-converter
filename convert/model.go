@@ -168,6 +168,7 @@ func (c *Converter) convertModels() error {
 	var order []string
 	var guardPlugins []kong.Plugin
 	usedRouteNames := map[string]bool{}
+	passthroughMatchers := map[string]string{}
 	identityPluginSeen := map[string]bool{}
 	lifecycleCandidates, err := c.videoLifecycleCandidates()
 	if err != nil {
@@ -221,6 +222,23 @@ func (c *Converter) convertModels() error {
 					"model %q: the passthrough format cannot use the semantic balancer algorithm",
 					m.Name)
 			}
+			// Kong allows one plugin of a name per route, and without a selector nothing
+			// tells two ai-proxy-advanced plugins on one route apart. Two passthrough
+			// models whose routes match the same requests are just as ambiguous even when
+			// they land in different route groups (different auth strategies, route
+			// names, ...), so the check keys on the request matchers, not the group key.
+			for _, b := range bases {
+				key, err := passthroughMatcherKey(b, m.Config.Route)
+				if err != nil {
+					return err
+				}
+				if other, ok := passthroughMatchers[key]; ok && other != m.Name {
+					return c.failAt("formats",
+						"model %q: a passthrough model cannot share route path %q with passthrough model %q",
+						m.Name, b, other)
+				}
+				passthroughMatchers[key] = m.Name
+			}
 		}
 		// API models share route-only ai-proxy-advanced plugins, so disabling one
 		// plugin could disable other models on the same route. Exclude explicitly
@@ -246,6 +264,9 @@ func (c *Converter) convertModels() error {
 
 		var routeNames []string
 		routeSeen := map[string]bool{}
+		// The plugin's llm_format comes from the first target, and passthrough forwards
+		// the body unchanged, so every target must speak the same client format.
+		passthroughFormat := ""
 
 		for j := range m.TargetModels {
 			tm := &m.TargetModels[j]
@@ -273,6 +294,18 @@ func (c *Converter) convertModels() error {
 				return c.failAt(fmt.Sprintf("targets[%d].config.upstream_url", j),
 					"model %q target %q: the passthrough format requires upstream_url for databricks",
 					m.Name, tm.Name)
+			}
+			if passthrough {
+				// Compare client formats, not sections, so gemini and vertex stay compatible.
+				format := aimap.ClientFormat(aimap.PassthroughFormat, providerType)
+				if passthroughFormat == "" {
+					passthroughFormat = format
+				} else if format != passthroughFormat {
+					return c.failAt(fmt.Sprintf("targets[%d].config.type", j),
+						"model %q target %q: the passthrough format forwards %s bodies unchanged, "+
+							"so every target must speak %s, not %s",
+						m.Name, tm.Name, passthroughFormat, passthroughFormat, format)
+				}
 			}
 			for _, capability := range caps {
 				var sec string
@@ -387,17 +420,6 @@ func (c *Converter) convertModels() error {
 						}
 					}
 					if pg == nil {
-						// Kong allows one plugin of a name per route, and without a selector
-						// nothing tells two ai-proxy-advanced plugins on one route apart, so
-						// a passthrough model cannot share its route with another model. Only
-						// another passthrough model can land on it: no other spec matches
-						// the bare base path.
-						if passthrough && len(g.proxies) > 0 {
-							return c.failAt("formats",
-								"model %q: a passthrough model cannot share route %q with another model",
-								m.Name, g.route.Name)
-						}
-
 						embeddings, err := c.resolveEmbeddings(balancerExtra(m.Config.Balancer, "embeddings"))
 						if err != nil {
 							return err
@@ -851,6 +873,24 @@ func modelRouteConfigKey(route aigw.ModelRouteConfig) (string, error) {
 		return "", err
 	}
 	return string(b), nil
+}
+
+// passthroughMatcherKey identifies the requests a passthrough route on base path b
+// matches: only the Kong matcher fields, so routes differing in name, tags or
+// buffering still collide while hosts/headers/... disambiguate them.
+// ponytail: exact equality, so partially overlapping hosts/methods are not caught.
+func passthroughMatcherKey(b string, route aigw.ModelRouteConfig) (string, error) {
+	k, err := json.Marshal(aigw.ModelRouteConfig{
+		Paths:        []string{b},
+		Hosts:        route.Hosts,
+		Methods:      route.Methods,
+		Protocols:    route.Protocols,
+		Headers:      route.Headers,
+		SNIs:         route.SNIs,
+		Sources:      route.Sources,
+		Destinations: route.Destinations,
+	})
+	return string(k), err
 }
 
 // uniqueModelRouteName reserves base if available, otherwise returns a stable

@@ -83,7 +83,32 @@ func TestPassthroughRejects(t *testing.T) {
     type: api
     formats: [{type: passthrough}]
     targets: [{name: b, provider: p, config: {type: openai}}]`,
-			"a passthrough model cannot share route",
+			"a passthrough model cannot share route path",
+		},
+		// Different auth strategies split the route group, but both routes still
+		// match the same requests.
+		"two passthrough models on one base path with different auth": {
+			`
+  - name: a
+    formats: [{type: passthrough}]
+    config: {route: {paths: [/ai]}}
+    targets: [{name: t, provider: p, config: {type: openai}}]
+  - name: b
+    formats: [{type: passthrough}]
+    access: {auth_strategies: [key]}
+    config: {route: {paths: [/ai]}}
+    targets: [{name: t2, provider: p, config: {type: openai}}]`,
+			"a passthrough model cannot share route path",
+		},
+		// The body is forwarded unchanged, so an openai body cannot reach anthropic.
+		"targets with different client formats": {
+			`
+  - name: mixed
+    formats: [{type: passthrough}]
+    targets:
+      - {name: a, provider: p, config: {type: openai}}
+      - {name: b, provider: p, config: {type: anthropic}}`,
+			"every target must speak openai, not anthropic",
 		},
 		"semantic balancer": {
 			`
@@ -169,4 +194,22 @@ policies:
 	require.Len(t, warnings, 2)
 	require.Contains(t, warnings[0], `policy "guard" (ai-prompt-guard) cannot read the request`)
 	require.Contains(t, warnings[1], `policy "cache" (ai-semantic-cache) cannot read the request`)
+}
+
+// TestPassthroughAllowsHostDisambiguatedModels pins that two passthrough models on one base
+// path convert when their hosts tell them apart, and that gemini and vertex targets mix.
+func TestPassthroughAllowsHostDisambiguatedModels(t *testing.T) {
+	_, _, err := Convert([]byte(`models:
+  - name: a
+    formats: [{type: passthrough}]
+    config: {route: {paths: [/ai], hosts: [a.example]}}
+    targets: [{name: t, provider: p, config: {type: openai}}]
+  - name: b
+    formats: [{type: passthrough}]
+    config: {route: {paths: [/ai], hosts: [b.example]}}
+    targets:
+      - {name: g, provider: p, config: {type: gemini}}
+      - {name: v, provider: p, config: {type: vertex}}
+`+passthroughProviders), Options{})
+	require.NoError(t, err)
 }
