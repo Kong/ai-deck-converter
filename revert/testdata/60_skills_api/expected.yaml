@@ -1,0 +1,61 @@
+models:
+  - type: api
+    name: skills-route
+    capabilities:
+      - skills
+    formats:
+      - type: openai
+    targets:
+      - name: gpt-5.6
+        provider: openai-env
+        config:
+          type: openai
+    config:
+      route:
+        paths:
+          - /ai
+      logging:
+        payloads: false
+        statistics: false
+      response_streaming: deny
+      model:
+        name_header: false
+  - type: api
+    name: ant-skills
+    capabilities:
+      - skills
+    formats:
+      - type: anthropic
+    targets:
+      - name: claude-sonnet-4-5
+        provider: anthropic-env
+        config:
+          type: anthropic
+          version: "2023-06-01"
+    config:
+      route:
+        paths:
+          - /claude
+      logging:
+        payloads: false
+        statistics: false
+      response_streaming: deny
+      model:
+        name_header: false
+model_providers:
+  - type: openai
+    name: openai-env
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: '{vault://env/openai-key}'
+  - type: anthropic
+    name: anthropic-env
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: x-api-key
+            value: '{vault://env/anthropic-key}'

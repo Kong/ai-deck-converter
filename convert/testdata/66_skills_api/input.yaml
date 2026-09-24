@@ -1,0 +1,61 @@
+models:
+  - display_name: OpenAI Skills API
+    name: openai-skills-api
+    type: api
+    enabled: true
+    capabilities: [skills]
+    formats:
+      - type: openai
+    targets:
+      - name: gpt-5.6
+        provider: openai-prod
+        config:
+          type: openai
+    policies: []
+    access:
+      acls: {allow: [], deny: []}
+    config:
+      route:
+        paths: [/ai]
+      response_streaming: deny
+      max_request_body_size: 536870912
+  - display_name: Anthropic Skills API
+    name: anthropic-skills-api
+    type: api
+    enabled: true
+    capabilities: [skills]
+    formats:
+      - type: anthropic
+    targets:
+      - name: claude-sonnet-4-5
+        provider: anthropic-prod
+        config:
+          type: anthropic
+          version: "2023-06-01"
+    policies: []
+    access:
+      acls: {allow: [], deny: []}
+    config:
+      route:
+        paths: [/claude]
+      response_streaming: deny
+      max_request_body_size: 536870912
+model_providers:
+  - type: openai
+    display_name: OpenAI Prod
+    name: openai-prod
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://env/openai-key}"
+  - type: anthropic
+    display_name: Anthropic Prod
+    name: anthropic-prod
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: x-api-key
+            value: "{vault://env/anthropic-key}"

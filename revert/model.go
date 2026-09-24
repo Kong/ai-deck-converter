@@ -689,13 +689,13 @@ func aiModelAlias(m kong.AIModel) string {
 func (r *Reverter) hasAIModels() bool { return len(r.src.AIModels) > 0 }
 
 // isAPIOnly reports whether the capabilities indicate an "api" model
-// (files/batches lifecycle APIs rather than synchronous generation).
+// (files/batches/skills lifecycle APIs rather than synchronous generation).
 func isAPIOnly(caps []string) bool {
 	if len(caps) == 0 {
 		return false
 	}
 	for _, c := range caps {
-		if c != "batches" && c != "files" {
+		if c != "batches" && c != "files" && c != "skills" {
 			return false
 		}
 	}
