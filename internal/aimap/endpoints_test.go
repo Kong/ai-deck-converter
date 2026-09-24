@@ -8,10 +8,35 @@ import (
 
 func TestFormats(t *testing.T) {
 	got := Formats()
-	// The valid Format.Type values, i.e. EndpointTable sections minus provider renderings.
-	want := []string{"anthropic", "bedrock", "cohere", "gemini", "huggingface", "openai", "typesafe"}
+	// The valid Format.Type values: EndpointTable sections minus provider renderings, plus
+	// passthrough, which is a format without a section of its own.
+	want := []string{"anthropic", "bedrock", "cohere", "gemini", "huggingface", "openai", "passthrough", "typesafe"}
 	require.Equal(t, want, got)
 	require.NotContains(t, got, "vertex", "vertex is a rendering of gemini, not a client format")
+}
+
+func TestClientFormatPassthroughBorrowsTheProviderSection(t *testing.T) {
+	// A provider with a section of its own renders on that section's paths.
+	require.Equal(t, "openai", ClientFormat("passthrough", "openai"))
+	require.Equal(t, "anthropic", ClientFormat("passthrough", "anthropic"))
+	require.Equal(t, "bedrock", ClientFormat("passthrough", "bedrock"))
+	// A provider rendering resolves through its base format, and SectionFor still
+	// keeps the rendering distinct.
+	require.Equal(t, "gemini", ClientFormat("passthrough", "vertex"))
+	require.Equal(t, "vertex", SectionFor("passthrough", "vertex"))
+	// Providers with no section of their own expose OpenAI-shaped APIs.
+	for _, providerType := range []string{"azure", "mistral", "databricks", "deepseek", ""} {
+		require.Equal(t, "openai", ClientFormat("passthrough", providerType), providerType)
+	}
+	// Every other format ignores the provider type, as before.
+	require.Equal(t, "anthropic", ClientFormat("anthropic", "openai"))
+	require.Equal(t, "openai", ClientFormat("", "anthropic"))
+}
+
+func TestRoutePathPassthroughIsTheBasePath(t *testing.T) {
+	require.Equal(t, "/ai", RoutePath("/ai", PassthroughEndpoint))
+	require.Equal(t, "/ai", RoutePath("/ai/", PassthroughEndpoint))
+	require.Equal(t, "/", RoutePath("/", PassthroughEndpoint))
 }
 
 func TestCapabilitiesFor(t *testing.T) {

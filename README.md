@@ -118,6 +118,7 @@ See `convert/testdata/*/input.yaml` for worked examples.
 | CA Certificate | `ca_certificates` entry (`cert`, `cert_digest`); `name` preserved as an `ai-gateway-name:` tag (Kong's entity has no name field). |
 | Certificate | `certificates` entry (`cert`/`key` and the optional `cert_alt`/`key_alt` pair passed through). Kong certificates have no `name`, so the source name is not represented in the output; in `db-less` mode it still seeds the generated `id`. |
 | SNI | Nested under its referenced Certificate's `snis` list (`hostname` → `name`, `labels` → `tags`); decK's file format has no standalone SNI entity. The SNI's own `name`/`display_name` have no Kong counterpart and are dropped. In `db-less` mode SNIs become a top-level `snis` entry referencing the certificate's generated `id`. |
+| Model with `formats: [{type: passthrough}]` | Requires AI Gateway 2.2+. **One route on the bare base path** (every method, no endpoint suffix), whatever `capabilities` it declares — `[]` is fine — with one route-scoped `ai-proxy-advanced` whose targets carry `route_type: passthrough` and no `model_alias`; `llm_format` is the provider's native format (openai for providers without their own). No `ai-model-selector`, no video lifecycle routes, and the model's policies/ACLs are route-scoped rather than `model:`-scoped, since nothing can select an `ai-models` row for a body of unknown shape (the row is still emitted). No `anthropic_version` default is applied. |
 | Model `policies`/`acls` | Top-level plugins scoped to the `ai-models` entity via a `model:` FK. |
 | Agent `access.acls` | Kong `acl` plugin on the agent's Route. |
 | `labels` | `tags` flattened to sorted `key:value` strings. |
@@ -270,6 +271,15 @@ and `formats` beyond the first.
   `authorization_servers`/`scopes_supported` are always attributed to the
   metadata rather than the provider's issuer/scopes.
 - **Labels** are lossy as tags when a value contains `:`.
+- **Passthrough models.** A passthrough model cannot share its base path with
+  another passthrough model, be combined with another format, or use the
+  `semantic` balancer; a databricks target needs `upstream_url`. All are
+  conversion errors. Policies that read the normalized LLM shape (guardrails,
+  prompt decorators/templates, semantic cache, RAG injector, …) produce a
+  warning when attached to the model or global; raw-byte ones
+  (`ai-request-transformer`, `ai-response-transformer`, `ai-sanitizer`) and
+  consumer/consumer-group policies are not checked. Revert recovers the model
+  with no `capabilities`.
 
 ## Community
 

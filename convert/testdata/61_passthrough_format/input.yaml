@@ -1,0 +1,33 @@
+models:
+  - display_name: GPT-5.2
+    id: 5b3e8cba-2cb7-4fd4-888e-20a6727230f2
+    name: gpt-5-2
+    type: model
+    enabled: true
+    capabilities: [generate]
+    formats:
+      - type: passthrough
+    config:
+      route:
+        paths: [/ai]
+      response_streaming: allow
+    targets:
+      - name: gpt-5.2
+        provider: openai-prod
+        config:
+          type: openai
+          temperature: 1.0
+          max_tokens: 1024
+    policies: []
+    access:
+      acls: {allow: [], deny: []}
+model_providers:
+  - name: openai-prod
+    type: openai
+    display_name: OpenAI Prod
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://ai/openai-token}"
