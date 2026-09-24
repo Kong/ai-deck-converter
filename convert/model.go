@@ -332,10 +332,10 @@ func (c *Converter) convertModels() error {
 				// rejects the pairing. An unresolvable provider type is left to the
 				// warning above rather than escalated here.
 				if aimap.RequiresNativeFormat(capability) && providerType != "" &&
-					aimap.PluginProvider(providerType) != llmFormat(m) {
+					aimap.PluginProvider(providerType) != llmFormat(m, providerType) {
 					return c.failAt("capabilities",
 						"model %q: capability %q is passthrough-only, so provider type %q cannot serve llm_format %q",
-						m.Name, capability, providerType, llmFormat(m))
+						m.Name, capability, providerType, llmFormat(m, providerType))
 				}
 				// A capability with secondary endpoints (bedrock generate, also
 				// reachable via invoke) emits one route per endpoint, each
