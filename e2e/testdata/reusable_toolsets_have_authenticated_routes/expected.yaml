@@ -1,0 +1,122 @@
+_format_version: "3.0"
+_transform: false
+services:
+  - id: 1fcd64ef-e422-51db-a0df-c37d58b8bfbe
+    name: team-a
+    host: localhost
+  - id: 15350122-8c21-5d6c-8271-8ca7a60e76a0
+    name: team-b
+    host: localhost
+  - id: 05eb9429-4518-5093-97a0-996b25774817
+    name: aggregate
+    host: localhost
+routes:
+  - id: b7da278e-6cd7-5fc6-8bc0-cbef184ea183
+    name: team-a-route
+    service:
+      id: 1fcd64ef-e422-51db-a0df-c37d58b8bfbe
+    paths:
+      - /mcp/team-a
+    protocols:
+      - http
+      - https
+  - id: 9ffeb599-0bf8-5581-925c-5445c0cdb425
+    name: team-b-route
+    service:
+      id: 15350122-8c21-5d6c-8271-8ca7a60e76a0
+    paths:
+      - /mcp/team-b
+    protocols:
+      - http
+      - https
+  - id: 698e5db5-2023-59ac-8021-74259b467359
+    name: aggregate-route
+    service:
+      id: 05eb9429-4518-5093-97a0-996b25774817
+    paths:
+      - /mcp/aggregate
+    protocols:
+      - http
+      - https
+consumers:
+  - id: 8b1264af-6bb7-5a64-8953-351cc04ed773
+    username: mcp-client
+plugins:
+  - id: e0b8689b-5fff-5b3d-b710-cbaaeb5cf804
+    name: ai-mcp-proxy
+    config:
+      include_consumer_groups: true
+      logging:
+        log_audits: false
+        log_payloads: false
+        log_statistics: true
+      mode: conversion-only
+      tools:
+        - description: Get a report
+          method: GET
+          name: team-a-report
+          path: report
+    route:
+      id: b7da278e-6cd7-5fc6-8bc0-cbef184ea183
+    tags:
+      - mcp-listener:aggregate-id
+  - id: 10b5bf80-102f-5dc1-abcc-538e772834d5
+    name: key-auth
+    config:
+      hide_credentials: false
+      key_names:
+        - apikey
+    route:
+      id: b7da278e-6cd7-5fc6-8bc0-cbef184ea183
+  - id: c1b3fb4f-aee9-59cd-bfa4-c542a643c3b2
+    name: ai-mcp-proxy
+    config:
+      include_consumer_groups: true
+      logging:
+        log_audits: false
+        log_payloads: false
+        log_statistics: true
+      mode: conversion-only
+      tools:
+        - description: Get a report
+          method: GET
+          name: team-b-report
+          path: report
+    route:
+      id: 9ffeb599-0bf8-5581-925c-5445c0cdb425
+    tags:
+      - mcp-listener:aggregate-id
+  - id: 1baf169d-fffb-50f9-bfea-211774cfd43e
+    name: key-auth
+    config:
+      hide_credentials: false
+      key_names:
+        - apikey
+    route:
+      id: 9ffeb599-0bf8-5581-925c-5445c0cdb425
+  - id: 702ac868-583d-5c8d-ade7-0e006b8bef35
+    name: ai-mcp-proxy
+    config:
+      include_consumer_groups: true
+      logging:
+        log_audits: false
+        log_payloads: false
+        log_statistics: true
+      mode: listener
+      server:
+        tag: mcp-listener:aggregate-id
+      tools: []
+    route:
+      id: 698e5db5-2023-59ac-8021-74259b467359
+  - id: 9d81b785-26fc-5d9b-b02f-3595cd69219f
+    name: key-auth
+    config:
+      hide_credentials: false
+      key_names:
+        - apikey
+    route:
+      id: 698e5db5-2023-59ac-8021-74259b467359
+keyauth_credentials:
+  - id: 5a4ea264-58ef-5e59-8990-86f62d824cba
+    key: mcp-e2e-secret
+    consumer: 8b1264af-6bb7-5a64-8953-351cc04ed773

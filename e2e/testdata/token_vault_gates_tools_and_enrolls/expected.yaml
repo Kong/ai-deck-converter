@@ -1,0 +1,44 @@
+_format_version: "3.0"
+_transform: false
+services:
+  - id: 81d7f3e7-8b39-565e-9cd7-27020a81fbbb
+    name: vaulted-vendor-mcp
+    url: http://host.docker.internal:18081
+    host: host.docker.internal
+    port: 18081
+    protocol: http
+routes:
+  - id: a7590114-1b2d-51d1-8274-87d37a66f4fa
+    name: vaulted-vendor-route
+    service:
+      id: 81d7f3e7-8b39-565e-9cd7-27020a81fbbb
+    paths:
+      - /mcp/vaulted
+    protocols:
+      - http
+      - https
+plugins:
+  - id: 687b8f2f-4a9e-54ba-bfa8-d9f3acc0e09d
+    name: ai-mcp-proxy
+    config:
+      auth:
+        provider: token_vault
+        token_vault:
+          directory: my-directory
+          encryption_secrets:
+            - test-token-vault-encryption-key
+          provider: my-upstream-provider
+          redis:
+            connect_timeout: 2000
+            database: 0
+            host: mcp-tv-redis
+            port: 6379
+      include_consumer_groups: true
+      logging:
+        log_audits: false
+        log_payloads: false
+        log_statistics: true
+      mode: passthrough-listener
+      tools: []
+    route:
+      id: a7590114-1b2d-51d1-8274-87d37a66f4fa
