@@ -120,11 +120,24 @@ func (r *Reverter) revertMCPServer(svc *kong.Service, rt *kong.Route, plugins, s
 	m.Config.Server = mcpServerConfigForAIGateway(getMap(cfg, "server"))
 	m.Config.Sources = r.mcpSources[svc.Name]
 	m.Config.Proxy = proxyFromConfig(getMap(cfg, "proxy_config"))
-	upstream, err := r.upstreamFromConfig(getMap(cfg, "auth"), fmt.Sprintf("MCP server %q", svc.Name))
-	if err != nil {
-		return err
+	// Token Vault credential resolution lifts into the top-level token_vault
+	// field (its position in the AI Gateway schema); other upstream auth (e.g.
+	// AWS SigV4) lifts into config.upstream.auth. The two never coexist — they
+	// lower to the same plugin auth record.
+	authBlock := getMap(cfg, "auth")
+	if getStr(authBlock, "provider") == aimap.UpstreamAuthProviderTokenVault {
+		tokenVault, err := r.tokenVaultFromConfig(authBlock, fmt.Sprintf("MCP server %q", svc.Name))
+		if err != nil {
+			return err
+		}
+		m.TokenVault = tokenVault
+	} else {
+		upstream, err := r.upstreamFromConfig(authBlock, fmt.Sprintf("MCP server %q", svc.Name))
+		if err != nil {
+			return err
+		}
+		m.Config.Upstream = upstream
 	}
-	m.Config.Upstream = upstream
 	m.Config.ToolsCacheTTLSeconds = getInt(cfg, "tools_cache_ttl_seconds")
 
 	// Access: the ACL attribute config and default_acl live in the plugin

@@ -1,0 +1,45 @@
+mcp_servers:
+  - type: passthrough-listener
+    name: vaulted-vendor-mcp
+    config:
+      logging:
+        payloads: false
+        statistics: true
+        audits: false
+    tools:
+      - name: vendorTool
+        description: A vendor tool
+    upstream_url: https://mcp.internal.kongair.com
+    token_vault:
+      directory: my-directory
+      provider: my-upstream-provider
+      redis:
+        host: redis.internal
+        port: 6379
+        database: 0
+        connect_timeout: 2000
+        keepalive:
+          pool_size: 256
+        sentinel:
+          master: mymaster
+          role: any
+          nodes:
+            - host: sentinel-1.internal
+              port: 6379
+      encryption_secrets:
+        - '{vault://env/TOKEN_VAULT_ENC_SECRET}'
+        - '{vault://env/TOKEN_VAULT_ENC_SECRET_OLD}'
+  - type: passthrough-listener
+    name: bare-vaulted-vendor-mcp
+    config:
+      logging:
+        payloads: false
+        statistics: true
+        audits: false
+    tools:
+      - name: bareVendorTool
+        description: A bare vendor tool
+    upstream_url: https://bare-mcp.internal.kongair.com
+    token_vault:
+      directory: my-directory
+      provider: my-other-upstream-provider

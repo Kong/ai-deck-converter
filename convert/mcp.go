@@ -40,6 +40,7 @@ func (c *Converter) convertMCPServers() error {
 			kong.FieldMapping{GeneratedPrefix: "config.tools", SourcePrefix: "tools"},
 			kong.FieldMapping{GeneratedPrefix: "config.proxy_config", SourcePrefix: "config.proxy"},
 			kong.FieldMapping{GeneratedPrefix: "config.auth", SourcePrefix: "config.upstream.auth"},
+			kong.FieldMapping{GeneratedPrefix: "config.auth.token_vault", SourcePrefix: "token_vault"},
 			kong.FieldMapping{GeneratedPrefix: "config.default_acl", SourcePrefix: "access"},
 			kong.FieldMapping{GeneratedPrefix: "config.acl_attribute_type", SourcePrefix: "access.acl_attribute_type"},
 			kong.FieldMapping{
@@ -259,6 +260,38 @@ func (c *Converter) mcpPlugin(m *aigw.MCPServer) (kong.Plugin, error) {
 	// but we pass it through whenever set and let the plugin validate.
 	if pc := proxyConfigBlock(m.Config.Proxy); pc != nil {
 		cfg["proxy_config"] = pc
+	}
+	// Upstream authentication (e.g. AWS SigV4) and Token Vault credential
+	// resolution both lower to the plugin's auth record, which can only carry
+	// one provider — a server declaring both cannot be represented.
+	if m.TokenVault != nil && m.Config.Upstream != nil && m.Config.Upstream.Auth != nil {
+		return kong.Plugin{}, c.failAt("token_vault",
+			"MCP server %q: token_vault and config.upstream.auth are mutually exclusive "+
+				"(both lower to the ai-mcp-proxy plugin's auth record)", m.Name)
+	}
+	// Kong's Token Vault caches exchanged credentials in Redis encrypted with
+	// encryption_secrets, so a redis block without them is rejected by the
+	// plugin's own entity check. Reject here rather than emit a config decK
+	// would refuse to apply.
+	if tv := m.TokenVault; tv != nil && tv.Redis != nil && len(tv.EncryptionSecrets) == 0 {
+		return kong.Plugin{}, c.failAt("token_vault.encryption_secrets",
+			"MCP server %q: token_vault.encryption_secrets is required when token_vault.redis is configured", m.Name)
+	}
+	// A present but empty token_vault block would otherwise lower to
+	// auth.token_vault: {} — the plugin schema requires directory and provider
+	// when provider is token_vault, so reject it the same way. (After this the
+	// lowered block can never be empty.)
+	if tv := m.TokenVault; tv != nil && (tv.Directory == "" || tv.Provider == "") {
+		return kong.Plugin{}, c.failAt("token_vault",
+			"MCP server %q: token_vault requires directory and provider", m.Name)
+	}
+	// Token Vault credential resolution (auth.provider: token_vault); only
+	// emitted when set.
+	if tv := m.TokenVault; tv != nil {
+		cfg["auth"] = map[string]any{
+			"provider":    aimap.UpstreamAuthProviderTokenVault,
+			"token_vault": aimap.TokenVaultToPlugin(tv),
+		}
 	}
 	// Upstream authentication (e.g. AWS SigV4) lowers to the plugin's auth
 	// record; only emitted when set.

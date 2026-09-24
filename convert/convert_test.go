@@ -220,6 +220,7 @@ mcp_servers:
 			{GeneratedPrefix: "config.tools", SourcePrefix: "tools"},
 			{GeneratedPrefix: "config.proxy_config", SourcePrefix: "config.proxy"},
 			{GeneratedPrefix: "config.auth", SourcePrefix: "config.upstream.auth"},
+			{GeneratedPrefix: "config.auth.token_vault", SourcePrefix: "token_vault"},
 			{GeneratedPrefix: "config.default_acl", SourcePrefix: "access"},
 			{GeneratedPrefix: "config.acl_attribute_type", SourcePrefix: "access.acl_attribute_type"},
 			{GeneratedPrefix: "config.access_token_claim_field", SourcePrefix: "access.access_token_claim_field"},
