@@ -101,16 +101,34 @@ func testReusableToolsetsAreInternalOnly(t *testing.T, license string) {
 		t.Fatalf("mock upstream saw %d /report requests, want 2 (one per tool call); hits: %v", reports, mock.hits())
 	}
 
+	// The gate keys off the listener the request was served on
+	// (ngx.var.server_addr), so client-controlled forwarding headers that
+	// claim a unix-socket origin must not open the route either.
+	spoofs := []struct{ name, value string }{
+		{"", ""},
+		{"X-Forwarded-For", "unix://bypass-me"},
+		{"X-Forwarded-For", "unix"},
+		{"X-Forwarded-Host", "bypass-me"},
+		{"X-Forwarded-Host", "unix"},
+		{"X-Forwarded-Host", "unix://bypass-me"},
+	}
 	for _, server := range []string{"team-a", "team-b"} {
 		for _, apiKey := range []string{"", mcpE2EAPIKey} {
-			context := server + ": direct request without credentials"
-			if apiKey != "" {
-				context = server + ": direct request with the listener's credential"
+			for _, spoof := range spoofs {
+				context := server + ": direct request without credentials"
+				if apiKey != "" {
+					context = server + ": direct request with the listener's credential"
+				}
+				headers := mcpHeaders(apiKey, "")
+				if spoof.name != "" {
+					headers[spoof.name] = spoof.value
+					context += fmt.Sprintf(" and %s: %s", spoof.name, spoof.value)
+				}
+				resp := httpPost(t, gateway.ProxyURL()+"/mcp/"+server, headers,
+					`{"jsonrpc": "2.0", "id": 3, "method": "tools/list"}`)
+				requireStatus(t, resp, 404, context)
+				t.Logf("PASS: %s rejected with 404", context)
 			}
-			resp := httpPost(t, gateway.ProxyURL()+"/mcp/"+server, mcpHeaders(apiKey, ""),
-				`{"jsonrpc": "2.0", "id": 3, "method": "tools/list"}`)
-			requireStatus(t, resp, 404, context)
-			t.Logf("PASS: %s rejected with 404", context)
 		}
 	}
 }

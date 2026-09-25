@@ -27,6 +27,7 @@ func (c *Converter) convertMCPServers() error {
 	// shares a name with one (the shared model service is named
 	// aimap.GatewayServiceName, which an MCP server is free to be called too).
 	var conversionOnlyServices []int
+	exposed := c.exposedSources()
 	for i := range c.src.MCPServers {
 		m := &c.src.MCPServers[i]
 		route := buildRoute(m.Config.Route, m.Name)
@@ -70,7 +71,9 @@ func (c *Converter) convertMCPServers() error {
 			return err
 		}
 		route.Plugins = append(route.Plugins, authPlugins...)
-		if m.Type == mcpConversionOnly {
+		// An unexposed conversion-only server is pruned below, so it gets no
+		// gate and its policies cannot collide with one.
+		if m.Type == mcpConversionOnly && exposed[m.Name] {
 			// Kong allows one plugin per name on a route, so a policy of the
 			// gate's type would collide with it; neither can be dropped without
 			// either opening the route or losing the user's plugin.
@@ -116,7 +119,7 @@ func (c *Converter) convertMCPServers() error {
 		c.out.Services = append(c.out.Services, service)
 	}
 	c.wireListenerSources()
-	return c.pruneUnexposedSources(conversionOnlyServices)
+	return c.pruneUnexposedSources(conversionOnlyServices, exposed)
 }
 
 // mcpToolsetGate closes a conversion-only server's route to clients. Such a
@@ -184,16 +187,9 @@ func (c *Converter) wireListenerSources() {
 	}
 }
 
-// pruneUnexposedSources drops conversion-only MCP servers that no listener in
-// the document names in config.sources. Such a server reaches no client — its
-// tools are only ever served through a listener — so its Service and Route
-// exist solely as dead configuration: its route is gated off from clients
-// (mcpToolsetGate), and no listener re-enters it to execute its tools.
-//
-// Note this is a whole-document judgement. A conversion-only server converted
-// on its own, with its listener in another document, has nothing here to
-// associate with and is pruned.
-func (c *Converter) pruneUnexposedSources(conversionOnlyServices []int) error {
+// exposedSources returns the names of the MCP servers that some listener in
+// the document names in config.sources.
+func (c *Converter) exposedSources() map[string]bool {
 	exposed := map[string]bool{}
 	for i := range c.src.MCPServers {
 		m := &c.src.MCPServers[i]
@@ -204,7 +200,20 @@ func (c *Converter) pruneUnexposedSources(conversionOnlyServices []int) error {
 			exposed[sourceName] = true
 		}
 	}
+	return exposed
+}
 
+// pruneUnexposedSources drops conversion-only MCP servers that no listener in
+// the document names in config.sources. Such a server reaches no client — its
+// tools are only ever served through a listener — so its Service and Route
+// exist solely as dead configuration: no listener re-enters it to execute its
+// tools. It is never gated (see convertMCPServers), so it must never survive:
+// the drop warns, and under -strict that warning is an error instead.
+//
+// Note this is a whole-document judgement. A conversion-only server converted
+// on its own, with its listener in another document, has nothing here to
+// associate with and is pruned.
+func (c *Converter) pruneUnexposedSources(conversionOnlyServices []int, exposed map[string]bool) error {
 	// Collect first, in document order, so the warnings are deterministic.
 	drop := make(map[int]bool, len(conversionOnlyServices))
 	for _, i := range conversionOnlyServices {

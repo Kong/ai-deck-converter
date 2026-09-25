@@ -209,6 +209,39 @@ func TestConversionOnlySourceRejectsPreFunctionPolicy(t *testing.T) {
 	require.Equal(t, []string{aimap.MCPToolsetGateTag}, routePlugins(t, out, "toolset-a")[1].Tags)
 }
 
+// mcpUnexposedPreFunctionPolicy gives a conversion-only server that no
+// listener names a policy of the gate's own plugin type.
+const mcpUnexposedPreFunctionPolicy = `
+policies:
+  - name: my-pre-function
+    type: pre-function
+    config:
+      access: ['kong.log.notice("hello")']
+mcp_servers:
+  - type: conversion-only
+    name: orphan
+    config:
+      route: {paths: [/mcp/orphan]}
+    policies: [my-pre-function]
+    tools:
+      - {name: report, description: Get a report, method: GET, path: /report}
+`
+
+func TestUnexposedConversionOnlySourceWithPreFunctionPolicyIsDropped(t *testing.T) {
+	// An unexposed server is pruned, never gated, so its pre-function policy
+	// has no gate to collide with: it is dropped with a warning, not rejected.
+	out, warnings := convertMCP(t, mcpUnexposedPreFunctionPolicy)
+	require.Empty(t, serviceNames(out))
+	require.Len(t, warnings, 1)
+	require.Contains(t, warnings[0], `MCP server "orphan" is conversion-only but no listener names it`)
+
+	// Under -strict the drop is what fails, not a gate collision.
+	_, _, err := Convert([]byte(mcpUnexposedPreFunctionPolicy), Options{Strict: true})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "no listener names it")
+	require.NotContains(t, err.Error(), "cannot also have")
+}
+
 func TestSourceSharedByListenersWithDifferentAccess(t *testing.T) {
 	// Nothing is copied from either listener, so their differing access no
 	// longer conflicts: each keeps its own, and the shared source gets one gate.
