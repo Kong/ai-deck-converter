@@ -1193,6 +1193,49 @@ datastores:
 	require.Contains(t, err.Error(), "redis-ce")
 }
 
+func TestConvertRejectsMismatchedVectorDBStrategy(t *testing.T) {
+	for _, tc := range []struct {
+		name          string
+		strategy      string
+		datastoreType string
+	}{
+		{name: "redis strategy with vectordb datastore", strategy: "redis", datastoreType: "vectordb"},
+		{name: "pgvector strategy with redis-ee datastore", strategy: "pgvector", datastoreType: "redis-ee"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			src := []byte(`
+models:
+  - type: model
+    name: m1
+    capabilities: [generate]
+    formats: [{type: openai}]
+    targets:
+      - name: gpt-4o
+        provider: p1
+        config: {type: openai}
+    datastores: [{name: ds}]
+    config:
+      route: {paths: [/ai]}
+      balancer:
+        algorithm: semantic
+        vectordb: {strategy: ` + tc.strategy + `, dimensions: 1536, distance_metric: cosine}
+model_providers:
+  - name: p1
+    type: openai
+datastores:
+  - type: ` + tc.datastoreType + `
+    name: ds
+    config: {host: store.internal}
+`)
+			_, _, err := Convert(src, Options{})
+			require.Error(t, err, "vectordb strategy must match the datastore type")
+			require.Contains(t, err.Error(), "m1")
+			require.Contains(t, err.Error(), tc.strategy)
+			require.Contains(t, err.Error(), tc.datastoreType)
+		})
+	}
+}
+
 func TestConvertRejectsMultipleDatastoresOnModel(t *testing.T) {
 	src := []byte(`
 models:
