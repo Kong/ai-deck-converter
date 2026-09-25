@@ -1117,9 +1117,23 @@ func (c *Converter) resolveModelDatastore(m *aigw.Model) (*aigw.Datastore, error
 // sub-block, replacing any inline connection ("the datastore wins") while the
 // common fields the model authors itself are preserved.
 func (c *Converter) modelVectorDB(m *aigw.Model, ds *aigw.Datastore) (any, error) {
-	vectordb := aimap.VectorDBToPlugin(balancerExtra(m.Config.Balancer, "vectordb"))
+	vdb := balancerExtra(m.Config.Balancer, "vectordb")
+	vectordb := aimap.VectorDBToPlugin(vdb)
 	if ds == nil {
 		return vectordb, nil
+	}
+
+	if vdb != nil {
+		vectorDB, ok := vdb.(map[string]interface{})
+		if !ok {
+			return nil, c.failAt("models", "model %q's balancer.vectordb is not a map", m.Name)
+		}
+		strategy, _ := aimap.VectorDBStrategyForDatastoreType(ds.Type)
+		if vectorDB["strategy"] != strategy {
+			return nil, c.failAt("models", "model %q's balancer.vectordb.strategy %q does not match "+
+				"the datastore type %q (expected %q)",
+				m.Name, vectorDB["strategy"], ds.Type, strategy)
+		}
 	}
 	out, err := aimap.ApplyModelDatastore(vectordb, ds.Type, ds.Config)
 	if err != nil {
