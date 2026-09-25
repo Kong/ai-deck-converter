@@ -37,13 +37,16 @@ func sessionID(resp httpResponse) string {
 	return headerValue(resp.Header, "Mcp-Session-Id")
 }
 
-// testReusableToolsetsHaveAuthenticatedRoutes drives the aggregate MCP listener
-// that references conversion-only sources (team-a, team-b): their tools are
-// reachable only through the listener that names them in config.sources, and
-// the converter copies the listener's key-auth onto their conversion-only
-// routes so those routes cannot be reached on terms the listener would reject.
-func testReusableToolsetsHaveAuthenticatedRoutes(t *testing.T, license string) {
-	configPath := convertCase(t, "reusable_toolsets_have_authenticated_routes", nil)
+// testReusableToolsetsAreInternalOnly drives the aggregate MCP listener that
+// references conversion-only sources (team-a, team-b): their tools are
+// reachable only through the listener that names them in config.sources. The
+// converter gates each conversion-only route with a pre-function that answers
+// 404 to anything but ai-mcp-proxy's unix-socket re-entry, so the listener's
+// tool calls reach the mock upstream while direct client requests never do,
+// even with the listener's own credential.
+func testReusableToolsetsAreInternalOnly(t *testing.T, license string) {
+	mock := startMockUpstream(t)
+	configPath := convertCase(t, "reusable_toolsets_are_internal_only", patchMCPPort(18082, mock.Port))
 
 	gateway := startGateway(t, GatewayOptions{
 		Image:  gatewayImage(t, "kong/kong-ai-gateway-dev:2.1.0-rc.3"),
@@ -82,29 +85,50 @@ func testReusableToolsetsHaveAuthenticatedRoutes(t *testing.T, license string) {
 	for _, tool := range []string{"team-a-report", "team-b-report"} {
 		resp := httpPost(t, mcpURL, mcpHeaders(mcpE2EAPIKey, sess), fmt.Sprintf(
 			`{"jsonrpc": "2.0", "id": 4, "method": "tools/call", "params": {"name": %q, "arguments": {}}}`, tool))
-		switch {
-		case strings.Contains(resp.Body, "No API key found in request"):
-			t.Logf("WARN: %s resolved to a path on its own conversion-only route and was rejected by the inherited key-auth "+
-				"(internal tool calls carry no credentials)", tool)
-		case strings.Contains(resp.Body, "HTTP call failed with status"):
-			t.Logf("INFO: %s was not blocked by the inherited access, but the call failed: %s", tool, resp.Body)
-		default:
-			t.Logf("PASS: %s executed successfully", tool)
+		requireStatus(t, resp, 200, tool+": tools/call")
+		if strings.Contains(resp.Body, `"isError":true`) || !strings.Contains(resp.Body, "hello from the mock upstream") {
+			t.Fatalf("%s did not execute against the mock upstream\ntools/call response:\n%s", tool, resp.Body)
+		}
+		t.Logf("PASS: %s executed through the gated conversion-only route", tool)
+	}
+	var reports int
+	for _, hit := range mock.hits() {
+		if hit.Path == "/report" {
+			reports++
 		}
 	}
+	if reports != 2 {
+		t.Fatalf("mock upstream saw %d /report requests, want 2 (one per tool call); hits: %v", reports, mock.hits())
+	}
 
+	// The gate keys off the listener the request was served on
+	// (ngx.var.server_addr), so client-controlled forwarding headers that
+	// claim a unix-socket origin must not open the route either.
+	spoofs := []struct{ name, value string }{
+		{"", ""},
+		{"X-Forwarded-For", "unix://bypass-me"},
+		{"X-Forwarded-For", "unix"},
+		{"X-Forwarded-Host", "bypass-me"},
+		{"X-Forwarded-Host", "unix"},
+		{"X-Forwarded-Host", "unix://bypass-me"},
+	}
 	for _, server := range []string{"team-a", "team-b"} {
-		resp := httpPost(t, gateway.ProxyURL()+"/mcp/"+server, mcpHeaders("", ""),
-			`{"jsonrpc": "2.0", "id": 3, "method": "tools/list"}`)
-		requireStatus(t, resp, 401, server+": unauthenticated request")
-		t.Logf("PASS: %s rejects unauthenticated requests with 401", server)
-
-		resp = httpPost(t, gateway.ProxyURL()+"/mcp/"+server, mcpHeaders(mcpE2EAPIKey, ""),
-			`{"jsonrpc": "2.0", "id": 3, "method": "tools/list"}`)
-		if resp.Status == 401 {
-			t.Fatalf("%s: the listener's own credential was rejected", server)
+		for _, apiKey := range []string{"", mcpE2EAPIKey} {
+			for _, spoof := range spoofs {
+				context := server + ": direct request without credentials"
+				if apiKey != "" {
+					context = server + ": direct request with the listener's credential"
+				}
+				headers := mcpHeaders(apiKey, "")
+				if spoof.name != "" {
+					headers[spoof.name] = spoof.value
+					context += fmt.Sprintf(" and %s: %s", spoof.name, spoof.value)
+				}
+				resp := httpPost(t, gateway.ProxyURL()+"/mcp/"+server, headers,
+					`{"jsonrpc": "2.0", "id": 3, "method": "tools/list"}`)
+				requireStatus(t, resp, 404, context)
+				t.Logf("PASS: %s rejected with 404", context)
+			}
 		}
-		t.Logf("INFO: %s authenticated request returned %d (conversion-only mode; what happens past auth "+
-			"is up to ai-mcp-proxy and the Gateway Service upstream)", server, resp.Status)
 	}
 }

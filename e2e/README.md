@@ -59,7 +59,7 @@ Every case:
 | Case | What it proves |
 | --- | --- |
 | `single_model_multiple_aliases` | Each alias of a body-selector model routes through its own `ai-proxy-advanced` copy to the (mocked) upstream, with the provider credential applied. |
-| `reusable_toolsets_have_authenticated_routes` | An aggregate MCP listener over conversion-only sources serves both sources' tools; the listener's key-auth is copied onto the conversion-only routes. |
+| `reusable_toolsets_are_internal_only` | An aggregate MCP listener over conversion-only sources serves and executes both sources' tools; the conversion-only routes are gated so direct client requests get 404, with or without credentials. |
 | `token_vault_gates_tools_and_enrolls` | The Token Vault lifecycle: unenrolled callers see only the virtual enrollment tools, enrollment unlocks the real tools, and the exchanged credential is applied upstream and cached in Redis. |
 
 ## Failures

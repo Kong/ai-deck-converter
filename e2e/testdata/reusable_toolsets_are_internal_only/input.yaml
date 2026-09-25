@@ -1,12 +1,18 @@
 mcp_servers:
+  # Conversion-only toolsets: reachable only through the listener that names
+  # them in config.sources. The converter gates their routes so direct client
+  # requests get a 404; ai-mcp-proxy's internal re-entry (over a unix socket)
+  # still reaches them. upstream_url points at the harness's mock REST API.
   - type: conversion-only
     name: team-a
+    upstream_url: http://host.docker.internal:18082
     config:
       route: {name: team-a-route, paths: [/mcp/team-a]}
     tools:
       - {name: team-a-report, description: Get a report, method: GET, path: report} #/mcp/team-a/report
   - type: conversion-only
     name: team-b
+    upstream_url: http://host.docker.internal:18082
     config:
       route: {name: team-b-route, paths: [/mcp/team-b]}
     tools:

@@ -37,7 +37,7 @@ func TestE2E(t *testing.T) {
 		run  func(t *testing.T)
 	}{
 		{"single_model_multiple_aliases", func(t *testing.T) { testSingleModelMultipleAliases(t, license) }},
-		{"reusable_toolsets_have_authenticated_routes", func(t *testing.T) { testReusableToolsetsHaveAuthenticatedRoutes(t, license) }},
+		{"reusable_toolsets_are_internal_only", func(t *testing.T) { testReusableToolsetsAreInternalOnly(t, license) }},
 		{"token_vault_gates_tools_and_enrolls", func(t *testing.T) { testTokenVaultGatesToolsAndEnrolls(t, license) }},
 	}
 	for _, c := range cases {
