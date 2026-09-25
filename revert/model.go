@@ -104,6 +104,12 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 		if llmFormat == "" {
 			llmFormat = aimap.DefaultLLMFormat
 		}
+		if allTargetsPassthrough(cfg) {
+			// llm_format still names the wire format the passthrough targets serve, but
+			// the model that produced them declared the passthrough format; recovering
+			// llm_format here would lower back to real route_types.
+			llmFormat = aimap.PassthroughFormat
+		}
 		genai := getStr(cfg, "genai_category")
 		fkName := ""
 		if proxy.Model != nil {
@@ -155,7 +161,11 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 
 			var capability string
 			var bases []string
-			if match, ok := resolveEndpoint(section, routeType, genai, rt.Name, path); ok {
+			if routeType == aimap.PassthroughRouteType {
+				// A passthrough route is the model's base path itself and serves no
+				// capability of its own (see aimap.PassthroughEndpoint).
+				bases = rt.Paths
+			} else if match, ok := resolveEndpoint(section, routeType, genai, rt.Name, path); ok {
 				capability = match.capability
 				for _, p := range rt.Paths {
 					if b, ok := basePathFor(p, match.spec); ok {
@@ -188,7 +198,7 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 			if g.model.Config.Logging == nil {
 				g.model.Config.Logging = loggingFromBlockWithDefaults(getMap(target, "logging"), false, false)
 			}
-			if !g.capsSeen[capability] {
+			if capability != "" && !g.capsSeen[capability] {
 				g.capsSeen[capability] = true
 				g.caps = append(g.caps, capability)
 			}
@@ -679,13 +689,13 @@ func aiModelAlias(m kong.AIModel) string {
 func (r *Reverter) hasAIModels() bool { return len(r.src.AIModels) > 0 }
 
 // isAPIOnly reports whether the capabilities indicate an "api" model
-// (files/batches lifecycle APIs rather than synchronous generation).
+// (files/batches/skills lifecycle APIs rather than synchronous generation).
 func isAPIOnly(caps []string) bool {
 	if len(caps) == 0 {
 		return false
 	}
 	for _, c := range caps {
-		if c != "batches" && c != "files" {
+		if c != "batches" && c != "files" && c != "skills" {
 			return false
 		}
 	}
@@ -737,4 +747,21 @@ func deriveModelName(alias string) string {
 		}
 	}
 	return b.String()
+}
+
+// allTargetsPassthrough reports whether every target of an ai-proxy-advanced plugin carries the
+// passthrough route_type, which is the only shape the plugin accepts: it refuses to mix
+// passthrough targets with any other route_type.
+func allTargetsPassthrough(cfg map[string]any) bool {
+	targets := getSlice(cfg, "targets")
+	if len(targets) == 0 {
+		return false
+	}
+	for _, raw := range targets {
+		target, ok := raw.(map[string]any)
+		if !ok || getStr(target, "route_type") != aimap.PassthroughRouteType {
+			return false
+		}
+	}
+	return true
 }

@@ -63,7 +63,7 @@ func TestMapOptionsAzureRenames(t *testing.T) {
 		"temperature":   0.5,
 		"deployment_id": "gpt4o-dep",
 		"api_version":   "2024-02-01",
-	}, "azure", "gpt-4o", p)
+	}, "azure", "gpt-4o", p, false)
 	want := map[string]any{
 		"temperature":         0.5,
 		"azure_deployment_id": "gpt4o-dep",
@@ -82,7 +82,7 @@ func TestMapOptionsGeminiNesting(t *testing.T) {
 			"location_id":  "us-central1",
 			"api_endpoint": "https://us-central1-aiplatform.googleapis.com",
 		},
-	}, "vertex", "gemini-2.5-pro", p)
+	}, "vertex", "gemini-2.5-pro", p, false)
 	want := map[string]any{
 		"max_tokens": 4096,
 		"gemini": map[string]any{
@@ -101,7 +101,7 @@ func TestMapOptionsBedrockNesting(t *testing.T) {
 	got := mapOptions(map[string]any{
 		"max_tokens": 1024,
 		"region":     "us-east-1",
-	}, "bedrock", "anthropic.claude-3-5-sonnet", p)
+	}, "bedrock", "anthropic.claude-3-5-sonnet", p, false)
 	want := map[string]any{
 		"max_tokens":        1024,
 		"anthropic_version": "bedrock-2023-05-31",
@@ -114,7 +114,7 @@ func TestMapOptionsBedrockNesting(t *testing.T) {
 }
 
 func TestMapOptionsBedrockNonAnthropicDoesNotDefaultAnthropicVersion(t *testing.T) {
-	got := mapOptions(nil, "bedrock", "amazon.titan-embed-text-v2:0", &aigw.Provider{Type: "bedrock"})
+	got := mapOptions(nil, "bedrock", "amazon.titan-embed-text-v2:0", &aigw.Provider{Type: "bedrock"}, false)
 	require.Nil(t, got)
 }
 
@@ -161,4 +161,23 @@ model_providers:
 	conversionErr, ok := AsConversionError(err)
 	require.True(t, ok)
 	require.Equal(t, "capabilities", conversionErr.Diagnostics[0].Field)
+}
+
+// A passthrough target forwards the client's request unchanged, so the plugin must not
+// default the version headers it would otherwise set when building the upstream request.
+func TestMapOptionsPassthroughDoesNotDefaultAnthropicVersion(t *testing.T) {
+	anthropic := &aigw.Provider{Type: "anthropic"}
+	require.Nil(t, mapOptions(nil, "anthropic", "claude-sonnet-4-5", anthropic, true))
+	require.Equal(t,
+		map[string]any{"anthropic_version": "2023-06-01"},
+		mapOptions(nil, "anthropic", "claude-sonnet-4-5", anthropic, false))
+
+	bedrock := &aigw.Provider{Type: "bedrock"}
+	require.Nil(t, mapOptions(nil, "bedrock", "anthropic.claude-3-5-sonnet", bedrock, true))
+
+	// An explicitly authored version is the client's business either way: it is passed
+	// through, not defaulted, so passthrough does not drop it.
+	require.Equal(t,
+		map[string]any{"anthropic_version": "2024-01-01"},
+		mapOptions(map[string]any{"version": "2024-01-01"}, "anthropic", "claude-sonnet-4-5", anthropic, true))
 }

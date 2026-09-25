@@ -8,10 +8,35 @@ import (
 
 func TestFormats(t *testing.T) {
 	got := Formats()
-	// The valid Format.Type values, i.e. EndpointTable sections minus provider renderings.
-	want := []string{"anthropic", "bedrock", "cohere", "gemini", "huggingface", "openai", "typesafe"}
+	// The valid Format.Type values: EndpointTable sections minus provider renderings, plus
+	// passthrough, which is a format without a section of its own.
+	want := []string{"anthropic", "bedrock", "cohere", "gemini", "huggingface", "openai", "passthrough", "typesafe"}
 	require.Equal(t, want, got)
 	require.NotContains(t, got, "vertex", "vertex is a rendering of gemini, not a client format")
+}
+
+func TestClientFormatPassthroughBorrowsTheProviderSection(t *testing.T) {
+	// A provider with a section of its own renders on that section's paths.
+	require.Equal(t, "openai", ClientFormat("passthrough", "openai"))
+	require.Equal(t, "anthropic", ClientFormat("passthrough", "anthropic"))
+	require.Equal(t, "bedrock", ClientFormat("passthrough", "bedrock"))
+	// A provider rendering resolves through its base format, and SectionFor still
+	// keeps the rendering distinct.
+	require.Equal(t, "gemini", ClientFormat("passthrough", "vertex"))
+	require.Equal(t, "vertex", SectionFor("passthrough", "vertex"))
+	// Providers with no section of their own expose OpenAI-shaped APIs.
+	for _, providerType := range []string{"azure", "mistral", "databricks", "deepseek", ""} {
+		require.Equal(t, "openai", ClientFormat("passthrough", providerType), providerType)
+	}
+	// Every other format ignores the provider type, as before.
+	require.Equal(t, "anthropic", ClientFormat("anthropic", "openai"))
+	require.Equal(t, "openai", ClientFormat("", "anthropic"))
+}
+
+func TestRoutePathPassthroughIsTheBasePath(t *testing.T) {
+	require.Equal(t, "/ai", RoutePath("/ai", PassthroughEndpoint))
+	require.Equal(t, "/ai", RoutePath("/ai/", PassthroughEndpoint))
+	require.Equal(t, "/", RoutePath("/", PassthroughEndpoint))
 }
 
 func TestCapabilitiesFor(t *testing.T) {
@@ -133,6 +158,33 @@ func TestEndpointsForAndSectionEndpoints(t *testing.T) {
 	// A section with no secondaries returns exactly the primary specs.
 	require.Len(t, SectionEndpoints("openai"), len(EndpointTable["openai"]),
 		"openai section has no secondary endpoints")
+}
+
+func TestSkillsCapability(t *testing.T) {
+	// The skills API is a restful CRUD surface on its own route, per provider section.
+	for section, wantPath := range map[string]string{"openai": "/skills", "anthropic": "/v1/skills"} {
+		spec, ok := LookupEndpoint(section, "skills")
+		require.True(t, ok, "%s skills lookup ok", section)
+		require.Equal(t, "llm/v1/skills", spec.RouteType, "%s skills route type", section)
+		require.Equal(t, "skills", spec.RouteLabel, "%s skills route label", section)
+		require.Equal(t, wantPath, spec.PathSuffix, "%s skills path suffix", section)
+		require.Equal(t, mGetPostDelete, spec.Methods, "%s skills methods", section)
+		require.Equal(t, catTextGen, spec.GenaiCategory, "%s skills category", section)
+		// Kong does not support log statistics for skills, and the routes carry no model.
+		require.False(t, spec.SupportsLogStatistics, "%s skills log statistics", section)
+		require.Nil(t, spec.DefaultModelSelectorConfig, "%s skills model selector", section)
+	}
+	// No other format serves it.
+	_, ok := LookupEndpoint("gemini", "skills")
+	require.False(t, ok, "gemini does not serve skills")
+
+	// Passthrough-only: offered only when the provider renders the model's own format.
+	require.True(t, RequiresNativeFormat("skills"), "skills requires a native format")
+	require.False(t, RequiresNativeFormat("generate"), "generate is converted across formats")
+	require.Contains(t, CapabilitiesFor("openai", "openai"), "skills")
+	require.Contains(t, CapabilitiesFor("anthropic", "anthropic"), "skills")
+	require.NotContains(t, CapabilitiesFor("openai", "anthropic"), "skills")
+	require.NotContains(t, CapabilitiesFor("anthropic", "openai"), "skills")
 }
 
 func TestRoutePath(t *testing.T) {

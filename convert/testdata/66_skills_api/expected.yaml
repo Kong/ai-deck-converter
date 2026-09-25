@@ -1,0 +1,71 @@
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: openai-skills
+        paths:
+          - /ai/skills
+        methods:
+          - GET
+          - POST
+          - DELETE
+        strip_path: false
+      - name: anthropic-skills
+        paths:
+          - /claude/v1/skills
+        methods:
+          - GET
+          - POST
+          - DELETE
+        strip_path: false
+plugins:
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      max_request_body_size: 536870912
+      model_name_header: false
+      response_streaming: deny
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://env/openai-key}'
+          description: gpt-5.6
+          logging:
+            log_payloads: false
+            log_statistics: false
+          model:
+            name: gpt-5.6
+            provider: openai
+          route_type: llm/v1/skills
+    route: openai-skills
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      max_request_body_size: 536870912
+      model_name_header: false
+      response_streaming: deny
+      targets:
+        - auth:
+            header_name: x-api-key
+            header_value: '{vault://env/anthropic-key}'
+          description: claude-sonnet-4-5
+          logging:
+            log_payloads: false
+            log_statistics: false
+          model:
+            name: claude-sonnet-4-5
+            options:
+              anthropic_version: "2023-06-01"
+            provider: anthropic
+          route_type: llm/v1/skills
+    route: anthropic-skills
+ai_models:
+  - name: openai-skills-api
+  - name: anthropic-skills-api

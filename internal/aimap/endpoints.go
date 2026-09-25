@@ -48,6 +48,16 @@ const (
 
 // Shared defaults and the converged gateway service identity.
 const (
+	// PassthroughFormat is the model format that forwards the client's request
+	// body to the provider unchanged. It is deliberately not an EndpointTable
+	// section: it borrows the provider's own section (see ClientFormat) and
+	// changes nothing but the target's route_type.
+	PassthroughFormat = "passthrough"
+
+	// PassthroughRouteType is the ai-proxy-advanced target route_type a
+	// PassthroughFormat model emits. It requires AI Gateway 2.2 or later.
+	PassthroughRouteType = "passthrough"
+
 	DefaultLLMFormat      = "openai"
 	DefaultBasePath       = "/"
 	DefaultMaxBodySize    = 8388608
@@ -65,21 +75,45 @@ const (
 )
 
 var (
-	mPost    = []string{"POST"}
-	mGetPost = []string{"GET", "POST"}
+	mPost          = []string{"POST"}
+	mGetPost       = []string{"GET", "POST"}
+	mGetPostDelete = []string{"GET", "POST", "DELETE"}
 )
 
 // SectionFor selects the endpoint section from the model's llm_format (the
-// client-facing wire format that determines the request paths). The only case
-// where the provider type matters is gemini-format traffic served by Vertex,
-// which uses Vertex's project/location URL templates instead of Gemini's.
+// client-facing wire format that determines the request paths). The provider
+// type matters in two cases: gemini-format traffic served by Vertex, which
+// uses Vertex's project/location URL templates instead of Gemini's, and
+// passthrough, which has no client format of its own (see ClientFormat).
 func SectionFor(format, providerType string) string {
-	format = NormalizeFormat(format)
-	if format == "" {
-		format = DefaultLLMFormat
-	}
+	format = ClientFormat(format, providerType)
 	if format == "gemini" && providerType == "vertex" {
 		return "vertex"
+	}
+
+	return format
+}
+
+// ClientFormat returns the client-facing wire format a model renders as, which
+// is the llm_format the ai-proxy-advanced plugin carries.
+//
+// It is the declared format for every format but PassthroughFormat. Passthrough
+// forwards the client's request body unchanged, so the wire format is whatever
+// the provider itself speaks natively rather than anything the model declares:
+// the paths, methods and llm_format all come from the provider's own section,
+// and only the target's route_type says passthrough.
+func ClientFormat(format, providerType string) string {
+	format = NormalizeFormat(format)
+	if format == PassthroughFormat {
+		format = NormalizeFormat(providerType)
+		if _, served := EndpointTable[format]; !served {
+			// Providers that speak no section of their own (azure, mistral,
+			// databricks, ...) all expose OpenAI-shaped APIs.
+			format = DefaultLLMFormat
+		}
+	}
+	if format == "" {
+		format = DefaultLLMFormat
 	}
 
 	return format
@@ -107,6 +141,40 @@ var renderingSections = map[string]string{
 	"vertex": "gemini",
 }
 
+// PromptReadingPolicies are the AI policies that parse the request or response into the
+// normalized LLM shape before acting on it, so they cannot do their job for a passthrough model:
+// the body reaches the provider exactly as the client sent it, in whatever shape that provider
+// speaks. The AI policies absent from this set are the ones that already work on raw bytes
+// (ai-request-transformer, ai-response-transformer, ai-sanitizer), which passthrough leaves
+// intact.
+var PromptReadingPolicies = map[string]bool{
+	"ai-aws-guardrails":          true,
+	"ai-azure-content-safety":    true,
+	"ai-custom-guardrail":        true,
+	"ai-gcp-model-armor":         true,
+	"ai-lakera-guard":            true,
+	"ai-llm-as-judge":            true,
+	"ai-nvidia-nemo-guardrail":   true,
+	"ai-prompt-compressor":       true,
+	"ai-prompt-decorator":        true,
+	"ai-prompt-guard":            true,
+	"ai-prompt-template":         true,
+	"ai-rag-injector":            true,
+	"ai-semantic-cache":          true,
+	"ai-semantic-prompt-guard":   true,
+	"ai-semantic-response-guard": true,
+}
+
+// PassthroughEndpoint is the one route a PassthroughFormat model serves. Capabilities do not
+// apply to it: every request under the model's base path is forwarded as it stands, whatever
+// endpoint it names, so the route matches the base path itself on every method.
+var PassthroughEndpoint = EndpointSpec{
+	RouteLabel:            "passthrough",
+	RouteType:             PassthroughRouteType,
+	GenaiCategory:         catTextGen,
+	SupportsLogStatistics: true,
+}
+
 // EndpointSectionFor selects the EndpointTable section that serves a single
 // capability's route. It starts from SectionFor (which keeps a provider-specific
 // rendering like Vertex distinct so capability enumeration is accurate) but, for
@@ -131,38 +199,60 @@ func EndpointSectionFor(format, providerType, capability string) string {
 
 // Formats returns the client-facing wire formats a model may declare (the valid Format.Type
 // values), sorted. Provider-rendering sections such as "vertex" are EndpointTable keys but not
-// formats, so they are excluded.
+// formats, so they are excluded; PassthroughFormat is a valid format that is not a section, so it
+// is added.
 func Formats() []string {
-	out := make([]string, 0, len(EndpointTable))
+	out := make([]string, 0, len(EndpointTable)+1)
 	for section := range EndpointTable {
 		if _, rendering := renderingSections[section]; rendering {
 			continue
 		}
 		out = append(out, section)
 	}
+	out = append(out, PassthroughFormat)
 	sort.Strings(out)
 	return out
 }
 
+// nativeFormatCapabilities are the capabilities Kong serves only as passthrough: unlike
+// generate/image/... there is no request/response conversion between wire formats for them, so the
+// serving provider has to render the model's own format (openai model on an openai provider,
+// anthropic on anthropic). ai-proxy-advanced's schema rejects every other pairing.
+var nativeFormatCapabilities = map[string]bool{"skills": true}
+
+// RequiresNativeFormat reports whether capability is passthrough-only. Callers enforce it on the
+// provider enum ai-proxy-advanced will carry, which is narrower than format rendering: Kong
+// restricts these route types to the openai and anthropic provider enums, so an azure provider
+// fails even though its traffic renders the openai format.
+func RequiresNativeFormat(capability string) bool { return nativeFormatCapabilities[capability] }
+
 // CapabilitiesFor returns the capabilities a model of the given client format may declare when
 // served by the given provider type, resolved through the same section routing the converter uses
 // (SectionFor) — so the gemini format served by Vertex reports the Vertex-only image, video, and
-// rerank capabilities, while served by Gemini it does not. "generate" is listed first when
+// rerank capabilities, while served by Gemini it does not, and a passthrough-only capability is
+// left out unless the provider renders the model's own format. "generate" is listed first when
 // present, the rest sorted. An unknown format, or a rendering section passed as a format, yields
 // nil — keeping parity with Formats, which excludes those sections.
 func CapabilitiesFor(format, providerType string) []string {
 	if _, rendering := renderingSections[format]; rendering {
 		return nil
 	}
-	caps, ok := EndpointTable[SectionFor(format, providerType)]
+	section := SectionFor(format, providerType)
+	caps, ok := EndpointTable[section]
 	if !ok {
 		return nil
 	}
+	provider := PluginProvider(providerType)
 	rest := make([]string, 0, len(caps))
 	hasGenerate := false
 	for c := range caps {
 		if c == "generate" {
 			hasGenerate = true
+			continue
+		}
+		// A passthrough-only capability is only reachable when the provider's own format is the
+		// one the client speaks, which is exactly the section it was looked up in.
+		if nativeFormatCapabilities[c] && section != provider {
 			continue
 		}
 		rest = append(rest, c)
@@ -284,7 +374,12 @@ var EndpointTable = map[string]map[string]EndpointEntry{
 		},
 		"files": {
 			Primary: EndpointSpec{
-				"files", "/files", false, []string{"GET", "POST", "DELETE"}, "llm/v1/files", catTextGen, nil, true,
+				"files", "/files", false, mGetPostDelete, "llm/v1/files", catTextGen, nil, true,
+			},
+		},
+		"skills": {
+			Primary: EndpointSpec{
+				"skills", "/skills", false, mGetPostDelete, "llm/v1/skills", catTextGen, nil, false,
 			},
 		},
 	},
@@ -298,6 +393,11 @@ var EndpointTable = map[string]map[string]EndpointEntry{
 		"batches": {
 			Primary: EndpointSpec{
 				"batches", "/v1/messages/batches", false, mGetPost, "llm/v1/batches", catTextGen, nil, false,
+			},
+		},
+		"skills": {
+			Primary: EndpointSpec{
+				"skills", "/v1/skills", false, mGetPostDelete, "llm/v1/skills", catTextGen, nil, false,
 			},
 		},
 	},
@@ -546,6 +646,10 @@ func RoutePath(base string, spec EndpointSpec) string {
 	}
 	if isRegex {
 		return "~" + base + suffix
+	}
+	if base+suffix == "" {
+		// A root base with no suffix (PassthroughEndpoint) is the root itself.
+		return "/"
 	}
 	return base + suffix
 }
