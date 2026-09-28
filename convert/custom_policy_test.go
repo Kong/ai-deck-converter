@@ -17,9 +17,10 @@ func TestConvertCustomPoliciesToDBLessPlugins(t *testing.T) {
 			Handler: "return {}",
 		},
 		{
-			Name:   "installed-policy",
-			Type:   "installed",
-			Schema: "return { name = 'installed-policy' }",
+			Name:    "installed-policy",
+			Type:    "installed",
+			Schema:  "return { name = 'installed-policy' }",
+			Handler: "return {}",
 		},
 	}}
 
@@ -36,13 +37,23 @@ func TestConvertCustomPoliciesToDBLessPlugins(t *testing.T) {
 	require.Equal(t, "return {}", plugin.Handler)
 }
 
-func TestConvertCustomPoliciesSkipsPoliciesWithoutHandler(t *testing.T) {
-	c := newConverter(&aigw.Document{CustomPolicies: []aigw.CustomPolicy{{
-		Name:   "streaming-policy",
-		Type:   "streaming",
-		Schema: "return { name = 'streaming-policy' }",
-	}}}, Options{}.withDefaults())
+func TestConvertCustomPoliciesSkipsPoliciesWithoutStreamingHandler(t *testing.T) {
+	for _, policy := range []aigw.CustomPolicy{
+		{
+			Name:   "streaming-policy",
+			Type:   "streaming",
+			Schema: "return { name = 'streaming-policy' }",
+		},
+		{
+			Name:    "installed-policy",
+			Type:    "installed",
+			Schema:  "return { name = 'installed-policy' }",
+			Handler: "return {}",
+		},
+	} {
+		c := newConverter(&aigw.Document{CustomPolicies: []aigw.CustomPolicy{policy}}, Options{}.withDefaults())
 
-	require.NoError(t, c.run())
-	require.Empty(t, c.projectDBLess().CustomPlugins)
+		require.NoError(t, c.run())
+		require.Empty(t, c.projectDBLess().CustomPlugins)
+	}
 }

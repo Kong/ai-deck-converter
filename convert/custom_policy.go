@@ -6,7 +6,7 @@ import (
 
 func (c *Converter) convertCustomPolicies() error {
 	for _, policy := range c.src.CustomPolicies {
-		if policy.Handler == "" {
+		if policy.Type != "streaming" || policy.Handler == "" {
 			continue
 		}
 		if policy.Name == "" {
