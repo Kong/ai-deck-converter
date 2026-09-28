@@ -1,0 +1,27 @@
+custom_policies:
+  - id: 00000000-0000-0000-0000-000000000001
+    name: streaming-policy
+    type: streaming
+    schema: |
+      return {
+        name = "streaming-policy",
+        fields = {},
+      }
+    handler: |
+      return {
+        VERSION = "1.0.0",
+      }
+  - name: installed-policy
+    type: installed
+    schema: |
+      return {
+        name = "installed-policy",
+        fields = {},
+      }
+policies:
+  - id: 00000000-0000-0000-0000-000000000002
+    name: streaming-policy-instance
+    type: streaming-policy
+    global: true
+    config:
+      message: custom policy is active

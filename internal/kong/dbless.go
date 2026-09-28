@@ -14,6 +14,7 @@ type DBLessDocument struct {
 	ConsumerGroups         []DBLessConsumerGroup       `yaml:"consumer_groups,omitempty"`
 	ConsumerGroupConsumers []DBLessConsumerGroupMember `yaml:"consumer_group_consumers,omitempty"`
 	Plugins                []DBLessPlugin              `yaml:"plugins,omitempty"`
+	CustomPlugins          []DBLessCustomPlugin        `yaml:"custom_plugins,omitempty"`
 	Vaults                 []DBLessVault               `yaml:"vaults,omitempty"`
 	Certificates           []DBLessCertificate         `yaml:"certificates,omitempty"`
 	SNIs                   []DBLessSNI                 `yaml:"snis,omitempty"`
@@ -85,6 +86,16 @@ type DBLessPlugin struct {
 	Tags          []string          `yaml:"tags,omitempty"`
 	TargetSources []TargetSource    `yaml:"-"`
 	Source        *Source           `yaml:"-"`
+}
+
+// DBLessCustomPlugin supplies a user-defined plugin schema and handler to a
+// data plane before its configuration uses the plugin.
+type DBLessCustomPlugin struct {
+	ID      string `yaml:"id"`
+	Name    string `yaml:"name"`
+	Enabled bool   `yaml:"enabled"`
+	Schema  string `yaml:"schema"`
+	Handler string `yaml:"handler"`
 }
 
 type DBLessConsumer struct {

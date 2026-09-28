@@ -1,0 +1,20 @@
+_format_version: "3.0"
+_transform: false
+plugins:
+  - id: 00000000-0000-0000-0000-000000000002
+    name: streaming-policy
+    config:
+      message: custom policy is active
+custom_plugins:
+  - id: 00000000-0000-0000-0000-000000000001
+    name: streaming-policy
+    enabled: true
+    schema: |
+      return {
+        name = "streaming-policy",
+        fields = {},
+      }
+    handler: |
+      return {
+        VERSION = "1.0.0",
+      }
