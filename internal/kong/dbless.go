@@ -93,7 +93,6 @@ type DBLessPlugin struct {
 type DBLessCustomPlugin struct {
 	ID      string `yaml:"id"`
 	Name    string `yaml:"name"`
-	Enabled bool   `yaml:"enabled"`
 	Schema  string `yaml:"schema"`
 	Handler string `yaml:"handler"`
 }
