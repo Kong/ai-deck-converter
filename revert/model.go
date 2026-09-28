@@ -162,14 +162,12 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 
 			var capability string
 			var bases []string
-			secondary := false
 			if routeType == aimap.PassthroughRouteType {
 				// A passthrough route is the model's base path itself and serves no
 				// capability of its own (see aimap.PassthroughEndpoint).
 				bases = rt.Paths
 			} else if match, ok := resolveEndpoint(section, routeType, genai, rt.Name, path); ok {
 				capability = match.capability
-				secondary = match.secondary
 				for _, p := range rt.Paths {
 					if b, ok := basePathFor(p, match.spec); ok {
 						bases = append(bases, b)
@@ -218,11 +216,14 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 			key := targetFingerprint(tm)
 
 			// With neither model FK nor alias, groups key by route, so a
-			// secondary endpoint's route — emitted by the forward converter
-			// alongside the capability's primary route, with the same targets —
-			// would become a model of its own. Fold it into the primary's group.
+			// capability's primary and secondary routes — emitted by the forward
+			// converter side by side with the same targets — would become two
+			// models instead of one. Fold whichever is processed second into the
+			// group the first one created; route order in the source document is
+			// not guaranteed (only the forward converter emits primary first), so
+			// this must not depend on which spec, primary or secondary, comes first.
 			var g *modelGroup
-			if secondary && groupFK == "" && alias == "" {
+			if groupFK == "" && alias == "" {
 				g = acc.aliaslessGroupServing(capability, bases, key)
 			}
 			if g == nil {
