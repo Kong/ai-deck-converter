@@ -19,7 +19,6 @@ func (c *Converter) convertCustomPolicies() error {
 		c.customPlugins = append(c.customPlugins, kong.DBLessCustomPlugin{
 			ID:      firstNonEmpty(policy.ID, stableUUID("custom_plugin:"+policy.Name)),
 			Name:    policy.Name,
-			Enabled: true,
 			Schema:  policy.Schema,
 			Handler: policy.Handler,
 		})

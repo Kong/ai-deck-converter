@@ -32,7 +32,6 @@ func TestConvertCustomPoliciesToDBLessPlugins(t *testing.T) {
 	plugin := out.CustomPlugins[0]
 	require.Equal(t, "00000000-0000-0000-0000-000000000001", plugin.ID)
 	require.Equal(t, "streaming-policy", plugin.Name)
-	require.True(t, plugin.Enabled)
 	require.Equal(t, "return { name = 'streaming-policy' }", plugin.Schema)
 	require.Equal(t, "return {}", plugin.Handler)
 }
