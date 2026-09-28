@@ -129,15 +129,20 @@ A model's `capabilities` choose which routes are created. The mapping (path,
 methods, `route_type`, `genai_category`) is defined per provider section in
 `convert/endpoints.go`, derived from `ref/supported-endpoints.md`. Loose
 spellings are normalized (`chat`→`generate`, `batch`→`batches`); bare `audio`
-fans out to speech/transcription/translation. Native formats (bedrock, gemini,
-vertex) emit regex routes (`~/ai/...`); capabilities that share an upstream
+fans out to speech/transcription/translation. Native formats (bedrock, gemini)
+emit regex routes (`~/ai/...`); capabilities that share an upstream
 endpoint (e.g. bedrock embeddings/image/audio/video → `/invoke`) collapse into
 one route with multiple targets.
 
 Most capabilities map to a single canonical endpoint, but a few are reachable
 through more than one and get a route per endpoint: bedrock `generate` emits
 both `bedrock-converse` (Converse) and `bedrock-invoke` (InvokeModel), each
-carrying the model's target(s). These extra endpoints live in the capability's
+carrying the model's target(s). Likewise every gemini capability is served on
+both its Gemini API path and its Gemini Enterprise path (e.g. `gemini-generate`
+and `gemini-enterprise-generate`), whichever provider type serves it; the Gemini
+Enterprise-only
+image (`:predict`), video (`:predictLongRunning`) and rerank (`:rank`)
+capabilities are available to gemini-format models too. These extra endpoints live in the capability's
 own `internal/aimap.EndpointTable` entry, as `EndpointEntry.Secondary`
 alongside the canonical `Primary` spec — read both together via
 `aimap.EndpointsFor` / `aimap.SectionEndpoints` — never look up a capability's

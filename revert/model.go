@@ -156,17 +156,20 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 			modelMap := getMap(target, "model")
 			alias := getStr(modelMap, "model_alias")
 			routeType := getStr(target, "route_type")
-			providerType := detectProviderType(getStr(modelMap, "provider"), path)
+			providerType := detectProviderType(
+				getStr(modelMap, "provider"), path, r.geminiPathTargets[geminiTargetKey(target)])
 			section := aimap.SectionFor(llmFormat, providerType)
 
 			var capability string
 			var bases []string
+			secondary := false
 			if routeType == aimap.PassthroughRouteType {
 				// A passthrough route is the model's base path itself and serves no
 				// capability of its own (see aimap.PassthroughEndpoint).
 				bases = rt.Paths
 			} else if match, ok := resolveEndpoint(section, routeType, genai, rt.Name, path); ok {
 				capability = match.capability
+				secondary = match.secondary
 				for _, p := range rt.Paths {
 					if b, ok := basePathFor(p, match.spec); ok {
 						bases = append(bases, b)
@@ -186,21 +189,6 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 					return err
 				}
 				continue
-			}
-
-			g, err := r.modelGroupFor(acc, rt, groupFK, alias, llmFormat, bases, cfg, nextEntry, refs, acls, idpRefs)
-			if err != nil {
-				return err
-			}
-			// Logging is carried per target by ai-proxy-advanced but is a single
-			// model-level block in the AI Gateway model; lift it back from the
-			// first target that has it (all of a model's targets share the block).
-			if g.model.Config.Logging == nil {
-				g.model.Config.Logging = loggingFromBlockWithDefaults(getMap(target, "logging"), false, false)
-			}
-			if capability != "" && !g.capsSeen[capability] {
-				g.capsSeen[capability] = true
-				g.caps = append(g.caps, capability)
 			}
 
 			name := getStr(modelMap, "name")
@@ -228,10 +216,61 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 			// capabilities still fingerprints identically (capability lives on
 			// the model, not the target), so those collapse as before.
 			key := targetFingerprint(tm)
+
+			// With neither model FK nor alias, groups key by route, so a
+			// secondary endpoint's route — emitted by the forward converter
+			// alongside the capability's primary route, with the same targets —
+			// would become a model of its own. Fold it into the primary's group.
+			var g *modelGroup
+			if secondary && groupFK == "" && alias == "" {
+				g = acc.aliaslessGroupServing(capability, bases, key)
+			}
+			if g == nil {
+				var err error
+				g, err = r.modelGroupFor(acc, rt, groupFK, alias, llmFormat, bases, cfg, nextEntry, refs, acls, idpRefs)
+				if err != nil {
+					return err
+				}
+			}
+			// Logging is carried per target by ai-proxy-advanced but is a single
+			// model-level block in the AI Gateway model; lift it back from the
+			// first target that has it (all of a model's targets share the block).
+			if g.model.Config.Logging == nil {
+				g.model.Config.Logging = loggingFromBlockWithDefaults(getMap(target, "logging"), false, false)
+			}
+			if capability != "" && !g.capsSeen[capability] {
+				g.capsSeen[capability] = true
+				g.caps = append(g.caps, capability)
+			}
+
 			if !g.targetsSeen[key] {
 				g.targetsSeen[key] = true
 				g.model.TargetModels = append(g.model.TargetModels, tm)
 			}
+		}
+	}
+	return nil
+}
+
+// modelRoutePaths returns the Config.Route.Paths of a model recovered from the
+// given base paths: nil for the single default base path.
+func modelRoutePaths(bases []string) []string {
+	if len(bases) > 1 || (len(bases) == 1 && !isDefaultBasePath(bases[0])) {
+		return bases
+	}
+	return nil
+}
+
+// aliaslessGroupServing returns the alias-less group that already serves
+// capability at the given base paths through the target fingerprinted as
+// targetKey, or nil when there is none.
+func (acc *modelAcc) aliaslessGroupServing(capability string, bases []string, targetKey string) *modelGroup {
+	paths := modelRoutePaths(bases)
+	for _, key := range acc.order {
+		g := acc.groups[key]
+		if g.aliasless && g.capsSeen[capability] && g.targetsSeen[targetKey] &&
+			slices.Equal(g.model.Config.Route.Paths, paths) {
+			return g
 		}
 	}
 	return nil
@@ -310,9 +349,7 @@ func (r *Reverter) modelGroupFor(
 			Access:   aigw.ModelAccess{ACLs: acls, AuthStrategies: idpRefs},
 		},
 	}
-	if len(bases) > 1 || (len(bases) == 1 && !isDefaultBasePath(bases[0])) {
-		g.model.Config.Route.Paths = bases
-	}
+	g.model.Config.Route.Paths = modelRoutePaths(bases)
 	if alias != "" {
 		setAliasField(&g.model.Config.Route.Model, alias, name, nextEntry())
 	}
