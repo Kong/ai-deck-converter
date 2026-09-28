@@ -184,6 +184,8 @@ func (c *Converter) projectDBLess() *kong.DBLessDocument {
 		})
 	}
 
+	out.CustomPlugins = append(out.CustomPlugins, c.customPlugins...)
+
 	for _, cert := range c.out.CACertificates {
 		out.CACertificates = append(out.CACertificates, kong.DBLessCACertificate{
 			ID:         firstNonEmpty(cert.ID, stableUUID("ca_certificate:"+cert.Cert)),

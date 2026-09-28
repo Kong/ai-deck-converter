@@ -333,6 +333,7 @@ type Converter struct {
 	authStrategies map[string]*aigw.AuthStrategy
 	consumerGroups map[string]*aigw.ConsumerGroup
 	datastores     map[string]*aigw.Datastore
+	customPlugins  []kong.DBLessCustomPlugin
 
 	warnings []string
 }
@@ -447,6 +448,9 @@ func cloneStrings(in []string) []string {
 func (c *Converter) run() error {
 	c.buildRegistries()
 	if err := c.convertGlobalPolicies(); err != nil {
+		return err
+	}
+	if err := c.convertCustomPolicies(); err != nil {
 		return err
 	}
 	c.convertVaults()

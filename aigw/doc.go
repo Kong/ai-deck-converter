@@ -19,6 +19,7 @@ type (
 	AuthHeader        = internal.AuthHeader
 	AuthParam         = internal.AuthParam
 	Policy            = internal.Policy
+	CustomPolicy      = internal.CustomPolicy
 	RouteConfig       = internal.RouteConfig
 	CIDRPort          = internal.CIDRPort
 	Logging           = internal.Logging
