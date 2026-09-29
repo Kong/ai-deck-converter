@@ -275,8 +275,9 @@ and `formats` beyond the first.
   another passthrough model, be combined with another format, or use the
   `semantic` balancer; a databricks target needs `upstream_url`. All are
   conversion errors. Policies that read the normalized LLM shape (guardrails,
-  prompt decorators/templates/compressor, RAG injector, and `ai-sanitizer`
-  when `anonymize` includes credentials, which is its default) produce a
+  prompt decorators/templates/compressor, RAG injector, semantic cache,
+  LLM-as-judge, and `ai-sanitizer` when `anonymize` includes credentials,
+  which is its default) produce a
   warning when attached to the model or global; other AI policies work on raw
   bytes, and consumer/consumer-group policies are not checked. A target whose
   provider has no native `llm_format` (azure, mistral, sagemaker, …) also

@@ -191,10 +191,11 @@ policies:
 	require.Contains(t, doc, "name: pt", "the ai_models row is the model identity and stays")
 
 	// Only the policies that read the normalized shape are reported: one that works on raw
-	// bytes, one that never looks at the body, and one outside the list are all fine as they are.
-	require.Len(t, warnings, 2)
+	// bytes and one that never looks at the body are both fine as they are.
+	require.Len(t, warnings, 3)
 	require.Contains(t, warnings[0], `policy "guard" (ai-prompt-guard) may not work properly`)
-	require.Contains(t, warnings[1], `policy "lakera" (ai-lakera-guard) may not work properly`)
+	require.Contains(t, warnings[1], `policy "cache" (ai-semantic-cache) may not work properly`)
+	require.Contains(t, warnings[2], `policy "lakera" (ai-lakera-guard) may not work properly`)
 }
 
 // TestPassthroughWarnsAboutSanitizerOnlyWhenItAnonymizesCredentials pins that ai-sanitizer is
@@ -207,7 +208,8 @@ func TestPassthroughWarnsAboutSanitizerOnlyWhenItAnonymizesCredentials(t *testin
 		"anonymize: [phone, credentials]":       true,
 		"anonymize: [phone, email]":             false,
 		"anonymize: [all]":                      false,
-		"anonymize: [all, all_and_credentials]": false, // the data plane collapses it to [all]
+		"anonymize: [all, all_and_credentials]": true,
+		"anonymize: [all, credentials]":         true,
 	} {
 		_, warnings, err := Convert([]byte(`
 models:

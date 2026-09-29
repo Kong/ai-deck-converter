@@ -161,19 +161,22 @@ var PromptReadingPolicies = map[string]bool{
 	"ai-custom-guardrail":        true,
 	"ai-gcp-model-armor":         true,
 	"ai-lakera-guard":            true,
+	"ai-llm-as-judge":            true,
 	"ai-nvidia-nemo-guardrail":   true,
 	"ai-prompt-compressor":       true,
 	"ai-prompt-decorator":        true,
 	"ai-prompt-guard":            true,
 	"ai-prompt-template":         true,
 	"ai-rag-injector":            true,
+	"ai-semantic-cache":          true,
 	"ai-semantic-prompt-guard":   true,
 	"ai-semantic-response-guard": true,
 }
 
 // SanitizerAnonymizesCredentials reports whether an ai-sanitizer config anonymizes credentials,
-// the one sanitizer mode that needs the normalized LLM shape. It mirrors the data plane: an
-// unset anonymize defaults to all_and_credentials, and a list holding "all" collapses to "all".
+// the one sanitizer mode that needs the normalized LLM shape. An unset anonymize defaults to
+// all_and_credentials on the data plane. A list holding "all" as well is still reported: the data
+// plane collapsing it to "all" is a known bug, fixed after AI Gateway 2.2.
 func SanitizerAnonymizesCredentials(cfg map[string]any) bool {
 	var types []string
 	switch v := cfg["anonymize"].(type) {
@@ -188,9 +191,6 @@ func SanitizerAnonymizesCredentials(cfg map[string]any) bool {
 	}
 	if len(types) == 0 {
 		return true
-	}
-	if slices.Contains(types, "all") {
-		return false
 	}
 	return slices.Contains(types, "all_and_credentials") || slices.Contains(types, "credentials")
 }
