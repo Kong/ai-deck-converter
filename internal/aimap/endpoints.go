@@ -6,6 +6,7 @@
 package aimap
 
 import (
+	"slices"
 	"sort"
 	"strings"
 )
@@ -102,7 +103,7 @@ func ClientFormat(format, providerType string) string {
 	format = NormalizeFormat(format)
 	if format == PassthroughFormat {
 		format = NormalizeFormat(providerType)
-		if _, served := EndpointTable[format]; !served {
+		if !HasNativeFormat(providerType) {
 			// Providers that speak no section of their own (azure, mistral,
 			// databricks, ...) all expose OpenAI-shaped APIs.
 			format = DefaultLLMFormat
@@ -113,6 +114,14 @@ func ClientFormat(format, providerType string) string {
 	}
 
 	return format
+}
+
+// HasNativeFormat reports whether a provider type speaks a wire format of its own, i.e. has a
+// matching llm_format. Passthrough extracts usage with that format's adapter; any other provider
+// falls back to OpenAI-shaped extraction, which may find nothing.
+func HasNativeFormat(providerType string) bool {
+	_, served := EndpointTable[NormalizeFormat(providerType)]
+	return served
 }
 
 // NormalizeFormat maps a provider name used directly as a model's format
@@ -135,11 +144,10 @@ var formatAliases = map[string]string{
 }
 
 // PromptReadingPolicies are the AI policies that parse the request or response into the
-// normalized LLM shape before acting on it, so they cannot do their job for a passthrough model:
-// the body reaches the provider exactly as the client sent it, in whatever shape that provider
-// speaks. The AI policies absent from this set are the ones that already work on raw bytes
-// (ai-request-transformer, ai-response-transformer, ai-sanitizer), which passthrough leaves
-// intact.
+// normalized LLM shape before acting on it, so they may not work properly for a passthrough
+// model: the body reaches the provider exactly as the client sent it, in whatever shape that
+// provider speaks. ai-sanitizer belongs here only when it anonymizes credentials (see
+// SanitizerAnonymizesCredentials); the other AI policies work on raw bytes.
 var PromptReadingPolicies = map[string]bool{
 	"ai-aws-guardrails":          true,
 	"ai-azure-content-safety":    true,
@@ -156,6 +164,28 @@ var PromptReadingPolicies = map[string]bool{
 	"ai-semantic-cache":          true,
 	"ai-semantic-prompt-guard":   true,
 	"ai-semantic-response-guard": true,
+}
+
+// SanitizerAnonymizesCredentials reports whether an ai-sanitizer config anonymizes credentials,
+// the one sanitizer mode that needs the normalized LLM shape. An unset anonymize defaults to
+// all_and_credentials on the data plane. A list holding "all" as well is still reported: the data
+// plane collapsing it to "all" is a bug tracked in KOKO-4587.
+func SanitizerAnonymizesCredentials(cfg map[string]any) bool {
+	var types []string
+	switch v := cfg["anonymize"].(type) {
+	case []string:
+		types = v
+	case []any:
+		for _, t := range v {
+			if s, ok := t.(string); ok {
+				types = append(types, s)
+			}
+		}
+	}
+	if len(types) == 0 {
+		return true
+	}
+	return slices.Contains(types, "all_and_credentials") || slices.Contains(types, "credentials")
 }
 
 // PassthroughEndpoint is the one route a PassthroughFormat model serves. Capabilities do not
