@@ -164,6 +164,9 @@ func (r *Reverter) warn(format string, args ...any) error {
 func (r *Reverter) run() error {
 	r.buildIndexes()
 	r.indexMCPListenerSources()
+	if err := r.revertCustomPolicies(); err != nil {
+		return err
+	}
 	r.revertGlobalPolicies()
 	r.revertVaults()
 	r.revertCACertificates()

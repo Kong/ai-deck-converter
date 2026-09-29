@@ -333,7 +333,6 @@ type Converter struct {
 	authStrategies map[string]*aigw.AuthStrategy
 	consumerGroups map[string]*aigw.ConsumerGroup
 	datastores     map[string]*aigw.Datastore
-	customPlugins  []kong.DBLessCustomPlugin
 
 	warnings []string
 }
