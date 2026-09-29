@@ -521,7 +521,7 @@ var EndpointTable = map[string]map[string]EndpointEntry{
 	"huggingface": {
 		"generate": {
 			Primary: EndpointSpec{
-				"generate", "/generate", false, mPost, "llm/v1/chat", catTextGen, &defaultBodyModelSelectorConfig, true,
+				"generate", "/v1/chat/completions", false, mPost, "llm/v1/chat", catTextGen, &defaultBodyModelSelectorConfig, true,
 			},
 		},
 	},
