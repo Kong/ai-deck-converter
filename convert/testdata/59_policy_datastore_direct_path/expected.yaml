@@ -34,3 +34,4 @@ consumers:
               redis:
                 cluster_max_redirections: 5
                 host: cache-redis.internal
+              strategy: redis

@@ -17,11 +17,10 @@ func DatastoreSupported(policyType, datastoreType string) bool {
 // storing it: Kong's own defaults would otherwise persist a connection the
 // conversion re-substitutes anyway.
 func DatastorePathsForPolicyType(policyType string) []string {
-	if !aimap.PolicyTypeSupportsDatastore(policyType) {
+	support, ok := aimap.DatastoreSupportForPluginType(policyType)
+	if !ok {
 		return nil
 	}
-
-	support, _ := aimap.DatastoreSupportForPolicyType(policyType, "")
 	if support.ConfigPath != aimap.VectorDBConfigPath {
 		return []string{support.ConfigPath}
 	}
@@ -29,4 +28,16 @@ func DatastorePathsForPolicyType(policyType string) []string {
 		support.ConfigPath + "." + aimap.VectorDBStrategyRedis,
 		support.ConfigPath + "." + aimap.VectorDBStrategyPGVector,
 	}
+}
+
+func DatastoreStrategyPathForPolicyType(policyType string) string {
+	support, ok := aimap.DatastoreSupportForPluginType(policyType)
+	if !ok {
+		return ""
+	}
+	return support.StrategyPath
+}
+
+func DatastoreStrategyForDatastoreType(datastoreType string) (string, bool) {
+	return aimap.VectorDBStrategyForDatastoreType(datastoreType)
 }
