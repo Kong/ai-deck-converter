@@ -95,8 +95,7 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 		return entry
 	}
 
-	routeProxies := findPlugins(plugins, "ai-proxy-advanced")
-	redirect := r.mergeableAliasFKs(routeProxies)
+	routeProxies, redirect := r.mergeableAliasFKs(findPlugins(plugins, "ai-proxy-advanced"))
 
 	for _, proxy := range routeProxies {
 		cfg := proxy.Config
@@ -424,13 +423,26 @@ func mergeACLs(dst *aigw.ACLs, src aigw.ACLs) {
 // produced (see convert.convertModels). The marker is required, not just a
 // tie-breaker: without it, this shape is indistinguishable from N
 // independently-authored models that happen to be config-identical
-// and merging those would silently corrupt them into one. Returns
-// a map from every non-canonical member's FK to the first-seen (canonical)
-// member's FK; members outside any multi-FK class are absent from the map.
-func (r *Reverter) mergeableAliasFKs(proxies []*kong.Plugin) map[string]string {
-	canonicalByShape := map[string]string{}
-	redirect := map[string]string{}
-	for _, proxy := range proxies {
+// and merging those would silently corrupt them into one.
+//
+// A class's canonical member is the one whose FK the marker names (the
+// source model's first alias, which convert tags every copy with), falling
+// back to the first-seen member when none matches. Plugin order is not
+// trusted: a live Admin API dump makes no ordering promise.
+//
+// Returns proxies reordered so each class's canonical member is processed
+// first, at the position of the class's first-seen member (the group it
+// creates then seeds route.model.values with the canonical alias), and a map
+// from every non-canonical member's FK to its canonical member's FK; members
+// outside any multi-FK class are absent from the map.
+func (r *Reverter) mergeableAliasFKs(proxies []*kong.Plugin) ([]*kong.Plugin, map[string]string) {
+	type class struct {
+		first     int // index of the first-seen member in proxies
+		canonical int // index of the canonical member in proxies
+	}
+	classes := map[string]*class{}
+	shapeOf := make([]string, len(proxies))
+	for i, proxy := range proxies {
 		if proxy.Model == nil {
 			continue
 		}
@@ -440,13 +452,42 @@ func (r *Reverter) mergeableAliasFKs(proxies []*kong.Plugin) map[string]string {
 			continue
 		}
 		shape := group + "\x00" + proxyShapeFingerprint(proxy.Config)
-		if canon, ok := canonicalByShape[shape]; ok {
-			redirect[fkName] = canon
-		} else {
-			canonicalByShape[shape] = fkName
+		shapeOf[i] = shape
+		c, ok := classes[shape]
+		if !ok {
+			classes[shape] = &class{first: i, canonical: i}
+			continue
+		}
+		if fkName == group && string(*proxies[c.canonical].Model) != group {
+			c.canonical = i
 		}
 	}
-	return redirect
+
+	ordered := make([]*kong.Plugin, 0, len(proxies))
+	redirect := map[string]string{}
+	for i, proxy := range proxies {
+		c, ok := classes[shapeOf[i]]
+		if !ok {
+			ordered = append(ordered, proxy)
+			continue
+		}
+		canon := proxies[c.canonical]
+		switch i {
+		case c.first:
+			ordered = append(ordered, canon)
+			if c.canonical != i {
+				ordered = append(ordered, proxy)
+			}
+		case c.canonical:
+			// Already emitted at the class's first-seen position.
+		default:
+			ordered = append(ordered, proxy)
+		}
+		if i != c.canonical {
+			redirect[string(*proxy.Model)] = string(*canon.Model)
+		}
+	}
+	return ordered, redirect
 }
 
 // aiModelAliasGroup returns the aimap.EncodeModelAliasGroup marker on name's

@@ -92,18 +92,17 @@ ai_models:
 	require.Len(t, m.TargetModels, 1, "one target")
 }
 
-// TestRevertMultiAliasCanonicalNameIgnoresPluginOrder is a bug-demonstration
+// TestRevertMultiAliasCanonicalNameIgnoresPluginOrder guards against a
+// regression where revert picked the canonical alias from whichever
+// ai-proxy-advanced plugin appeared first in the YAML, ignoring the
+// "ai-gateway-model-alias-group:<canonical-alias>" tag every alias of a
+// multi-alias model's ai-models/ai-proxy-advanced entries carry. Below, the
+// tag says "@kong/openai" is canonical even though "@kong/the-openai-model"'s
+// plugin is listed first — revert must still name the model correctly.
 //
-// A multi-alias model's ai-models/ai-proxy-advanced entries all carry an
-// identical "ai-gateway-model-alias-group:<canonical-alias>" tag, which
-// revert uses to merge them into one model named after that alias. But
-// revert actually picks the canonical alias from whichever ai-proxy-advanced
-// plugin appears first in the YAML, ignoring the tag. Below, the tag says
-// "@kong/openai" is canonical, but "@kong/the-openai-model"'s plugin comes
-// first — so revert names the model wrong.
-//
-// This bug surfaces with input from elsewhere, e.g.
-// a live Kong Admin API dump, which makes no ordering promise.
+// Plugin order mattering at all is the regression risk here: it surfaces
+// with input from elsewhere, e.g. a live Kong Admin API dump, which makes no
+// ordering promise.
 func TestRevertMultiAliasCanonicalNameIgnoresPluginOrder(t *testing.T) {
 	src := []byte(`
 _format_version: "3.0"
@@ -176,8 +175,9 @@ ai_models:
 	require.NoError(t, yaml.Unmarshal(deckYAML, &redeck), "unmarshal re-converted document")
 	require.Len(t, redeck.AIModels, 2, "still one ai-models entry per alias")
 
-	// Bug: should still say "@kong/openai"; it's flipped to
-	// "@kong/the-openai-model" because revert picked the wrong canonical alias.
+	// Regression check: must still say "@kong/openai" per the tag, not
+	// "@kong/the-openai-model" — plugin order must not affect which alias
+	// wins as canonical.
 	for _, m := range redeck.AIModels {
 		require.Contains(t, m.Tags, "ai-gateway-model-alias-group:@kong/openai",
 			"re-converting should reproduce the original alias-group tag, not a new one")
