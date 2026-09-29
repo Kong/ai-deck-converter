@@ -289,13 +289,14 @@ func applyAcmeDatastore(config, dsConfig map[string]any, strategyPath string) ma
 // config or its nested resources/cache in place, so a reusable source Policy
 // is never mutated.
 func applyDatakitDatastore(config, dsConfig map[string]any) map[string]any {
+	const newDatakitCacheKeys = 2 // "redis" and "strategy", both set below.
 	out := make(map[string]any, len(config)+1)
 	maps.Copy(out, config)
 	resources, _ := out["resources"].(map[string]any)
 	newResources := make(map[string]any, len(resources)+1)
 	maps.Copy(newResources, resources)
 	cache, _ := newResources["cache"].(map[string]any)
-	newCache := make(map[string]any, len(cache)+2)
+	newCache := make(map[string]any, len(cache)+newDatakitCacheKeys)
 	maps.Copy(newCache, cache)
 	newCache["redis"] = dsConfig
 	newCache["strategy"] = VectorDBStrategyRedis
