@@ -1,8 +1,9 @@
 # Gemini batch routes (type=api, route-only, no model selector). The batches
 # suffix is non-regex, so it must join the base path with a separator
-# ("/gm" + "/v1beta/batches"), not fuse into "/gmv1beta/batches". Gemini-format
-# batches served by Vertex render on the same gemini client path, so both
-# providers are exercised. Regression for KOKO-4240.
+# ("/gm" + "/v1beta/batches"), not fuse into "/gmv1beta/batches". Every
+# gemini-format batches model, whichever provider serves it, renders on both
+# the Gemini path and the Gemini Enterprise batchPredictionJobs path; both providers are
+# exercised. Regression for KOKO-4240.
 model_providers:
   - name: gemini-prod
     type: gemini

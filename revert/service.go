@@ -14,6 +14,7 @@ import (
 func (r *Reverter) revertServices() error {
 	acc := &modelAcc{groups: map[string]*modelGroup{}}
 	routesSeen := map[string]bool{}
+	r.indexGeminiPathTargets()
 
 	for i := range r.src.Services {
 		svc := &r.src.Services[i]

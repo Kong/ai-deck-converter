@@ -69,12 +69,38 @@ routes:
       - http
       - https
     strip_path: false
+  - id: 090ce054-21c9-5fd3-a8f0-e0733e5dcc43
+    name: gemini-enterprise-generate
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - ~/gemini-default-name/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/(?<publisher>[^/]+)/models/(?<model_name>[^:/]+):(?:generateContent|streamGenerateContent)
+    methods:
+      - GET
+      - POST
+    protocols:
+      - http
+      - https
+    strip_path: false
   - id: 7ddc17d8-fad0-5f2f-9988-d25560595484
     name: gemini-generate-2
     service:
       id: 947a4e23-b483-5a65-8165-da9aed24565b
     paths:
       - ~/gemini-default-alias/v1beta/models/(?<model_name>[^:/]+):(?:generateContent|streamGenerateContent)
+    methods:
+      - GET
+      - POST
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: 0c6b2a42-9783-5417-b9b4-d2515dc7daaf
+    name: gemini-enterprise-generate-2
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - ~/gemini-default-alias/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/(?<publisher>[^/]+)/models/(?<model_name>[^:/]+):(?:generateContent|streamGenerateContent)
     methods:
       - GET
       - POST
@@ -95,12 +121,38 @@ routes:
       - http
       - https
     strip_path: false
+  - id: dc130716-b3ce-5c36-85bf-e0ab90c69fb4
+    name: gemini-enterprise-generate-3
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - ~/gemini-path-name/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/(?<publisher>[^/]+)/models/(?<model_name>[^:/]+):(?:generateContent|streamGenerateContent)
+    methods:
+      - GET
+      - POST
+    protocols:
+      - http
+      - https
+    strip_path: false
   - id: 1c7e3f8d-03b4-5e58-aca8-585308f7a935
     name: gemini-generate-4
     service:
       id: 947a4e23-b483-5a65-8165-da9aed24565b
     paths:
       - ~/gemini-path-alias/v1beta/models/(?<model_name>[^:/]+):(?:generateContent|streamGenerateContent)
+    methods:
+      - GET
+      - POST
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: 0682218c-cc1e-5985-9b28-191595ab4364
+    name: gemini-enterprise-generate-4
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - ~/gemini-path-alias/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/(?<publisher>[^/]+)/models/(?<model_name>[^:/]+):(?:generateContent|streamGenerateContent)
     methods:
       - GET
       - POST
@@ -266,8 +318,38 @@ plugins:
         - path_pattern: 'models/([%w%.%-]+):'
           source: path
     route:
-      id: 7ddc17d8-fad0-5f2f-9988-d25560595484
+      id: 090ce054-21c9-5fd3-a8f0-e0733e5dcc43
   - id: e4b46606-e4f5-57c3-9298-949d4e990f2d
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: gemini
+      targets:
+        - description: gemini-2.5-pro
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: gemini-default-name
+            name: gemini-2.5-pro
+            provider: gemini
+          route_type: llm/v1/chat
+    route:
+      id: 090ce054-21c9-5fd3-a8f0-e0733e5dcc43
+    model:
+      id: cb864ea7-b5fc-567a-bb09-254e9a2edd35
+  - id: 47b56eb4-93bb-5ba2-a7a7-1b24635b434e
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - path_pattern: 'models/([%w%.%-]+):'
+          source: path
+    route:
+      id: 7ddc17d8-fad0-5f2f-9988-d25560595484
+  - id: 1fc0cc9b-eb94-5eb9-8c69-d8361c990007
     name: ai-proxy-advanced
     config:
       balancer:
@@ -288,7 +370,37 @@ plugins:
       id: 7ddc17d8-fad0-5f2f-9988-d25560595484
     model:
       id: bc123b7e-e80a-5e9c-8623-be038a536152
-  - id: 47b56eb4-93bb-5ba2-a7a7-1b24635b434e
+  - id: b21a1b0e-3d70-5c23-84a5-d25fee046ce9
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - path_pattern: 'models/([%w%.%-]+):'
+          source: path
+    route:
+      id: 0c6b2a42-9783-5417-b9b4-d2515dc7daaf
+  - id: cf7316be-1398-5d7d-bed6-bacd43b095b8
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: gemini
+      targets:
+        - description: gemini-2.5-pro
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: '@kong/gemini'
+            name: gemini-2.5-pro
+            provider: gemini
+          route_type: llm/v1/chat
+    route:
+      id: 0c6b2a42-9783-5417-b9b4-d2515dc7daaf
+    model:
+      id: bc123b7e-e80a-5e9c-8623-be038a536152
+  - id: ea5f9246-1910-58d8-9d91-68ca8f388d7d
     name: ai-model-selector
     config:
       max_request_body_size: 8388608
@@ -297,7 +409,7 @@ plugins:
           source: path
     route:
       id: 61808011-06ae-5208-8ea7-6454b413c8c1
-  - id: 1fc0cc9b-eb94-5eb9-8c69-d8361c990007
+  - id: 5f4b0e19-29d1-5ce6-b34f-3e1394bf878e
     name: ai-proxy-advanced
     config:
       balancer:
@@ -318,7 +430,37 @@ plugins:
       id: 61808011-06ae-5208-8ea7-6454b413c8c1
     model:
       id: a34ab1e3-4979-5117-962a-0508b6e2c33a
-  - id: b21a1b0e-3d70-5c23-84a5-d25fee046ce9
+  - id: 4c3c42b4-138d-5f50-b141-efb32541e17c
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - path_pattern: 'models/([%w%.%-]+):'
+          source: path
+    route:
+      id: dc130716-b3ce-5c36-85bf-e0ab90c69fb4
+  - id: 0f8844dd-7362-5ea0-8eeb-35ee0580b632
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: gemini
+      targets:
+        - description: gemini-2.5-pro
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: gemini-path-name
+            name: gemini-2.5-pro
+            provider: gemini
+          route_type: llm/v1/chat
+    route:
+      id: dc130716-b3ce-5c36-85bf-e0ab90c69fb4
+    model:
+      id: a34ab1e3-4979-5117-962a-0508b6e2c33a
+  - id: 5a7abd23-205f-5c84-b7f1-035c47aaeaf5
     name: ai-model-selector
     config:
       max_request_body_size: 8388608
@@ -327,7 +469,7 @@ plugins:
           source: path
     route:
       id: 1c7e3f8d-03b4-5e58-aca8-585308f7a935
-  - id: cf7316be-1398-5d7d-bed6-bacd43b095b8
+  - id: 74150451-efc7-5a74-9754-5c27da9e52ac
     name: ai-proxy-advanced
     config:
       balancer:
@@ -346,6 +488,36 @@ plugins:
           route_type: llm/v1/chat
     route:
       id: 1c7e3f8d-03b4-5e58-aca8-585308f7a935
+    model:
+      id: c7915821-8736-59a2-9d78-df6e12ddfe3a
+  - id: 4ea90c46-4e21-5a47-b656-f67c908b7483
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - path_pattern: 'models/([%w%.%-]+):'
+          source: path
+    route:
+      id: 0682218c-cc1e-5985-9b28-191595ab4364
+  - id: 732a022e-4d91-596a-9c3c-60772ba24ae0
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: gemini
+      targets:
+        - description: gemini-2.5-pro
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: gemini-path-alias
+            name: gemini-2.5-pro
+            provider: gemini
+          route_type: llm/v1/chat
+    route:
+      id: 0682218c-cc1e-5985-9b28-191595ab4364
     model:
       id: c7915821-8736-59a2-9d78-df6e12ddfe3a
 ai_models:

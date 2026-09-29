@@ -1,0 +1,212 @@
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: gemini-predict
+        paths:
+          - ~/img/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/(?<publisher>[^/]+)/models/(?<model_name>[^:/]+):predict
+        methods:
+          - GET
+          - POST
+        strip_path: false
+      - name: gemini-predict-long-running
+        paths:
+          - ~/img/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/(?<publisher>[^/]+)/models/(?<model_name>[^:/]+):predictLongRunning
+        methods:
+          - GET
+          - POST
+        strip_path: false
+      - name: gemini-generate
+        paths:
+          - ~/mix/v1beta/models/(?<model_name>[^:/]+):(?:generateContent|streamGenerateContent)
+        methods:
+          - GET
+          - POST
+        strip_path: false
+      - name: gemini-enterprise-generate
+        paths:
+          - ~/mix/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/(?<publisher>[^/]+)/models/(?<model_name>[^:/]+):(?:generateContent|streamGenerateContent)
+        methods:
+          - GET
+          - POST
+        strip_path: false
+      - name: gemini-predict-2
+        paths:
+          - ~/mix/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/(?<publisher>[^/]+)/models/(?<model_name>[^:/]+):predict
+        methods:
+          - GET
+          - POST
+        strip_path: false
+      - name: gemini-ranking
+        paths:
+          - ~/mix/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/rankingConfigs/(?<config_name>[^:/]+):rank
+        methods:
+          - GET
+          - POST
+        strip_path: false
+plugins:
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - path_pattern: 'models/([%w%.%-]+):'
+          source: path
+    route: gemini-predict
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: image/generation
+      llm_format: gemini
+      targets:
+        - auth:
+            gcp_service_account_json: '{vault://ai/gcp}'
+            gcp_use_service_account: true
+          description: imagen-4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: imagen
+            name: imagen-4
+            provider: gemini
+          route_type: image/v1/images/generations
+    route: gemini-predict
+    model: imagen
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - path_pattern: 'models/([%w%.%-]+):'
+          source: path
+    route: gemini-predict-long-running
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: video/generation
+      llm_format: gemini
+      targets:
+        - auth:
+            gcp_service_account_json: '{vault://ai/gcp}'
+            gcp_use_service_account: true
+          description: imagen-4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: imagen
+            name: imagen-4
+            provider: gemini
+          route_type: video/v1/videos/generations
+    route: gemini-predict-long-running
+    model: imagen
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - path_pattern: 'models/([%w%.%-]+):'
+          source: path
+    route: gemini-generate
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: gemini
+      targets:
+        - auth:
+            gcp_service_account_json: '{vault://ai/gcp}'
+            gcp_use_service_account: true
+          description: gemini-2.5
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: mixed
+            name: gemini-2.5
+            provider: gemini
+          route_type: llm/v1/chat
+    route: gemini-generate
+    model: mixed
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - path_pattern: 'models/([%w%.%-]+):'
+          source: path
+    route: gemini-enterprise-generate
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: gemini
+      targets:
+        - auth:
+            gcp_service_account_json: '{vault://ai/gcp}'
+            gcp_use_service_account: true
+          description: gemini-2.5
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: mixed
+            name: gemini-2.5
+            provider: gemini
+          route_type: llm/v1/chat
+    route: gemini-enterprise-generate
+    model: mixed
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - path_pattern: 'models/([%w%.%-]+):'
+          source: path
+    route: gemini-predict-2
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: image/generation
+      llm_format: gemini
+      targets:
+        - auth:
+            gcp_service_account_json: '{vault://ai/gcp}'
+            gcp_use_service_account: true
+          description: gemini-2.5
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: mixed
+            name: gemini-2.5
+            provider: gemini
+          route_type: image/v1/images/generations
+    route: gemini-predict-2
+    model: mixed
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: gemini
+      targets:
+        - auth:
+            gcp_service_account_json: '{vault://ai/gcp}'
+            gcp_use_service_account: true
+          description: gemini-2.5
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: mixed
+            name: gemini-2.5
+            provider: gemini
+          route_type: llm/v1/chat
+    route: gemini-ranking
+    model: mixed
+ai_models:
+  - name: imagen
+  - name: mixed
