@@ -1,0 +1,47 @@
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: huggingface-generate
+        paths:
+          - /ai/v1/chat/completions
+        methods:
+          - POST
+        strip_path: false
+plugins:
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: huggingface-generate
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: huggingface
+      response_streaming: allow
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: Bearer {vault://ai/hf-token}
+          description: meta-llama/Llama-3.3-70B-Instruct
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: '@huggingface/llama-3.3-70b-instruct'
+            name: meta-llama/Llama-3.3-70B-Instruct
+            options:
+              max_tokens: 4096
+              temperature: 1
+              upstream_url: https://kong-hf-tgi.huggingface.cloud
+            provider: huggingface
+          route_type: llm/v1/chat
+    route: huggingface-generate
+    model: '@huggingface/llama-3.3-70b-instruct'
+ai_models:
+  - name: '@huggingface/llama-3.3-70b-instruct'
