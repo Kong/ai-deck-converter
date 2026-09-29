@@ -321,11 +321,7 @@ func (c *Converter) convertModels() error {
 					sec = aimap.SectionFor(aimap.PassthroughFormat, providerType)
 					specs = []aimap.EndpointSpec{aimap.PassthroughEndpoint}
 				} else {
-					// The section is resolved per capability: gemini-format traffic
-					// served by Vertex renders as gemini for shared capabilities
-					// (generate/embeddings) but keeps the Vertex section for the
-					// Vertex-only image/video/rerank endpoints.
-					sec = aimap.EndpointSectionFor(llmFormat(m, providerType), providerType, capability)
+					sec = aimap.SectionFor(llmFormat(m, providerType), providerType)
 					var ok bool
 					specs, ok = aimap.EndpointsFor(sec, capability)
 					if !ok {

@@ -1,0 +1,29 @@
+models:
+  - display_name: Gemini all capabilities
+    name: gemini-all-capabilities
+    type: model
+    enabled: true
+    capabilities: [ generate, embeddings, image, video, rerank, batches, files ]
+    formats:
+      - type: gemini
+    config:
+      route:
+        paths: [ /gemini ]
+    targets:
+      - name: gemini-2.5-pro
+        provider: gemini-prod
+        config:
+          type: gemini
+    policies: [ ]
+    access:
+      acls: { allow: [ ], deny: [ ] }
+model_providers:
+  - name: gemini-prod
+    type: gemini
+    display_name: Gemini Prod
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: x-goog-api-key
+            value: e2e-fake-gemini-key

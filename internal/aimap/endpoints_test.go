@@ -8,11 +8,11 @@ import (
 
 func TestFormats(t *testing.T) {
 	got := Formats()
-	// The valid Format.Type values: EndpointTable sections minus provider renderings, plus
-	// passthrough, which is a format without a section of its own.
+	// The valid Format.Type values: EndpointTable sections plus passthrough, which is a format
+	// without a section of its own.
 	want := []string{"anthropic", "bedrock", "cohere", "gemini", "huggingface", "openai", "passthrough", "typesafe"}
 	require.Equal(t, want, got)
-	require.NotContains(t, got, "vertex", "vertex is a rendering of gemini, not a client format")
+	require.NotContains(t, got, "vertex", "vertex is an alias of gemini, not a client format")
 }
 
 func TestClientFormatPassthroughBorrowsTheProviderSection(t *testing.T) {
@@ -20,10 +20,9 @@ func TestClientFormatPassthroughBorrowsTheProviderSection(t *testing.T) {
 	require.Equal(t, "openai", ClientFormat("passthrough", "openai"))
 	require.Equal(t, "anthropic", ClientFormat("passthrough", "anthropic"))
 	require.Equal(t, "bedrock", ClientFormat("passthrough", "bedrock"))
-	// A provider rendering resolves through its base format, and SectionFor still
-	// keeps the rendering distinct.
+	// A format alias resolves through its base format and section.
 	require.Equal(t, "gemini", ClientFormat("passthrough", "vertex"))
-	require.Equal(t, "vertex", SectionFor("passthrough", "vertex"))
+	require.Equal(t, "gemini", SectionFor("passthrough", "vertex"))
 	// Providers with no section of their own expose OpenAI-shaped APIs.
 	for _, providerType := range []string{"azure", "mistral", "databricks", "deepseek", ""} {
 		require.Equal(t, "openai", ClientFormat("passthrough", providerType), providerType)
@@ -40,18 +39,16 @@ func TestRoutePathPassthroughIsTheBasePath(t *testing.T) {
 }
 
 func TestCapabilitiesFor(t *testing.T) {
-	// gemini served by Vertex folds in the Vertex-only image/video/rerank, generate first.
-	require.Equal(t,
-		[]string{"generate", "batches", "embeddings", "image", "rerank", "video"},
-		CapabilitiesFor("gemini", "vertex"))
-	// gemini served by Gemini has no image/video/rerank.
-	require.Equal(t,
-		[]string{"generate", "batches", "embeddings", "files"},
-		CapabilitiesFor("gemini", "gemini"))
+	// The gemini section covers Gemini and Gemini Enterprise endpoints alike, whichever provider serves it.
+	for _, providerType := range []string{"gemini", "vertex"} {
+		require.Equal(t,
+			[]string{"generate", "batches", "embeddings", "files", "image", "rerank", "video"},
+			CapabilitiesFor("gemini", providerType), providerType)
+	}
 	// A format whose section is provider-independent.
 	require.Equal(t, []string{"rerank"}, CapabilitiesFor("cohere", "cohere"))
-	// An unknown format yields nil, as does a rendering section passed as a format (parity with
-	// Formats, which excludes "vertex").
+	// An unknown format yields nil, as does a format alias (parity with Formats, which excludes
+	// "vertex").
 	require.Nil(t, CapabilitiesFor("nope", ""))
 	require.Nil(t, CapabilitiesFor("vertex", "vertex"))
 }
@@ -66,7 +63,7 @@ func TestSectionDerivation(t *testing.T) {
 		{"anthropic", "anthropic", "anthropic"},
 		{"bedrock", "bedrock", "bedrock"},
 		{"gemini", "gemini", "gemini"},
-		{"gemini", "vertex", "vertex"}, // gemini format served by Vertex
+		{"gemini", "vertex", "gemini"}, // gemini format served by Vertex
 		{"", "openai", "openai"},       // default format
 	}
 	for _, tc := range cases {
@@ -75,30 +72,37 @@ func TestSectionDerivation(t *testing.T) {
 	}
 }
 
-func TestEndpointSectionFor(t *testing.T) {
-	cases := []struct {
-		format, providerType, capability, want string
-	}{
-		// Vertex renders shared capabilities on Gemini's client paths...
-		{"gemini", "vertex", "generate", "gemini"},
-		{"gemini", "vertex", "embeddings", "gemini"},
-		{"gemini", "vertex", "batches", "gemini"},
-		// ...but keeps the Vertex section for its exclusive capabilities.
-		{"gemini", "vertex", "image", "vertex"},
-		{"gemini", "vertex", "video", "vertex"},
-		{"gemini", "vertex", "rerank", "vertex"},
-		// Vertex does not implement Gemini's Files API; don't map it to gemini.
-		{"gemini", "vertex", "files", "vertex"},
-		// Gemini served by Gemini is unaffected.
-		{"gemini", "gemini", "generate", "gemini"},
-		// Non-rendering sections pass through regardless of capability.
-		{"openai", "openai", "generate", "openai"},
+func TestGeminiEnterpriseEndpoints(t *testing.T) {
+	// Every gemini capability's full set of paths, primary first.
+	const loc = "v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)"
+	const model = loc + "/publishers/(?<publisher>[^/]+)/models/(?<model_name>[^:/]+)"
+	want := map[string][]string{
+		"generate": {
+			"v1beta/models/(?<model_name>[^:/]+):(?:generateContent|streamGenerateContent)",
+			model + ":(?:generateContent|streamGenerateContent)",
+		},
+		"embeddings": {
+			"v1beta/models/(?<model_name>[^:/]+):(?:embedContent|batchEmbedContents)",
+			model + ":embedContent",
+		},
+		"image":   {model + ":predict"},
+		"video":   {model + ":predictLongRunning"},
+		"rerank":  {loc + "/rankingConfigs/(?<config_name>[^:/]+):rank"},
+		"batches": {"/v1beta/batches", loc + "/batchPredictionJobs"},
+		"files":   {"(?:upload/)?v1beta/files"},
 	}
-	for _, tc := range cases {
-		got := EndpointSectionFor(tc.format, tc.providerType, tc.capability)
-		require.Equalf(t, tc.want, got,
-			"EndpointSectionFor(%q,%q,%q)", tc.format, tc.providerType, tc.capability)
+	require.Len(t, EndpointTable["gemini"], len(want), "gemini capabilities")
+	for capability, paths := range want {
+		specs, ok := EndpointsFor("gemini", capability)
+		require.True(t, ok, capability)
+		got := make([]string, len(specs))
+		for i, spec := range specs {
+			got[i] = spec.PathSuffix
+		}
+		require.Equal(t, paths, got, capability)
 	}
+	_, ok := EndpointTable["vertex"]
+	require.False(t, ok, "vertex is served by the gemini section")
 }
 
 func TestEndpointLookupAndNormalization(t *testing.T) {
