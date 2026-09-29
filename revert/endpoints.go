@@ -13,6 +13,7 @@ import (
 type endpointMatch struct {
 	capability string
 	spec       aimap.EndpointSpec
+	secondary  bool // spec is one of the capability's Secondary endpoints
 }
 
 // specRegexes caches compiled Go regexes for the regex endpoint specs, keyed by
@@ -50,7 +51,7 @@ func resolveEndpoint(section, routeType, genaiCategory, routeName, routePath str
 	var cands []endpointMatch
 	for _, ce := range caps {
 		if ce.Spec.RouteType == routeType {
-			cands = append(cands, endpointMatch{ce.Capability, ce.Spec})
+			cands = append(cands, endpointMatch{ce.Capability, ce.Spec, ce.Secondary})
 		}
 	}
 	if len(cands) == 0 {
@@ -62,7 +63,7 @@ func resolveEndpoint(section, routeType, genaiCategory, routeName, routePath str
 				strings.HasSuffix(routeName, "-"+ce.Spec.RouteLabel)
 			_, byPath := basePathFor(routePath, ce.Spec)
 			if byName || byPath {
-				cands = append(cands, endpointMatch{ce.Capability, ce.Spec})
+				cands = append(cands, endpointMatch{ce.Capability, ce.Spec, ce.Secondary})
 			}
 		}
 	}

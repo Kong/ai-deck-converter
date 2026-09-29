@@ -10,9 +10,23 @@ services:
           - GET
           - POST
         strip_path: false
+      - name: gemini-enterprise-batches
+        paths:
+          - ~/gm/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/batchPredictionJobs
+        methods:
+          - GET
+          - POST
+        strip_path: false
       - name: gemini-batches-2
         paths:
           - /gv/v1beta/batches
+        methods:
+          - GET
+          - POST
+        strip_path: false
+      - name: gemini-enterprise-batches-2
+        paths:
+          - ~/gv/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/batchPredictionJobs
         methods:
           - GET
           - POST
@@ -43,6 +57,23 @@ plugins:
       llm_format: gemini
       model_name_header: false
       targets:
+        - description: gemini-batch-target
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: gemini-batch-target
+            provider: gemini
+          route_type: llm/v1/batches
+    route: gemini-enterprise-batches
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: gemini
+      model_name_header: false
+      targets:
         - auth:
             gcp_service_account_json: '{vault://ai/gcp-service-account-json}'
             gcp_use_service_account: true
@@ -55,6 +86,26 @@ plugins:
             provider: gemini
           route_type: llm/v1/batches
     route: gemini-batches-2
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: gemini
+      model_name_header: false
+      targets:
+        - auth:
+            gcp_service_account_json: '{vault://ai/gcp-service-account-json}'
+            gcp_use_service_account: true
+          description: gemini-batch-vertex-target
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: gemini-batch-vertex-target
+            provider: gemini
+          route_type: llm/v1/batches
+    route: gemini-enterprise-batches-2
 ai_models:
   - name: gemini-batches
   - name: gemini-batches-vertex

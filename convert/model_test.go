@@ -167,7 +167,7 @@ models:
     capabilities: [generate]
     formats: [{type: passthrough}]
     config: {route: {paths: [/ai]}}
-    policies: [guard, transform, logs]
+    policies: [guard, transform, logs, cache]
     targets:
       - name: gpt-a
         provider: p
@@ -176,7 +176,8 @@ policies:
   - {name: guard, type: ai-prompt-guard, config: {allow_patterns: ["^safe"]}}
   - {name: transform, type: ai-request-transformer, config: {prompt: rewrite}}
   - {name: logs, type: http-log, config: {http_endpoint: "https://logs.internal/x"}}
-  - {name: cache, type: ai-semantic-cache, global: true, config: {}}
+  - {name: cache, type: ai-semantic-cache, config: {}}
+  - {name: lakera, type: ai-lakera-guard, global: true, config: {}}
 `+passthroughProviders), Options{})
 	require.NoError(t, err)
 
@@ -191,9 +192,86 @@ policies:
 
 	// Only the policies that read the normalized shape are reported: one that works on raw
 	// bytes and one that never looks at the body are both fine as they are.
-	require.Len(t, warnings, 2)
-	require.Contains(t, warnings[0], `policy "guard" (ai-prompt-guard) cannot read the request`)
-	require.Contains(t, warnings[1], `policy "cache" (ai-semantic-cache) cannot read the request`)
+	require.Len(t, warnings, 3)
+	require.Contains(t, warnings[0], `policy "guard" (ai-prompt-guard) may not work properly`)
+	require.Contains(t, warnings[1], `policy "cache" (ai-semantic-cache) may not work properly`)
+	require.Contains(t, warnings[2], `policy "lakera" (ai-lakera-guard) may not work properly`)
+}
+
+// TestPassthroughWarnsAboutSanitizerOnlyWhenItAnonymizesCredentials pins that ai-sanitizer is
+// reported only when the anonymize list the data plane ends up with includes credentials.
+func TestPassthroughWarnsAboutSanitizerOnlyWhenItAnonymizesCredentials(t *testing.T) {
+	for anonymize, warns := range map[string]bool{
+		"":                                      true, // the data plane defaults to all_and_credentials
+		"anonymize: null":                       true,
+		"anonymize: [all_and_credentials]":      true,
+		"anonymize: [phone, credentials]":       true,
+		"anonymize: [phone, email]":             false,
+		"anonymize: [all]":                      false,
+		"anonymize: [all, all_and_credentials]": true,
+		"anonymize: [all, credentials]":         true,
+	} {
+		_, warnings, err := Convert([]byte(`
+models:
+  - name: pt
+    formats: [{type: passthrough}]
+    config: {route: {paths: [/ai]}}
+    policies: [san]
+    targets: [{name: t, provider: p, config: {type: openai}}]
+policies:
+  - name: san
+    type: ai-sanitizer
+    config: {`+anonymize+`}
+`+passthroughProviders), Options{})
+		require.NoError(t, err, anonymize)
+		if warns {
+			require.Len(t, warnings, 1, anonymize)
+			require.Contains(t, warnings[0], `policy "san" (ai-sanitizer) may not work properly`, anonymize)
+		} else {
+			require.Empty(t, warnings, anonymize)
+		}
+	}
+}
+
+// TestPassthroughWarnsAboutProvidersWithoutNativeFormat pins that a passthrough target whose
+// provider has no llm_format of its own is reported, since usage extraction may find nothing.
+func TestPassthroughWarnsAboutProvidersWithoutNativeFormat(t *testing.T) {
+	for providerType, warns := range map[string]bool{
+		"openai":      false,
+		"anthropic":   false,
+		"bedrock":     false,
+		"cohere":      false,
+		"gemini":      false,
+		"vertex":      false,
+		"huggingface": false,
+		"azure":       true,
+		"mistral":     true,
+		"sagemaker":   true,
+	} {
+		_, warnings, err := Convert([]byte(`
+models:
+  - name: pt
+    formats: [{type: passthrough}]
+    config: {route: {paths: [/ai]}}
+    targets: [{name: t, provider: p, config: {type: `+providerType+`}}]
+`+passthroughProviders), Options{})
+		require.NoError(t, err, providerType)
+		if warns {
+			require.Len(t, warnings, 1, providerType)
+			require.Contains(t, warnings[0], `provider type "`+providerType+`" has no native llm_format`)
+		} else {
+			require.Empty(t, warnings, providerType)
+		}
+	}
+
+	_, _, err := Convert([]byte(`
+models:
+  - name: pt
+    formats: [{type: passthrough}]
+    config: {route: {paths: [/ai]}}
+    targets: [{name: t, provider: p, config: {type: azure}}]
+`+passthroughProviders), Options{Strict: true})
+	require.ErrorContains(t, err, "has no native llm_format")
 }
 
 // TestPassthroughAllowsHostDisambiguatedModels pins that two passthrough models on one base

@@ -295,6 +295,13 @@ func (c *Converter) convertModels() error {
 					"model %q target %q: the passthrough format requires upstream_url for databricks",
 					m.Name, tm.Name)
 			}
+			if passthrough && providerType != "" && !aimap.HasNativeFormat(providerType) {
+				if err := c.warn(
+					"model %q target %q: provider type %q has no native llm_format, so the passthrough "+
+						"format may not extract usage or cost", m.Name, tm.Name, providerType); err != nil {
+					return err
+				}
+			}
 			if passthrough {
 				// Compare client formats, not sections, so gemini and vertex stay compatible.
 				format := aimap.ClientFormat(aimap.PassthroughFormat, providerType)
@@ -314,11 +321,7 @@ func (c *Converter) convertModels() error {
 					sec = aimap.SectionFor(aimap.PassthroughFormat, providerType)
 					specs = []aimap.EndpointSpec{aimap.PassthroughEndpoint}
 				} else {
-					// The section is resolved per capability: gemini-format traffic
-					// served by Vertex renders as gemini for shared capabilities
-					// (generate/embeddings) but keeps the Vertex section for the
-					// Vertex-only image/video/rerank endpoints.
-					sec = aimap.EndpointSectionFor(llmFormat(m, providerType), providerType, capability)
+					sec = aimap.SectionFor(llmFormat(m, providerType), providerType)
 					var ok bool
 					specs, ok = aimap.EndpointsFor(sec, capability)
 					if !ok {
@@ -1235,7 +1238,7 @@ func balancerAlgorithm(b *aigw.Balancer) string {
 
 // warnPassthroughPolicies reports the policies reaching a passthrough model -- its own and the
 // global ones -- that read the normalized LLM shape. They still load on the data plane, so this
-// is a warning rather than a rejection: the configuration is valid, those policies just cannot
+// is a warning rather than a rejection: the configuration is valid, those policies just may not
 // see what they look for.
 func (c *Converter) warnPassthroughPolicies(m *aigw.Model) error {
 	refs := slices.Clone(m.Policies)
@@ -1246,12 +1249,17 @@ func (c *Converter) warnPassthroughPolicies(m *aigw.Model) error {
 	}
 	for _, ref := range refs {
 		policy := c.policies[ref]
-		if policy == nil || !aimap.PromptReadingPolicies[policy.Type] {
+		if policy == nil {
+			continue
+		}
+		readsPrompt := aimap.PromptReadingPolicies[policy.Type] ||
+			policy.Type == "ai-sanitizer" && aimap.SanitizerAnonymizesCredentials(policy.Config)
+		if !readsPrompt {
 			continue
 		}
 		if err := c.warn(
-			"model %q uses the passthrough format, so policy %q (%s) cannot read the request or "+
-				"response: the body reaches the provider unchanged, in the provider's own shape",
+			"model %q uses the passthrough format, so policy %q (%s) may not work properly: "+
+				"the body reaches the provider unchanged, in the provider's own shape",
 			m.Name, ref, policy.Type); err != nil {
 			return err
 		}

@@ -129,15 +129,20 @@ A model's `capabilities` choose which routes are created. The mapping (path,
 methods, `route_type`, `genai_category`) is defined per provider section in
 `convert/endpoints.go`, derived from `ref/supported-endpoints.md`. Loose
 spellings are normalized (`chat`→`generate`, `batch`→`batches`); bare `audio`
-fans out to speech/transcription/translation. Native formats (bedrock, gemini,
-vertex) emit regex routes (`~/ai/...`); capabilities that share an upstream
+fans out to speech/transcription/translation. Native formats (bedrock, gemini)
+emit regex routes (`~/ai/...`); capabilities that share an upstream
 endpoint (e.g. bedrock embeddings/image/audio/video → `/invoke`) collapse into
 one route with multiple targets.
 
 Most capabilities map to a single canonical endpoint, but a few are reachable
 through more than one and get a route per endpoint: bedrock `generate` emits
 both `bedrock-converse` (Converse) and `bedrock-invoke` (InvokeModel), each
-carrying the model's target(s). These extra endpoints live in the capability's
+carrying the model's target(s). Likewise every gemini capability is served on
+both its Gemini API path and its Gemini Enterprise path (e.g. `gemini-generate`
+and `gemini-enterprise-generate`), whichever provider type serves it; the Gemini
+Enterprise-only
+image (`:predict`), video (`:predictLongRunning`) and rerank (`:rank`)
+capabilities are available to gemini-format models too. These extra endpoints live in the capability's
 own `internal/aimap.EndpointTable` entry, as `EndpointEntry.Secondary`
 alongside the canonical `Primary` spec — read both together via
 `aimap.EndpointsFor` / `aimap.SectionEndpoints` — never look up a capability's
@@ -275,10 +280,13 @@ and `formats` beyond the first.
   another passthrough model, be combined with another format, or use the
   `semantic` balancer; a databricks target needs `upstream_url`. All are
   conversion errors. Policies that read the normalized LLM shape (guardrails,
-  prompt decorators/templates, semantic cache, RAG injector, …) produce a
-  warning when attached to the model or global; raw-byte ones
-  (`ai-request-transformer`, `ai-response-transformer`, `ai-sanitizer`) and
-  consumer/consumer-group policies are not checked. Revert recovers the model
+  prompt decorators/templates/compressor, RAG injector, semantic cache,
+  LLM-as-judge, and `ai-sanitizer` when `anonymize` includes credentials,
+  which is its default) produce a
+  warning when attached to the model or global; other AI policies work on raw
+  bytes, and consumer/consumer-group policies are not checked. A target whose
+  provider has no native `llm_format` (azure, mistral, sagemaker, …) also
+  warns: usage and cost extraction may find nothing. Revert recovers the model
   with no `capabilities`.
 
 ## Community

@@ -121,6 +121,10 @@ type Reverter struct {
 	authStrategyNames  map[string]bool
 	authStrategyCounts map[string]int // auth strategy type -> running index
 
+	// geminiPathTargets holds the geminiTargetKey of every gemini-enum target
+	// served on a Gemini-style route path (see detectProviderType).
+	geminiPathTargets map[string]bool
+
 	warnings []string
 }
 
@@ -141,6 +145,7 @@ func newReverter(doc *kong.Document, opts Options) *Reverter {
 		authStrategyByFP:   map[string]string{},
 		authStrategyNames:  map[string]bool{},
 		authStrategyCounts: map[string]int{},
+		geminiPathTargets:  map[string]bool{},
 	}
 }
 
@@ -159,6 +164,9 @@ func (r *Reverter) warn(format string, args ...any) error {
 func (r *Reverter) run() error {
 	r.buildIndexes()
 	r.indexMCPListenerSources()
+	if err := r.revertCustomPolicies(); err != nil {
+		return err
+	}
 	r.revertGlobalPolicies()
 	r.revertVaults()
 	r.revertCACertificates()
