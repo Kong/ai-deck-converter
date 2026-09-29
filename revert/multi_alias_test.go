@@ -3,7 +3,9 @@ package revert
 import (
 	"testing"
 
+	"github.com/Kong/ai-deck-converter/convert"
 	"github.com/Kong/ai-deck-converter/internal/aigw"
+	"github.com/Kong/ai-deck-converter/internal/kong"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 )
@@ -88,6 +90,98 @@ ai_models:
 	require.Equal(t, []string{"@kong/openai", "@kong/the-openai-model"},
 		m.Config.Route.Model.Values, "every alias lands in route.model.values")
 	require.Len(t, m.TargetModels, 1, "one target")
+}
+
+// TestRevertMultiAliasCanonicalNameIgnoresPluginOrder is a bug-demonstration
+//
+// A multi-alias model's ai-models/ai-proxy-advanced entries all carry an
+// identical "ai-gateway-model-alias-group:<canonical-alias>" tag, which
+// revert uses to merge them into one model named after that alias. But
+// revert actually picks the canonical alias from whichever ai-proxy-advanced
+// plugin appears first in the YAML, ignoring the tag. Below, the tag says
+// "@kong/openai" is canonical, but "@kong/the-openai-model"'s plugin comes
+// first — so revert names the model wrong.
+//
+// This bug surfaces with input from elsewhere, e.g.
+// a live Kong Admin API dump, which makes no ordering promise.
+func TestRevertMultiAliasCanonicalNameIgnoresPluginOrder(t *testing.T) {
+	src := []byte(`
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: openai-chat
+        paths:
+          - /ai/chat/completions
+        methods:
+          - POST
+        strip_path: false
+plugins:
+  - name: ai-model-selector
+    config:
+      sources:
+        - body_path: model
+          source: body
+    route: openai-chat
+
+  # Listed first, though the tag below names @kong/openai canonical.
+  - name: ai-proxy-advanced
+    config:
+      llm_format: openai
+      targets:
+        - model:
+            model_alias: '@kong/the-openai-model'
+            name: gpt-5
+            provider: openai
+          route_type: llm/v1/chat
+    route: openai-chat
+    model: '@kong/the-openai-model'
+
+  # The alias the tag names canonical.
+  - name: ai-proxy-advanced
+    config:
+      llm_format: openai
+      targets:
+        - model:
+            model_alias: '@kong/openai'
+            name: gpt-5
+            provider: openai
+          route_type: llm/v1/chat
+    route: openai-chat
+    model: '@kong/openai'
+
+ai_models:
+  - name: '@kong/the-openai-model'
+    tags:
+      - ai-gateway-model-alias-group:@kong/openai
+  - name: '@kong/openai'
+    tags:
+      - ai-gateway-model-alias-group:@kong/openai
+`)
+
+	doc, warnings := revertToDoc(t, src, Options{})
+	require.Empty(t, warnings, "no warnings expected")
+	require.Len(t, doc.Models, 1, "the two aliases should still merge into one model")
+
+	// Convert the reverted model back and inspect its tags.
+	aigwYAML, err := yaml.Marshal(doc)
+	require.NoError(t, err, "marshal reverted document")
+
+	deckYAML, warnings, err := convert.Convert(aigwYAML, convert.Options{})
+	require.NoError(t, err, "re-convert")
+	require.Empty(t, warnings, "no warnings expected")
+
+	var redeck kong.Document
+	require.NoError(t, yaml.Unmarshal(deckYAML, &redeck), "unmarshal re-converted document")
+	require.Len(t, redeck.AIModels, 2, "still one ai-models entry per alias")
+
+	// Bug: should still say "@kong/openai"; it's flipped to
+	// "@kong/the-openai-model" because revert picked the wrong canonical alias.
+	for _, m := range redeck.AIModels {
+		require.Contains(t, m.Tags, "ai-gateway-model-alias-group:@kong/openai",
+			"re-converting should reproduce the original alias-group tag, not a new one")
+	}
 }
 
 func TestRevertMultiAliasValuesWithoutMarkerStaysSeparate(t *testing.T) {
