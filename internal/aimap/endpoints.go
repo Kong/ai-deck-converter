@@ -169,7 +169,7 @@ var PromptReadingPolicies = map[string]bool{
 // SanitizerAnonymizesCredentials reports whether an ai-sanitizer config anonymizes credentials,
 // the one sanitizer mode that needs the normalized LLM shape. An unset anonymize defaults to
 // all_and_credentials on the data plane. A list holding "all" as well is still reported: the data
-// plane collapsing it to "all" is a known bug, fixed after AI Gateway 2.2.
+// plane collapsing it to "all" is a bug tracked in KOKO-4587.
 func SanitizerAnonymizesCredentials(cfg map[string]any) bool {
 	var types []string
 	switch v := cfg["anonymize"].(type) {
