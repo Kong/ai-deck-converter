@@ -16,13 +16,12 @@ func (c *Converter) convertCustomPolicies() error {
 			return c.failAt("custom_policies.schema", "custom policy schema is required")
 		}
 
-		c.customPlugins = append(c.customPlugins, kong.DBLessCustomPlugin{
+		c.out.CustomPlugins = append(c.out.CustomPlugins, kong.CustomPlugin{
 			ID:      firstNonEmpty(policy.ID, stableUUID("custom_plugin:"+policy.Name)),
 			Name:    policy.Name,
 			Schema:  policy.Schema,
 			Handler: policy.Handler,
 		})
 	}
-
 	return nil
 }

@@ -26,6 +26,8 @@ func TestConvertCustomPoliciesToDBLessPlugins(t *testing.T) {
 
 	c := newConverter(doc, Options{OutputMode: "db-less"}.withDefaults())
 	require.NoError(t, c.run())
+	require.Len(t, c.out.CustomPlugins, 1)
+	require.Equal(t, "streaming-policy", c.out.CustomPlugins[0].Name)
 
 	out := c.projectDBLess()
 	require.Len(t, out.CustomPlugins, 1)
