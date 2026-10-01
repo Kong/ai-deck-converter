@@ -161,3 +161,68 @@ func TestEnsureAnonymousConsumerOverwritesExistingPlugin(t *testing.T) {
 	require.NotNil(t, anon.Plugins[0].Enabled)
 	require.True(t, *anon.Plugins[0].Enabled, "overwritten plugin should always be enabled")
 }
+
+func authStrategyOverrideDoc(strategyConfig string) string {
+	return `models:
+  - name: a
+    config: {route: {paths: [/a]}}
+    targets: [{name: t, provider: openai-prod, config: {type: openai}}]
+    access: {auth_strategies: [ka]}
+  - name: b
+    config: {route: {paths: [/b]}}
+    targets: [{name: t, provider: openai-prod, config: {type: openai}}]
+    access: {auth_strategies: [ka]}
+model_providers:
+  - name: openai-prod
+    type: openai
+    config:
+      auth: {type: basic, headers: [{name: Authorization, value: x}]}
+auth_strategies:
+  - name: ka
+    type: key-auth
+    config: ` + strategyConfig + "\n"
+}
+
+func TestAuthStrategyWarnsOverrides(t *testing.T) {
+	cases := map[string]struct {
+		config string
+		want   string
+	}{
+		"anonymous": {
+			`{key_names: [k], anonymous: someone}`,
+			`anonymous will be overridden to "anonymous"`,
+		},
+		"identity_realms": {
+			`{principals: {enabled: true}, identity_realms: [{scope: cp}]}`,
+			"identity_realms will be overridden to []",
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			src := []byte(authStrategyOverrideDoc(tc.config))
+			_, warnings, err := Convert(src, Options{})
+			require.NoError(t, err)
+			require.Len(t, warnings, 2, "each referencing model warns")
+			require.Contains(t, warnings[0], `model "a" references auth strategy "ka"`)
+			require.Contains(t, warnings[1], `model "b" references auth strategy "ka"`)
+			for _, w := range warnings {
+				require.Contains(t, w, tc.want)
+			}
+
+			_, _, err = Convert(src, Options{Strict: true})
+			require.Error(t, err)
+		})
+	}
+}
+
+func TestAuthStrategyDoesNotWarnMatchingValues(t *testing.T) {
+	for _, cfg := range []string{
+		`{key_names: [k], anonymous: anonymous}`,
+		`{principals: {enabled: true}, identity_realms: []}`,
+		`{principals: {enabled: false}, identity_realms: [{scope: cp}]}`,
+	} {
+		_, warnings, err := Convert([]byte(authStrategyOverrideDoc(cfg)), Options{Strict: true})
+		require.NoError(t, err, cfg)
+		require.Empty(t, warnings, cfg)
+	}
+}

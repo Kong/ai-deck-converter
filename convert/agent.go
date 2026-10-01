@@ -24,7 +24,7 @@ func (c *Converter) convertAgents() error {
 		guard = sourceScopedPlugins(guard, "agent", a.Name)
 		route.Plugins = append(route.Plugins, guard...)
 
-		authStrategyPlugins, err := c.scopedAuthStrategyPlugins(a.Access.AuthStrategies)
+		authStrategyPlugins, err := c.scopedAuthStrategyPlugins(fmt.Sprintf("agent %q", a.Name), a.Access.AuthStrategies)
 		if err != nil {
 			return err
 		}

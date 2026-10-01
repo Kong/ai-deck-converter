@@ -104,6 +104,15 @@ func (c *Converter) mcpIdentityPlugins(m *aigw.MCPServer, route *kong.Route) ([]
 		// than defaulted, so a strategy that
 		// sets hide_credentials: true cannot silently strip it here -- the
 		// strategy may be shared with models/agents, where hiding it is fine.
+		if hide, _ := idp.Config["hide_credentials"].(bool); hide {
+			if err := c.warn(
+				"MCP server %q references key-auth auth strategy %q with hide_credentials: true. "+
+					"This will be ignored, and hide_credentials will be overridden to false "+
+					"because ai-mcp-proxy needs the credential to execute tools.",
+				m.Name, idp.Name); err != nil {
+				return nil, err
+			}
+		}
 		cfg["hide_credentials"] = false
 	}
 	plugin := kong.Plugin{Name: idp.Type, Config: cfg, Source: source("identity_provider", idp.Name, "config")}

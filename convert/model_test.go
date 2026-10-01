@@ -291,3 +291,72 @@ func TestPassthroughAllowsHostDisambiguatedModels(t *testing.T) {
 `+passthroughProviders), Options{})
 	require.NoError(t, err)
 }
+
+const overrideProvider = `
+model_providers:
+  - name: openai-prod
+    type: openai
+    config:
+      auth: {type: basic, headers: [{name: Authorization, value: x}]}
+`
+
+func TestModelWarnsRouteNameOverride(t *testing.T) {
+	src := `models:
+  - name: m
+    capabilities: [generate, embeddings]
+    config: {route: {name: custom, paths: [/ai]}}
+    targets: [{name: t, provider: openai-prod, config: {type: openai}}]
+` + overrideProvider
+	_, warnings, err := Convert([]byte(src), Options{})
+	require.NoError(t, err)
+	require.Len(t, warnings, 1)
+	require.Contains(t, warnings[0], `sets config.route.name to "custom"`)
+
+	_, _, err = Convert([]byte(src), Options{Strict: true})
+	require.Error(t, err)
+}
+
+func TestModelWarnsLogStatisticsOverride(t *testing.T) {
+	src := `models:
+  - name: m
+    capabilities: [generate, audio]
+    config:
+      route: {paths: [/ai]}
+      logging: {statistics: true}
+    targets: [{name: t, provider: openai-prod, config: {type: openai}}]
+` + overrideProvider
+	out, warnings, err := Convert([]byte(src), Options{})
+	require.NoError(t, err)
+	require.Len(t, warnings, 3, "one warning per affected route")
+	for i, route := range []string{"openai-audio-speech", "openai-audio-transcribe", "openai-audio-translate"} {
+		require.Contains(t, warnings[i], `ignored on the "`+route+`" route`)
+		require.Contains(t, warnings[i], "log_statistics will be overridden to false")
+	}
+	require.Contains(t, string(out), "log_statistics: true", "chat route keeps the user value")
+
+	_, _, err = Convert([]byte(src), Options{Strict: true})
+	require.Error(t, err)
+}
+
+func TestModelDoesNotWarnLogStatisticsWhenSupportedOrUnset(t *testing.T) {
+	for name, src := range map[string]string{
+		"supported": `models:
+  - name: m
+    capabilities: [generate]
+    config: {route: {paths: [/ai]}, logging: {statistics: true}}
+    targets: [{name: t, provider: openai-prod, config: {type: openai}}]
+`,
+		"defaulted": `models:
+  - name: m
+    capabilities: [audio]
+    config: {route: {paths: [/ai]}}
+    targets: [{name: t, provider: openai-prod, config: {type: openai}}]
+`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, warnings, err := Convert([]byte(src+overrideProvider), Options{Strict: true})
+			require.NoError(t, err)
+			require.Empty(t, warnings)
+		})
+	}
+}

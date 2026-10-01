@@ -287,13 +287,17 @@ mcp_servers:
 
 func TestMCPKeyAuthNeverHidesCredentials(t *testing.T) {
 	out, warnings := convertMCP(t, mcpHiddenCredentials)
-	require.Empty(t, warnings)
+	require.Len(t, warnings, 1)
+	require.Contains(t, warnings[0], "hide_credentials will be overridden to false")
 
 	// Forced to false on the listener -- a strategy asking to hide it does
 	// not win here.
 	keyAuth := routePlugins(t, out, "aggregate")[1]
 	require.Equal(t, "key-auth", keyAuth.Name)
 	require.Equal(t, false, keyAuth.Config["hide_credentials"])
+
+	_, _, err := Convert([]byte(mcpHiddenCredentials), Options{Strict: true})
+	require.Error(t, err)
 }
 
 // mcpUnexposedSources has a conversion-only server no listener names, next to

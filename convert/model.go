@@ -261,6 +261,15 @@ func (c *Converter) convertModels() error {
 		if err != nil {
 			return err
 		}
+		if m.Config.Route.Name != "" {
+			if err := c.warn(
+				"model %q sets config.route.name to %q. "+
+					"This will be ignored, and each route name will be overridden "+
+					"to the generated {format}-{endpoint} name.",
+				m.Name, m.Config.Route.Name); err != nil {
+				return err
+			}
+		}
 
 		var routeNames []string
 		routeSeen := map[string]bool{}
@@ -409,6 +418,15 @@ func (c *Converter) convertModels() error {
 					if !routeSeen[g.route.Name] {
 						routeSeen[g.route.Name] = true
 						routeNames = append(routeNames, g.route.Name)
+						if !spec.SupportsLogStatistics && loggingStatisticsSet(m.Config.Logging) {
+							if err := c.warn(
+								"model %q sets config.logging.statistics to true. "+
+									"This will be ignored on the %q route, and log_statistics will be "+
+									"overridden to false because the endpoint does not support it.",
+								m.Name, g.route.Name); err != nil {
+								return err
+							}
+						}
 					}
 
 					pg := g.proxyByOwner[ownerKey]
@@ -594,7 +612,7 @@ func (c *Converter) convertModels() error {
 
 		// Each route group contains only models with the same auth-strategy
 		// set, so these plugins can safely remain route-scoped.
-		idpPlugins, err := c.scopedAuthStrategyPlugins(m.Access.AuthStrategies)
+		idpPlugins, err := c.scopedAuthStrategyPlugins(fmt.Sprintf("model %q", m.Name), m.Access.AuthStrategies)
 		if err != nil {
 			return err
 		}
@@ -749,7 +767,9 @@ func (c *Converter) convertModels() error {
 			plugins[i].Route = kong.NewStringRef(routeName)
 			c.out.Plugins = append(c.out.Plugins, plugins[i])
 		}
-		idpPlugins, err := c.scopedAuthStrategyPlugins(candidate.model.Access.AuthStrategies)
+		idpPlugins, err := c.scopedAuthStrategyPlugins(
+			fmt.Sprintf("model %q video lifecycle route", candidate.model.Name),
+			candidate.model.Access.AuthStrategies)
 		if err != nil {
 			return err
 		}
@@ -949,6 +969,10 @@ func (g *proxyGroup) proxyConfig() map[string]any {
 		cfg["proxy_config"] = g.proxy
 	}
 	return cfg
+}
+
+func loggingStatisticsSet(l *aigw.Logging) bool {
+	return l != nil && l.Statistics != nil && *l.Statistics
 }
 
 // modelLoggingBlock maps a model's AI Gateway logging into the per-target logging
