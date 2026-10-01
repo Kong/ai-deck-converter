@@ -1,0 +1,38 @@
+# Model aliases like "@openai/gpt-4o-mini" contain "@" and "/", which Kong's
+# validate_utf8_name rejects. The alias is what lands in Plugin.Model (it
+# becomes both ai_models.name and the FK), so instance_name generation must
+# sanitize it rather than emit it verbatim.
+model_providers:
+  - name: openai-prod
+    type: openai
+    config:
+      auth:
+        type: basic
+        headers: [{name: Authorization, value: "{vault://env/openai-token}"}]
+  - name: anthropic-prod
+    type: anthropic
+    config:
+      auth:
+        type: basic
+        headers: [{name: x-api-key, value: "{vault://env/anthropic-token}"}]
+models:
+  - name: gpt-4o-mini
+    type: model
+    capabilities: [chat]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/ai], model: {values: ["@openai/gpt-4o-mini"]}}
+    targets:
+      - name: gpt-4o-mini
+        provider: openai-prod
+        config: {type: openai}
+  - name: claude-opus
+    type: model
+    capabilities: [chat]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/ai], model: {values: ["@anthropic/claude-opus-4-6"]}}
+    targets:
+      - name: claude-opus-4-6
+        provider: anthropic-prod
+        config: {type: anthropic}

@@ -1,0 +1,80 @@
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: openai-chat
+        paths:
+          - /chat/completions
+        methods:
+          - POST
+        strip_path: false
+      - name: openai-embeddings
+        paths:
+          - /embeddings
+        methods:
+          - POST
+        strip_path: false
+plugins:
+  - name: ai-model-selector
+    instance_name: ai-model-selector.openai-chat
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-chat
+  - name: ai-proxy-advanced
+    instance_name: ai-proxy-advanced.gpt-5-2.openai-chat
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-5.2
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: gpt-5-2
+            name: gpt-5.2
+            provider: openai
+          route_type: llm/v1/chat
+    route: openai-chat
+    model: gpt-5-2
+  - name: ai-model-selector
+    instance_name: ai-model-selector.openai-embeddings
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-embeddings
+  - name: ai-proxy-advanced
+    instance_name: ai-proxy-advanced.gpt-5-2.openai-embeddings
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/embeddings
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-5.2
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: gpt-5-2
+            name: gpt-5.2
+            provider: openai
+          route_type: llm/v1/embeddings
+    route: openai-embeddings
+    model: gpt-5-2
+ai_models:
+  - name: gpt-5-2

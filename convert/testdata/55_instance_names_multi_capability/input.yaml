@@ -1,0 +1,20 @@
+# One model with two capabilities lowers to two routes and two
+# ai-proxy-advanced plugins, both carrying the SAME model FK. Proves the
+# model name alone is not a unique instance_name -- the route must be part
+# of it.
+models:
+  - name: gpt-5-2
+    type: model
+    capabilities: [generate, embeddings]
+    formats: [{type: openai}]
+    targets:
+      - name: gpt-5.2
+        provider: openai-prod
+        config: {type: openai}
+model_providers:
+  - name: openai-prod
+    type: openai
+    config:
+      auth:
+        type: basic
+        headers: [{name: Authorization, value: "{vault://ai/openai-token}"}]
