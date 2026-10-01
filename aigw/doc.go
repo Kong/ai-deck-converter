@@ -28,10 +28,13 @@ type (
 	Consumer          = internal.Consumer
 	ConsumerGroup     = internal.ConsumerGroup
 	Credential        = internal.Credential
+	AuthStrategy      = internal.AuthStrategy
+	Datastore         = internal.Datastore
 	MCPServer         = internal.MCPServer
 	Agent             = internal.Agent
 	Vault             = internal.Vault
 	Certificate       = internal.Certificate
+	CACertificate     = internal.CACertificate
 	SNI               = internal.SNI
 )
 
