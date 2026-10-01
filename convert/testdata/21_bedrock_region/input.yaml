@@ -27,10 +27,11 @@ models:
             config:
               type: bedrock
               region: us-east-1
+              vpc_endpoint: https://vpce-123.bedrock-runtime.us-east-1.vpce.amazonaws.com
     targets:
       - name: amazon.titan-embed-text-v2:0
         provider: bedrock-prod
-        config: {type: bedrock, region: us-east-1, embeddings_normalize: true}
+        config: {type: bedrock, region: us-east-1, embeddings_normalize: true, vpc_endpoint: "https://vpce-123.bedrock-runtime.us-east-1.vpce.amazonaws.com"}
     policies: []
     access:
       acls: {allow: [], deny: []}

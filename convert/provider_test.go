@@ -132,6 +132,29 @@ func TestLowerEmbeddingsModelBedrockNonAnthropicDoesNotDefaultAnthropicVersion(t
 	require.NotContains(t, model, "options")
 }
 
+func TestMapOptionsBedrockVPCEndpoint(t *testing.T) {
+	const vpce = "https://vpce-123.bedrock-runtime.us-east-1.vpce.amazonaws.com"
+	got := mapOptions(map[string]any{"vpc_endpoint": vpce},
+		"bedrock", "amazon.titan-embed-text-v2:0", &aigw.Provider{Type: "bedrock"})
+	want := map[string]any{"bedrock": map[string]any{"vpc_endpoint": vpce}}
+	require.Equal(t, want, got, "mapOptions bedrock vpc_endpoint mismatch")
+}
+
+func TestLowerEmbeddingsModelBedrockVPCEndpoint(t *testing.T) {
+	const vpce = "https://vpce-123.bedrock-runtime.us-east-1.vpce.amazonaws.com"
+	embeddings := map[string]any{
+		"model": map[string]any{
+			"name":   "amazon.titan-embed-text-v2:0",
+			"config": map[string]any{"type": "bedrock", "vpc_endpoint": vpce},
+		},
+	}
+
+	lowerEmbeddingsModel(embeddings, &aigw.Provider{Type: "bedrock"})
+	model := embeddings["model"].(map[string]any)
+	want := map[string]any{"bedrock": map[string]any{"vpc_endpoint": vpce}}
+	require.Equal(t, want, model["options"], "embeddings bedrock vpc_endpoint mismatch")
+}
+
 func TestConvertRejectsUnsupportedCapability(t *testing.T) {
 	src := []byte(`
 models:
