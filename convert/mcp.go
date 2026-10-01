@@ -32,6 +32,21 @@ func (c *Converter) convertMCPServers() error {
 		m := &c.src.MCPServers[i]
 		route := buildRoute(m.Config.Route, m.Name)
 		route.Source = source("mcp_server", m.Name, "config.route")
+		if m.Type == mcpConversionOnly {
+			// The DP re-enters this route to run a listener's tool call.
+			// It adds the route path to the tool's config.url-relative path.
+			// strip_path must remove that prefix before Kong adds the service path.
+			if route.StripPath != nil && !*route.StripPath {
+				if err := c.warn(
+					"MCP server %q of type %q has set strip_path set to false. "+
+						"This will be ignored, and strip_path will be overridden to true "+
+						"to enforce tool routing to behave as documented.",
+					m.Name, m.Type); err != nil {
+					return err
+				}
+				route.StripPath = new(true)
+			}
+		}
 		plugin, err := c.mcpPlugin(m)
 		if err != nil {
 			return err
