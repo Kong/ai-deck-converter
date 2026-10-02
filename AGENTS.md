@@ -133,6 +133,7 @@ comments you write or edit. Commit messages are always necessary.
     word glued to the next comment marker.
 12. **No emoji, no exclamation marks.**
 
-## Reference material
+## Design Decisions (RFCs)
 
-`ref/` contains the source-of-truth docs this converter encodes: `supported-endpoints.md`, the AI plugin docs (`ai-proxy-advanced.md`, `ai-mcp-proxy.md`, `ai-a2a-proxy.md`), admin API specs, and `ref/examples/models/<provider>/` pairs of AI-Gateway config + the hand-authored Kong decK output they should produce. Consult these when adding provider support or changing emitted plugin config. `examples/` holds end-to-end sample inputs.
+- Substantive design decisions are recorded as RFCs under `docs/decisions/`
+  Start from `docs/decisions/00000-template.md`.
