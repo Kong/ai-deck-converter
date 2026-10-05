@@ -1,6 +1,8 @@
 package convert
 
 import (
+	"maps"
+
 	"github.com/Kong/ai-deck-converter/internal/aigw"
 	"github.com/Kong/ai-deck-converter/internal/kong"
 )
@@ -85,6 +87,17 @@ func authStrategyPlugin(idp *aigw.AuthStrategy) kong.Plugin {
 		Config: cfg,
 		Source: source("identity_provider", idp.Name, "config"),
 	}
+}
+
+// withoutAnonymousFallback returns a copy of p without config.anonymous.
+// request-termination does not run on ws and wss routes.
+// An anonymous fallback there lets unauthenticated clients through.
+func withoutAnonymousFallback(p kong.Plugin) kong.Plugin {
+	cfg := make(map[string]any, len(p.Config))
+	maps.Copy(cfg, p.Config)
+	delete(cfg, "anonymous")
+	p.Config = cfg
+	return p
 }
 
 // forceKeyAuthIdentityRealms enforces the key-auth schema constraint that when

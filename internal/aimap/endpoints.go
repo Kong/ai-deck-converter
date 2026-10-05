@@ -73,6 +73,14 @@ const (
 	// video operations. It is not a source AI Gateway route and is ignored by
 	// the reverse converter.
 	VideoLifecycleRouteTag = "aigw:video-lifecycle"
+
+	// GatewayWebSocketServiceName names the Service for realtime routes.
+	// Kong selects the WebSocket proxy path from the Service protocol.
+	GatewayWebSocketServiceName = "ai-gateway-websocket"
+	GatewayWebSocketServiceURL  = "ws://ai-gateway.upstream.local"
+
+	// RealtimeRouteType is the route_type of the WebSocket realtime endpoint.
+	RealtimeRouteType = "realtime/v1/realtime"
 )
 
 var (
@@ -80,6 +88,12 @@ var (
 	mGetPost       = []string{"GET", "POST"}
 	mGetPostDelete = []string{"GET", "POST", "DELETE"}
 )
+
+// IsWebSocketEndpoint reports whether spec serves WebSocket traffic.
+// Kong rejects methods on its routes. ai-model-selector does not run on it.
+func IsWebSocketEndpoint(spec EndpointSpec) bool {
+	return spec.RouteType == RealtimeRouteType
+}
 
 // SectionFor selects the endpoint section from the model's llm_format (the
 // client-facing wire format that determines the request paths). The provider
@@ -330,8 +344,8 @@ var EndpointTable = map[string]map[string]EndpointEntry{
 		},
 		"realtime": {
 			Primary: EndpointSpec{
-				"realtime", "/realtime", false, mGetPost, "realtime/v1/realtime", catRealtime,
-				&defaultBodyModelSelectorConfig, true,
+				"realtime", "/realtime", false, nil, RealtimeRouteType, catRealtime,
+				nil, true,
 			},
 		},
 		"embeddings": {

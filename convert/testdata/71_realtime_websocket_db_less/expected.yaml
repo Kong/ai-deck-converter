@@ -1,0 +1,122 @@
+_format_version: "3.0"
+_transform: false
+services:
+  - id: 947a4e23-b483-5a65-8165-da9aed24565b
+    name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    host: ai-gateway.upstream.local
+    port: 80
+    protocol: http
+  - id: 81558bc1-3a1b-5dd1-b985-f764a06e74c3
+    name: ai-gateway-websocket
+    url: ws://ai-gateway.upstream.local
+    host: ai-gateway.upstream.local
+    port: 80
+    protocol: ws
+routes:
+  - id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+    name: openai-chat
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /mixed/chat/completions
+    methods:
+      - POST
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: b2ed74bc-70de-5c05-98a5-1ff4f804ad51
+    name: openai-realtime
+    service:
+      id: 81558bc1-3a1b-5dd1-b985-f764a06e74c3
+    paths:
+      - /mixed/realtime
+    protocols:
+      - ws
+      - wss
+    strip_path: false
+plugins:
+  - id: 17fa8192-4b9f-5b5a-8379-20ad8bc836a7
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+  - id: f3adc007-171c-5519-8763-3a0eef79bde3
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://env/openai-key}'
+          description: gpt-realtime
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: mixed-realtime
+            name: gpt-realtime
+            provider: openai
+          route_type: llm/v1/chat
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+    model:
+      id: bdb67c7a-33a3-5664-a801-be7b64f9516e
+  - id: fe4129f3-2075-5492-8b59-90def2cf73ab
+    name: ai-proxy-advanced
+    protocols:
+      - ws
+      - wss
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: realtime/generation
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://env/openai-key}'
+          description: gpt-realtime
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: gpt-realtime
+            provider: openai
+          route_type: realtime/v1/realtime
+    route:
+      id: b2ed74bc-70de-5c05-98a5-1ff4f804ad51
+    tags:
+      - ai-gateway-realtime-model:mixed-realtime
+  - id: e45212c5-1ccd-5ea9-ab12-788311c62746
+    name: acl
+    config:
+      allow:
+        - premium-users
+      include_consumer_groups: true
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+    model:
+      id: bdb67c7a-33a3-5664-a801-be7b64f9516e
+  - id: 2501ef6b-218c-5327-ad93-4df6a2133531
+    name: acl
+    protocols:
+      - ws
+      - wss
+    config:
+      allow:
+        - premium-users
+      include_consumer_groups: true
+    route:
+      id: b2ed74bc-70de-5c05-98a5-1ff4f804ad51
+ai_models:
+  - id: bdb67c7a-33a3-5664-a801-be7b64f9516e
+    name: mixed-realtime

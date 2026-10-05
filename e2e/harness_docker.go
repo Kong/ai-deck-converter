@@ -41,12 +41,13 @@ func execCommand(name string, args ...string) (string, error) {
 }
 
 type Gateway struct {
-	t          *testing.T
-	docker     dockerCLI
-	name       string
-	proxyPort  int
-	adminPort  int
-	artifactID string
+	t            *testing.T
+	docker       dockerCLI
+	name         string
+	proxyPort    int
+	proxyTLSPort int
+	adminPort    int
+	artifactID   string
 }
 
 type GatewayOptions struct {
@@ -55,6 +56,8 @@ type GatewayOptions struct {
 	Config    string
 	Env       []string
 	RunArgs   []string
+	// ProxyTLS adds a TLS proxy listener with Kong's self-signed certificate.
+	ProxyTLS bool
 }
 
 func startGateway(t *testing.T, opts GatewayOptions) *Gateway {
@@ -66,18 +69,27 @@ func startGateway(t *testing.T, opts GatewayOptions) *Gateway {
 
 	proxyPort := freePort(t)
 	adminPort := freePort(t)
+	proxyListen := "0.0.0.0:8000"
+	var proxyTLSPort int
+	if opts.ProxyTLS {
+		proxyTLSPort = freePort(t)
+		proxyListen += ", 0.0.0.0:8443 ssl"
+	}
 
 	args := []string{
 		"run", "-d", "--name", name,
 		"-v", opts.Config + ":/kong/declarative/kong.yaml:ro,Z",
 		"-e", "KONG_DATABASE=off",
 		"-e", "KONG_DECLARATIVE_CONFIG=/kong/declarative/kong.yaml",
-		"-e", "KONG_PROXY_LISTEN=0.0.0.0:8000",
+		"-e", "KONG_PROXY_LISTEN=" + proxyListen,
 		"-e", "KONG_ADMIN_LISTEN=0.0.0.0:8001",
 		"-e", "KONG_LOG_LEVEL=info",
 		"--add-host", "host.docker.internal:host-gateway",
 		"-p", fmt.Sprintf("%d:8000", proxyPort),
 		"-p", fmt.Sprintf("%d:8001", adminPort),
+	}
+	if opts.ProxyTLS {
+		args = append(args, "-p", fmt.Sprintf("%d:8443", proxyTLSPort))
 	}
 	for _, env := range opts.Env {
 		args = append(args, "-e", env)
@@ -89,12 +101,13 @@ func startGateway(t *testing.T, opts GatewayOptions) *Gateway {
 	t.Logf("gateway %s started (image %s, proxy :%d, admin :%d)", name, opts.Image, proxyPort, adminPort)
 
 	g := &Gateway{
-		t:          t,
-		docker:     d,
-		name:       name,
-		proxyPort:  proxyPort,
-		adminPort:  adminPort,
-		artifactID: id,
+		t:            t,
+		docker:       d,
+		name:         name,
+		proxyPort:    proxyPort,
+		proxyTLSPort: proxyTLSPort,
+		adminPort:    adminPort,
+		artifactID:   id,
 	}
 	t.Cleanup(g.stop)
 	return g
@@ -109,6 +122,14 @@ func (g *Gateway) stop() {
 
 func (g *Gateway) ProxyURL() string {
 	return fmt.Sprintf("http://127.0.0.1:%d", g.proxyPort)
+}
+
+// ProxyTLSURL returns the TLS proxy listener URL. It needs GatewayOptions.ProxyTLS.
+func (g *Gateway) ProxyTLSURL() string {
+	if g.proxyTLSPort == 0 {
+		g.t.Fatal("the gateway was started without GatewayOptions.ProxyTLS")
+	}
+	return fmt.Sprintf("https://127.0.0.1:%d", g.proxyTLSPort)
 }
 
 func (g *Gateway) AdminURL() string {

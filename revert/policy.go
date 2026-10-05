@@ -3,6 +3,7 @@ package revert
 import (
 	"fmt"
 	"reflect"
+	"slices"
 
 	"github.com/Kong/ai-deck-converter/internal/aigw"
 	"github.com/Kong/ai-deck-converter/internal/kong"
@@ -64,7 +65,7 @@ func (r *Reverter) authStrategyPolicyRefs(plugins []kong.Plugin) ([]string, aigw
 		// The anonymous fallback is the forward converter's marker that an auth
 		// plugin originated from an auth strategy. A bare key-auth/OIDC
 		// plugin remains a regular policy for backwards-compatible reversals.
-		if authPluginNames[p.Name] && p.Config["anonymous"] == anonymousConsumerName {
+		if authPluginNames[p.Name] && (p.Config["anonymous"] == anonymousConsumerName || isWebSocketAuthPlugin(p)) {
 			idpRefs = append(idpRefs, r.registerAuthStrategy(p).Name)
 			continue
 		}
@@ -72,6 +73,18 @@ func (r *Reverter) authStrategyPolicyRefs(plugins []kong.Plugin) ([]string, aigw
 	}
 	refs, acls := r.policyRefs(rest)
 	return refs, acls, idpRefs
+}
+
+// isWebSocketAuthPlugin reports whether p is an auth plugin that runs on
+// WebSocket routes with no anonymous fallback. The forward converter drops the
+// fallback there. request-termination does not run on ws and wss.
+func isWebSocketAuthPlugin(p kong.Plugin) bool {
+	_, anonymous := p.Config["anonymous"]
+	return !anonymous && hasWebSocketProtocol(p.Protocols)
+}
+
+func hasWebSocketProtocol(protocols []string) bool {
+	return slices.ContainsFunc(protocols, func(p string) bool { return p == "ws" || p == "wss" })
 }
 
 func (r *Reverter) modelPolicyRefs(plugins []kong.Plugin) ([]string, aigw.ACLs, []string) {

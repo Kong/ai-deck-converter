@@ -4,7 +4,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/Kong/ai-deck-converter/internal/aigw"
 	"github.com/Kong/ai-deck-converter/internal/aimap"
+	"github.com/Kong/ai-deck-converter/internal/kong"
 	"github.com/stretchr/testify/require"
 )
 
@@ -359,4 +361,196 @@ func TestModelDoesNotWarnLogStatisticsWhenSupportedOrUnset(t *testing.T) {
 			require.Empty(t, warnings)
 		})
 	}
+}
+
+func convertRealtimeDocument(t *testing.T, src string) (*kong.Document, []string) {
+	t.Helper()
+	input, err := aigw.Parse([]byte(src))
+	require.NoError(t, err)
+	doc, warnings, err := ConvertDocument(input, Options{})
+	require.NoError(t, err)
+	return doc, warnings
+}
+
+func routeByName(t *testing.T, doc *kong.Document, name string) (kong.Service, kong.Route) {
+	t.Helper()
+	for _, svc := range doc.Services {
+		for _, route := range svc.Routes {
+			if route.Name == name {
+				return svc, route
+			}
+		}
+	}
+	t.Fatalf("route %q not found", name)
+	return kong.Service{}, kong.Route{}
+}
+
+func pluginsOnRoute(doc *kong.Document, route string) []kong.Plugin {
+	var out []kong.Plugin
+	for _, p := range doc.Plugins {
+		if p.Route != nil && string(*p.Route) == route {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+func TestRealtimeRouteUsesWebSocketTransport(t *testing.T) {
+	src := `models:
+  - name: m
+    capabilities: [generate, realtime]
+    config:
+      route:
+        paths: [/ai]
+        methods: [GET, POST]
+        protocols: [https, wss]
+    targets: [{name: t, provider: openai-prod, config: {type: openai}}]
+` + overrideProvider
+	doc, warnings := convertRealtimeDocument(t, src)
+
+	httpService, chat := routeByName(t, doc, "openai-chat")
+	require.Equal(t, aimap.GatewayServiceName, httpService.Name)
+	require.Equal(t, []string{"GET", "POST"}, chat.Methods)
+	require.Equal(t, []string{"https"}, chat.Protocols, "wss maps to its HTTP counterpart")
+
+	wsService, realtime := routeByName(t, doc, "openai-realtime")
+	require.Equal(t, aimap.GatewayWebSocketServiceName, wsService.Name)
+	require.Equal(t, aimap.GatewayWebSocketServiceURL, wsService.URL)
+	require.Nil(t, realtime.Methods)
+	require.Equal(t, []string{"wss"}, realtime.Protocols, "https maps to its WebSocket counterpart")
+
+	plugins := pluginsOnRoute(doc, "openai-realtime")
+	require.Len(t, plugins, 1, "no ai-model-selector on the WebSocket route")
+	require.Equal(t, "ai-proxy-advanced", plugins[0].Name)
+	require.Nil(t, plugins[0].Model)
+	require.Equal(t, []string{"wss"}, plugins[0].Protocols)
+
+	require.Len(t, warnings, 3)
+	require.Contains(t, warnings[0], `overridden to [https] on the "openai-chat" route`)
+	require.Contains(t, warnings[1], `ignored on the WebSocket route "openai-realtime"`)
+	require.Contains(t, warnings[2], `overridden to [wss] on the "openai-realtime" route`)
+
+	input, err := aigw.Parse([]byte(src))
+	require.NoError(t, err)
+	_, _, err = ConvertDocument(input, Options{Strict: true})
+	require.Error(t, err)
+}
+
+func TestRealtimeRoutesAreNotSharedBetweenModels(t *testing.T) {
+	doc, warnings := convertRealtimeDocument(t, `models:
+  - name: a
+    capabilities: [realtime]
+    targets: [{name: t, provider: openai-prod, config: {type: openai}}]
+  - name: b
+    capabilities: [realtime]
+    targets: [{name: t, provider: openai-prod, config: {type: openai}}]
+`+overrideProvider)
+	require.Empty(t, warnings)
+	require.Len(t, doc.Services, 1, "no HTTP Service without HTTP routes")
+	require.Equal(t, aimap.GatewayWebSocketServiceName, doc.Services[0].Name)
+	require.Len(t, doc.Services[0].Routes, 2)
+}
+
+func TestRealtimeRouteAuthStrategyHasNoAnonymousFallback(t *testing.T) {
+	const strategies = `
+auth_strategies:
+  - {name: oidc, type: openid-connect, config: {issuer: https://idp.example.com}}
+  - {name: keys, type: key-auth, config: {}}
+`
+	doc, warnings := convertRealtimeDocument(t, `models:
+  - name: m
+    capabilities: [realtime]
+    access: {auth_strategies: [oidc]}
+    targets: [{name: t, provider: openai-prod, config: {type: openai}}]
+`+overrideProvider+strategies)
+	require.Empty(t, warnings)
+	require.Empty(t, doc.Consumers, "request-termination cannot run on WebSocket routes")
+	var auth *kong.Plugin
+	for _, p := range pluginsOnRoute(doc, "openai-realtime") {
+		if p.Name == "openid-connect" {
+			auth = &p
+		}
+	}
+	require.NotNil(t, auth)
+	require.NotContains(t, auth.Config, "anonymous")
+	require.Equal(t, []string{"ws", "wss"}, auth.Protocols)
+
+	_, _, err := Convert([]byte(`models:
+  - name: m
+    capabilities: [realtime]
+    access: {auth_strategies: [oidc, keys]}
+    targets: [{name: t, provider: openai-prod, config: {type: openai}}]
+`+overrideProvider+strategies), Options{})
+	require.ErrorContains(t, err, "supports only one auth strategy")
+}
+
+// TestRealtimeRouteRejectsNonWebSocketAuthStrategy pins that a realtime model
+// cannot use an auth strategy plugin that rejects the ws/wss protocols (jwt,
+// confirmed against Kong AI Gateway 2.0.2, 2.1, and 2.2.0): emitting it there
+// would either leave the WebSocket route unprotected (the plugin would never
+// run, since its default protocols exclude ws/wss) or make the data plane
+// refuse the whole config, so the conversion fails instead.
+func TestRealtimeRouteRejectsNonWebSocketAuthStrategy(t *testing.T) {
+	_, _, err := Convert([]byte(`models:
+  - name: m
+    capabilities: [realtime]
+    access: {auth_strategies: [legacy]}
+    targets: [{name: t, provider: openai-prod, config: {type: openai}}]
+`+overrideProvider+`
+auth_strategies:
+  - {name: legacy, type: jwt, config: {}}
+`), Options{})
+	require.ErrorContains(t, err, `auth strategy plugin "jwt" does not support the ws and wss protocols`)
+}
+
+func TestTransportProtocols(t *testing.T) {
+	for _, tc := range []struct {
+		in        []string
+		websocket bool
+		want      []string
+	}{
+		{nil, false, nil},
+		{[]string{"https"}, false, []string{"https"}},
+		{[]string{"ws", "wss"}, false, []string{"http", "https"}},
+		{[]string{"http", "ws"}, false, []string{"http"}},
+		{nil, true, []string{"ws", "wss"}},
+		{[]string{"https"}, true, []string{"wss"}},
+		{[]string{"grpc"}, true, []string{"ws", "wss"}},
+		{[]string{"http", "ws", "wss"}, true, []string{"ws", "wss"}},
+	} {
+		require.Equal(t, tc.want, transportProtocols(tc.in, tc.websocket), "%v websocket=%v", tc.in, tc.websocket)
+	}
+}
+
+func TestRealtimeRouteSkipsPluginsWithoutWebSocketSupport(t *testing.T) {
+	src := `models:
+  - name: m
+    capabilities: [generate, realtime]
+    policies: [guard]
+    access: {acls: {allow: [premium]}}
+    targets: [{name: t, provider: openai-prod, config: {type: openai}}]
+policies:
+  - {type: ai-prompt-guard, name: guard, config: {deny_patterns: [forbidden]}}
+` + overrideProvider
+	doc, warnings := convertRealtimeDocument(t, src)
+
+	var realtimeNames []string
+	for _, p := range pluginsOnRoute(doc, "openai-realtime") {
+		realtimeNames = append(realtimeNames, p.Name)
+	}
+	require.ElementsMatch(t, []string{"ai-proxy-advanced", "acl"}, realtimeNames)
+
+	var chatNames []string
+	for _, p := range pluginsOnRoute(doc, "openai-chat") {
+		chatNames = append(chatNames, p.Name)
+	}
+	require.Contains(t, chatNames, "ai-prompt-guard", "the HTTP route keeps the policy")
+
+	require.Len(t, warnings, 1)
+	require.Contains(t, warnings[0], `plugin "ai-prompt-guard", which does not support the ws and wss protocols`)
+
+	input, err := aigw.Parse([]byte(src))
+	require.NoError(t, err)
+	_, _, err = ConvertDocument(input, Options{Strict: true})
+	require.Error(t, err)
 }
