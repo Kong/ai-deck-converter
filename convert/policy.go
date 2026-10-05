@@ -25,6 +25,49 @@ func (c *Converter) convertGlobalPolicies() error {
 	return nil
 }
 
+// warnGlobalPoliciesForWebSocket flags every global policy once the document
+// emits a WebSocket route. A global plugin carries no protocols override, so
+// it keeps Kong's schema default (http/https) and never runs against ws/wss
+// traffic. This mirrors convertModels' treatment of auth-strategy plugins on
+// a realtime route (convert/model.go): an auth policy type fails the
+// conversion instead of warning, since a silently-unenforced check is worse
+// than a dropped policy.
+func (c *Converter) warnGlobalPoliciesForWebSocket() error {
+	if !c.hasWebSocketRoute() {
+		return nil
+	}
+	for i := range c.src.Policies {
+		p := &c.src.Policies[i]
+		if p.Global == nil || !*p.Global {
+			continue
+		}
+		if authPolicyTypes[p.Type] {
+			return c.failAt("policies",
+				"global policy %q has type %q, but a global plugin keeps Kong's http/https "+
+					"default protocols and cannot authenticate the WebSocket routes this document emits",
+				p.Name, p.Type)
+		}
+		if err := c.warn(
+			"global policy %q (type %q) keeps Kong's http/https default protocols, "+
+				"so it will not run on the WebSocket routes this document emits",
+			p.Name, p.Type); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// hasWebSocketRoute reports whether any converted model route moved to the
+// WebSocket Service.
+func (c *Converter) hasWebSocketRoute() bool {
+	for _, svc := range c.out.Services {
+		if svc.Name == aimap.GatewayWebSocketServiceName && len(svc.Routes) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
 // entityKind identifies the kind of entity scopedPlugins is building plugins
 // for, so it can apply entity-specific validation (e.g. rejecting
 // authentication policies on models).

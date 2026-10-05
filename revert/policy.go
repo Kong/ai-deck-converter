@@ -62,9 +62,11 @@ func (r *Reverter) authStrategyPolicyRefs(plugins []kong.Plugin) ([]string, aigw
 	var rest []kong.Plugin
 	var idpRefs []string
 	for _, p := range plugins {
-		// The anonymous fallback is the forward converter's marker that an auth
-		// plugin originated from an auth strategy. A bare key-auth/OIDC
-		// plugin remains a regular policy for backwards-compatible reversals.
+		// The anonymous fallback is the forward converter's marker that an
+		// auth plugin originated from an auth strategy. A bare key-auth/OIDC
+		// plugin with http/https protocols remains a regular policy; one
+		// carrying ws/wss is recovered as an auth strategy, like the forward
+		// converter's own WebSocket auth plugins.
 		if authPluginNames[p.Name] && (p.Config["anonymous"] == anonymousConsumerName || isWebSocketAuthPlugin(p)) {
 			idpRefs = append(idpRefs, r.registerAuthStrategy(p).Name)
 			continue

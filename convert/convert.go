@@ -502,6 +502,9 @@ func (c *Converter) run() error {
 	if err := c.convertModels(); err != nil {
 		return err
 	}
+	if err := c.warnGlobalPoliciesForWebSocket(); err != nil {
+		return err
+	}
 	if err := c.convertMCPServers(); err != nil {
 		return err
 	}

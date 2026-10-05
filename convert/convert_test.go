@@ -2627,3 +2627,64 @@ model_providers:
 		t.Fatalf("expected 2 scoped ai-sanitizer plugins, got %d: %s", sanitizerCount, out)
 	}
 }
+
+// TestGlobalPolicyRejectsAuthTypeOnRealtimeDocument pins that a global
+// authentication policy fails the conversion once the document emits a
+// WebSocket route: the plugin stays on Kong's http/https default protocols,
+// so it would silently leave the realtime route unauthenticated.
+func TestGlobalPolicyRejectsAuthTypeOnRealtimeDocument(t *testing.T) {
+	_, _, err := Convert([]byte(`
+policies:
+  - type: key-auth
+    name: require-key
+    global: true
+models:
+  - name: m
+    capabilities: [realtime]
+    targets: [{name: t, provider: openai-prod, config: {type: openai}}]
+`+overrideProvider), Options{})
+	require.ErrorContains(t, err, `global policy "require-key" has type "key-auth"`)
+	require.ErrorContains(t, err, "cannot authenticate the WebSocket routes")
+}
+
+// TestGlobalPolicyWarnsOnRealtimeDocument pins that a non-auth global policy
+// only warns, since it still protects every HTTP route; it just never runs
+// against the document's WebSocket traffic.
+func TestGlobalPolicyWarnsOnRealtimeDocument(t *testing.T) {
+	src := []byte(`
+policies:
+  - type: http-log
+    name: audit-log
+    global: true
+    config: {http_endpoint: https://logs.example.com/ingest}
+models:
+  - name: m
+    capabilities: [realtime]
+    targets: [{name: t, provider: openai-prod, config: {type: openai}}]
+` + overrideProvider)
+	_, warnings, err := Convert(src, Options{})
+	require.NoError(t, err)
+	require.Len(t, warnings, 1)
+	require.Contains(t, warnings[0], `global policy "audit-log" (type "http-log")`)
+	require.Contains(t, warnings[0], "will not run on the WebSocket routes")
+
+	_, _, err = Convert(src, Options{Strict: true})
+	require.Error(t, err)
+}
+
+// TestGlobalPolicyNoWarningWithoutRealtimeRoute pins that global policies are
+// unaffected when the document emits no WebSocket route.
+func TestGlobalPolicyNoWarningWithoutRealtimeRoute(t *testing.T) {
+	_, warnings, err := Convert([]byte(`
+policies:
+  - type: key-auth
+    name: require-key
+    global: true
+models:
+  - name: m
+    capabilities: [generate]
+    targets: [{name: t, provider: openai-prod, config: {type: openai}}]
+`+overrideProvider), Options{Strict: true})
+	require.NoError(t, err)
+	require.Empty(t, warnings)
+}
