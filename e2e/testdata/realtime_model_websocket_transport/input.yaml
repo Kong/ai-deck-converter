@@ -1,0 +1,57 @@
+models:
+  - display_name: GPT realtime and chat
+    name: gpt-realtime-mixed
+    type: model
+    enabled: true
+    capabilities: [ generate, realtime ]
+    formats:
+      - type: openai
+    config:
+      route:
+        paths: [ /ai-realtime ]
+    targets:
+      - name: gpt-realtime
+        provider: openai-prod
+        config:
+          type: openai
+    # ai-prompt-guard does not accept the ws protocols. The converter keeps it
+    # on the chat route and leaves it off the realtime route with a warning.
+    policies: [ prompt-guard ]
+    access:
+      acls: { allow: [ premium-users ] }
+      auth_strategies: [ consumer-keys ]
+model_providers:
+  - name: openai-prod
+    type: openai
+    display_name: OpenAI Prod
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://ai/openai-token}"
+policies:
+  - name: prompt-guard
+    type: ai-prompt-guard
+    config:
+      deny_patterns: [ "forbidden" ]
+auth_strategies:
+  - name: consumer-keys
+    type: key-auth
+    config: {}
+consumers:
+  - name: premium-user
+    type: api-key
+    consumer_groups: [ premium-users ]
+    credentials:
+      - name: premium-key
+        type: api-key
+        api_key: premium-secret
+  - name: basic-user
+    type: api-key
+    credentials:
+      - name: basic-key
+        type: api-key
+        api_key: basic-secret
+consumer_groups:
+  - name: premium-users

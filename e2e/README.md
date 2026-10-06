@@ -61,6 +61,7 @@ Every case:
 | `single_model_multiple_aliases` | Each alias of a body-selector model routes through its own `ai-proxy-advanced` copy to the (mocked) upstream, with the provider credential applied.                                                         |
 | `gemini_model_all_capabilities` | A gemini model declaring every capability (generate, embeddings, image, video, rerank, batches, files) is accepted by the data plane, with every Gemini Standard API and Gemini Enterprise AI route loaded. |
 | `reusable_toolsets_are_internal_only` | An aggregate MCP listener over conversion-only sources serves and executes both sources' tools; the conversion-only routes are gated so direct client requests get 404, with or without credentials.        |
+| `realtime_model_websocket_transport` | A model with chat and realtime capabilities serves both transports: the chat route stays on HTTP, and `ws`/`wss` clients reach the (mocked) upstream through the `ai-gateway-websocket` Service with the provider credential applied. On the WebSocket route, key-auth rejects a missing key with 401 and the ACL rejects a consumer outside the group with 403. The prompt guard, which cannot run on WebSocket, still applies on HTTP. |
 | `token_vault_gates_tools_and_enrolls` | The Token Vault lifecycle: unenrolled callers see only the virtual enrollment tools, enrollment unlocks the real tools, and the exchanged credential is applied upstream and cached in Redis.               |
 
 ## Failures

@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"slices"
 
 	publicaigw "github.com/Kong/ai-deck-converter/aigw"
 	"github.com/Kong/ai-deck-converter/internal/aigw"
@@ -390,7 +391,9 @@ func buildRoute(rc aigw.RouteConfig, entityName string) kong.Route {
 	}
 }
 
-func buildModelRoute(rc aigw.ModelRouteConfig, routeName string, paths []string, defaultMethods []string) kong.Route {
+func buildModelRoute(
+	rc aigw.ModelRouteConfig, routeName string, paths []string, defaultMethods []string, websocket bool,
+) kong.Route {
 	route := buildRoute(aigw.RouteConfig{
 		Name:                    rc.Name,
 		Paths:                   rc.Paths,
@@ -412,13 +415,45 @@ func buildModelRoute(rc aigw.ModelRouteConfig, routeName string, paths []string,
 	}, routeName)
 	route.Name = routeName
 	route.Paths = paths
-	if len(route.Methods) == 0 {
+	route.Protocols = transportProtocols(route.Protocols, websocket)
+	if websocket {
+		// Kong rejects methods on ws and wss routes.
+		route.Methods = nil
+	} else if len(route.Methods) == 0 {
 		route.Methods = defaultMethods
 	}
 	if route.StripPath == nil {
 		route.StripPath = boolPtr(false)
 	}
 	return route
+}
+
+// transportProtocols changes each route protocol to its counterpart on the
+// WebSocket or HTTP transport. The TLS choice of each protocol stays.
+// One model route config feeds the routes of both transports.
+func transportProtocols(protocols []string, websocket bool) []string {
+	counterpart := map[string]string{"ws": "http", "wss": "https"}
+	if websocket {
+		counterpart = map[string]string{"http": "ws", "https": "wss", "ws": "ws", "wss": "wss"}
+	} else if !slices.ContainsFunc(protocols, func(p string) bool { return p == "ws" || p == "wss" }) {
+		return protocols
+	}
+
+	var out []string
+	for _, p := range protocols {
+		if mapped, ok := counterpart[p]; ok {
+			p = mapped
+		} else if websocket {
+			continue
+		}
+		if !slices.Contains(out, p) {
+			out = append(out, p)
+		}
+	}
+	if websocket && len(out) == 0 {
+		return []string{"ws", "wss"}
+	}
+	return out
 }
 
 func toKongCIDRPorts(in []aigw.CIDRPort) []kong.CIDRPort {
@@ -465,6 +500,9 @@ func (c *Converter) run() error {
 		return err
 	}
 	if err := c.convertModels(); err != nil {
+		return err
+	}
+	if err := c.warnGlobalPoliciesForWebSocket(); err != nil {
 		return err
 	}
 	if err := c.convertMCPServers(); err != nil {

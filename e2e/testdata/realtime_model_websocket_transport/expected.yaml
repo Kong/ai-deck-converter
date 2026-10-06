@@ -1,0 +1,173 @@
+_format_version: "3.0"
+_transform: false
+services:
+  - id: 947a4e23-b483-5a65-8165-da9aed24565b
+    name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    host: ai-gateway.upstream.local
+    port: 80
+    protocol: http
+  - id: 81558bc1-3a1b-5dd1-b985-f764a06e74c3
+    name: ai-gateway-websocket
+    url: ws://ai-gateway.upstream.local
+    host: ai-gateway.upstream.local
+    port: 80
+    protocol: ws
+routes:
+  - id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+    name: openai-chat
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /ai-realtime/chat/completions
+    methods:
+      - POST
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: b2ed74bc-70de-5c05-98a5-1ff4f804ad51
+    name: openai-realtime
+    service:
+      id: 81558bc1-3a1b-5dd1-b985-f764a06e74c3
+    paths:
+      - /ai-realtime/realtime
+    protocols:
+      - ws
+      - wss
+    strip_path: false
+consumers:
+  - id: 9dc33ddb-303b-5036-a127-b36d11911b18
+    username: premium-user
+  - id: 8fd38b4c-59a8-54ce-a6fd-1b919bc1fffa
+    username: basic-user
+  - id: 1e8d7140-b92a-52b9-9aa1-07931156b4bc
+    username: anonymous
+    custom_id: anonymous
+consumer_groups:
+  - id: ccdc7a46-6d73-5cfd-96db-0dc5b6ccf7d6
+    name: premium-users
+consumer_group_consumers:
+  - consumer: 9dc33ddb-303b-5036-a127-b36d11911b18
+    consumer_group: ccdc7a46-6d73-5cfd-96db-0dc5b6ccf7d6
+plugins:
+  - id: d39c1a27-9765-525d-a8f2-96c4a2435124
+    name: request-termination
+    enabled: true
+    config:
+      message: Unauthorized
+      status_code: 401
+    consumer:
+      id: 1e8d7140-b92a-52b9-9aa1-07931156b4bc
+  - id: 17fa8192-4b9f-5b5a-8379-20ad8bc836a7
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+  - id: f3adc007-171c-5519-8763-3a0eef79bde3
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-realtime
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: gpt-realtime-mixed
+            name: gpt-realtime
+            provider: openai
+          route_type: llm/v1/chat
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+    model:
+      id: e8317b57-812f-5942-a706-9673d239ea50
+  - id: fe4129f3-2075-5492-8b59-90def2cf73ab
+    name: ai-proxy-advanced
+    protocols:
+      - ws
+      - wss
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: realtime/generation
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-realtime
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: gpt-realtime
+            provider: openai
+          route_type: realtime/v1/realtime
+    route:
+      id: b2ed74bc-70de-5c05-98a5-1ff4f804ad51
+    tags:
+      - ai-gateway-realtime-model:gpt-realtime-mixed
+  - id: bb045713-64c3-5c6a-ae54-3337bc34061d
+    name: ai-prompt-guard
+    config:
+      deny_patterns:
+        - forbidden
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+    model:
+      id: e8317b57-812f-5942-a706-9673d239ea50
+  - id: 2501ef6b-218c-5327-ad93-4df6a2133531
+    name: acl
+    config:
+      allow:
+        - premium-users
+      include_consumer_groups: true
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+    model:
+      id: e8317b57-812f-5942-a706-9673d239ea50
+  - id: 686423ce-18e4-505b-8697-73b683a022da
+    name: acl
+    protocols:
+      - ws
+      - wss
+    config:
+      allow:
+        - premium-users
+      include_consumer_groups: true
+    route:
+      id: b2ed74bc-70de-5c05-98a5-1ff4f804ad51
+  - id: 6afbae24-bec6-532d-97ee-ca0ddb350e2f
+    name: key-auth
+    config:
+      anonymous: anonymous
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+  - id: 14b95fe8-855a-59e8-ac9d-18e05903fca5
+    name: key-auth
+    protocols:
+      - ws
+      - wss
+    route:
+      id: b2ed74bc-70de-5c05-98a5-1ff4f804ad51
+ai_models:
+  - id: e8317b57-812f-5942-a706-9673d239ea50
+    name: gpt-realtime-mixed
+keyauth_credentials:
+  - id: 9a7c63e7-2e60-503b-857e-4f7965a6dc6b
+    key: premium-secret
+    consumer: 9dc33ddb-303b-5036-a127-b36d11911b18
+  - id: 76f0e4c7-fb2c-5d91-bc9e-4949f3fd4fce
+    key: basic-secret
+    consumer: 8fd38b4c-59a8-54ce-a6fd-1b919bc1fffa

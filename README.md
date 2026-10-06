@@ -205,6 +205,21 @@ and `formats` beyond the first.
 - **Shared gateway Service.** All model routes nest under one `ai-gateway`
   Service with the nominal url `http://ai-gateway.upstream.local`;
   `ai-proxy-advanced` overrides the real upstream per target.
+- **Realtime routes use WebSocket.** Kong selects its WebSocket proxy path from
+  the Service protocol, so `realtime` routes nest under a second
+  `ai-gateway-websocket` Service (`ws://ai-gateway.upstream.local`). They use
+  `ws`/`wss` (an authored `http`/`https` maps to `ws`/`wss`) and no methods,
+  and each model gets its own realtime route. `ai-model-selector` does not run
+  on WebSocket, so the realtime route's `ai-proxy-advanced`, policy, ACL, and
+  auth-strategy plugins are route-scoped and carry the route's `protocols`, and
+  its targets carry no `model_alias`. Policy plugins whose schema rejects
+  `ws`/`wss` (every AI policy plugin, such as `ai-prompt-guard`) are left off
+  the realtime route with a warning; they still apply to the model's HTTP
+  routes. The anonymous consumer's `request-termination` cannot run on
+  WebSocket either, so a realtime auth plugin has no `anonymous` fallback, a
+  model with more than one auth strategy cannot declare `realtime`, and an
+  auth strategy whose plugin type rejects `ws`/`wss` (e.g. `jwt`) fails the
+  conversion rather than silently leaving the route unprotected.
 - **Mostly one endpoint per capability.** Each (section, capability) maps to an
   `aimap.EndpointEntry` with a primary canonical endpoint, plus any secondaries
   in its `Secondary` field (currently just bedrock `generate`, also served by

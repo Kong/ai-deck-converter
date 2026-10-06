@@ -124,6 +124,11 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 		if canon, ok := redirect[fkName]; ok {
 			groupFK = canon
 		}
+		// A realtime plugin has no model FK. Its tag names the ai-models entry.
+		realtimeModel, _ := aimap.DecodeRealtimeModel(proxy.Tags)
+		if groupFK == "" && realtimeModel != "" {
+			groupFK = realtimeModel
+		}
 
 		// Guard refs for this plugin's model: route-wide guards plus any scoped to
 		// this model FK.
@@ -231,6 +236,9 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 				if err != nil {
 					return err
 				}
+			}
+			if realtimeModel != "" {
+				r.mergeAliasGroupMembers(g, realtimeModel)
 			}
 			// Logging is carried per target by ai-proxy-advanced but is a single
 			// model-level block in the AI Gateway model; lift it back from the
@@ -488,6 +496,17 @@ func (r *Reverter) mergeableAliasFKs(proxies []*kong.Plugin) ([]*kong.Plugin, ma
 		}
 	}
 	return ordered, redirect
+}
+
+// mergeAliasGroupMembers folds into g every other ai-models entry of the alias
+// group that canonical names. A realtime-only model has no FK-scoped plugin
+// copies, so the ai-models entries are the only record of its other aliases.
+func (r *Reverter) mergeAliasGroupMembers(g *modelGroup, canonical string) {
+	for _, m := range r.src.AIModels {
+		if m.Name != canonical && r.aiModelAliasGroup(m.Name) == canonical {
+			mergeAliasIntoGroup(g, m.Name, nil, aigw.ACLs{}, nil)
+		}
+	}
 }
 
 // aiModelAliasGroup returns the aimap.EncodeModelAliasGroup marker on name's

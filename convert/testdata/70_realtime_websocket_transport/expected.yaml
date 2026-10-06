@@ -1,0 +1,200 @@
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: openai-chat
+        paths:
+          - /mixed/chat/completions
+        methods:
+          - POST
+        strip_path: false
+  - name: ai-gateway-websocket
+    url: ws://ai-gateway.upstream.local
+    routes:
+      - name: openai-realtime
+        paths:
+          - /mixed/realtime
+        protocols:
+          - ws
+          - wss
+        strip_path: false
+      - name: openai-realtime-2
+        paths:
+          - /realtime-only/realtime
+        protocols:
+          - ws
+          - wss
+        strip_path: false
+consumers:
+  - username: anonymous
+    custom_id: anonymous
+    plugins:
+      - name: request-termination
+        enabled: true
+        config:
+          message: Unauthorized
+          status_code: 401
+plugins:
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-chat
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://env/openai-key}'
+          description: gpt-realtime
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: mixed-realtime
+            name: gpt-realtime
+            provider: openai
+          route_type: llm/v1/chat
+    route: openai-chat
+    model: mixed-realtime
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://env/openai-key}'
+          description: gpt-realtime
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: mixed-realtime-alias
+            name: gpt-realtime
+            provider: openai
+          route_type: llm/v1/chat
+    route: openai-chat
+    model: mixed-realtime-alias
+  - name: ai-proxy-advanced
+    protocols:
+      - ws
+      - wss
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: realtime/generation
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://env/openai-key}'
+          description: gpt-realtime
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: gpt-realtime
+            provider: openai
+          route_type: realtime/v1/realtime
+    route: openai-realtime
+    tags:
+      - ai-gateway-realtime-model:mixed-realtime
+  - name: ai-proxy-advanced
+    protocols:
+      - ws
+      - wss
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: realtime/generation
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://env/openai-key}'
+          description: gpt-realtime-mini
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: gpt-realtime-mini
+            provider: openai
+          route_type: realtime/v1/realtime
+    route: openai-realtime-2
+    tags:
+      - ai-gateway-realtime-model:realtime-only
+  - name: http-log
+    config:
+      http_endpoint: https://logs.example.com/ingest
+    route: openai-chat
+    model: mixed-realtime
+  - name: http-log
+    config:
+      http_endpoint: https://logs.example.com/ingest
+    route: openai-chat
+    model: mixed-realtime-alias
+  - name: acl
+    config:
+      allow:
+        - premium-users
+      include_consumer_groups: true
+    route: openai-chat
+    model: mixed-realtime
+  - name: acl
+    config:
+      allow:
+        - premium-users
+      include_consumer_groups: true
+    route: openai-chat
+    model: mixed-realtime-alias
+  - name: http-log
+    protocols:
+      - ws
+      - wss
+    config:
+      http_endpoint: https://logs.example.com/ingest
+    route: openai-realtime
+  - name: acl
+    protocols:
+      - ws
+      - wss
+    config:
+      allow:
+        - premium-users
+      include_consumer_groups: true
+    route: openai-realtime
+  - name: openid-connect
+    config:
+      anonymous: anonymous
+      issuer: https://dev-123456.okta.com/oauth2/default
+    route: openai-chat
+  - name: openid-connect
+    protocols:
+      - ws
+      - wss
+    config:
+      issuer: https://dev-123456.okta.com/oauth2/default
+    route: openai-realtime
+ai_models:
+  - name: mixed-realtime
+    tags:
+      - ai-gateway-model-alias-group:mixed-realtime
+  - name: mixed-realtime-alias
+    tags:
+      - ai-gateway-model-alias-group:mixed-realtime
+  - name: realtime-only
+    tags:
+      - ai-gateway-model-alias-group:realtime-only
+  - name: realtime-only-alias
+    tags:
+      - ai-gateway-model-alias-group:realtime-only

@@ -17,8 +17,10 @@ import (
 
 type recordedRequest struct {
 	Path          string
+	Query         string
 	Authorization string
 	Body          string
+	WebSocket     bool
 }
 
 type mockUpstream struct {
@@ -32,21 +34,31 @@ type mockUpstream struct {
 
 // startMockUpstream serves a generic 200 JSON response for every request and
 // records what it received, so a case can assert the gateway proxied to it and
-// which credential was applied.
+// which credential was applied. A WebSocket upgrade request gets an echo
+// connection instead (see serveWebSocketEcho).
 func startMockUpstream(t *testing.T) *mockUpstream {
 	t.Helper()
 	m := &mockUpstream{t: t}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if isWebSocketUpgrade(r) {
+			m.record(recordedRequest{
+				Path:          r.URL.Path,
+				Query:         r.URL.RawQuery,
+				Authorization: r.Header.Get("Authorization"),
+				WebSocket:     true,
+			})
+			serveWebSocketEcho(t, w, r)
+			return
+		}
 		body, _ := io.ReadAll(r.Body)
-		m.mu.Lock()
-		m.requests = append(m.requests, recordedRequest{
+		m.record(recordedRequest{
 			Path:          r.URL.Path,
+			Query:         r.URL.RawQuery,
 			Authorization: r.Header.Get("Authorization"),
 			Body:          string(body),
 		})
-		m.mu.Unlock()
 
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("X-Mock-Upstream", "ai-deck-converter-e2e")
@@ -57,6 +69,12 @@ func startMockUpstream(t *testing.T) *mockUpstream {
 	m.Port = serveOnFreePort(t, mux)
 	m.URL = fmt.Sprintf("http://host.docker.internal:%d", m.Port)
 	return m
+}
+
+func (m *mockUpstream) record(req recordedRequest) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.requests = append(m.requests, req)
 }
 
 func (m *mockUpstream) hits() []recordedRequest {
