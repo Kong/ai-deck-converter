@@ -42,7 +42,7 @@ The caller decides how to handle each issue.
 
 The expected conversion behavior is:
 
-1. A caller calls the conversion functionality with an input YAML document.
+1. A caller calls the conversion functionality with an input YAML or JSON document.
 2. The converter converts each resource.
    1. If an issue occurs, the converter adds it to the conversion result.
 3. After the last resource, the converter returns the configuration and the
@@ -52,10 +52,10 @@ New concept: issues
 
 - **Issue**: a condition that the converter reports during conversion.
 - **Issue severity**: the level of an issue.
-  - `warning`: the converter worked around the issue. The entity is in the
-    generated configuration. A nested item of the entity can be absent.
-  - `error`: the converter could not work around the issue. The affected
-    entity is absent from the generated configuration.
+  - `warning`: the converter worked around the issue. 
+    The generated configuration is valid but may not fully behave as the user intended.
+  - `error`: the converter could not work around the issue. 
+    The generated configuration is either invalid or diverges from the user intent.
 
 Severity belongs to each issue, not to its code. One code can occur with
 either severity. For example, a missing required field on a nested item is a
@@ -64,29 +64,29 @@ either severity. For example, a missing required field on a nested item is a
 ### Example issues
 
 - Issues that are usually errors:
-  - Missing Required Field
+  - Missing Required Config Field
   - Internal Error
     - Covers converter bugs that affect one entity. A panic in one entity gives
       this issue.
   - Undefined Reference
-  - Value Invalid
+  - Config Field Invalid
     - If the converter can still make the entity, use Behavior May Differ.
     - Examples:
       - entity conflict: two entities need one generated resource. No valid
         configuration exists for both.
       - incompatible fields
 - Issues that are usually warnings:
-  - Value Dropped
-    - Covers values or entities that the converter removes, for example
+  - Config Field Dropped
+    - Covers fields or entities that the converter removes, for example,
       duplicate aliases or an unused conversion-only MCP server.
-  - Value Ignored
-    - Covers values that the converter does not support.
-    - If the converter cannot make the entity, use Value Invalid.
-  - Value Overridden
-    - Covers a user value that the converter replaces with a forced value or a
+  - Config Field Ignored
+    - Covers fields that the converter does not support.
+    - If the converter cannot make the entity, use Config Field Invalid.
+  - Config Field Overridden
+    - Covers a user-provided field that the converter replaces with another field or a
       fallback.
     - A default that the converter applies to an unset field is not an issue.
-    - If the converter cannot make the entity, use Value Invalid.
+    - If the converter cannot make the entity, use Config Field Invalid.
   - Behavior May Differ
     - The configuration loads. It may not do what the user expects.
     - Examples:
@@ -113,9 +113,9 @@ To implement this RFC, the converter needs:
       of the MCP server still convert.
     - Auth strategy references are an exception to the nested item rule. The
       auth strategy rule below applies to them.
-    - The `warning` uses the code of the cause, not `VALUE_DROPPED`. Its
+    - The `warning` uses the code of the cause, not `CONFIG_FIELD_DROPPED`. Its
       `Fields` path points at the item. For example, a tool without a
-      description gives `MISSING_REQUIRED_FIELD` with the path
+      description gives `MISSING_REQUIRED_CONFIG_FIELD` with the path
       `tools[2].description`.
     - Sometimes the entity is not valid without the left-out items. Then the
       converter leaves out the entity and reports an `error`. For example, a
@@ -134,14 +134,14 @@ Issues use this structure:
 type ConversionIssueCode string
 
 const (
-	MissingRequiredField ConversionIssueCode = "MISSING_REQUIRED_FIELD"
-	UndefinedReference   ConversionIssueCode = "UNDEFINED_REFERENCE"
-	ValueOverridden      ConversionIssueCode = "VALUE_OVERRIDDEN"
-	ValueDropped         ConversionIssueCode = "VALUE_DROPPED"
-	ValueIgnored         ConversionIssueCode = "VALUE_IGNORED"
-	ValueInvalid         ConversionIssueCode = "VALUE_INVALID"
-	BehaviorMayDiffer    ConversionIssueCode = "BEHAVIOR_MAY_DIFFER"
-	InternalError        ConversionIssueCode = "INTERNAL_ERROR"
+	MissingRequiredConfigField ConversionIssueCode = "MISSING_REQUIRED_CONFIG_FIELD"
+	UndefinedReference         ConversionIssueCode = "UNDEFINED_REFERENCE"
+	ConfigFieldOverridden      ConversionIssueCode = "CONFIG_FIELD_OVERRIDDEN"
+	ConfigFieldDropped         ConversionIssueCode = "CONFIG_FIELD_DROPPED"
+	ConfigFieldIgnored         ConversionIssueCode = "CONFIG_FIELD_IGNORED"
+	ConfigFieldInvalid         ConversionIssueCode = "CONFIG_FIELD_INVALID"
+	BehaviorMayDiffer          ConversionIssueCode = "BEHAVIOR_MAY_DIFFER"
+	InternalError              ConversionIssueCode = "INTERNAL_ERROR"
 )
 
 type ConversionIssueSeverity string
