@@ -31,8 +31,11 @@ type routeGroup struct {
 	// selectorByKey maps a dedup key to that entry (minus max_request_body_size).
 	selectorByKey map[string]map[string]any
 	selectorMax   int // largest max_request_body_size across contributors that set it
-	proxies       []*proxyGroup
-	proxyByOwner  map[string]*proxyGroup
+	// selectorUnlimited is true when a contributor sets max_request_body_size to 0.
+	// The plugin reads 0 as unlimited, so 0 wins over every other value.
+	selectorUnlimited bool
+	proxies           []*proxyGroup
+	proxyByOwner      map[string]*proxyGroup
 }
 
 // addSelector folds one model's desired ai-model-selector shape into the
@@ -48,6 +51,9 @@ func (g *routeGroup) addSelector(cfg map[string]any) {
 	maps.Copy(entry, cfg)
 	if size, ok := entry["max_request_body_size"].(int); ok {
 		delete(entry, "max_request_body_size")
+		if size == 0 {
+			g.selectorUnlimited = true
+		}
 		if size > g.selectorMax {
 			g.selectorMax = size
 		}
@@ -87,9 +93,7 @@ func (g *routeGroup) selectorConfig(useSources bool) map[string]any {
 		cfg := make(map[string]any, len(g.selectorByKey[g.selectorOrder[0]])+1)
 		maps.Copy(cfg, g.selectorByKey[g.selectorOrder[0]])
 
-		if g.selectorMax > 0 {
-			cfg["max_request_body_size"] = g.selectorMax
-		}
+		g.setSelectorBodySize(cfg)
 
 		// If a new PCRE pattern type comes in,
 		// replace it with a best-effort Lua str:match
@@ -108,11 +112,18 @@ func (g *routeGroup) selectorConfig(useSources bool) map[string]any {
 	}
 
 	cfg := map[string]any{"sources": sources}
-	if g.selectorMax > 0 {
-		cfg["max_request_body_size"] = g.selectorMax
-	}
+	g.setSelectorBodySize(cfg)
 
 	return cfg
+}
+
+func (g *routeGroup) setSelectorBodySize(cfg map[string]any) {
+	switch {
+	case g.selectorUnlimited:
+		cfg["max_request_body_size"] = 0
+	case g.selectorMax > 0:
+		cfg["max_request_body_size"] = g.selectorMax
+	}
 }
 
 // proxyGroup accumulates one ai-proxy-advanced plugin: the targets owned by a
@@ -1411,10 +1422,11 @@ func isPassthrough(m *aigw.Model) bool {
 // least aimap.DefaultMaxBodySize, raised to the model's own
 // max_request_body_size (destined for ai-proxy-advanced) only if that value
 // is larger, so the selector never reads less of the body than the proxy
-// itself is configured to accept.
+// itself is configured to accept. The plugin reads 0 as unlimited, so a
+// model value of 0 returns 0.
 func bodySizeOrDefault(m *aigw.Model) int {
-	if m.Config.MaxRequestBodySize != nil && *m.Config.MaxRequestBodySize > aimap.DefaultMaxBodySize {
-		return *m.Config.MaxRequestBodySize
+	if size := m.Config.MaxRequestBodySize; size != nil && (*size == 0 || *size > aimap.DefaultMaxBodySize) {
+		return *size
 	}
 	return aimap.DefaultMaxBodySize
 }

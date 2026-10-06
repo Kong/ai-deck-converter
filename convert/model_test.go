@@ -554,3 +554,42 @@ policies:
 	_, _, err = ConvertDocument(input, Options{Strict: true})
 	require.Error(t, err)
 }
+
+func TestBodySizeOrDefault(t *testing.T) {
+	size := func(v int) *int { return &v }
+	for name, tc := range map[string]struct {
+		in   *int
+		want int
+	}{
+		"unset":             {in: nil, want: aimap.DefaultMaxBodySize},
+		"zero is unlimited": {in: size(0), want: 0},
+		"below default":     {in: size(1048576), want: aimap.DefaultMaxBodySize},
+		"above default":     {in: size(16777216), want: 16777216},
+	} {
+		t.Run(name, func(t *testing.T) {
+			m := &aigw.Model{Config: aigw.ModelConfig{MaxRequestBodySize: tc.in}}
+			require.Equal(t, tc.want, bodySizeOrDefault(m))
+		})
+	}
+}
+
+func TestSelectorConfigBodySize(t *testing.T) {
+	for name, tc := range map[string]struct {
+		sizes []int
+		want  any
+	}{
+		"largest wins":           {sizes: []int{8388608, 16777216}, want: 16777216},
+		"zero wins over largest": {sizes: []int{16777216, 0}, want: 0},
+		"only zero":              {sizes: []int{0}, want: 0},
+	} {
+		t.Run(name, func(t *testing.T) {
+			for _, useSources := range []bool{false, true} {
+				g := &routeGroup{}
+				for _, size := range tc.sizes {
+					g.addSelector(map[string]any{"source": "body", "body_path": "model", "max_request_body_size": size})
+				}
+				require.Equal(t, tc.want, g.selectorConfig(useSources)["max_request_body_size"])
+			}
+		})
+	}
+}
