@@ -46,9 +46,11 @@ func TestRoundTrip(t *testing.T) {
 			require.NoError(t, err, "revert")
 			require.Empty(t, warnings, "unexpected revert warnings")
 
-			deck2, warnings, err := convert.Convert(aigwYAML, opts)
+			deck2Doc, warnings, err := convert.Convert(aigwYAML, opts.Options)
 			require.NoError(t, err, "re-convert")
 			require.Empty(t, warnings, "unexpected convert warnings")
+			deck2, err := deck2Doc.ToYAML()
+			require.NoError(t, err, "encode re-converted document")
 
 			require.Equalf(t, string(deck1), string(deck2),
 				"round trip mismatch for %s\n--- intermediate aigw ---\n%s", dir, aigwYAML)
@@ -56,14 +58,20 @@ func TestRoundTrip(t *testing.T) {
 	}
 }
 
-func loadForwardOptions(t *testing.T, dir string) convert.Options {
+// forwardOptions mirrors the convert golden options.yaml layout.
+type forwardOptions struct {
+	convert.Options `yaml:",inline"`
+	OutputMode      string `yaml:"output_mode"`
+}
+
+func loadForwardOptions(t *testing.T, dir string) forwardOptions {
 	t.Helper()
 	data, err := os.ReadFile(filepath.Join(dir, "options.yaml"))
 	if os.IsNotExist(err) {
-		return convert.Options{}
+		return forwardOptions{}
 	}
 	require.NoError(t, err, "read options")
-	var opts convert.Options
+	var opts forwardOptions
 	require.NoError(t, yaml.Unmarshal(data, &opts), "parse options")
 	return opts
 }

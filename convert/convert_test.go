@@ -5,7 +5,6 @@ import (
 	"strings"
 	"testing"
 
-	publicaigw "github.com/Kong/ai-deck-converter/aigw"
 	"github.com/Kong/ai-deck-converter/internal/aigw"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
@@ -32,7 +31,7 @@ models:
         paths: [/v1/chat/completions]
         model: {path: {path_param: model_name}}
 `)
-	out, warnings, err := Convert(src, Options{})
+	out, warnings, err := convertYAML(src, Options{})
 	require.NoError(t, err, "convert")
 	require.Contains(t, strings.Join(warnings, "\n"), "is not a regex path",
 		"expected non-regex path_param warning")
@@ -138,7 +137,25 @@ models:
 		`model "skills-api" target "gpt-5.6" has no resolvable provider type`)
 }
 
-func TestWithMetadataTracksGeneratedTargetSources(t *testing.T) {
+func convertYAML(src []byte, opts Options) ([]byte, []string, error) {
+	doc, warnings, err := Convert(src, opts)
+	if err != nil {
+		return nil, warnings, err
+	}
+	data, err := doc.ToYAML()
+	return data, warnings, err
+}
+
+func convertDBLessYAML(src []byte, opts Options) ([]byte, []string, error) {
+	doc, warnings, err := Convert(src, opts)
+	if err != nil {
+		return nil, warnings, err
+	}
+	data, err := doc.ToDBLess().ToYAML()
+	return data, warnings, err
+}
+
+func TestConvertMetadataTracksGeneratedTargetSources(t *testing.T) {
 	src := []byte(`
 model_providers:
   - name: local
@@ -157,8 +174,9 @@ models:
       model: {}
 `)
 
-	_, metadata, _, err := WithMetadata(src, Options{OutputMode: "db-less"})
+	doc, _, err := Convert(src, Options{})
 	require.NoError(t, err)
+	metadata := doc.ToDBLess().Metadata()
 	require.Equal(t, []PluginTargetSource{
 		{
 			PluginIndex:      1,
@@ -181,7 +199,7 @@ models:
 	}, metadata.PluginTargets)
 }
 
-func TestWithMetadataMergesCapabilitiesOnCollapsedTarget(t *testing.T) {
+func TestConvertMetadataMergesCapabilitiesOnCollapsedTarget(t *testing.T) {
 	// Bedrock's invoke endpoint for "generate" is field-for-field identical to
 	// "audio/speech"'s endpoint, so a model declaring both collapses onto one
 	// bedrock-invoke target (see testdata/58_bedrock_generate_and_speech).
@@ -190,8 +208,9 @@ func TestWithMetadataMergesCapabilitiesOnCollapsedTarget(t *testing.T) {
 	src, err := os.ReadFile("testdata/58_bedrock_generate_and_speech/input.yaml")
 	require.NoError(t, err)
 
-	_, metadata, warnings, err := WithMetadata(src, Options{OutputMode: "db-less"})
+	doc, warnings, err := Convert(src, Options{})
 	require.NoError(t, err)
+	metadata := doc.ToDBLess().Metadata()
 	require.Empty(t, warnings)
 
 	var invokeTarget *PluginTargetSource
@@ -207,7 +226,7 @@ func TestWithMetadataMergesCapabilitiesOnCollapsedTarget(t *testing.T) {
 	require.Equal(t, []string{"Chat completions", "audio/speech"}, invokeTarget.CapabilityLabels)
 }
 
-func TestWithMetadataTracksMCPGeneratedEntities(t *testing.T) {
+func TestConvertMetadataTracksMCPGeneratedEntities(t *testing.T) {
 	src := []byte(`
 mcp_servers:
   - type: conversion-listener
@@ -218,8 +237,9 @@ mcp_servers:
       - {name: search, description: Search, method: GET, path: /search, scheme: https, host: tools.internal}
 `)
 
-	_, metadata, _, err := WithMetadata(src, Options{OutputMode: "db-less"})
+	doc, _, err := Convert(src, Options{})
 	require.NoError(t, err)
+	metadata := doc.ToDBLess().Metadata()
 
 	require.Len(t, metadata.Plugins, 1)
 	require.Equal(t, GeneratedEntitySource{
@@ -250,7 +270,7 @@ mcp_servers:
 	})
 }
 
-func TestWithMetadataTracksNestedDeckEntities(t *testing.T) {
+func TestConvertMetadataTracksNestedDeckEntities(t *testing.T) {
 	src := []byte(`
 agents:
   - type: a2a
@@ -260,8 +280,9 @@ agents:
       route: {paths: [/agents/book]}
 `)
 
-	_, metadata, _, err := WithMetadata(src, Options{})
+	doc, _, err := Convert(src, Options{})
 	require.NoError(t, err)
+	metadata := doc.Metadata()
 	require.Len(t, metadata.Services, 1)
 	require.Equal(t, "services[0]", metadata.Services[0].Location)
 	require.Equal(t, "config.url", metadata.Services[0].FieldPrefix)
@@ -309,7 +330,7 @@ models:
         config: {type: openai}
 `)
 
-	out, warnings, err := Convert(src, Options{})
+	out, warnings, err := convertYAML(src, Options{})
 	require.NoError(t, err, "convert")
 	require.Contains(t, strings.Join(warnings, "\n"), "multiple targets")
 
@@ -378,7 +399,7 @@ models:
         config: {type: openai}
 `)
 
-	out, warnings, err := Convert(src, Options{})
+	out, warnings, err := convertYAML(src, Options{})
 	require.NoError(t, err, "convert")
 	require.Contains(t, strings.Join(warnings, "\n"), "shared by multiple video models")
 	require.Contains(t, string(out), "openai-videos-lifecycle")
@@ -411,13 +432,11 @@ model_providers:
   - name: p1
     type: openai
 `)
-	// Invalid in every output mode, so it is rejected regardless of -strict.
-	for _, mode := range []string{"", "db-less"} {
-		_, _, err := Convert(src, Options{OutputMode: mode})
-		require.Error(t, err, "acl with both allow and deny must be rejected (mode %q)", mode)
-		require.Contains(t, err.Error(), "allow")
-		require.Contains(t, err.Error(), "deny")
-	}
+	// The config is invalid for every output layout, so it fails without -strict.
+	_, _, err := Convert(src, Options{})
+	require.Error(t, err, "acl with both allow and deny must be rejected")
+	require.Contains(t, err.Error(), "allow")
+	require.Contains(t, err.Error(), "deny")
 }
 
 // The skills API is served only as passthrough, so Kong rejects a llm/v1/skills
@@ -517,7 +536,7 @@ auth_strategies:
     config: {issuer: https://id.example.test}
 `)
 
-	out, _, err := Convert(src, Options{})
+	out, _, err := convertYAML(src, Options{})
 	require.NoError(t, err, "convert")
 
 	var doc struct {
@@ -580,7 +599,7 @@ auth_strategies:
     type: openid-connect
 `)
 
-	out, _, err := Convert(src, Options{})
+	out, _, err := convertYAML(src, Options{})
 	require.NoError(t, err, "convert")
 
 	var doc struct {
@@ -631,7 +650,7 @@ model_providers:
   - name: p1
     type: openai
 `)
-	out, _, err := Convert(src, Options{})
+	out, _, err := convertYAML(src, Options{})
 	require.NoError(t, err, "convert")
 
 	var doc struct {
@@ -697,7 +716,7 @@ mcp_servers:
     tools:
       - {name: t, description: a tool, method: GET, path: /t, scheme: https, host: x.internal}
 `)
-	out, _, err := Convert(src, Options{OutputMode: "db-less"})
+	out, _, err := convertDBLessYAML(src, Options{})
 	require.NoError(t, err, "convert db-less")
 
 	var doc struct {
@@ -728,7 +747,7 @@ mcp_servers:
 			"acl_attribute_type is oauth_access_token: Kong's schema rejects that")
 }
 
-func TestConvertDocumentToDBLessYAML(t *testing.T) {
+func TestConvertMetadataLocationsMatchLayout(t *testing.T) {
 	src := []byte(`
 models:
   - type: model
@@ -747,16 +766,11 @@ model_providers:
     type: openai
 `)
 
-	doc, err := publicaigw.Parse(src)
-	require.NoError(t, err, "parse source")
+	doc, _, err := Convert(src, Options{})
+	require.NoError(t, err)
 
-	got, _, err := ConvertDocumentToDBLessYAML(doc, Options{})
-	require.NoError(t, err, "convert typed db-less")
-
-	want, _, err := Convert(src, Options{OutputMode: "db-less"})
-	require.NoError(t, err, "convert yaml db-less")
-
-	require.Equal(t, string(want), string(got), "typed db-less output mismatch")
+	require.Equal(t, "services[0].routes[0]", doc.Metadata().Routes[0].Location, "decK locations are nested")
+	require.Equal(t, "routes[0]", doc.ToDBLess().Metadata().Routes[0].Location, "db-less locations are flat")
 }
 
 func TestConvertDBLessPreservesProvidedPolicyIDAndGeneratesMissingOnes(t *testing.T) {
@@ -774,7 +788,7 @@ policies:
     global: true
 `)
 
-	out, _, err := Convert(src, Options{OutputMode: "db-less"})
+	out, _, err := convertDBLessYAML(src, Options{})
 	require.NoError(t, err, "convert db-less")
 
 	var got map[string]any
@@ -821,7 +835,7 @@ model_providers:
     type: openai
 `)
 
-	out, _, err := Convert(src, Options{OutputMode: "db-less"})
+	out, _, err := convertDBLessYAML(src, Options{})
 	require.NoError(t, err, "convert db-less")
 
 	var got struct {
@@ -865,7 +879,7 @@ model_providers:
     type: openai
 `)
 
-	out, _, err := Convert(src, Options{})
+	out, _, err := convertYAML(src, Options{})
 	require.NoError(t, err, "convert")
 
 	var got map[string]any
@@ -925,7 +939,7 @@ model_providers:
     type: gemini
 `)
 
-	out, _, err := Convert(src, Options{})
+	out, _, err := convertYAML(src, Options{})
 	require.NoError(t, err, "convert")
 
 	var got map[string]any
@@ -967,7 +981,7 @@ model_providers:
     type: openai
 `)
 
-	out, _, err := Convert(src, Options{})
+	out, _, err := convertYAML(src, Options{})
 	require.NoError(t, err, "convert")
 
 	var got map[string]any
@@ -1030,7 +1044,7 @@ model_providers:
     type: openai
 `)
 
-	out, _, err := Convert(src, Options{OutputMode: "db-less"})
+	out, _, err := convertDBLessYAML(src, Options{})
 	require.NoError(t, err, "convert db-less")
 
 	var got map[string]any
@@ -1507,9 +1521,7 @@ datastores:
     name: ds
     config: {host: pg.internal, port: 5432}
 `)
-	doc, err := publicaigw.Parse(src)
-	require.NoError(t, err, "parse source")
-	out, _, err := ConvertDocument(doc, Options{})
+	out, _, err := Convert(src, Options{})
 	require.NoError(t, err, "convert")
 	var plugin map[string]any
 	for _, p := range out.Plugins {
@@ -1586,7 +1598,7 @@ mcp_servers:
       server: {tag: bucket1}
       sources: [toolset]
 `)
-			out, _, err := Convert(src, Options{OutputMode: "db-less"})
+			out, _, err := convertDBLessYAML(src, Options{})
 			require.NoError(t, err, "convert db-less")
 
 			var got struct {
@@ -1688,7 +1700,7 @@ mcp_servers:
     config:
       route: {paths: [/mcp], strip_path: false}
 `)
-	out, _, err := Convert(src, Options{OutputMode: "db-less"})
+	out, _, err := convertDBLessYAML(src, Options{})
 	require.NoError(t, err, "convert db-less")
 
 	var got struct {
@@ -1738,7 +1750,7 @@ agents:
       url: https://b.internal/api
       route: {paths: [/agents/on]}
 `)
-	out, _, err := Convert(src, Options{OutputMode: "db-less"})
+	out, _, err := convertDBLessYAML(src, Options{})
 	require.NoError(t, err, "convert db-less")
 
 	var got struct {
@@ -1777,7 +1789,7 @@ agents:
       route: {paths: [/protected-agent]}
 `)
 
-	out, _, err := Convert(src, Options{OutputMode: "db-less"})
+	out, _, err := convertDBLessYAML(src, Options{})
 	require.NoError(t, err)
 
 	var got struct {
@@ -1814,7 +1826,7 @@ mcp_servers:
     config:
       route: {paths: [/mcp/on]}
 `)
-	out, _, err := Convert(src, Options{OutputMode: "db-less"})
+	out, _, err := convertDBLessYAML(src, Options{})
 	require.NoError(t, err, "convert db-less")
 
 	var got struct {
@@ -1852,7 +1864,7 @@ models:
       model: {alias: gpt-chat}
 `)
 
-	out, _, err := Convert(src, Options{OutputMode: "db-less"})
+	out, _, err := convertDBLessYAML(src, Options{})
 	require.NoError(t, err, "convert db-less")
 
 	var got struct {
@@ -1909,7 +1921,7 @@ models:
       model: {alias: openai-chat}
 `)
 
-	out, _, err := Convert(src, Options{})
+	out, _, err := convertYAML(src, Options{})
 	require.NoError(t, err, "convert")
 
 	var got struct {
@@ -1960,7 +1972,7 @@ consumers:
         api_key: sk-test
 `)
 
-	out, _, err := Convert(src, Options{OutputMode: "db-less"})
+	out, _, err := convertDBLessYAML(src, Options{})
 	require.NoError(t, err, "convert db-less")
 
 	var got map[string]any
@@ -2007,7 +2019,7 @@ model_providers:
     type: openai
 `)
 
-	out, _, err := Convert(src, Options{OutputMode: "db-less"})
+	out, _, err := convertDBLessYAML(src, Options{})
 	if err != nil {
 		t.Fatalf("convert db-less: %v", err)
 	}
@@ -2098,7 +2110,7 @@ model_providers:
     type: openai
 `)
 
-	out, _, err := Convert(src, Options{OutputMode: "db-less"})
+	out, _, err := convertDBLessYAML(src, Options{})
 	require.NoError(t, err, "convert db-less")
 
 	var got struct {
@@ -2176,7 +2188,7 @@ consumers:
         api_key: sk-bob
 `)
 
-	out, _, err := Convert(src, Options{OutputMode: "db-less"})
+	out, _, err := convertDBLessYAML(src, Options{})
 	if err != nil {
 		t.Fatalf("convert db-less: %v", err)
 	}
@@ -2253,7 +2265,7 @@ model_providers:
     type: openai
 `)
 
-	out, _, err := Convert(src, Options{OutputMode: "db-less"})
+	out, _, err := convertDBLessYAML(src, Options{})
 	if err != nil {
 		t.Fatalf("convert db-less: %v", err)
 	}
@@ -2310,7 +2322,7 @@ mcp_servers:
       sources: [team-a]
 `)
 
-	out, _, err := Convert(src, Options{OutputMode: "db-less"})
+	out, _, err := convertDBLessYAML(src, Options{})
 	if err != nil {
 		t.Fatalf("convert db-less: %v", err)
 	}
@@ -2395,7 +2407,7 @@ mcp_servers:
       sources: [team-a]
 `)
 
-	out, _, err := Convert(src, Options{OutputMode: "db-less"})
+	out, _, err := convertDBLessYAML(src, Options{})
 	if err != nil {
 		t.Fatalf("convert db-less: %v", err)
 	}
@@ -2492,7 +2504,7 @@ mcp_servers:
       sources: [team-a]
 `)
 
-	out, _, err := Convert(src, Options{OutputMode: "db-less"})
+	out, _, err := convertDBLessYAML(src, Options{})
 	if err != nil {
 		t.Fatalf("convert db-less: %v", err)
 	}
@@ -2580,7 +2592,7 @@ model_providers:
     type: openai
 `)
 
-	out, _, err := Convert(src, Options{OutputMode: "db-less"})
+	out, _, err := convertDBLessYAML(src, Options{})
 	if err != nil {
 		t.Fatalf("convert db-less: %v", err)
 	}

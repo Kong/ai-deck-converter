@@ -5,7 +5,6 @@ import (
 
 	"github.com/Kong/ai-deck-converter/convert"
 	"github.com/Kong/ai-deck-converter/internal/aigw"
-	"github.com/Kong/ai-deck-converter/internal/kong"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 )
@@ -167,12 +166,9 @@ ai_models:
 	aigwYAML, err := yaml.Marshal(doc)
 	require.NoError(t, err, "marshal reverted document")
 
-	deckYAML, warnings, err := convert.Convert(aigwYAML, convert.Options{})
+	redeck, warnings, err := convert.Convert(aigwYAML, convert.Options{})
 	require.NoError(t, err, "re-convert")
 	require.Empty(t, warnings, "no warnings expected")
-
-	var redeck kong.Document
-	require.NoError(t, yaml.Unmarshal(deckYAML, &redeck), "unmarshal re-converted document")
 	require.Len(t, redeck.AIModels, 2, "still one ai-models entry per alias")
 
 	// Regression check: must still say "@kong/openai" per the tag, not

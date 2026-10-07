@@ -77,33 +77,11 @@ func (g *routeGroup) addSelector(cfg map[string]any) {
 // distinct shape contributed by the route's models, plus a single
 // max_request_body_size raised to the largest ceiling any body-shaped entry
 // asked for. Returns nil when no model on the route wants a selector at all.
-//
-// useSources selects which of the two mutually exclusive wire schemas to
-// target (Options.ModelSelectorSources): false emits the legacy flat form
-// (top-level source/body_path/header_name/path_pattern) — the route's key
-// already guarantees at most one shape was ever contributed in that mode,
-// see convertModels. true always emits config.sources, even for a single
-// shape, since data planes that understand config.sources do not accept the
-// legacy top-level config.source at all.
-func (g *routeGroup) selectorConfig(useSources bool) map[string]any {
+// It emits config.sources even for a single shape.
+// Data planes that read config.sources reject the legacy config.source.
+func (g *routeGroup) selectorConfig() map[string]any {
 	if len(g.selectorOrder) == 0 {
 		return nil
-	}
-	if !useSources {
-		cfg := make(map[string]any, len(g.selectorByKey[g.selectorOrder[0]])+1)
-		maps.Copy(cfg, g.selectorByKey[g.selectorOrder[0]])
-
-		g.setSelectorBodySize(cfg)
-
-		// If a new PCRE pattern type comes in,
-		// replace it with a best-effort Lua str:match
-		if path, ok := cfg["pcre_pattern"]; ok {
-			cfg["path_pattern"] = tryConvertPCREToLua(path.(string))
-			delete(cfg, "pcre_pattern")
-			delete(cfg, "pcre_capture_name")
-		}
-
-		return cfg
 	}
 
 	sources := make([]map[string]any, 0, len(g.selectorOrder))
@@ -178,10 +156,6 @@ type videoLifecycleCandidate struct {
 // scoped to both the route and the ai-model entity; type "api" plugins are
 // scoped route-only.
 func (c *Converter) convertModels() error {
-	// useSources selects which of the two mutually exclusive
-	// ai-model-selector wire schemas to target; withDefaults populates the
-	// pointer before c.opts is ever read, so it is never nil here.
-	useSources := *c.opts.ModelSelectorSources
 	groups := map[string]*routeGroup{}
 	var order []string
 	var guardPlugins []kong.Plugin
@@ -407,14 +381,8 @@ func (c *Converter) convertModels() error {
 						}
 					}
 					// The alias *value* is per-model and deliberately excluded from
-					// routeConfigKey. When targeting config.sources (Options.
-					// ModelSelectorSources), the selector *shape* (which source/field an
-					// ai-model-selector reads) no longer forces a split: models wanting
-					// different shapes still share the route, and their shapes compact
-					// into config.sources (see routeGroup.addSelector). Otherwise the
-					// shape stays a route-level concern like auth strategies, since
-					// the legacy schema's ai-model-selector can only read one shape at
-					// a time: models wanting incompatible shapes cannot share a route.
+					// routeConfigKey. The selector shape does not split routes either.
+					// Shapes of models on one route merge into config.sources.
 					// A passthrough model's route is its base path whatever its targets'
 					// providers, so the section stays out of its key: targets on
 					// different providers still share the one route.
@@ -426,9 +394,6 @@ func (c *Converter) convertModels() error {
 						spec.RouteLabel +
 						"|" + identityKey +
 						"|" + routeConfigKey
-					if !useSources {
-						key += "|" + modelSelectorShapeKey(selectorCfgs)
-					}
 					// Without a selector, a route cannot pick one model's plugin.
 					// Each model therefore gets its own WebSocket route.
 					if websocket {
@@ -741,19 +706,10 @@ func (c *Converter) convertModels() error {
 			service.Routes = append(service.Routes, g.route)
 		}
 
-		if selectorCfg := g.selectorConfig(useSources); selectorCfg != nil {
+		if selectorCfg := g.selectorConfig(); selectorCfg != nil {
 			mappings := []kong.FieldMapping{
 				{GeneratedPrefix: "config.max_request_body_size", SourcePrefix: "config.max_request_body_size"},
-			}
-			if useSources {
-				mappings = append(mappings,
-					kong.FieldMapping{GeneratedPrefix: "config.sources", SourcePrefix: "config.route.model"})
-			} else {
-				mappings = append(mappings,
-					kong.FieldMapping{GeneratedPrefix: "config.body_path", SourcePrefix: "config.route.model.body.body_param"},
-					kong.FieldMapping{GeneratedPrefix: "config.header_name", SourcePrefix: "config.route.model.header.header_param"},
-					kong.FieldMapping{GeneratedPrefix: "config.path_pattern", SourcePrefix: "config.route.model.path.values"},
-				)
+				{GeneratedPrefix: "config.sources", SourcePrefix: "config.route.model"},
 			}
 			c.out.Plugins = append(c.out.Plugins, kong.Plugin{
 				Name:   "ai-model-selector",
@@ -1544,33 +1500,6 @@ func defaultModelSelectorConfig(m *aigw.Model, spec aimap.EndpointSpec) map[stri
 	return config
 }
 
-// modelSelectorShapeKey canonicalizes an ai-model-selector config's shape
-// (source plus field name) for route grouping under the legacy schema,
-// deliberately dropping max_request_body_size and any alias value: two
-// models wanting the same shape can still share a route even if their alias
-// values or body-size ceilings differ (the latter merges to the max across
-// contributors), but models wanting different shapes need their own
-// ai-model-selector/route, the same way models with different
-// auth-strategy sets do.
-func modelSelectorShapeKey(cfg []map[string]any) string {
-	var sources strings.Builder
-	sources.WriteString("")
-	for _, source := range cfg {
-		switch v, _ := source["source"].(string); v {
-		case "body":
-			bodyPath, _ := source["body_path"].(string)
-			sources.WriteString("body:" + bodyPath + ".")
-		case "header":
-			headerName, _ := source["header_name"].(string)
-			sources.WriteString("header:" + headerName + ".")
-		case "path":
-			sources.WriteString("path" + ".")
-		}
-	}
-
-	return strings.TrimSuffix(sources.String(), ".")
-}
-
 func boolPtr(b bool) *bool { return &b }
 
 // pathParamCaptured reports whether every authored path is a regex path (a
@@ -1598,11 +1527,6 @@ func pathParamCaptured(paths []string, param string, specIsRegex bool) bool {
 // the quoted form).
 var pcreNamedCaptureOpen = regexp.MustCompile(`\(\?(?:P?<([A-Za-z_][A-Za-z0-9_]*)>|'([A-Za-z_][A-Za-z0-9_]*)')`)
 
-// pcreNamedGroupFull matches a whole PCRE named capture group (opening plus
-// body) in any of the three spellings, for substitution when deriving a Lua
-// path_pattern.
-var pcreNamedGroupFull = regexp.MustCompile(`\(\?(?:P?<[A-Za-z_][A-Za-z0-9_]*>|'[A-Za-z_][A-Za-z0-9_]*')[^)]*\)`)
-
 // namedCaptureName returns the group name from a pcreNamedCaptureOpen submatch.
 func namedCaptureName(m []string) string {
 	if m[1] != "" {
@@ -1619,23 +1543,4 @@ func pathHasNamedCapture(s, param string) bool {
 		}
 	}
 	return false
-}
-
-// tryConvertPCREToLua derives an ai-model-selector Lua path_pattern from
-// a model's own hand-authored base path. A base path carrying a PCRE named
-// capture group (e.g. "(?<my_openai_model>)", "(?P<my_openai_model>)", or
-// "(?'my_openai_model')") marks where the client-supplied model alias appears.
-func tryConvertPCREToLua(pattern string) string {
-	pattern = strings.TrimPrefix(pattern, "~")
-
-	// genericPathAliasCapture is the Lua pattern substituted for a PCRE named
-	// capture group when deriving an ai-model-selector path_pattern: it matches
-	// any alias value Kong's route path leaves for the model segment.
-	const genericPathAliasCapture = "([%w%.%-:]+)"
-
-	if !pcreNamedGroupFull.MatchString(pattern) {
-		// Didn't work, use the default pattern
-		return aimap.OpenAIDefaultPathPattern
-	}
-	return pcreNamedGroupFull.ReplaceAllString(pattern, genericPathAliasCapture)
 }

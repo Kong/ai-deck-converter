@@ -4,6 +4,8 @@
 // foreign-key references).
 package kong
 
+import "fmt"
+
 // FormatVersion is the decK declarative config version this converter targets.
 const FormatVersion = "3.0"
 
@@ -19,6 +21,36 @@ type Document struct {
 	Certificates   []Certificate   `yaml:"certificates,omitempty"`
 	AIModels       []AIModel       `yaml:"ai_models,omitempty"`
 	CACertificates []CACertificate `yaml:"ca_certificates,omitempty"`
+}
+
+// Metadata returns the AI Gateway source of each generated entity.
+// Locations use the nested decK layout, e.g. services[0].routes[0].
+func (d *Document) Metadata() *ConversionMetadata {
+	metadata := &ConversionMetadata{}
+	for index, plugin := range d.Plugins {
+		metadata.appendPlugin(index, fmt.Sprintf("plugins[%d]", index), plugin.Source, plugin.TargetSources)
+	}
+	for serviceIndex, service := range d.Services {
+		serviceLocation := fmt.Sprintf("services[%d]", serviceIndex)
+		if service.Source != nil {
+			metadata.Services = append(metadata.Services, generatedEntitySource(serviceIndex, serviceLocation, service.Source))
+		}
+		for pluginIndex, plugin := range service.Plugins {
+			location := fmt.Sprintf("%s.plugins[%d]", serviceLocation, pluginIndex)
+			metadata.appendPlugin(pluginIndex, location, plugin.Source, plugin.TargetSources)
+		}
+		for routeIndex, route := range service.Routes {
+			routeLocation := fmt.Sprintf("%s.routes[%d]", serviceLocation, routeIndex)
+			if route.Source != nil {
+				metadata.Routes = append(metadata.Routes, generatedEntitySource(routeIndex, routeLocation, route.Source))
+			}
+			for pluginIndex, plugin := range route.Plugins {
+				location := fmt.Sprintf("%s.plugins[%d]", routeLocation, pluginIndex)
+				metadata.appendPlugin(pluginIndex, location, plugin.Source, plugin.TargetSources)
+			}
+		}
+	}
+	return metadata
 }
 
 // Ref is a name-based foreign-key reference, rendered as `{name: <x>}`.

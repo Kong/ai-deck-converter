@@ -1,11 +1,9 @@
-package convert
+package kong
 
 import (
 	"crypto/sha1" //nolint:gosec
 	"fmt"
 	"net/url"
-
-	"github.com/Kong/ai-deck-converter/internal/kong"
 )
 
 var dbLessNamespace = [16]byte{
@@ -24,13 +22,11 @@ type dbLessIDs struct {
 	consumer map[string]string
 }
 
-// projectDBLess reshapes the already-converted Kong document into a flattened
-// db-less DP payload. It assigns stable IDs to every emitted entity, moves
-// nested entities into top-level collections, converts name-based foreign keys
-// into ID references, and lifts nested credentials/group memberships into the
-// top-level entities the DP expects.
-func (c *Converter) projectDBLess() *kong.DBLessDocument {
-	out := kong.NewDBLessDocument()
+// ToDBLess changes the decK document into a flattened db-less document.
+// Each entity without an ID gets a stable ID made from its name.
+// Name references become ID references.
+func (d *Document) ToDBLess() *DBLessDocument {
+	out := NewDBLessDocument()
 	ids := dbLessIDs{
 		service:  map[string]string{},
 		route:    map[string]string{},
@@ -42,31 +38,31 @@ func (c *Converter) projectDBLess() *kong.DBLessDocument {
 		consumer: map[string]string{},
 	}
 
-	for _, svc := range c.out.Services {
-		ids.service[svc.Name] = firstNonEmpty(svc.ID, stableUUID("service:"+svc.Name))
+	for _, svc := range d.Services {
+		ids.service[svc.Name] = firstNonEmpty(svc.ID, StableUUID("service:"+svc.Name))
 		for _, route := range svc.Routes {
-			ids.route[svc.Name+"|"+route.Name] = stableUUID("route:" + svc.Name + ":" + route.Name)
+			ids.route[svc.Name+"|"+route.Name] = StableUUID("route:" + svc.Name + ":" + route.Name)
 		}
 	}
-	for _, model := range c.out.AIModels {
-		ids.model[model.Name] = firstNonEmpty(model.ID, stableUUID("ai_model:"+model.Name))
+	for _, model := range d.AIModels {
+		ids.model[model.Name] = firstNonEmpty(model.ID, StableUUID("ai_model:"+model.Name))
 	}
-	for _, vault := range c.out.Vaults {
-		ids.vault[vault.Prefix] = firstNonEmpty(vault.ID, stableUUID("vault:"+vault.Prefix))
+	for _, vault := range d.Vaults {
+		ids.vault[vault.Prefix] = firstNonEmpty(vault.ID, StableUUID("vault:"+vault.Prefix))
 	}
-	for i, cert := range c.out.Certificates {
-		ids.cert[certKey(cert, i)] = firstNonEmpty(cert.ID, stableUUID("certificate:"+certKey(cert, i)))
+	for i, cert := range d.Certificates {
+		ids.cert[certKey(cert, i)] = firstNonEmpty(cert.ID, StableUUID("certificate:"+certKey(cert, i)))
 	}
-	for _, group := range c.out.ConsumerGroups {
-		ids.group[group.Name] = firstNonEmpty(group.ID, stableUUID("consumer_group:"+group.Name))
+	for _, group := range d.ConsumerGroups {
+		ids.group[group.Name] = firstNonEmpty(group.ID, StableUUID("consumer_group:"+group.Name))
 	}
-	for _, consumer := range c.out.Consumers {
-		ids.consumer[consumer.Username] = firstNonEmpty(consumer.ID, stableUUID("consumer:"+consumer.Username))
+	for _, consumer := range d.Consumers {
+		ids.consumer[consumer.Username] = firstNonEmpty(consumer.ID, StableUUID("consumer:"+consumer.Username))
 	}
 
 	memberSeen := map[string]bool{}
 
-	for _, svc := range c.out.Services {
+	for _, svc := range d.Services {
 		svcID := ids.service[svc.Name]
 		out.Services = append(out.Services, toDBLessService(svc, svcID))
 
@@ -75,7 +71,7 @@ func (c *Converter) projectDBLess() *kong.DBLessDocument {
 			out.Routes = append(out.Routes, toDBLessRoute(route, routeID, svcID))
 
 			for pluginIdx, plugin := range route.Plugins {
-				id := firstNonEmpty(plugin.ID, stableUUID(fmt.Sprintf("plugin:route:%s:%s:%d", route.Name, plugin.Name, pluginIdx)))
+				id := firstNonEmpty(plugin.ID, StableUUID(fmt.Sprintf("plugin:route:%s:%s:%d", route.Name, plugin.Name, pluginIdx)))
 				ids.plugin[id] = id
 				out.Plugins = append(out.Plugins, toDBLessPlugin(plugin, id, scopeRef{route: routeID}))
 			}
@@ -83,23 +79,23 @@ func (c *Converter) projectDBLess() *kong.DBLessDocument {
 		}
 
 		for pluginIdx, plugin := range svc.Plugins {
-			id := firstNonEmpty(plugin.ID, stableUUID(fmt.Sprintf("plugin:service:%s:%s:%d", svc.Name, plugin.Name, pluginIdx)))
+			id := firstNonEmpty(plugin.ID, StableUUID(fmt.Sprintf("plugin:service:%s:%s:%d", svc.Name, plugin.Name, pluginIdx)))
 			ids.plugin[id] = id
 			out.Plugins = append(out.Plugins, toDBLessPlugin(plugin, id, scopeRef{service: svcID}))
 		}
 	}
 
-	for _, consumer := range c.out.Consumers {
+	for _, consumer := range d.Consumers {
 		consumerID := ids.consumer[consumer.Username]
-		out.Consumers = append(out.Consumers, kong.DBLessConsumer{
+		out.Consumers = append(out.Consumers, DBLessConsumer{
 			ID:       consumerID,
 			Username: consumer.Username,
 			CustomID: consumer.CustomID,
 			Tags:     consumer.Tags,
 		})
 		for credIdx, cred := range consumer.KeyAuthCredentials {
-			out.KeyAuthCredentials = append(out.KeyAuthCredentials, kong.DBLessKeyAuthCredential{
-				ID:       firstNonEmpty(cred.ID, stableUUID(fmt.Sprintf("keyauth:%s:%s:%d", consumer.Username, cred.Key, credIdx))),
+			out.KeyAuthCredentials = append(out.KeyAuthCredentials, DBLessKeyAuthCredential{
+				ID:       firstNonEmpty(cred.ID, StableUUID(fmt.Sprintf("keyauth:%s:%s:%d", consumer.Username, cred.Key, credIdx))),
 				Key:      cred.Key,
 				Consumer: consumerID,
 				TTL:      cred.TTL,
@@ -107,7 +103,7 @@ func (c *Converter) projectDBLess() *kong.DBLessDocument {
 			})
 		}
 		for pluginIdx, plugin := range consumer.Plugins {
-			id := firstNonEmpty(plugin.ID, stableUUID(
+			id := firstNonEmpty(plugin.ID, StableUUID(
 				fmt.Sprintf("plugin:consumer:%s:%s:%d", consumer.Username, plugin.Name, pluginIdx)))
 			out.Plugins = append(out.Plugins, toDBLessPlugin(plugin, id, scopeRef{consumer: consumerID}))
 		}
@@ -115,7 +111,7 @@ func (c *Converter) projectDBLess() *kong.DBLessDocument {
 			groupName := groupRef.Name
 			groupID, ok := ids.group[groupName]
 			if !ok {
-				groupID = stableUUID("consumer_group:" + groupName)
+				groupID = StableUUID("consumer_group:" + groupName)
 				ids.group[groupName] = groupID
 			}
 			key := consumerID + "|" + groupID
@@ -123,30 +119,30 @@ func (c *Converter) projectDBLess() *kong.DBLessDocument {
 				continue
 			}
 			memberSeen[key] = true
-			out.ConsumerGroupConsumers = append(out.ConsumerGroupConsumers, kong.DBLessConsumerGroupMember{
+			out.ConsumerGroupConsumers = append(out.ConsumerGroupConsumers, DBLessConsumerGroupMember{
 				Consumer:      consumerID,
 				ConsumerGroup: groupID,
 			})
 		}
 	}
 
-	for _, group := range c.out.ConsumerGroups {
+	for _, group := range d.ConsumerGroups {
 		groupID := ids.group[group.Name]
-		out.ConsumerGroups = append(out.ConsumerGroups, kong.DBLessConsumerGroup{
+		out.ConsumerGroups = append(out.ConsumerGroups, DBLessConsumerGroup{
 			ID:   groupID,
 			Name: group.Name,
 			Tags: group.Tags,
 		})
 		for pluginIdx, plugin := range group.Plugins {
-			id := firstNonEmpty(plugin.ID, stableUUID(
+			id := firstNonEmpty(plugin.ID, StableUUID(
 				fmt.Sprintf("plugin:consumer_group:%s:%s:%d", group.Name, plugin.Name, pluginIdx)))
 			out.Plugins = append(out.Plugins, toDBLessPlugin(plugin, id, scopeRef{consumerGroup: groupID}))
 		}
 	}
 
-	for i, cert := range c.out.Certificates {
+	for i, cert := range d.Certificates {
 		certID := ids.cert[certKey(cert, i)]
-		out.Certificates = append(out.Certificates, kong.DBLessCertificate{
+		out.Certificates = append(out.Certificates, DBLessCertificate{
 			ID:      certID,
 			Cert:    cert.Cert,
 			Key:     cert.Key,
@@ -155,8 +151,8 @@ func (c *Converter) projectDBLess() *kong.DBLessDocument {
 			Tags:    cert.Tags,
 		})
 		for _, sni := range cert.SNIs {
-			out.SNIs = append(out.SNIs, kong.DBLessSNI{
-				ID:          firstNonEmpty(sni.ID, stableUUID("sni:"+certKey(cert, i)+":"+sni.Name)),
+			out.SNIs = append(out.SNIs, DBLessSNI{
+				ID:          firstNonEmpty(sni.ID, StableUUID("sni:"+certKey(cert, i)+":"+sni.Name)),
 				Name:        sni.Name,
 				Certificate: map[string]string{"id": certID},
 				Tags:        sni.Tags,
@@ -164,8 +160,8 @@ func (c *Converter) projectDBLess() *kong.DBLessDocument {
 		}
 	}
 
-	for _, vault := range c.out.Vaults {
-		out.Vaults = append(out.Vaults, kong.DBLessVault{
+	for _, vault := range d.Vaults {
+		out.Vaults = append(out.Vaults, DBLessVault{
 			ID:          ids.vault[vault.Prefix],
 			Prefix:      vault.Prefix,
 			Name:        vault.Name,
@@ -175,8 +171,8 @@ func (c *Converter) projectDBLess() *kong.DBLessDocument {
 		})
 	}
 
-	for _, model := range c.out.AIModels {
-		out.AIModels = append(out.AIModels, kong.DBLessAIModel{
+	for _, model := range d.AIModels {
+		out.AIModels = append(out.AIModels, DBLessAIModel{
 			ID:    ids.model[model.Name],
 			Name:  model.Name,
 			Alias: model.Alias,
@@ -184,26 +180,26 @@ func (c *Converter) projectDBLess() *kong.DBLessDocument {
 		})
 	}
 
-	for _, plugin := range c.out.CustomPlugins {
-		out.CustomPlugins = append(out.CustomPlugins, kong.DBLessCustomPlugin{
-			ID:      firstNonEmpty(plugin.ID, stableUUID("custom_plugin:"+plugin.Name)),
+	for _, plugin := range d.CustomPlugins {
+		out.CustomPlugins = append(out.CustomPlugins, DBLessCustomPlugin{
+			ID:      firstNonEmpty(plugin.ID, StableUUID("custom_plugin:"+plugin.Name)),
 			Name:    plugin.Name,
 			Schema:  plugin.Schema,
 			Handler: plugin.Handler,
 		})
 	}
 
-	for _, cert := range c.out.CACertificates {
-		out.CACertificates = append(out.CACertificates, kong.DBLessCACertificate{
-			ID:         firstNonEmpty(cert.ID, stableUUID("ca_certificate:"+cert.Cert)),
+	for _, cert := range d.CACertificates {
+		out.CACertificates = append(out.CACertificates, DBLessCACertificate{
+			ID:         firstNonEmpty(cert.ID, StableUUID("ca_certificate:"+cert.Cert)),
 			Cert:       cert.Cert,
 			CertDigest: cert.CertDigest,
 			Tags:       cert.Tags,
 		})
 	}
 
-	for pluginIdx, plugin := range c.out.Plugins {
-		id := firstNonEmpty(plugin.ID, stableUUID(fmt.Sprintf("plugin:top:%s:%d", plugin.Name, pluginIdx)))
+	for pluginIdx, plugin := range d.Plugins {
+		id := firstNonEmpty(plugin.ID, StableUUID(fmt.Sprintf("plugin:top:%s:%d", plugin.Name, pluginIdx)))
 		out.Plugins = append(out.Plugins, toDBLessPlugin(plugin, id, scopeRef{
 			service:       lookupStringRef(plugin.Service, ids.service),
 			route:         lookupStringRouteRef(plugin.Route, ids.route),
@@ -224,8 +220,8 @@ type scopeRef struct {
 	model         string
 }
 
-func toDBLessPlugin(plugin kong.Plugin, id string, scope scopeRef) kong.DBLessPlugin {
-	return kong.DBLessPlugin{
+func toDBLessPlugin(plugin Plugin, id string, scope scopeRef) DBLessPlugin {
+	return DBLessPlugin{
 		ID:            id,
 		Name:          plugin.Name,
 		Enabled:       plugin.Enabled,
@@ -243,8 +239,8 @@ func toDBLessPlugin(plugin kong.Plugin, id string, scope scopeRef) kong.DBLessPl
 	}
 }
 
-func toDBLessService(service kong.Service, id string) kong.DBLessService {
-	out := kong.DBLessService{
+func toDBLessService(service Service, id string) DBLessService {
+	out := DBLessService{
 		ID:       id,
 		Name:     service.Name,
 		URL:      service.URL,
@@ -279,8 +275,8 @@ func toDBLessService(service kong.Service, id string) kong.DBLessService {
 	return out
 }
 
-func toDBLessRoute(route kong.Route, id, serviceID string) kong.DBLessRoute {
-	r := kong.DBLessRoute{
+func toDBLessRoute(route Route, id, serviceID string) DBLessRoute {
+	r := DBLessRoute{
 		ID:                      id,
 		Name:                    route.Name,
 		Service:                 toDBLessFK(serviceID),
@@ -317,25 +313,25 @@ func toDBLessFK(id string) map[string]string {
 	}
 }
 
-func toDBLessCIDRPorts(in []kong.CIDRPort) []kong.DBLessCIDRPort {
+func toDBLessCIDRPorts(in []CIDRPort) []DBLessCIDRPort {
 	if len(in) == 0 {
 		return nil
 	}
-	out := make([]kong.DBLessCIDRPort, 0, len(in))
+	out := make([]DBLessCIDRPort, 0, len(in))
 	for _, item := range in {
-		out = append(out, kong.DBLessCIDRPort(item))
+		out = append(out, DBLessCIDRPort(item))
 	}
 	return out
 }
 
-func lookupStringRef(ref *kong.StringRef, ids map[string]string) string {
+func lookupStringRef(ref *StringRef, ids map[string]string) string {
 	if ref == nil {
 		return ""
 	}
 	return ids[string(*ref)]
 }
 
-func lookupStringRouteRef(ref *kong.StringRef, ids map[string]string) string {
+func lookupStringRouteRef(ref *StringRef, ids map[string]string) string {
 	if ref == nil {
 		return ""
 	}
@@ -364,7 +360,9 @@ func defaultPort(parsed *url.URL) int {
 	}
 }
 
-func stableUUID(key string) string {
+// StableUUID returns a version 5 style UUID for key. The same key always gives
+// the same UUID.
+func StableUUID(key string) string {
 	sum := sha1.Sum(append(dbLessNamespace[:], []byte(key)...)) //nolint:gosec
 	b := sum[:16]
 	b[6] = (b[6] & 0x0f) | 0x50 //nolint:mnd
@@ -376,6 +374,16 @@ func stableUUID(key string) string {
 		b[8:10],
 		b[10:16],
 	)
+}
+
+// certKey identifies a certificate for stable db-less ID derivation. The source
+// name is preferred; a hand-written decK config carries none, so the position
+// keeps the derived ID stable for a given input.
+func certKey(cert Certificate, idx int) string {
+	if cert.SourceName != "" {
+		return cert.SourceName
+	}
+	return fmt.Sprintf("%d", idx)
 }
 
 func firstNonEmpty(value, fallback string) string {

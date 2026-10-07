@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/Kong/ai-deck-converter/internal/aigw"
 	"github.com/Kong/ai-deck-converter/internal/aimap"
 	"github.com/Kong/ai-deck-converter/internal/kong"
 	"github.com/stretchr/testify/require"
@@ -48,9 +47,7 @@ mcp_servers:
 
 func convertMCP(t *testing.T, src string) (*kong.Document, []string) {
 	t.Helper()
-	doc, err := aigw.Parse([]byte(src))
-	require.NoError(t, err)
-	out, warnings, err := ConvertDocument(doc, Options{})
+	out, warnings, err := Convert([]byte(src), Options{})
 	require.NoError(t, err)
 	return out, warnings
 }
@@ -417,7 +414,7 @@ mcp_servers:
 }
 
 func TestTokenVaultConflictsWithUpstreamAuth(t *testing.T) {
-	doc, err := aigw.Parse([]byte(`
+	_, _, err := Convert([]byte(`
 mcp_servers:
   - type: passthrough-listener
     name: both
@@ -430,15 +427,13 @@ mcp_servers:
         auth: {type: aws, region: us-west-2}
     tools:
       - {name: report, description: Get a report}
-`))
-	require.NoError(t, err)
-	_, _, err = ConvertDocument(doc, Options{})
+`), Options{})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "mutually exclusive")
 }
 
 func TestTokenVaultRedisRequiresEncryptionSecrets(t *testing.T) {
-	doc, err := aigw.Parse([]byte(`
+	_, _, err := Convert([]byte(`
 mcp_servers:
   - type: passthrough-listener
     name: no-secrets
@@ -449,9 +444,7 @@ mcp_servers:
       redis: {host: redis.internal, port: 6379}
     tools:
       - {name: report, description: Get a report}
-`))
-	require.NoError(t, err)
-	_, _, err = ConvertDocument(doc, Options{})
+`), Options{})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "encryption_secrets is required")
 }
@@ -469,17 +462,15 @@ func TestTokenVaultRequiresDirectoryAndProvider(t *testing.T) {
 		{name: "missing directory", block: "    token_vault:\n      provider: my-upstream-provider"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			doc, err := aigw.Parse([]byte(`
+			_, _, err := Convert([]byte(`
 mcp_servers:
   - type: passthrough-listener
     name: hollow
     upstream_url: https://mcp.internal
-` + tt.block + `
+`+tt.block+`
     tools:
       - {name: report, description: Get a report}
-`))
-			require.NoError(t, err)
-			_, _, err = ConvertDocument(doc, Options{})
+`), Options{})
 			require.Error(t, err)
 			require.Contains(t, err.Error(), "token_vault requires directory and provider")
 		})

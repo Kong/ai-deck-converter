@@ -29,7 +29,11 @@ func TestGolden(t *testing.T) {
 			in, err := os.ReadFile(filepath.Join(dir, "input.yaml"))
 			require.NoError(t, err, "read input")
 			opts := loadOptions(t, dir)
-			got, _, err := Convert(in, opts)
+			encode := convertYAML
+			if opts.OutputMode == "db-less" {
+				encode = convertDBLessYAML
+			}
+			got, _, err := encode(in, opts.Options)
 			require.NoError(t, err, "convert")
 
 			expectedPath := filepath.Join(dir, "expected.yaml")
@@ -44,14 +48,21 @@ func TestGolden(t *testing.T) {
 	}
 }
 
-func loadOptions(t *testing.T, dir string) Options {
+// goldenOptions adds output_mode to Options. It selects the expected.yaml
+// layout: "db-less", or decK when empty.
+type goldenOptions struct {
+	Options    `yaml:",inline"`
+	OutputMode string `yaml:"output_mode"`
+}
+
+func loadOptions(t *testing.T, dir string) goldenOptions {
 	t.Helper()
 	data, err := os.ReadFile(filepath.Join(dir, "options.yaml"))
 	if os.IsNotExist(err) {
-		return Options{}
+		return goldenOptions{}
 	}
 	require.NoError(t, err, "read options")
-	var opts Options
+	var opts goldenOptions
 	require.NoError(t, yaml.Unmarshal(data, &opts), "parse options")
 	return opts
 }

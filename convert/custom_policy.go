@@ -1,6 +1,8 @@
 package convert
 
 import (
+	"cmp"
+
 	"github.com/Kong/ai-deck-converter/internal/kong"
 )
 
@@ -17,7 +19,7 @@ func (c *Converter) convertCustomPolicies() error {
 		}
 
 		c.out.CustomPlugins = append(c.out.CustomPlugins, kong.CustomPlugin{
-			ID:      firstNonEmpty(policy.ID, stableUUID("custom_plugin:"+policy.Name)),
+			ID:      cmp.Or(policy.ID, kong.StableUUID("custom_plugin:"+policy.Name)),
 			Name:    policy.Name,
 			Schema:  policy.Schema,
 			Handler: policy.Handler,
