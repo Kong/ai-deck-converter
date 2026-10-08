@@ -326,7 +326,8 @@ func (c *Converter) convertModels() error {
 					m.Name, tm.Name)
 			}
 			// The Mantle endpoint does not serve the Converse or InvokeModel APIs.
-			if providerType == "bedrock" && tm.Config.Options["endpoint_type"] == "mantle" && hasFormat(m, "bedrock") {
+			if providerType == "bedrock" && tm.Config.Options["endpoint_type"] == "mantle" &&
+				llmFormat(m, providerType) == "bedrock" {
 				return c.failAt(fmt.Sprintf("targets[%d].config.endpoint_type", j),
 					"model %q target %q: the mantle endpoint type is not supported with the bedrock format",
 					m.Name, tm.Name)
@@ -1421,11 +1422,7 @@ func (c *Converter) warnPassthroughPolicies(m *aigw.Model) error {
 // format), so every target of the model is passthrough or none is — which is
 // also what ai-proxy-advanced requires of one plugin's targets.
 func isPassthrough(m *aigw.Model) bool {
-	return hasFormat(m, aimap.PassthroughFormat)
-}
-
-func hasFormat(m *aigw.Model, format string) bool {
-	return slices.ContainsFunc(m.Formats, func(f aigw.Format) bool { return f.Type == format })
+	return slices.ContainsFunc(m.Formats, func(f aigw.Format) bool { return f.Type == aimap.PassthroughFormat })
 }
 
 // bodySizeOrDefault returns the ai-model-selector's max_request_body_size: at
