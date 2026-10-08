@@ -273,7 +273,7 @@ func TestMCPOAuth2DerivesAudienceAndPassthrough(t *testing.T) {
 // MCP server WITH access.metadata (which lowers to ai-mcp-oauth2, a plugin that
 // cannot represent token_exchange). The control must not be dropped silently.
 const mcpTokenExchangeDropInput = `
-identity_providers:
+auth_strategies:
   - display_name: Okta OIDC
     name: okta-oidc-te
     type: openid-connect
@@ -301,7 +301,7 @@ mcp_servers:
       route:
         paths: [/mcp/with-meta]
     access:
-      identity_providers: [okta-oidc-te]
+      auth_strategies: [okta-oidc-te]
       metadata:
         endpoint: /mcp/with-meta/.well-known/oauth-protected-resource
         resource: https://api.example.com/mcp/with-meta
