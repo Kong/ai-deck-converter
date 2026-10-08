@@ -26,29 +26,16 @@ type Document struct {
 // can populate the current keys without recursing.
 type documentFields Document
 
-// deprecatedDocument holds the superseded top-level keys that UnmarshalYAML
-// folds into their current equivalents. They are accepted silently on input
-// and never emitted.
-type deprecatedDocument struct {
-	// IdentityProviders is the former name of AuthStrategies.
-	IdentityProviders []AuthStrategy `yaml:"identity_providers,omitempty"`
-}
-
-// UnmarshalYAML decodes a Document, folding deprecated top-level keys into the
-// fields that replaced them. Entities given under the current key come first;
-// entities under the deprecated key are appended, so a document may set either
-// (or, transitionally, both).
+// UnmarshalYAML decodes a Document and rejects identity_providers.
 func (d *Document) UnmarshalYAML(value *yaml.Node) error {
+	if err := rejectIdentityProviders(value); err != nil {
+		return err
+	}
 	var fields documentFields
 	if err := value.Decode(&fields); err != nil {
 		return err
 	}
-	var deprecated deprecatedDocument
-	if err := value.Decode(&deprecated); err != nil {
-		return err
-	}
 	*d = Document(fields)
-	d.AuthStrategies = append(d.AuthStrategies, deprecated.IdentityProviders...)
 	return nil
 }
 
