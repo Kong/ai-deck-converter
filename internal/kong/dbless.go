@@ -79,6 +79,7 @@ type DBLessPlugin struct {
 	Protocols     []string          `yaml:"protocols,omitempty"`
 	Condition     string            `yaml:"condition,omitempty"`
 	Config        map[string]any    `yaml:"config,omitempty"`
+	Ordering      *Ordering         `yaml:"ordering,omitempty"`
 	Service       map[string]string `yaml:"service,omitempty"`
 	Route         map[string]string `yaml:"route,omitempty"`
 	Consumer      map[string]string `yaml:"consumer,omitempty"`

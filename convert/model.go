@@ -655,9 +655,24 @@ func (c *Converter) convertModels() error {
 				// Same ai-model identities as the ai-proxy-advanced FKs: one copy
 				// of this policy/ACL plugin per alias, so a request is protected
 				// regardless of which alias it names.
+				//
+				// A plugin outranking ai-model-selector's priority would run
+				// before model selection by default. Its model: FK would then
+				// have no effect. OutranksModelSelector attaches ordering to
+				// place it after ai-model-selector and before ai-proxy-advanced.
+				// This has no runtime effect yet on a model-scoped instance; see
+				// "Assumptions and limitations" in README.md.
+				var ordering *kong.Ordering
+				if aimap.OutranksModelSelector(p.Name) {
+					ordering = &kong.Ordering{
+						After:  &kong.OrderingPhases{Access: []string{"ai-model-selector"}},
+						Before: &kong.OrderingPhases{Access: []string{"ai-proxy-advanced"}},
+					}
+				}
 				for _, alias := range aliases {
 					pCopy := p
 					pCopy.Model = kong.NewStringRef(alias)
+					pCopy.Ordering = ordering
 					guardPlugins = append(guardPlugins, pCopy)
 				}
 			}

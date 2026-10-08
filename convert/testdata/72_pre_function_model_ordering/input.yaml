@@ -1,0 +1,42 @@
+models:
+  # Both policies here have a static Kong priority above ai-model-selector's,
+  # so each per-alias copy must gain an ordering block (forcing it after
+  # ai-model-selector, before ai-proxy-advanced) or its model: FK would have
+  # no effect: pre-function is the extreme case (priority 1000000),
+  # request-validator (999) proves the trigger is table-driven, not
+  # name-special-cased.
+  - type: model
+    name: guarded-gpt
+    capabilities: [generate]
+    formats: [{type: openai}]
+    targets:
+      - name: gpt-4o
+        provider: openai-main
+        config: {type: openai}
+    policies: [ordering-probe, body-schema-guard]
+    config:
+      route:
+        paths: [/ai]
+        model:
+          values: ["@kong/gpt-4o", "@kong/gpt-4o-alias"]
+
+model_providers:
+  - type: openai
+    name: openai-main
+    config:
+      auth:
+        type: basic
+        headers: [{name: Authorization, value: "{vault://env/openai-key}"}]
+
+policies:
+  - type: pre-function
+    name: ordering-probe
+    config:
+      access:
+        - |
+          local model = ngx.ctx.ai_model
+          return kong.response.exit(200, { selected_model = model and model.name or ngx.null })
+  - type: request-validator
+    name: body-schema-guard
+    config:
+      body_schema: '[{"type":"object"}]'

@@ -1,0 +1,39 @@
+models:
+  - display_name: Ordering probe model
+    name: ordering-probe-model
+    type: model
+    enabled: true
+    capabilities: [ generate ]
+    formats:
+      - type: openai
+    config:
+      route:
+        paths: [ /ai-ordering-probe ]
+        model:
+          values: [ ordering-probe-alias-one, ordering-probe-alias-two ]
+    targets:
+      - name: gpt-4o
+        provider: openai-prod
+        config:
+          type: openai
+    policies: [ ordering-probe ]
+    access:
+      acls: { allow: [ ], deny: [ ] }
+model_providers:
+  - name: openai-prod
+    type: openai
+    display_name: OpenAI Prod
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://ai/openai-token}"
+policies:
+  - type: pre-function
+    name: ordering-probe
+    config:
+      access:
+        - |
+          local model = ngx.ctx.ai_model
+          return kong.response.exit(200, { selected_model = model and model.name or ngx.null })
