@@ -22,14 +22,20 @@ import (
 // ai-proxy-advanced plugin (a proxyGroup).
 type routeGroup struct {
 	route kong.Route
+	// websocket routes belong to the WebSocket Service. They carry no
+	// ai-model-selector. Their plugins are therefore route-scoped.
+	websocket bool
 	// selectorOrder holds dedup keys (json of entry minus max_request_body_size),
 	// in first-contributed order.
 	selectorOrder []string
 	// selectorByKey maps a dedup key to that entry (minus max_request_body_size).
 	selectorByKey map[string]map[string]any
 	selectorMax   int // largest max_request_body_size across contributors that set it
-	proxies       []*proxyGroup
-	proxyByOwner  map[string]*proxyGroup
+	// selectorUnlimited is true when a contributor sets max_request_body_size to 0.
+	// The plugin reads 0 as unlimited, so 0 wins over every other value.
+	selectorUnlimited bool
+	proxies           []*proxyGroup
+	proxyByOwner      map[string]*proxyGroup
 }
 
 // addSelector folds one model's desired ai-model-selector shape into the
@@ -45,6 +51,9 @@ func (g *routeGroup) addSelector(cfg map[string]any) {
 	maps.Copy(entry, cfg)
 	if size, ok := entry["max_request_body_size"].(int); ok {
 		delete(entry, "max_request_body_size")
+		if size == 0 {
+			g.selectorUnlimited = true
+		}
 		if size > g.selectorMax {
 			g.selectorMax = size
 		}
@@ -84,9 +93,7 @@ func (g *routeGroup) selectorConfig(useSources bool) map[string]any {
 		cfg := make(map[string]any, len(g.selectorByKey[g.selectorOrder[0]])+1)
 		maps.Copy(cfg, g.selectorByKey[g.selectorOrder[0]])
 
-		if g.selectorMax > 0 {
-			cfg["max_request_body_size"] = g.selectorMax
-		}
+		g.setSelectorBodySize(cfg)
 
 		// If a new PCRE pattern type comes in,
 		// replace it with a best-effort Lua str:match
@@ -105,11 +112,18 @@ func (g *routeGroup) selectorConfig(useSources bool) map[string]any {
 	}
 
 	cfg := map[string]any{"sources": sources}
-	if g.selectorMax > 0 {
-		cfg["max_request_body_size"] = g.selectorMax
-	}
+	g.setSelectorBodySize(cfg)
 
 	return cfg
+}
+
+func (g *routeGroup) setSelectorBodySize(cfg map[string]any) {
+	switch {
+	case g.selectorUnlimited:
+		cfg["max_request_body_size"] = 0
+	case g.selectorMax > 0:
+		cfg["max_request_body_size"] = g.selectorMax
+	}
 }
 
 // proxyGroup accumulates one ai-proxy-advanced plugin: the targets owned by a
@@ -121,7 +135,11 @@ type proxyGroup struct {
 	// under; empty scopes the plugin route-only (type "api"). One
 	// ai-proxy-advanced plugin is emitted per alias (see the emission loop),
 	// each with its targets' model_alias set to that alias.
-	aliases           []string
+	aliases []string
+	// realtimeModel names the ai_models entry of a route-scoped realtime plugin.
+	// Its targets carry no model_alias. No selector presents an alias on a
+	// WebSocket route, so an aliased target is in a pool nothing selects.
+	realtimeModel     string
 	enabled           *bool
 	llmFormat         string
 	genaiCategory     string
@@ -170,6 +188,9 @@ func (c *Converter) convertModels() error {
 	usedRouteNames := map[string]bool{}
 	passthroughMatchers := map[string]string{}
 	identityPluginSeen := map[string]bool{}
+	// websocketRoutes holds the protocols of each WebSocket route by name.
+	// Plugins on these routes must declare the same protocols to run.
+	websocketRoutes := map[string][]string{}
 	lifecycleCandidates, err := c.videoLifecycleCandidates()
 	if err != nil {
 		return err
@@ -261,6 +282,15 @@ func (c *Converter) convertModels() error {
 		if err != nil {
 			return err
 		}
+		if m.Config.Route.Name != "" {
+			if err := c.warn(
+				"model %q sets config.route.name to %q. "+
+					"This will be ignored, and each route name will be overridden "+
+					"to the generated {format}-{endpoint} name.",
+				m.Name, m.Config.Route.Name); err != nil {
+				return err
+			}
+		}
 
 		var routeNames []string
 		routeSeen := map[string]bool{}
@@ -295,6 +325,13 @@ func (c *Converter) convertModels() error {
 					"model %q target %q: the passthrough format requires upstream_url for databricks",
 					m.Name, tm.Name)
 			}
+			if passthrough && providerType != "" && !aimap.HasNativeFormat(providerType) {
+				if err := c.warn(
+					"model %q target %q: provider type %q has no native llm_format, so the passthrough "+
+						"format may not extract usage or cost", m.Name, tm.Name, providerType); err != nil {
+					return err
+				}
+			}
 			if passthrough {
 				// Compare client formats, not sections, so gemini and vertex stay compatible.
 				format := aimap.ClientFormat(aimap.PassthroughFormat, providerType)
@@ -314,11 +351,7 @@ func (c *Converter) convertModels() error {
 					sec = aimap.SectionFor(aimap.PassthroughFormat, providerType)
 					specs = []aimap.EndpointSpec{aimap.PassthroughEndpoint}
 				} else {
-					// The section is resolved per capability: gemini-format traffic
-					// served by Vertex renders as gemini for shared capabilities
-					// (generate/embeddings) but keeps the Vertex section for the
-					// Vertex-only image/video/rerank endpoints.
-					sec = aimap.EndpointSectionFor(llmFormat(m, providerType), providerType, capability)
+					sec = aimap.SectionFor(llmFormat(m, providerType), providerType)
 					var ok bool
 					specs, ok = aimap.EndpointsFor(sec, capability)
 					if !ok {
@@ -342,6 +375,7 @@ func (c *Converter) convertModels() error {
 				// carrying this target; revert's capsSeen folds the routes back
 				// into the one capability.
 				for _, spec := range specs {
+					websocket := aimap.IsWebSocketEndpoint(spec)
 					logging := modelLoggingBlock(withLoggingDefaults(m.Config.Logging, false, false), spec.SupportsLogStatistics)
 					// Authentication plugins execute before the model selector. Models
 					// with different auth-strategy sets therefore cannot share a
@@ -353,7 +387,7 @@ func (c *Converter) convertModels() error {
 						return err
 					}
 					var selectorCfgs []map[string]any
-					if !passthrough {
+					if !passthrough && !websocket {
 						selectorCfgs, err = c.buildModelSelectorConfig(m, spec)
 						if err != nil {
 							return err
@@ -382,6 +416,11 @@ func (c *Converter) convertModels() error {
 					if !useSources {
 						key += "|" + modelSelectorShapeKey(selectorCfgs)
 					}
+					// Without a selector, a route cannot pick one model's plugin.
+					// Each model therefore gets its own WebSocket route.
+					if websocket {
+						key += "|" + m.Name
+					}
 					g := groups[key]
 					if g == nil {
 						paths := make([]string, len(bases))
@@ -392,8 +431,12 @@ func (c *Converter) convertModels() error {
 						g = &routeGroup{
 							route: buildModelRoute(
 								m.Config.Route, routeName,
-								paths, spec.Methods),
+								paths, spec.Methods, websocket),
+							websocket:    websocket,
 							proxyByOwner: map[string]*proxyGroup{},
+						}
+						if websocket {
+							websocketRoutes[routeName] = g.route.Protocols
 						}
 						g.route.Source = source("model", m.Name, "config.route")
 						groups[key] = g
@@ -406,6 +449,18 @@ func (c *Converter) convertModels() error {
 					if !routeSeen[g.route.Name] {
 						routeSeen[g.route.Name] = true
 						routeNames = append(routeNames, g.route.Name)
+						if !spec.SupportsLogStatistics && loggingStatisticsSet(m.Config.Logging) {
+							if err := c.warn(
+								"model %q sets config.logging.statistics to true. "+
+									"This will be ignored on the %q route, and log_statistics will be "+
+									"overridden to false because the endpoint does not support it.",
+								m.Name, g.route.Name); err != nil {
+								return err
+							}
+						}
+						if err := c.warnTransportOverrides(m, g.route); err != nil {
+							return err
+						}
 					}
 
 					pg := g.proxyByOwner[ownerKey]
@@ -448,7 +503,11 @@ func (c *Converter) convertModels() error {
 						// aliases, or the model name when none is set), not m.Name; using
 						// m.Name would dangle the FK whenever an alias is authored.
 						var pluginAliases []string
-						if fkScoped {
+						realtimeModel := ""
+						switch {
+						case fkScoped && websocket:
+							realtimeModel = aliases[0]
+						case fkScoped:
 							pluginAliases = aliases
 						}
 
@@ -460,6 +519,7 @@ func (c *Converter) convertModels() error {
 						pg = &proxyGroup{
 							routeName:         g.route.Name,
 							aliases:           pluginAliases,
+							realtimeModel:     realtimeModel,
 							enabled:           disabledModelPluginEnabled(m.Enabled),
 							llmFormat:         llmFormat(m, providerType),
 							genaiCategory:     spec.GenaiCategory,
@@ -574,6 +634,20 @@ func (c *Converter) convertModels() error {
 			for k := range plugins {
 				p := plugins[k]
 				p.Route = kong.NewStringRef(routeName)
+				if protocols, ok := websocketRoutes[routeName]; ok {
+					if !aimap.SupportsWebSocket(p.Name) {
+						if err := c.warn(
+							"model %q uses plugin %q, which does not support the ws and wss protocols. "+
+								"This plugin will be ignored on the WebSocket route %q.",
+							m.Name, p.Name, routeName); err != nil {
+							return err
+						}
+						continue
+					}
+					p.Protocols = protocols
+					guardPlugins = append(guardPlugins, p)
+					continue
+				}
 				if !fkScoped {
 					guardPlugins = append(guardPlugins, p)
 					continue
@@ -591,22 +665,49 @@ func (c *Converter) convertModels() error {
 
 		// Each route group contains only models with the same auth-strategy
 		// set, so these plugins can safely remain route-scoped.
-		idpPlugins, err := c.scopedAuthStrategyPlugins(m.Access.AuthStrategies)
+		idpPlugins, err := c.scopedAuthStrategyPlugins(fmt.Sprintf("model %q", m.Name), m.Access.AuthStrategies)
 		if err != nil {
 			return err
 		}
-		if len(idpPlugins) > 0 {
-			c.ensureAnonymousConsumer()
-		}
 		for _, routeName := range routeNames {
 			key := routeName + "\x00" + authStrategyKey(m.Access.AuthStrategies)
-			if identityPluginSeen[key] {
+			if identityPluginSeen[key] || len(idpPlugins) == 0 {
 				continue
 			}
 			identityPluginSeen[key] = true
+			protocols, websocket := websocketRoutes[routeName]
+			if websocket && len(idpPlugins) > 1 {
+				return c.failAt("access.auth_strategies",
+					"model %q: the WebSocket route %q supports only one auth strategy, because "+
+						"request-termination cannot reject the anonymous consumer on ws and wss routes",
+					m.Name, routeName)
+			}
+			if websocket {
+				// An auth plugin that can't run on ws/wss would otherwise leave the
+				// route unprotected (a plugin's protocols default to http/https, so
+				// it would simply never execute on a ws/wss-only route) or make the
+				// whole declarative config fail to load (an invalid protocols value
+				// on any one plugin rejects the entire file). Fail the conversion
+				// instead of choosing between those silently.
+				for _, p := range idpPlugins {
+					if !aimap.SupportsWebSocket(p.Name) {
+						return c.failAt("access.auth_strategies",
+							"model %q: auth strategy plugin %q does not support the ws and wss "+
+								"protocols, so it cannot protect the WebSocket route %q",
+							m.Name, p.Name, routeName)
+					}
+				}
+			}
+			if !websocket {
+				c.ensureAnonymousConsumer()
+			}
 			for k := range idpPlugins {
 				p := idpPlugins[k]
 				p.Route = kong.NewStringRef(routeName)
+				if websocket {
+					p = withoutAnonymousFallback(p)
+					p.Protocols = protocols
+				}
 				guardPlugins = append(guardPlugins, p)
 			}
 		}
@@ -618,9 +719,14 @@ func (c *Converter) convertModels() error {
 	}
 
 	service := kong.Service{Name: aimap.GatewayServiceName, URL: aimap.GatewayServiceURL}
+	websocketService := kong.Service{Name: aimap.GatewayWebSocketServiceName, URL: aimap.GatewayWebSocketServiceURL}
 	for _, key := range order {
 		g := groups[key]
-		service.Routes = append(service.Routes, g.route)
+		if g.websocket {
+			websocketService.Routes = append(websocketService.Routes, g.route)
+		} else {
+			service.Routes = append(service.Routes, g.route)
+		}
 
 		if selectorCfg := g.selectorConfig(useSources); selectorCfg != nil {
 			mappings := []kong.FieldMapping{
@@ -645,11 +751,20 @@ func (c *Converter) convertModels() error {
 		}
 		for _, pg := range g.proxies {
 			if len(pg.aliases) == 0 {
+				var protocols, tags []string
+				if g.websocket {
+					protocols = g.route.Protocols
+				}
+				if pg.realtimeModel != "" {
+					tags = []string{aimap.EncodeRealtimeModel(pg.realtimeModel)}
+				}
 				c.out.Plugins = append(c.out.Plugins, kong.Plugin{
 					Name:          "ai-proxy-advanced",
 					Enabled:       pg.enabled,
+					Protocols:     protocols,
 					Route:         kong.NewStringRef(pg.routeName),
 					Config:        pg.proxyConfig(),
+					Tags:          tags,
 					TargetSources: pg.targetSources,
 					Source:        pg.source,
 				})
@@ -746,7 +861,9 @@ func (c *Converter) convertModels() error {
 			plugins[i].Route = kong.NewStringRef(routeName)
 			c.out.Plugins = append(c.out.Plugins, plugins[i])
 		}
-		idpPlugins, err := c.scopedAuthStrategyPlugins(candidate.model.Access.AuthStrategies)
+		idpPlugins, err := c.scopedAuthStrategyPlugins(
+			fmt.Sprintf("model %q video lifecycle route", candidate.model.Name),
+			candidate.model.Access.AuthStrategies)
 		if err != nil {
 			return err
 		}
@@ -758,7 +875,11 @@ func (c *Converter) convertModels() error {
 			c.out.Plugins = append(c.out.Plugins, idpPlugins[i])
 		}
 	}
-	c.out.Services = append(c.out.Services, service)
+	for _, svc := range []kong.Service{service, websocketService} {
+		if len(svc.Routes) > 0 {
+			c.out.Services = append(c.out.Services, svc)
+		}
+	}
 	c.out.Plugins = append(c.out.Plugins, guardPlugins...)
 	return nil
 }
@@ -865,9 +986,30 @@ func buildVideoLifecycleRoute(rc aigw.ModelRouteConfig, routeName string, bases 
 		base = strings.TrimRight(base, "/")
 		paths = append(paths, base+"/videos")
 	}
-	route := buildModelRoute(rc, routeName, paths, []string{"GET", "DELETE"})
+	route := buildModelRoute(rc, routeName, paths, []string{"GET", "DELETE"}, false)
 	route.Tags = append(route.Tags, aimap.VideoLifecycleRouteTag)
 	return route
+}
+
+// warnTransportOverrides reports route methods and protocols of m that the
+// transport of route replaces.
+func (c *Converter) warnTransportOverrides(m *aigw.Model, route kong.Route) error {
+	rc := m.Config.Route
+	if len(rc.Methods) > 0 && len(route.Methods) == 0 {
+		if err := c.warn(
+			"model %q sets config.route.methods. This will be ignored on the WebSocket route %q, "+
+				"because Kong does not match methods on ws and wss routes.",
+			m.Name, route.Name); err != nil {
+			return err
+		}
+	}
+	if len(rc.Protocols) > 0 && !slices.Equal(rc.Protocols, route.Protocols) {
+		return c.warn(
+			"model %q sets config.route.protocols to %v. This will be overridden to %v on the %q route, "+
+				"because the route transport supports only these protocols.",
+			m.Name, rc.Protocols, route.Protocols, route.Name)
+	}
+	return nil
 }
 
 // modelRouteConfigKey returns a stable representation of the client-facing
@@ -946,6 +1088,10 @@ func (g *proxyGroup) proxyConfig() map[string]any {
 		cfg["proxy_config"] = g.proxy
 	}
 	return cfg
+}
+
+func loggingStatisticsSet(l *aigw.Logging) bool {
+	return l != nil && l.Statistics != nil && *l.Statistics
 }
 
 // modelLoggingBlock maps a model's AI Gateway logging into the per-target logging
@@ -1235,7 +1381,7 @@ func balancerAlgorithm(b *aigw.Balancer) string {
 
 // warnPassthroughPolicies reports the policies reaching a passthrough model -- its own and the
 // global ones -- that read the normalized LLM shape. They still load on the data plane, so this
-// is a warning rather than a rejection: the configuration is valid, those policies just cannot
+// is a warning rather than a rejection: the configuration is valid, those policies just may not
 // see what they look for.
 func (c *Converter) warnPassthroughPolicies(m *aigw.Model) error {
 	refs := slices.Clone(m.Policies)
@@ -1246,12 +1392,17 @@ func (c *Converter) warnPassthroughPolicies(m *aigw.Model) error {
 	}
 	for _, ref := range refs {
 		policy := c.policies[ref]
-		if policy == nil || !aimap.PromptReadingPolicies[policy.Type] {
+		if policy == nil {
+			continue
+		}
+		readsPrompt := aimap.PromptReadingPolicies[policy.Type] ||
+			policy.Type == "ai-sanitizer" && aimap.SanitizerAnonymizesCredentials(policy.Config)
+		if !readsPrompt {
 			continue
 		}
 		if err := c.warn(
-			"model %q uses the passthrough format, so policy %q (%s) cannot read the request or "+
-				"response: the body reaches the provider unchanged, in the provider's own shape",
+			"model %q uses the passthrough format, so policy %q (%s) may not work properly: "+
+				"the body reaches the provider unchanged, in the provider's own shape",
 			m.Name, ref, policy.Type); err != nil {
 			return err
 		}
@@ -1271,10 +1422,11 @@ func isPassthrough(m *aigw.Model) bool {
 // least aimap.DefaultMaxBodySize, raised to the model's own
 // max_request_body_size (destined for ai-proxy-advanced) only if that value
 // is larger, so the selector never reads less of the body than the proxy
-// itself is configured to accept.
+// itself is configured to accept. The plugin reads 0 as unlimited, so a
+// model value of 0 returns 0.
 func bodySizeOrDefault(m *aigw.Model) int {
-	if m.Config.MaxRequestBodySize != nil && *m.Config.MaxRequestBodySize > aimap.DefaultMaxBodySize {
-		return *m.Config.MaxRequestBodySize
+	if size := m.Config.MaxRequestBodySize; size != nil && (*size == 0 || *size > aimap.DefaultMaxBodySize) {
+		return *size
 	}
 	return aimap.DefaultMaxBodySize
 }

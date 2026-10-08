@@ -105,7 +105,7 @@ See `convert/testdata/*/input.yaml` for worked examples.
 |---|---|
 | Model | One **route per (provider endpoint, capability)** under a single shared `ai-gateway` Service, with the path derived from the model's `formats[0].type` (llm_format) + capability via the endpoint table. Each route gets an `ai-proxy-advanced` plugin (`route:` FK) — models that resolve to the same endpoint share one route, contributing one `targets[]` entry each. Body-model routes also get an `ai-model-selector` plugin. One `ai-models` entry (`name` + `alias`) is emitted per model — one per `config.route.model.values` entry when the model declares several aliases, each with its own `ai-proxy-advanced` (and policy/ACL) copy scoped to that alias, so requests naming any alias select the model. |
 | Provider | Not a standalone entity. Its `type` and `config.auth` populate each referencing target's `model.provider`, `model.options`, and `auth`. |
-| MCP Server | Service + Route + `ai-mcp-proxy` (`config.mode` = source type). Server ACLs / per-tool ACLs are written into the plugin config (`default_acl`, `tools[].acl`), not Kong `acl` plugins. `access.auth_strategies` + `access.metadata` (openid-connect) add an `ai-mcp-oauth2` plugin and append `metadata.endpoint` to the route (listener / conversion-listener / passthrough-listener only); a `key-auth` strategy adds a `key-auth` plugin (and is rejected if `metadata` is set). `config.upstream.auth` (AWS SigV4) and the top-level `token_vault` lower to the plugin's `auth` record (mutually exclusive). A `conversion-only` server serves no MCP traffic of its own and cannot declare `access` itself, so each listener that names it in `config.sources` copies its own access plugin onto the source's route (first listener wins, with a warning on conflict; stripped again on revert, where leaving it would produce an unconvertible document). A `conversion-only` server that no listener names is dropped entirely, with a warning: it reaches no client and would publish an endpoint with no access on it. `key-auth` access on an MCP server is always emitted with `hide_credentials: false`, so the client's key survives onto the internal request `ai-mcp-proxy` issues when executing a tool. |
+| MCP Server | Service + Route + `ai-mcp-proxy` (`config.mode` = source type). Server ACLs / per-tool ACLs are written into the plugin config (`default_acl`, `tools[].acl`), not Kong `acl` plugins. `access.auth_strategies` + `access.metadata` (openid-connect) add an `ai-mcp-oauth2` plugin and append `metadata.endpoint` to the route (listener / conversion-listener / passthrough-listener only); a `key-auth` strategy adds a `key-auth` plugin (and is rejected if `metadata` is set). `config.upstream.auth` (AWS SigV4) and the top-level `token_vault` lower to the plugin's `auth` record (mutually exclusive). A `conversion-only` server serves no MCP traffic of its own and cannot declare `access` itself, so its route gets a `pre-function` gate (tagged `aigw-generated:mcp-toolset-gate`) that answers 404 to any request not arriving over the unix socket `ai-mcp-proxy` re-enters Kong through to execute a listener's tool call: its tools are reachable only through the listeners that name it in `config.sources`, on their access terms. The gate is dropped again on revert. A `conversion-only` server that no listener names is dropped entirely, with a warning: it reaches no client. `key-auth` access on an MCP server is always emitted with `hide_credentials: false`, so the client's key survives onto the internal request `ai-mcp-proxy` issues when executing a tool. |
 | Agent (`a2a`) | Service (`config.url`) + Route + `ai-a2a-proxy` plugin (logging). `config.upstream.auth` (AWS SigV4) lowers to the plugin's `auth` record, and `config.proxy` to `proxy_config`. |
 | Agent (`http`) | Service (`config.url`) + Route, no AI plugin. |
 | Policy | Kong plugin (`name` = policy `type`, config passed through). `global: true` -> one top-level plugin; otherwise instantiated per referencing entity. |
@@ -129,15 +129,20 @@ A model's `capabilities` choose which routes are created. The mapping (path,
 methods, `route_type`, `genai_category`) is defined per provider section in
 `convert/endpoints.go`, derived from `ref/supported-endpoints.md`. Loose
 spellings are normalized (`chat`→`generate`, `batch`→`batches`); bare `audio`
-fans out to speech/transcription/translation. Native formats (bedrock, gemini,
-vertex) emit regex routes (`~/ai/...`); capabilities that share an upstream
+fans out to speech/transcription/translation. Native formats (bedrock, gemini)
+emit regex routes (`~/ai/...`); capabilities that share an upstream
 endpoint (e.g. bedrock embeddings/image/audio/video → `/invoke`) collapse into
 one route with multiple targets.
 
 Most capabilities map to a single canonical endpoint, but a few are reachable
 through more than one and get a route per endpoint: bedrock `generate` emits
 both `bedrock-converse` (Converse) and `bedrock-invoke` (InvokeModel), each
-carrying the model's target(s). These extra endpoints live in the capability's
+carrying the model's target(s). Likewise every gemini capability is served on
+both its Gemini API path and its Gemini Enterprise path (e.g. `gemini-generate`
+and `gemini-enterprise-generate`), whichever provider type serves it; the Gemini
+Enterprise-only
+image (`:predict`), video (`:predictLongRunning`) and rerank (`:rank`)
+capabilities are available to gemini-format models too. These extra endpoints live in the capability's
 own `internal/aimap.EndpointTable` entry, as `EndpointEntry.Secondary`
 alongside the canonical `Primary` spec — read both together via
 `aimap.EndpointsFor` / `aimap.SectionEndpoints` — never look up a capability's
@@ -200,6 +205,21 @@ and `formats` beyond the first.
 - **Shared gateway Service.** All model routes nest under one `ai-gateway`
   Service with the nominal url `http://ai-gateway.upstream.local`;
   `ai-proxy-advanced` overrides the real upstream per target.
+- **Realtime routes use WebSocket.** Kong selects its WebSocket proxy path from
+  the Service protocol, so `realtime` routes nest under a second
+  `ai-gateway-websocket` Service (`ws://ai-gateway.upstream.local`). They use
+  `ws`/`wss` (an authored `http`/`https` maps to `ws`/`wss`) and no methods,
+  and each model gets its own realtime route. `ai-model-selector` does not run
+  on WebSocket, so the realtime route's `ai-proxy-advanced`, policy, ACL, and
+  auth-strategy plugins are route-scoped and carry the route's `protocols`, and
+  its targets carry no `model_alias`. Policy plugins whose schema rejects
+  `ws`/`wss` (every AI policy plugin, such as `ai-prompt-guard`) are left off
+  the realtime route with a warning; they still apply to the model's HTTP
+  routes. The anonymous consumer's `request-termination` cannot run on
+  WebSocket either, so a realtime auth plugin has no `anonymous` fallback, a
+  model with more than one auth strategy cannot declare `realtime`, and an
+  auth strategy whose plugin type rejects `ws`/`wss` (e.g. `jwt`) fails the
+  conversion rather than silently leaving the route unprotected.
 - **Mostly one endpoint per capability.** Each (section, capability) maps to an
   `aimap.EndpointEntry` with a primary canonical endpoint, plus any secondaries
   in its `Secondary` field (currently just bedrock `generate`, also served by
@@ -275,10 +295,13 @@ and `formats` beyond the first.
   another passthrough model, be combined with another format, or use the
   `semantic` balancer; a databricks target needs `upstream_url`. All are
   conversion errors. Policies that read the normalized LLM shape (guardrails,
-  prompt decorators/templates, semantic cache, RAG injector, …) produce a
-  warning when attached to the model or global; raw-byte ones
-  (`ai-request-transformer`, `ai-response-transformer`, `ai-sanitizer`) and
-  consumer/consumer-group policies are not checked. Revert recovers the model
+  prompt decorators/templates/compressor, RAG injector, semantic cache,
+  LLM-as-judge, and `ai-sanitizer` when `anonymize` includes credentials,
+  which is its default) produce a
+  warning when attached to the model or global; other AI policies work on raw
+  bytes, and consumer/consumer-group policies are not checked. A target whose
+  provider has no native `llm_format` (azure, mistral, sagemaker, …) also
+  warns: usage and cost extraction may find nothing. Revert recovers the model
   with no `capabilities`.
 
 ## Community

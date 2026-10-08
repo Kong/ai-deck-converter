@@ -6,6 +6,7 @@
 package aimap
 
 import (
+	"slices"
 	"sort"
 	"strings"
 )
@@ -72,6 +73,14 @@ const (
 	// video operations. It is not a source AI Gateway route and is ignored by
 	// the reverse converter.
 	VideoLifecycleRouteTag = "aigw:video-lifecycle"
+
+	// GatewayWebSocketServiceName names the Service for realtime routes.
+	// Kong selects the WebSocket proxy path from the Service protocol.
+	GatewayWebSocketServiceName = "ai-gateway-websocket"
+	GatewayWebSocketServiceURL  = "ws://ai-gateway.upstream.local"
+
+	// RealtimeRouteType is the route_type of the WebSocket realtime endpoint.
+	RealtimeRouteType = "realtime/v1/realtime"
 )
 
 var (
@@ -80,18 +89,20 @@ var (
 	mGetPostDelete = []string{"GET", "POST", "DELETE"}
 )
 
+// IsWebSocketEndpoint reports whether spec serves WebSocket traffic.
+// Kong rejects methods on its routes. ai-model-selector does not run on it.
+func IsWebSocketEndpoint(spec EndpointSpec) bool {
+	return spec.RouteType == RealtimeRouteType
+}
+
 // SectionFor selects the endpoint section from the model's llm_format (the
 // client-facing wire format that determines the request paths). The provider
-// type matters in two cases: gemini-format traffic served by Vertex, which
-// uses Vertex's project/location URL templates instead of Gemini's, and
-// passthrough, which has no client format of its own (see ClientFormat).
+// type only matters for passthrough, which has no client format of its own
+// (see ClientFormat). Gemini-format traffic served by a vertex provider uses
+// the gemini section, which carries Gemini Enterprise's project/location URL
+// templates as well.
 func SectionFor(format, providerType string) string {
-	format = ClientFormat(format, providerType)
-	if format == "gemini" && providerType == "vertex" {
-		return "vertex"
-	}
-
-	return format
+	return ClientFormat(format, providerType)
 }
 
 // ClientFormat returns the client-facing wire format a model renders as, which
@@ -106,7 +117,7 @@ func ClientFormat(format, providerType string) string {
 	format = NormalizeFormat(format)
 	if format == PassthroughFormat {
 		format = NormalizeFormat(providerType)
-		if _, served := EndpointTable[format]; !served {
+		if !HasNativeFormat(providerType) {
 			// Providers that speak no section of their own (azure, mistral,
 			// databricks, ...) all expose OpenAI-shaped APIs.
 			format = DefaultLLMFormat
@@ -119,34 +130,38 @@ func ClientFormat(format, providerType string) string {
 	return format
 }
 
-// NormalizeFormat maps a provider-rendering section named directly as a
-// model's format (e.g. "vertex") to its base client-facing wire format
-// ("gemini"). Vertex serves the same Gemini request/response shape, so a
-// model that names its format "vertex" is equivalent to one that names
-// "gemini" and is served by a vertex provider; keeping both spellings
-// working here means llm_format/routing never fork on which one was used.
+// HasNativeFormat reports whether a provider type speaks a wire format of its own, i.e. has a
+// matching llm_format. Passthrough extracts usage with that format's adapter; any other provider
+// falls back to OpenAI-shaped extraction, which may find nothing.
+func HasNativeFormat(providerType string) bool {
+	_, served := EndpointTable[NormalizeFormat(providerType)]
+	return served
+}
+
+// NormalizeFormat maps a provider name used directly as a model's format
+// (e.g. "vertex") to its base client-facing wire format ("gemini"). Vertex
+// serves the same Gemini request/response shape, so a model that names its
+// format "vertex" is equivalent to one that names "gemini"; keeping both
+// spellings working here means llm_format/routing never fork on which one
+// was used.
 func NormalizeFormat(format string) string {
-	if base, ok := renderingSections[format]; ok {
+	if base, ok := formatAliases[format]; ok {
 		return base
 	}
 	return format
 }
 
-// renderingSections are EndpointTable sections that are provider-specific renderings of a client
-// format rather than formats in their own right: SectionFor routes some (format, providerType)
-// pairs to them (the gemini format served by Vertex -> "vertex"). Each maps to its base format.
-// They are excluded from Formats and folded into their base format's capabilities. Keep in step
-// with SectionFor's special cases.
-var renderingSections = map[string]string{
+// formatAliases are provider names accepted as a model's format that are not formats in their
+// own right. Each maps to its base format. They are excluded from Formats.
+var formatAliases = map[string]string{
 	"vertex": "gemini",
 }
 
 // PromptReadingPolicies are the AI policies that parse the request or response into the
-// normalized LLM shape before acting on it, so they cannot do their job for a passthrough model:
-// the body reaches the provider exactly as the client sent it, in whatever shape that provider
-// speaks. The AI policies absent from this set are the ones that already work on raw bytes
-// (ai-request-transformer, ai-response-transformer, ai-sanitizer), which passthrough leaves
-// intact.
+// normalized LLM shape before acting on it, so they may not work properly for a passthrough
+// model: the body reaches the provider exactly as the client sent it, in whatever shape that
+// provider speaks. ai-sanitizer belongs here only when it anonymizes credentials (see
+// SanitizerAnonymizesCredentials); the other AI policies work on raw bytes.
 var PromptReadingPolicies = map[string]bool{
 	"ai-aws-guardrails":          true,
 	"ai-azure-content-safety":    true,
@@ -165,6 +180,28 @@ var PromptReadingPolicies = map[string]bool{
 	"ai-semantic-response-guard": true,
 }
 
+// SanitizerAnonymizesCredentials reports whether an ai-sanitizer config anonymizes credentials,
+// the one sanitizer mode that needs the normalized LLM shape. An unset anonymize defaults to
+// all_and_credentials on the data plane. A list holding "all" as well is still reported: the data
+// plane collapsing it to "all" is a bug tracked in KOKO-4587.
+func SanitizerAnonymizesCredentials(cfg map[string]any) bool {
+	var types []string
+	switch v := cfg["anonymize"].(type) {
+	case []string:
+		types = v
+	case []any:
+		for _, t := range v {
+			if s, ok := t.(string); ok {
+				types = append(types, s)
+			}
+		}
+	}
+	if len(types) == 0 {
+		return true
+	}
+	return slices.Contains(types, "all_and_credentials") || slices.Contains(types, "credentials")
+}
+
 // PassthroughEndpoint is the one route a PassthroughFormat model serves. Capabilities do not
 // apply to it: every request under the model's base path is forwarded as it stands, whatever
 // endpoint it names, so the route matches the base path itself on every method.
@@ -175,38 +212,12 @@ var PassthroughEndpoint = EndpointSpec{
 	SupportsLogStatistics: true,
 }
 
-// EndpointSectionFor selects the EndpointTable section that serves a single
-// capability's route. It starts from SectionFor (which keeps a provider-specific
-// rendering like Vertex distinct so capability enumeration is accurate) but, for
-// such a rendering, prefers the base client format's section for any capability
-// that format already serves. So gemini-format traffic served by Vertex renders
-// generate/embeddings on Gemini's client paths (a Vertex backend is still
-// reached via the gcp options and the gemini provider enum), while Vertex's
-// exclusive image/video/rerank endpoints keep the Vertex project/location paths.
-func EndpointSectionFor(format, providerType, capability string) string {
-	sec := SectionFor(format, providerType)
-	if base, ok := renderingSections[sec]; ok {
-		// Only fall back when the rendering section supports this capability too,
-		// otherwise we may accidentally enable base-only capabilities (e.g. files).
-		if _, ok := LookupEndpoint(sec, capability); ok {
-			if _, ok := LookupEndpoint(base, capability); ok {
-				return base
-			}
-		}
-	}
-	return sec
-}
-
 // Formats returns the client-facing wire formats a model may declare (the valid Format.Type
-// values), sorted. Provider-rendering sections such as "vertex" are EndpointTable keys but not
-// formats, so they are excluded; PassthroughFormat is a valid format that is not a section, so it
-// is added.
+// values), sorted: every EndpointTable section, plus PassthroughFormat, a valid format that is
+// not a section. Format aliases such as "vertex" are not listed.
 func Formats() []string {
 	out := make([]string, 0, len(EndpointTable)+1)
 	for section := range EndpointTable {
-		if _, rendering := renderingSections[section]; rendering {
-			continue
-		}
 		out = append(out, section)
 	}
 	out = append(out, PassthroughFormat)
@@ -228,13 +239,11 @@ func RequiresNativeFormat(capability string) bool { return nativeFormatCapabilit
 
 // CapabilitiesFor returns the capabilities a model of the given client format may declare when
 // served by the given provider type, resolved through the same section routing the converter uses
-// (SectionFor) — so the gemini format served by Vertex reports the Vertex-only image, video, and
-// rerank capabilities, while served by Gemini it does not, and a passthrough-only capability is
-// left out unless the provider renders the model's own format. "generate" is listed first when
-// present, the rest sorted. An unknown format, or a rendering section passed as a format, yields
-// nil — keeping parity with Formats, which excludes those sections.
+// (SectionFor). A passthrough-only capability is left out unless the provider renders the model's
+// own format. "generate" is listed first when present, the rest sorted. An unknown format, or a
+// format alias, yields nil — keeping parity with Formats, which excludes those aliases.
 func CapabilitiesFor(format, providerType string) []string {
-	if _, rendering := renderingSections[format]; rendering {
+	if _, alias := formatAliases[format]; alias {
 		return nil
 	}
 	section := SectionFor(format, providerType)
@@ -309,10 +318,16 @@ var bedrockInvokeChatSpec = EndpointSpec{
 	true, mGetPost, "llm/v1/chat", catTextGen, &bedrockPathModelSelectorConfig, true,
 }
 
+// Gemini Enterprise URL templates the gemini section's Gemini Enterprise endpoints build on.
+const (
+	geminiEnterpriseLocPath   = "v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)"
+	geminiEnterpriseModelPath = geminiEnterpriseLocPath + "/publishers/(?<publisher>[^/]+)/models/(?<model_name>[^:/]+)"
+)
+
 // EndpointTable maps section -> capability -> EndpointEntry, derived from
-// ref/supported-endpoints.md and the reference kong.yaml examples. Almost
-// every entry sets only Primary; Secondary is for the rare capability served
-// by more than one endpoint (bedrock "generate").
+// ref/supported-endpoints.md and the reference kong.yaml examples. Most
+// entries set only Primary; Secondary is for capabilities served by more
+// than one endpoint (bedrock "generate", gemini's enterprise endpoints).
 var EndpointTable = map[string]map[string]EndpointEntry{
 	"openai": {
 		"generate": {
@@ -329,8 +344,8 @@ var EndpointTable = map[string]map[string]EndpointEntry{
 		},
 		"realtime": {
 			Primary: EndpointSpec{
-				"realtime", "/realtime", false, mGetPost, "realtime/v1/realtime", catRealtime,
-				&defaultBodyModelSelectorConfig, true,
+				"realtime", "/realtime", false, nil, RealtimeRouteType, catRealtime,
+				nil, true,
 			},
 		},
 		"embeddings": {
@@ -456,73 +471,58 @@ var EndpointTable = map[string]map[string]EndpointEntry{
 			},
 		},
 	},
+	// The gemini section serves both the Gemini Standard API and Gemini Enterprise AI: every
+	// capability either API offers is listed, with the Gemini Enterprise endpoint as a
+	// Secondary spec where both do. Gemini Enterprise specs carry their own route labels
+	// so the two path shapes never collapse into one route.
 	"gemini": {
 		"generate": {
 			Primary: EndpointSpec{
 				"generate", "v1beta/models/(?<model_name>[^:/]+):(?:generateContent|streamGenerateContent)",
 				true, mGetPost, "llm/v1/chat", catTextGen, &geminiPathModelSelectorConfig, true,
 			},
+			Secondary: []EndpointSpec{{
+				"enterprise-generate", geminiEnterpriseModelPath + ":(?:generateContent|streamGenerateContent)",
+				true, mGetPost, "llm/v1/chat", catTextGen, &geminiPathModelSelectorConfig, true,
+			}},
 		},
 		"embeddings": {
 			Primary: EndpointSpec{
 				"embeddings", "v1beta/models/(?<model_name>[^:/]+):(?:embedContent|batchEmbedContents)",
 				true, mGetPost, "llm/v1/embeddings", catEmbeddings, &geminiPathModelSelectorConfig, true,
 			},
-		},
-		"batches": {
-			Primary: EndpointSpec{"batches", "/v1beta/batches", false, mGetPost, "llm/v1/batches", catTextGen, nil, true},
-		},
-		"files": {
-			Primary: EndpointSpec{"files", "(?:upload/)?v1beta/files", true, mGetPost, "llm/v1/chat", catTextGen, nil, true},
-		},
-	},
-	"vertex": {
-		"generate": {
-			Primary: EndpointSpec{
-				"generate",
-				"v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/google/models/" +
-					"(?<model_name>[^:/]+):(?:generateContent|streamGenerateContent)",
-				true, mGetPost, "llm/v1/chat", catTextGen, &geminiPathModelSelectorConfig, true,
-			},
-		},
-		"embeddings": {
-			Primary: EndpointSpec{
-				"embeddings",
-				"v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/google/models/" +
-					"(?<model_name>[^:/]+):(?:embedContent|batchEmbedContents)",
+			Secondary: []EndpointSpec{{
+				"enterprise-embeddings", geminiEnterpriseModelPath + ":embedContent",
 				true, mGetPost, "llm/v1/embeddings", catEmbeddings, &geminiPathModelSelectorConfig, true,
-			},
+			}},
 		},
 		"image": {
 			Primary: EndpointSpec{
-				"predict-long-running",
-				"v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/google/models/" +
-					"(?<model_name>[^:/]+):predictLongRunning",
+				"predict", geminiEnterpriseModelPath + ":predict",
 				true, mGetPost, "image/v1/images/generations", catImage, &geminiPathModelSelectorConfig, true,
 			},
 		},
 		"video": {
 			Primary: EndpointSpec{
-				"predict-long-running",
-				"v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/google/models/" +
-					"(?<model_name>[^:/]+):predictLongRunning",
+				"predict-long-running", geminiEnterpriseModelPath + ":predictLongRunning",
 				true, mGetPost, "video/v1/videos/generations", catVideo, &geminiPathModelSelectorConfig, true,
 			},
 		},
 		"rerank": {
 			Primary: EndpointSpec{
-				"ranking",
-				"v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/rankingConfigs/" +
-					"(?<ranking_config>[^:/]+):rank",
+				"ranking", geminiEnterpriseLocPath + "/rankingConfigs/(?<config_name>[^:/]+):rank",
 				true, mGetPost, "llm/v1/chat", catTextGen, nil, true,
 			},
 		},
 		"batches": {
-			Primary: EndpointSpec{
-				"batches",
-				"v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/batchPredictionJobs",
+			Primary: EndpointSpec{"batches", "/v1beta/batches", false, mGetPost, "llm/v1/batches", catTextGen, nil, true},
+			Secondary: []EndpointSpec{{
+				"enterprise-batches", geminiEnterpriseLocPath + "/batchPredictionJobs",
 				true, mGetPost, "llm/v1/batches", catTextGen, nil, true,
-			},
+			}},
+		},
+		"files": {
+			Primary: EndpointSpec{"files", "(?:upload/)?v1beta/files", true, mGetPost, "llm/v1/chat", catTextGen, nil, true},
 		},
 	},
 	"cohere": {
@@ -535,7 +535,7 @@ var EndpointTable = map[string]map[string]EndpointEntry{
 	"huggingface": {
 		"generate": {
 			Primary: EndpointSpec{
-				"generate", "/generate", false, mPost, "llm/v1/chat", catTextGen, &defaultBodyModelSelectorConfig, true,
+				"generate", "/v1/chat/completions", false, mPost, "llm/v1/chat", catTextGen, &defaultBodyModelSelectorConfig, true,
 			},
 		},
 	},
@@ -570,6 +570,7 @@ func EndpointsFor(section, capability string) (specs []EndpointSpec, ok bool) {
 type CapabilityEndpoint struct {
 	Capability string
 	Spec       EndpointSpec
+	Secondary  bool // Spec is one of the entry's Secondary specs, not its Primary
 }
 
 // SectionEndpoints returns every (capability, spec) pair served in a section —
@@ -580,9 +581,9 @@ func SectionEndpoints(section string) []CapabilityEndpoint {
 	entries := EndpointTable[section]
 	out := make([]CapabilityEndpoint, 0, len(entries))
 	for capability, entry := range entries {
-		out = append(out, CapabilityEndpoint{capability, entry.Primary})
+		out = append(out, CapabilityEndpoint{capability, entry.Primary, false})
 		for _, spec := range entry.Secondary {
-			out = append(out, CapabilityEndpoint{capability, spec})
+			out = append(out, CapabilityEndpoint{capability, spec, true})
 		}
 	}
 	return out

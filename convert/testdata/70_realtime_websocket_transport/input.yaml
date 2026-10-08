@@ -1,0 +1,58 @@
+models:
+  # One route config feeds both transports. The chat route stays on the HTTP
+  # Service. The realtime route moves to the WebSocket Service.
+  # Its plugins are route-scoped with ws protocols.
+  - type: model
+    name: mixed-realtime
+    capabilities: [generate, realtime]
+    formats: [{type: openai}]
+    targets:
+      - name: gpt-realtime
+        provider: openai-main
+        config: {type: openai}
+    policies: [audit-log]
+    access:
+      acls:
+        allow: [premium-users]
+      auth_strategies: [okta-oidc]
+    config:
+      route:
+        paths: [/mixed]
+        model:
+          values: [mixed-realtime, mixed-realtime-alias]
+
+  # A realtime-only model gets its own WebSocket route. Revert recovers its
+  # second alias from the ai_models alias group.
+  - type: model
+    name: realtime-only
+    capabilities: [realtime]
+    formats: [{type: openai}]
+    targets:
+      - name: gpt-realtime-mini
+        provider: openai-main
+        config: {type: openai}
+    config:
+      route:
+        paths: [/realtime-only]
+        model:
+          values: [realtime-only, realtime-only-alias]
+
+model_providers:
+  - type: openai
+    name: openai-main
+    config:
+      auth:
+        type: basic
+        headers: [{name: Authorization, value: "{vault://env/openai-key}"}]
+
+policies:
+  - type: http-log
+    name: audit-log
+    config:
+      http_endpoint: https://logs.example.com/ingest
+
+auth_strategies:
+  - name: okta-oidc
+    type: openid-connect
+    config:
+      issuer: https://dev-123456.okta.com/oauth2/default

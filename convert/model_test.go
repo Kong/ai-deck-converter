@@ -4,7 +4,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/Kong/ai-deck-converter/internal/aigw"
 	"github.com/Kong/ai-deck-converter/internal/aimap"
+	"github.com/Kong/ai-deck-converter/internal/kong"
 	"github.com/stretchr/testify/require"
 )
 
@@ -167,7 +169,7 @@ models:
     capabilities: [generate]
     formats: [{type: passthrough}]
     config: {route: {paths: [/ai]}}
-    policies: [guard, transform, logs]
+    policies: [guard, transform, logs, cache]
     targets:
       - name: gpt-a
         provider: p
@@ -176,7 +178,8 @@ policies:
   - {name: guard, type: ai-prompt-guard, config: {allow_patterns: ["^safe"]}}
   - {name: transform, type: ai-request-transformer, config: {prompt: rewrite}}
   - {name: logs, type: http-log, config: {http_endpoint: "https://logs.internal/x"}}
-  - {name: cache, type: ai-semantic-cache, global: true, config: {}}
+  - {name: cache, type: ai-semantic-cache, config: {}}
+  - {name: lakera, type: ai-lakera-guard, global: true, config: {}}
 `+passthroughProviders), Options{})
 	require.NoError(t, err)
 
@@ -191,9 +194,86 @@ policies:
 
 	// Only the policies that read the normalized shape are reported: one that works on raw
 	// bytes and one that never looks at the body are both fine as they are.
-	require.Len(t, warnings, 2)
-	require.Contains(t, warnings[0], `policy "guard" (ai-prompt-guard) cannot read the request`)
-	require.Contains(t, warnings[1], `policy "cache" (ai-semantic-cache) cannot read the request`)
+	require.Len(t, warnings, 3)
+	require.Contains(t, warnings[0], `policy "guard" (ai-prompt-guard) may not work properly`)
+	require.Contains(t, warnings[1], `policy "cache" (ai-semantic-cache) may not work properly`)
+	require.Contains(t, warnings[2], `policy "lakera" (ai-lakera-guard) may not work properly`)
+}
+
+// TestPassthroughWarnsAboutSanitizerOnlyWhenItAnonymizesCredentials pins that ai-sanitizer is
+// reported only when the anonymize list the data plane ends up with includes credentials.
+func TestPassthroughWarnsAboutSanitizerOnlyWhenItAnonymizesCredentials(t *testing.T) {
+	for anonymize, warns := range map[string]bool{
+		"":                                      true, // the data plane defaults to all_and_credentials
+		"anonymize: null":                       true,
+		"anonymize: [all_and_credentials]":      true,
+		"anonymize: [phone, credentials]":       true,
+		"anonymize: [phone, email]":             false,
+		"anonymize: [all]":                      false,
+		"anonymize: [all, all_and_credentials]": true,
+		"anonymize: [all, credentials]":         true,
+	} {
+		_, warnings, err := Convert([]byte(`
+models:
+  - name: pt
+    formats: [{type: passthrough}]
+    config: {route: {paths: [/ai]}}
+    policies: [san]
+    targets: [{name: t, provider: p, config: {type: openai}}]
+policies:
+  - name: san
+    type: ai-sanitizer
+    config: {`+anonymize+`}
+`+passthroughProviders), Options{})
+		require.NoError(t, err, anonymize)
+		if warns {
+			require.Len(t, warnings, 1, anonymize)
+			require.Contains(t, warnings[0], `policy "san" (ai-sanitizer) may not work properly`, anonymize)
+		} else {
+			require.Empty(t, warnings, anonymize)
+		}
+	}
+}
+
+// TestPassthroughWarnsAboutProvidersWithoutNativeFormat pins that a passthrough target whose
+// provider has no llm_format of its own is reported, since usage extraction may find nothing.
+func TestPassthroughWarnsAboutProvidersWithoutNativeFormat(t *testing.T) {
+	for providerType, warns := range map[string]bool{
+		"openai":      false,
+		"anthropic":   false,
+		"bedrock":     false,
+		"cohere":      false,
+		"gemini":      false,
+		"vertex":      false,
+		"huggingface": false,
+		"azure":       true,
+		"mistral":     true,
+		"sagemaker":   true,
+	} {
+		_, warnings, err := Convert([]byte(`
+models:
+  - name: pt
+    formats: [{type: passthrough}]
+    config: {route: {paths: [/ai]}}
+    targets: [{name: t, provider: p, config: {type: `+providerType+`}}]
+`+passthroughProviders), Options{})
+		require.NoError(t, err, providerType)
+		if warns {
+			require.Len(t, warnings, 1, providerType)
+			require.Contains(t, warnings[0], `provider type "`+providerType+`" has no native llm_format`)
+		} else {
+			require.Empty(t, warnings, providerType)
+		}
+	}
+
+	_, _, err := Convert([]byte(`
+models:
+  - name: pt
+    formats: [{type: passthrough}]
+    config: {route: {paths: [/ai]}}
+    targets: [{name: t, provider: p, config: {type: azure}}]
+`+passthroughProviders), Options{Strict: true})
+	require.ErrorContains(t, err, "has no native llm_format")
 }
 
 // TestPassthroughAllowsHostDisambiguatedModels pins that two passthrough models on one base
@@ -212,4 +292,304 @@ func TestPassthroughAllowsHostDisambiguatedModels(t *testing.T) {
       - {name: v, provider: p, config: {type: vertex}}
 `+passthroughProviders), Options{})
 	require.NoError(t, err)
+}
+
+const overrideProvider = `
+model_providers:
+  - name: openai-prod
+    type: openai
+    config:
+      auth: {type: basic, headers: [{name: Authorization, value: x}]}
+`
+
+func TestModelWarnsRouteNameOverride(t *testing.T) {
+	src := `models:
+  - name: m
+    capabilities: [generate, embeddings]
+    config: {route: {name: custom, paths: [/ai]}}
+    targets: [{name: t, provider: openai-prod, config: {type: openai}}]
+` + overrideProvider
+	_, warnings, err := Convert([]byte(src), Options{})
+	require.NoError(t, err)
+	require.Len(t, warnings, 1)
+	require.Contains(t, warnings[0], `sets config.route.name to "custom"`)
+
+	_, _, err = Convert([]byte(src), Options{Strict: true})
+	require.Error(t, err)
+}
+
+func TestModelWarnsLogStatisticsOverride(t *testing.T) {
+	src := `models:
+  - name: m
+    capabilities: [generate, audio]
+    config:
+      route: {paths: [/ai]}
+      logging: {statistics: true}
+    targets: [{name: t, provider: openai-prod, config: {type: openai}}]
+` + overrideProvider
+	out, warnings, err := Convert([]byte(src), Options{})
+	require.NoError(t, err)
+	require.Len(t, warnings, 3, "one warning per affected route")
+	for i, route := range []string{"openai-audio-speech", "openai-audio-transcribe", "openai-audio-translate"} {
+		require.Contains(t, warnings[i], `ignored on the "`+route+`" route`)
+		require.Contains(t, warnings[i], "log_statistics will be overridden to false")
+	}
+	require.Contains(t, string(out), "log_statistics: true", "chat route keeps the user value")
+
+	_, _, err = Convert([]byte(src), Options{Strict: true})
+	require.Error(t, err)
+}
+
+func TestModelDoesNotWarnLogStatisticsWhenSupportedOrUnset(t *testing.T) {
+	for name, src := range map[string]string{
+		"supported": `models:
+  - name: m
+    capabilities: [generate]
+    config: {route: {paths: [/ai]}, logging: {statistics: true}}
+    targets: [{name: t, provider: openai-prod, config: {type: openai}}]
+`,
+		"defaulted": `models:
+  - name: m
+    capabilities: [audio]
+    config: {route: {paths: [/ai]}}
+    targets: [{name: t, provider: openai-prod, config: {type: openai}}]
+`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, warnings, err := Convert([]byte(src+overrideProvider), Options{Strict: true})
+			require.NoError(t, err)
+			require.Empty(t, warnings)
+		})
+	}
+}
+
+func convertRealtimeDocument(t *testing.T, src string) (*kong.Document, []string) {
+	t.Helper()
+	input, err := aigw.Parse([]byte(src))
+	require.NoError(t, err)
+	doc, warnings, err := ConvertDocument(input, Options{})
+	require.NoError(t, err)
+	return doc, warnings
+}
+
+func routeByName(t *testing.T, doc *kong.Document, name string) (kong.Service, kong.Route) {
+	t.Helper()
+	for _, svc := range doc.Services {
+		for _, route := range svc.Routes {
+			if route.Name == name {
+				return svc, route
+			}
+		}
+	}
+	t.Fatalf("route %q not found", name)
+	return kong.Service{}, kong.Route{}
+}
+
+func pluginsOnRoute(doc *kong.Document, route string) []kong.Plugin {
+	var out []kong.Plugin
+	for _, p := range doc.Plugins {
+		if p.Route != nil && string(*p.Route) == route {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+func TestRealtimeRouteUsesWebSocketTransport(t *testing.T) {
+	src := `models:
+  - name: m
+    capabilities: [generate, realtime]
+    config:
+      route:
+        paths: [/ai]
+        methods: [GET, POST]
+        protocols: [https, wss]
+    targets: [{name: t, provider: openai-prod, config: {type: openai}}]
+` + overrideProvider
+	doc, warnings := convertRealtimeDocument(t, src)
+
+	httpService, chat := routeByName(t, doc, "openai-chat")
+	require.Equal(t, aimap.GatewayServiceName, httpService.Name)
+	require.Equal(t, []string{"GET", "POST"}, chat.Methods)
+	require.Equal(t, []string{"https"}, chat.Protocols, "wss maps to its HTTP counterpart")
+
+	wsService, realtime := routeByName(t, doc, "openai-realtime")
+	require.Equal(t, aimap.GatewayWebSocketServiceName, wsService.Name)
+	require.Equal(t, aimap.GatewayWebSocketServiceURL, wsService.URL)
+	require.Nil(t, realtime.Methods)
+	require.Equal(t, []string{"wss"}, realtime.Protocols, "https maps to its WebSocket counterpart")
+
+	plugins := pluginsOnRoute(doc, "openai-realtime")
+	require.Len(t, plugins, 1, "no ai-model-selector on the WebSocket route")
+	require.Equal(t, "ai-proxy-advanced", plugins[0].Name)
+	require.Nil(t, plugins[0].Model)
+	require.Equal(t, []string{"wss"}, plugins[0].Protocols)
+
+	require.Len(t, warnings, 3)
+	require.Contains(t, warnings[0], `overridden to [https] on the "openai-chat" route`)
+	require.Contains(t, warnings[1], `ignored on the WebSocket route "openai-realtime"`)
+	require.Contains(t, warnings[2], `overridden to [wss] on the "openai-realtime" route`)
+
+	input, err := aigw.Parse([]byte(src))
+	require.NoError(t, err)
+	_, _, err = ConvertDocument(input, Options{Strict: true})
+	require.Error(t, err)
+}
+
+func TestRealtimeRoutesAreNotSharedBetweenModels(t *testing.T) {
+	doc, warnings := convertRealtimeDocument(t, `models:
+  - name: a
+    capabilities: [realtime]
+    targets: [{name: t, provider: openai-prod, config: {type: openai}}]
+  - name: b
+    capabilities: [realtime]
+    targets: [{name: t, provider: openai-prod, config: {type: openai}}]
+`+overrideProvider)
+	require.Empty(t, warnings)
+	require.Len(t, doc.Services, 1, "no HTTP Service without HTTP routes")
+	require.Equal(t, aimap.GatewayWebSocketServiceName, doc.Services[0].Name)
+	require.Len(t, doc.Services[0].Routes, 2)
+}
+
+func TestRealtimeRouteAuthStrategyHasNoAnonymousFallback(t *testing.T) {
+	const strategies = `
+auth_strategies:
+  - {name: oidc, type: openid-connect, config: {issuer: https://idp.example.com}}
+  - {name: keys, type: key-auth, config: {}}
+`
+	doc, warnings := convertRealtimeDocument(t, `models:
+  - name: m
+    capabilities: [realtime]
+    access: {auth_strategies: [oidc]}
+    targets: [{name: t, provider: openai-prod, config: {type: openai}}]
+`+overrideProvider+strategies)
+	require.Empty(t, warnings)
+	require.Empty(t, doc.Consumers, "request-termination cannot run on WebSocket routes")
+	var auth *kong.Plugin
+	for _, p := range pluginsOnRoute(doc, "openai-realtime") {
+		if p.Name == "openid-connect" {
+			auth = &p
+		}
+	}
+	require.NotNil(t, auth)
+	require.NotContains(t, auth.Config, "anonymous")
+	require.Equal(t, []string{"ws", "wss"}, auth.Protocols)
+
+	_, _, err := Convert([]byte(`models:
+  - name: m
+    capabilities: [realtime]
+    access: {auth_strategies: [oidc, keys]}
+    targets: [{name: t, provider: openai-prod, config: {type: openai}}]
+`+overrideProvider+strategies), Options{})
+	require.ErrorContains(t, err, "supports only one auth strategy")
+}
+
+// TestRealtimeRouteRejectsNonWebSocketAuthStrategy pins that a realtime model
+// cannot use an auth strategy plugin that rejects the ws/wss protocols (jwt,
+// confirmed against Kong AI Gateway 2.0.2, 2.1, and 2.2.0): emitting it there
+// would either leave the WebSocket route unprotected (the plugin would never
+// run, since its default protocols exclude ws/wss) or make the data plane
+// refuse the whole config, so the conversion fails instead.
+func TestRealtimeRouteRejectsNonWebSocketAuthStrategy(t *testing.T) {
+	_, _, err := Convert([]byte(`models:
+  - name: m
+    capabilities: [realtime]
+    access: {auth_strategies: [legacy]}
+    targets: [{name: t, provider: openai-prod, config: {type: openai}}]
+`+overrideProvider+`
+auth_strategies:
+  - {name: legacy, type: jwt, config: {}}
+`), Options{})
+	require.ErrorContains(t, err, `auth strategy plugin "jwt" does not support the ws and wss protocols`)
+}
+
+func TestTransportProtocols(t *testing.T) {
+	for _, tc := range []struct {
+		in        []string
+		websocket bool
+		want      []string
+	}{
+		{nil, false, nil},
+		{[]string{"https"}, false, []string{"https"}},
+		{[]string{"ws", "wss"}, false, []string{"http", "https"}},
+		{[]string{"http", "ws"}, false, []string{"http"}},
+		{nil, true, []string{"ws", "wss"}},
+		{[]string{"https"}, true, []string{"wss"}},
+		{[]string{"grpc"}, true, []string{"ws", "wss"}},
+		{[]string{"http", "ws", "wss"}, true, []string{"ws", "wss"}},
+	} {
+		require.Equal(t, tc.want, transportProtocols(tc.in, tc.websocket), "%v websocket=%v", tc.in, tc.websocket)
+	}
+}
+
+func TestRealtimeRouteSkipsPluginsWithoutWebSocketSupport(t *testing.T) {
+	src := `models:
+  - name: m
+    capabilities: [generate, realtime]
+    policies: [guard]
+    access: {acls: {allow: [premium]}}
+    targets: [{name: t, provider: openai-prod, config: {type: openai}}]
+policies:
+  - {type: ai-prompt-guard, name: guard, config: {deny_patterns: [forbidden]}}
+` + overrideProvider
+	doc, warnings := convertRealtimeDocument(t, src)
+
+	var realtimeNames []string
+	for _, p := range pluginsOnRoute(doc, "openai-realtime") {
+		realtimeNames = append(realtimeNames, p.Name)
+	}
+	require.ElementsMatch(t, []string{"ai-proxy-advanced", "acl"}, realtimeNames)
+
+	var chatNames []string
+	for _, p := range pluginsOnRoute(doc, "openai-chat") {
+		chatNames = append(chatNames, p.Name)
+	}
+	require.Contains(t, chatNames, "ai-prompt-guard", "the HTTP route keeps the policy")
+
+	require.Len(t, warnings, 1)
+	require.Contains(t, warnings[0], `plugin "ai-prompt-guard", which does not support the ws and wss protocols`)
+
+	input, err := aigw.Parse([]byte(src))
+	require.NoError(t, err)
+	_, _, err = ConvertDocument(input, Options{Strict: true})
+	require.Error(t, err)
+}
+
+func TestBodySizeOrDefault(t *testing.T) {
+	size := func(v int) *int { return &v }
+	for name, tc := range map[string]struct {
+		in   *int
+		want int
+	}{
+		"unset":             {in: nil, want: aimap.DefaultMaxBodySize},
+		"zero is unlimited": {in: size(0), want: 0},
+		"below default":     {in: size(1048576), want: aimap.DefaultMaxBodySize},
+		"above default":     {in: size(16777216), want: 16777216},
+	} {
+		t.Run(name, func(t *testing.T) {
+			m := &aigw.Model{Config: aigw.ModelConfig{MaxRequestBodySize: tc.in}}
+			require.Equal(t, tc.want, bodySizeOrDefault(m))
+		})
+	}
+}
+
+func TestSelectorConfigBodySize(t *testing.T) {
+	for name, tc := range map[string]struct {
+		sizes []int
+		want  any
+	}{
+		"largest wins":           {sizes: []int{8388608, 16777216}, want: 16777216},
+		"zero wins over largest": {sizes: []int{16777216, 0}, want: 0},
+		"only zero":              {sizes: []int{0}, want: 0},
+	} {
+		t.Run(name, func(t *testing.T) {
+			for _, useSources := range []bool{false, true} {
+				g := &routeGroup{}
+				for _, size := range tc.sizes {
+					g.addSelector(map[string]any{"source": "body", "body_path": "model", "max_request_body_size": size})
+				}
+				require.Equal(t, tc.want, g.selectorConfig(useSources)["max_request_body_size"])
+			}
+		})
+	}
 }

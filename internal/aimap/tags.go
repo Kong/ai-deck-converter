@@ -95,3 +95,20 @@ func EncodeModelAliasGroup(sourceModelName string) string {
 func DecodeModelAliasGroup(tags []string) (group string, rest []string) {
 	return decodeTaggedValue(tags, modelAliasGroupTag)
 }
+
+// realtimeModelTag namespaces the tag that names the ai_models entry of a
+// realtime ai-proxy-advanced plugin. A WebSocket route has no
+// ai-model-selector, so the plugin carries no model FK and alias-less targets.
+// This tag is the only link back to the source model.
+const realtimeModelTag = "ai-gateway-realtime-model:"
+
+// EncodeRealtimeModel renders an ai_models name as a tag Kong can carry.
+func EncodeRealtimeModel(name string) string {
+	return realtimeModelTag + name
+}
+
+// DecodeRealtimeModel finds the tag written by EncodeRealtimeModel and returns
+// the ai_models name it names, along with the remaining tags in input order.
+func DecodeRealtimeModel(tags []string) (name string, rest []string) {
+	return decodeTaggedValue(tags, realtimeModelTag)
+}

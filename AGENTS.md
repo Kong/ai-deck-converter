@@ -38,10 +38,10 @@ Use `c.warn(...)` for unresolved references and unsupported features. In `-stric
 
 ### The endpoint table is the heart of model conversion
 
-`internal/aimap/endpoints.go` holds `EndpointTable[section][capability] → EndpointEntry{Primary EndpointSpec; Secondary []EndpointSpec}`. Secondary is only set for the handful of capabilities reachable through more than one endpoint (currently just bedrock `generate`, also served by `/invoke`). Read entries through `aimap.EndpointsFor(section, capability)` for one capability or `aimap.SectionEndpoints(section)` to scan a whole section — never index `EndpointTable`'s fields directly, or forward/reverse can drift. `section` is chosen from the model's `llm_format` (`SectionFor`), **not** the provider type — the one exception is gemini-format traffic served by Vertex. Each spec carries the path, methods, `route_type`, `genai_category`, regex flag, and whether the request body carries a `model` field.
+`internal/aimap/endpoints.go` holds `EndpointTable[section][capability] → EndpointEntry{Primary EndpointSpec; Secondary []EndpointSpec}`. Secondary is only set for capabilities reachable through more than one endpoint: bedrock `generate` (also served by `/invoke`), and the gemini section, which lists each capability's Gemini Enterprise endpoint as a secondary (the Gemini Enterprise-only image/video/rerank have Gemini Enterprise paths as primary). Read entries through `aimap.EndpointsFor(section, capability)` for one capability or `aimap.SectionEndpoints(section)` to scan a whole section — never index `EndpointTable`'s fields directly, or forward/reverse can drift. `section` is chosen from the model's `llm_format` (`SectionFor`), **not** the provider type; there is no separate vertex section (`vertex` is only accepted as a format alias of `gemini`). Each spec carries the path, methods, `route_type`, `genai_category`, regex flag, and whether the request body carries a `model` field.
 
 `convertModels` (`convert/model.go`) is the most intricate code path:
-- All model routes nest under **one shared `ai-gateway` Service** (placeholder url `http://ai-gateway.upstream.local`); `ai-proxy-advanced` overrides the real upstream per target.
+- All model routes nest under **one shared `ai-gateway` Service** (placeholder url `http://ai-gateway.upstream.local`); `ai-proxy-advanced` overrides the real upstream per target. The exception is WebSocket endpoints (`aimap.IsWebSocketEndpoint`, i.e. `realtime`): they nest under `ai-gateway-websocket` (`ws://…`), get one route per model with `ws`/`wss` and no methods, no `ai-model-selector`, and route-scoped plugins carrying the route's `protocols`. Targets there are alias-less: no selector presents an alias, so aliased targets fail with "failed to get balancer instance" (proven by `e2e/` case `realtime_model_websocket_transport`). The `aimap.EncodeRealtimeModel` tag on the plugin links it back to its `ai_models` entry for revert. Policy plugins not in `aimap.SupportsWebSocket` (all AI policy plugins) are skipped on the route with a warning, because the data plane rejects the whole config otherwise. Auth-strategy plugins not in `aimap.SupportsWebSocket` (e.g. `jwt`) fail the conversion instead of warning, since a silently-unenforceable auth check is worse than a dropped policy. Auth plugins there drop the `anonymous` fallback, since `request-termination` does not run on ws/wss. See `convert/testdata/70_realtime_websocket_transport`.
 - A capability with secondary endpoints emits **one route per endpoint** (bedrock `generate` → `bedrock-converse` + `bedrock-invoke`), each carrying the same target(s). Bedrock's invoke spec for `generate` is reused verbatim from `audio/speech` (same endpoint), so a model declaring both capabilities gets one `bedrock-invoke` route/target, not two — the target-fingerprint dedup below collapses them. See `convert/testdata/57_bedrock_generate_invoke` and `58_bedrock_generate_and_speech`.
 - Models/targets that resolve to the **same** `(section, RouteLabel)` collapse into **one route** with multiple `ai-proxy-advanced` `targets[]` (the `routeGroup` accumulator, deduped by `target|route_type`).
 - Body-model routes also get an `ai-model-selector` plugin; one `ai-models` entry is emitted per source model (per `config.route.model.values` entry for multi-alias models, each alias getting its own `ai-proxy-advanced`/policy copy, linked for revert by the `aimap.EncodeModelAliasGroup` tag); model `policies`/`acls` become top-level plugins scoped via a `model:` FK.
@@ -56,7 +56,7 @@ Provider auth and options are folded into each target by `convert/provider.go` (
 `revert/model.go` + `revert/endpoints.go` + `revert/provider.go` invert the above:
 - `resolveEndpoint` recovers `(capability, spec)` per target from progressively weaker signals: `route_type` within the section (scanned via `aimap.SectionEndpoints`, so secondary specs are candidates too), the `{section}-{RouteLabel}` route name, `genai_category`, then the path shape (`basePathFor` also recovers the model's base path, including from regex routes). A route/target with no other distinguishing signal resolves to whichever candidate capability sorts first alphabetically — for a bedrock `bedrock-invoke` route this means `audio/speech` beats `generate`'s secondary spec (they're field-for-field identical), a caveat that never breaks round-tripping a converter-produced config since re-converting the recovered model reproduces the same route/target either way. `revert/model.go`'s per-model capability set is a union across all of that model's routes, so a model's `bedrock-converse` route still contributes `generate` even when its `bedrock-invoke` route resolves as `audio/speech`.
 - Targets group into one Model per `model_alias` (named by the matching `ai-models` entry; alias-less groups match alias-less `ai-models` entries by position, else fall back to the route name).
-- Providers are **synthesized** from each target's auth/options (`defoldAuth`/`defoldOptions` reverse `resolveAuth`/`mapOptions`), deduped by fingerprint, named from the vault prefix (`openai-env`) or a per-type counter. The `gemini` plugin enum is disambiguated to vertex only by a vertex-style route path (`detectProviderType`).
+- Providers are **synthesized** from each target's auth/options (`defoldAuth`/`defoldOptions` reverse `resolveAuth`/`mapOptions`), deduped by fingerprint, named from the vault prefix (`openai-env`) or a per-type counter. The `gemini` plugin enum is disambiguated to vertex only by a Gemini Enterprise-style route path whose target is not also served on a Gemini-style path (`detectProviderType`, `indexGeminiPathTargets`). Alias-less targets on a secondary endpoint's route fold into the model group of the primary route (`aliaslessGroupServing`).
 - Forward defaults are dropped on the way back (e.g. `{algorithm: round-robin}` balancer) so round trips stay clean. `revert/roundtrip_test.go` asserts forward→reverse→forward is **byte-identical with zero warnings** for every `convert/testdata` case — keep it that way when changing either direction.
 
 ### Datastore support (policies and models)
@@ -67,6 +67,73 @@ A `Datastore` (`internal/aigw/datastore.go`) is a shared connection (`redis-ce`/
 
 Golden tests are the primary regression mechanism, in both directions. Each `convert/testdata/<case>/` (and `revert/testdata/<case>/`) has an `input.yaml`, an `expected.yaml`, and an optional `options.yaml` (overrides default `Options`). For revert cases, `input.yaml` is a decK config and `expected.yaml` is AI Gateway YAML; the `20_`/`21_` cases cover non-convention hand-written configs. To add a case: create the directory with `input.yaml`, run `go test ./<pkg> -run TestGolden -update`, then **review the generated `expected.yaml`** before committing — `-update` regenerates all cases, so inspect the diff. `revert/roundtrip_test.go` additionally re-converts every reverted forward golden and requires byte-identical output with zero warnings. `convert_test.go`, `provider_test.go`, `revert_test.go`, and the `internal/*` `_test.go` files cover units in isolation.
 
-## Reference material
+## Code Comment Style (Mandatory)
 
-`ref/` contains the source-of-truth docs this converter encodes: `supported-endpoints.md`, the AI plugin docs (`ai-proxy-advanced.md`, `ai-mcp-proxy.md`, `ai-a2a-proxy.md`), admin API specs, and `ref/examples/models/<provider>/` pairs of AI-Gateway config + the hand-authored Kong decK output they should produce. Consult these when adding provider support or changing emitted plugin config. `examples/` holds end-to-end sample inputs.
+This rule applies to **every** comment you write or touch: Go doc comments, inline
+comments, test comments, commit messages, and code blocks in Markdown. It applies
+to new comments and to comments you edit for any other reason.
+
+Write comments in **ASD-STE100 Simplified Technical English**.
+
+### Comment Only When Needed
+
+The default is **no comment**. Write a comment only if it gives the reader a fact
+that the code cannot show. Valid reasons:
+
+- The code does something unexpected. The comment tells why.
+- A constraint, invariant, or side effect is not visible in the code.
+- The code is a workaround for an external bug. Include the issue link.
+- Go requires a doc comment on an exported identifier.
+
+Do not write a comment that:
+
+- Tells what the code does. The code already shows this.
+- Describes your change, for example `added X`, `now uses Y`, `fixed bug`.
+  Put this in the commit message.
+- Labels an obvious block, for example `// Loop over servers`.
+- Tells the steps of the function one by one.
+
+If a better name or a smaller function removes the need for a comment, change the
+code. Do not write the comment.
+
+When a comment is necessary, keep only the essential fact. One sentence is the
+target. Use more only when the reader needs each sentence.
+
+Do not delete existing comments that you do not touch. This section applies to
+comments you write or edit. Commit messages are always necessary.
+
+### Hard Rules
+
+1. **One idea per sentence.** Split any sentence that has two clauses joined by
+   `and`, `but`, `so`, `because`, `which`, `where`, or a colon.
+2. **Maximum 20 words per sentence.** Count them. If over, split.
+3. **One sentence is the target. Maximum 3 sentences per comment block.** If you
+   need more, the code needs a better name or a smaller function, not a longer
+   comment.
+4. **Present tense, active voice.** Write `X changes Y`, not `X is used to
+   transform Y` or `Y gets transformed by X`.
+5. **One meaning per word.** Use the simplest verb that is correct:
+- `change` (not transform, translate, convert, marshal into, coerce)
+- `map` only when the code literally maps keys to values
+- `get` (not retrieve, fetch, obtain, acquire)
+- `send` (not dispatch, propagate, emit, forward on)
+- `make` (not construct, instantiate, materialize)
+- `use` (not leverage, utilize, employ)
+- `start` / `stop` (not initiate, terminate, tear down)
+6. **No parenthetical asides and no em dashes.** If the aside matters, make it its
+   own sentence. If it does not matter, delete it.
+7. **No filler.** Ban list: `simply`, `basically`, `essentially`, `note that`,
+   `it is worth noting`, `of course`, `obviously`, `in order to`, `please be aware`.
+8. **No hedging narrative.** Do not write `so that an update that leaves it out
+   does not silently clear it`. Write the fact: `the stored value stays`.
+9. **Do not restate the code.** If a sentence repeats the code or the function
+   signature in prose, delete it. If no sentence stays, delete the comment.
+10. **Go doc comments start with the identifier name.** `// FooBar does X.`
+11. **Wrap at 80 columns.** Never break a line mid-sentence in a way that leaves a
+    word glued to the next comment marker.
+12. **No emoji, no exclamation marks.**
+
+## Design Decisions (RFCs)
+
+- Substantive design decisions are recorded as RFCs under `docs/decisions/`
+  Start from `docs/decisions/00000-template.md`.

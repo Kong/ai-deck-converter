@@ -22,6 +22,16 @@ services:
                   path: /report
             tags:
               - mcp-listener:aggregate-id
+          - name: pre-function
+            config:
+              access:
+                - |
+                  local addr = ngx.var.server_addr or ""
+                  if addr:sub(1, 5) ~= "unix:" then
+                    return ngx.exit(ngx.HTTP_NOT_FOUND)
+                  end
+            tags:
+              - aigw-generated:mcp-toolset-gate
   - name: team-b
     host: localhost
     routes:
@@ -44,6 +54,16 @@ services:
                   path: /report
             tags:
               - mcp-listener:aggregate-id
+          - name: pre-function
+            config:
+              access:
+                - |
+                  local addr = ngx.var.server_addr or ""
+                  if addr:sub(1, 5) ~= "unix:" then
+                    return ngx.exit(ngx.HTTP_NOT_FOUND)
+                  end
+            tags:
+              - aigw-generated:mcp-toolset-gate
   - name: aggregate
     host: localhost
     routes:

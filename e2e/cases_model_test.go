@@ -3,6 +3,7 @@
 package e2e
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -57,4 +58,50 @@ func testSingleModelMultipleAliases(t *testing.T, license string) {
 		}
 	}
 	t.Logf("PASS: all %d alias requests carried the provider credential to the mock upstream", len(hits))
+}
+
+// testGeminiModelAllCapabilities proves the data plane accepts a gemini model
+// declaring every capability the gemini section serves, which renders on both
+// the Gemini Standard API and the Gemini Enterprise AI paths. A DB-less gateway refuses to start on
+// a declarative config it rejects, so readiness alone shows acceptance; the
+// admin API check then confirms every route was actually loaded.
+func testGeminiModelAllCapabilities(t *testing.T, license string) {
+	configPath := convertCase(t, "gemini_model_all_capabilities", nil)
+
+	gateway := startGateway(t, GatewayOptions{
+		Image:  gatewayImage(t, "kong/kong-ai-gateway:2.0.2"),
+		Config: configPath,
+		Env:    []string{licenseEnv(license)},
+	})
+	gateway.waitReady()
+
+	status, _, body := httpGet(gateway.AdminURL() + "/routes")
+	if status != 200 {
+		t.Fatalf("GET /routes returned %d:\n%s", status, body)
+	}
+	var routes struct {
+		Data []struct {
+			Name string `json:"name"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(body), &routes); err != nil {
+		t.Fatalf("decoding GET /routes: %v\n%s", err, body)
+	}
+	loaded := map[string]bool{}
+	for _, r := range routes.Data {
+		loaded[r.Name] = true
+	}
+	for _, name := range []string{
+		"gemini-generate", "gemini-enterprise-generate",
+		"gemini-embeddings", "gemini-enterprise-embeddings",
+		"gemini-predict", "gemini-predict-long-running",
+		"gemini-ranking",
+		"gemini-batches", "gemini-enterprise-batches",
+		"gemini-files",
+	} {
+		if !loaded[name] {
+			t.Fatalf("route %q was not loaded by the gateway; loaded routes: %v", name, loaded)
+		}
+	}
+	t.Logf("PASS: the gateway accepted all %d gemini capability routes", len(routes.Data))
 }

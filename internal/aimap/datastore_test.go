@@ -218,14 +218,16 @@ func TestApplyDatastoreSubstitutesAtConfigPath(t *testing.T) {
 			},
 		},
 		{
-			// datakit has no backend switch, so nothing beyond the connection.
+			// datakit's cache node refuses to configure without a strategy,
+			// so the substitution selects the one it just installed.
 			name:          "datakit nests under resources.cache",
 			policyType:    "datakit",
 			datastoreType: DatastoreTypeRedisEE,
 			want: map[string]any{
 				"resources": map[string]any{
 					"cache": map[string]any{
-						"redis": map[string]any{"host": "ds1.internal"},
+						"strategy": "redis",
+						"redis":    map[string]any{"host": "ds1.internal"},
 					},
 				},
 			},

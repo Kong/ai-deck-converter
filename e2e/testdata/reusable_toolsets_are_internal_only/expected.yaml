@@ -3,10 +3,16 @@ _transform: false
 services:
   - id: 1fcd64ef-e422-51db-a0df-c37d58b8bfbe
     name: team-a
-    host: localhost
+    url: http://host.docker.internal:18082
+    host: host.docker.internal
+    port: 18082
+    protocol: http
   - id: 15350122-8c21-5d6c-8271-8ca7a60e76a0
     name: team-b
-    host: localhost
+    url: http://host.docker.internal:18082
+    host: host.docker.internal
+    port: 18082
+    protocol: http
   - id: 05eb9429-4518-5093-97a0-996b25774817
     name: aggregate
     host: localhost
@@ -60,14 +66,19 @@ plugins:
       id: b7da278e-6cd7-5fc6-8bc0-cbef184ea183
     tags:
       - mcp-listener:aggregate-id
-  - id: 10b5bf80-102f-5dc1-abcc-538e772834d5
-    name: key-auth
+  - id: 50175443-4101-5d48-8cca-df1851daeb64
+    name: pre-function
     config:
-      hide_credentials: false
-      key_names:
-        - apikey
+      access:
+        - |
+          local addr = ngx.var.server_addr or ""
+          if addr:sub(1, 5) ~= "unix:" then
+            return ngx.exit(ngx.HTTP_NOT_FOUND)
+          end
     route:
       id: b7da278e-6cd7-5fc6-8bc0-cbef184ea183
+    tags:
+      - aigw-generated:mcp-toolset-gate
   - id: c1b3fb4f-aee9-59cd-bfa4-c542a643c3b2
     name: ai-mcp-proxy
     config:
@@ -86,14 +97,19 @@ plugins:
       id: 9ffeb599-0bf8-5581-925c-5445c0cdb425
     tags:
       - mcp-listener:aggregate-id
-  - id: 1baf169d-fffb-50f9-bfea-211774cfd43e
-    name: key-auth
+  - id: fbdd2d80-2cfc-5f6d-ad62-81d82716322a
+    name: pre-function
     config:
-      hide_credentials: false
-      key_names:
-        - apikey
+      access:
+        - |
+          local addr = ngx.var.server_addr or ""
+          if addr:sub(1, 5) ~= "unix:" then
+            return ngx.exit(ngx.HTTP_NOT_FOUND)
+          end
     route:
       id: 9ffeb599-0bf8-5581-925c-5445c0cdb425
+    tags:
+      - aigw-generated:mcp-toolset-gate
   - id: 702ac868-583d-5c8d-ade7-0e006b8bef35
     name: ai-mcp-proxy
     config:

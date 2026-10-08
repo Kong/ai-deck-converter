@@ -184,6 +184,15 @@ func (c *Converter) projectDBLess() *kong.DBLessDocument {
 		})
 	}
 
+	for _, plugin := range c.out.CustomPlugins {
+		out.CustomPlugins = append(out.CustomPlugins, kong.DBLessCustomPlugin{
+			ID:      firstNonEmpty(plugin.ID, stableUUID("custom_plugin:"+plugin.Name)),
+			Name:    plugin.Name,
+			Schema:  plugin.Schema,
+			Handler: plugin.Handler,
+		})
+	}
+
 	for _, cert := range c.out.CACertificates {
 		out.CACertificates = append(out.CACertificates, kong.DBLessCACertificate{
 			ID:         firstNonEmpty(cert.ID, stableUUID("ca_certificate:"+cert.Cert)),
@@ -220,6 +229,7 @@ func toDBLessPlugin(plugin kong.Plugin, id string, scope scopeRef) kong.DBLessPl
 		ID:            id,
 		Name:          plugin.Name,
 		Enabled:       plugin.Enabled,
+		Protocols:     plugin.Protocols,
 		Condition:     plugin.Condition,
 		Config:        plugin.Config,
 		Service:       toDBLessFK(scope.service),

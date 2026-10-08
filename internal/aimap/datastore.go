@@ -62,14 +62,19 @@ func VectorDBStrategyForDatastoreType(datastoreType string) (string, bool) {
 // the sub-block chosen dynamically by vectordb.strategy. Every other
 // supported plugin type assigns it directly at config.<ConfigPath> — no
 // strategy, no sub-block choice.
-// StrategyField is the config key selecting which backend the plugin uses.
-// A Datastore is inert unless it names redis, and its default rarely does, so
-// substituting a connection without setting this would attach a Datastore the
-// plugin never reads. Empty when the plugin has no such switch.
+// StrategyPath is the dot-path under the plugin's config at which the field
+// selecting which backend the plugin uses lives — "vectordb.strategy" for the
+// VectorDB family (inside the block the policy authors itself),
+// "resources.cache.strategy" for datakit, and a plain top-level field
+// ("strategy", "policy", or "storage") for the rest. A Datastore is inert
+// unless it names redis, several plugins mark the field required, and
+// datakit's cache node refuses to configure without one, so substitution
+// always sets it too. Never empty: every plugin in this table has exactly
+// one.
 type DatastoreSupport struct {
-	AllowedTypes  map[string]struct{}
-	ConfigPath    string
-	StrategyField string
+	AllowedTypes map[string]struct{}
+	ConfigPath   string
+	StrategyPath string
 }
 
 // Allows reports whether datastoreType is one this plugin type accepts.
@@ -84,77 +89,90 @@ func (s DatastoreSupport) Allows(datastoreType string) bool {
 var datastoreSupportedPolicyTypes = map[string]DatastoreSupport{
 	"ai-rag-injector": {
 		ConfigPath:   "vectordb",
+		StrategyPath: "vectordb.strategy",
 		AllowedTypes: map[string]struct{}{DatastoreTypeRedisEE: {}, DatastoreTypeVectorDB: {}},
 	},
 	"ai-semantic-cache": {
 		ConfigPath:   "vectordb",
+		StrategyPath: "vectordb.strategy",
 		AllowedTypes: map[string]struct{}{DatastoreTypeRedisEE: {}, DatastoreTypeVectorDB: {}},
 	},
 	"ai-semantic-prompt-guard": {
 		ConfigPath:   "vectordb",
+		StrategyPath: "vectordb.strategy",
 		AllowedTypes: map[string]struct{}{DatastoreTypeRedisEE: {}, DatastoreTypeVectorDB: {}},
 	},
 	"ai-semantic-response-guard": {
 		ConfigPath:   "vectordb",
+		StrategyPath: "vectordb.strategy",
 		AllowedTypes: map[string]struct{}{DatastoreTypeRedisEE: {}, DatastoreTypeVectorDB: {}},
 	},
 	"ai-rate-limiting-advanced": {
-		ConfigPath:    "redis",
-		StrategyField: "strategy",
-		AllowedTypes:  map[string]struct{}{DatastoreTypeRedisEE: {}},
+		ConfigPath:   "redis",
+		StrategyPath: "strategy",
+		AllowedTypes: map[string]struct{}{DatastoreTypeRedisEE: {}},
 	},
 	"acme": {
-		ConfigPath:    "storage_config.redis",
-		StrategyField: "storage",
-		AllowedTypes:  map[string]struct{}{DatastoreTypeRedisCE: {}},
+		ConfigPath:   "storage_config.redis",
+		StrategyPath: "storage",
+		AllowedTypes: map[string]struct{}{DatastoreTypeRedisCE: {}},
 	},
 	"rate-limiting": {
-		ConfigPath:    "redis",
-		StrategyField: "policy",
-		AllowedTypes:  map[string]struct{}{DatastoreTypeRedisCE: {}},
+		ConfigPath:   "redis",
+		StrategyPath: "policy",
+		AllowedTypes: map[string]struct{}{DatastoreTypeRedisCE: {}},
 	},
 	"response-ratelimiting": {
-		ConfigPath:    "redis",
-		StrategyField: "policy",
-		AllowedTypes:  map[string]struct{}{DatastoreTypeRedisCE: {}},
+		ConfigPath:   "redis",
+		StrategyPath: "policy",
+		AllowedTypes: map[string]struct{}{DatastoreTypeRedisCE: {}},
 	},
 	"datakit": {
-		// No backend switch on its cache block.
 		ConfigPath:   "resources.cache.redis",
+		StrategyPath: "resources.cache.strategy",
 		AllowedTypes: map[string]struct{}{DatastoreTypeRedisEE: {}},
 	},
 	"graphql-proxy-cache-advanced": {
-		ConfigPath:    "redis",
-		StrategyField: "strategy",
-		AllowedTypes:  map[string]struct{}{DatastoreTypeRedisEE: {}},
+		ConfigPath:   "redis",
+		StrategyPath: "strategy",
+		AllowedTypes: map[string]struct{}{DatastoreTypeRedisEE: {}},
 	},
 	"graphql-rate-limiting-advanced": {
-		ConfigPath:    "redis",
-		StrategyField: "strategy",
-		AllowedTypes:  map[string]struct{}{DatastoreTypeRedisEE: {}},
+		ConfigPath:   "redis",
+		StrategyPath: "strategy",
+		AllowedTypes: map[string]struct{}{DatastoreTypeRedisEE: {}},
 	},
 	"proxy-cache-advanced": {
-		ConfigPath:    "redis",
-		StrategyField: "strategy",
-		AllowedTypes:  map[string]struct{}{DatastoreTypeRedisEE: {}},
+		ConfigPath:   "redis",
+		StrategyPath: "strategy",
+		AllowedTypes: map[string]struct{}{DatastoreTypeRedisEE: {}},
 	},
 	"rate-limiting-advanced": {
-		ConfigPath:    "redis",
-		StrategyField: "strategy",
-		AllowedTypes:  map[string]struct{}{DatastoreTypeRedisEE: {}},
+		ConfigPath:   "redis",
+		StrategyPath: "strategy",
+		AllowedTypes: map[string]struct{}{DatastoreTypeRedisEE: {}},
 	},
 	"service-protection": {
-		ConfigPath:    "redis",
-		StrategyField: "strategy",
-		AllowedTypes:  map[string]struct{}{DatastoreTypeRedisEE: {}},
+		ConfigPath:   "redis",
+		StrategyPath: "strategy",
+		AllowedTypes: map[string]struct{}{DatastoreTypeRedisEE: {}},
 	},
 }
 
 // PolicyTypeSupportsDatastore reports whether policyType consumes a Datastore
 // at all, for callers with no concrete Datastore type yet to check.
 func PolicyTypeSupportsDatastore(policyType string) bool {
-	_, known := datastoreSupportedPolicyTypes[policyType]
+	_, known := DatastoreSupportForPluginType(policyType)
 	return known
+}
+
+// DatastoreSupportForPluginType returns how pluginType consumes a Datastore,
+// and whether it consumes one at all — the lookup half of
+// DatastoreSupportForPolicyType, for callers with no Datastore type in hand
+// yet to check against it.
+func DatastoreSupportForPluginType(pluginType string) (DatastoreSupport, bool) {
+	support, ok := datastoreSupportedPolicyTypes[pluginType]
+	return support, ok
 }
 
 // DatastoreSupportForPolicyType returns how the given policy plugin type
@@ -222,11 +240,11 @@ func ApplyDatastore(
 		vectordbConfig, _ := config[VectorDBConfigPath].(map[string]any)
 		return applyVectorDBDatastore(config, vectordbConfig, strategy, datastoreConfig), nil
 	case "redis":
-		return applyRedisDatastore(config, datastoreConfig, support.StrategyField), nil
+		return applyRedisDatastore(config, datastoreConfig, support.StrategyPath), nil
 	case "storage_config.redis":
-		return applyAcmeDatastore(config, datastoreConfig, support.StrategyField), nil
+		return applyAcmeDatastore(config, datastoreConfig, support.StrategyPath), nil
 	case "resources.cache.redis":
-		return applyDatakitDatastore(config, datastoreConfig, support.StrategyField), nil
+		return applyDatakitDatastore(config, datastoreConfig), nil
 	default:
 		return nil, fmt.Errorf("unhandled Datastore config path %q", support.ConfigPath)
 	}
@@ -234,23 +252,23 @@ func ApplyDatastore(
 
 // applyRedisDatastore assigns dsConfig at config["redis"] — the flat case
 // shared by most of DatastoreSupport's plugins (rate-limiting,
-// ai-rate-limiting-advanced, proxy-cache-advanced, etc.). Never mutates
-// config in place, so a reusable source Policy is never mutated.
-func applyRedisDatastore(config, dsConfig map[string]any, strategyField string) map[string]any {
+// ai-rate-limiting-advanced, proxy-cache-advanced, etc.) — and selects it at
+// strategyPath, a top-level config key. Never mutates config in place, so a
+// reusable source Policy is never mutated.
+func applyRedisDatastore(config, dsConfig map[string]any, strategyPath string) map[string]any {
 	out := make(map[string]any, len(config)+1)
 	maps.Copy(out, config)
 	out["redis"] = dsConfig
-	if strategyField != "" {
-		out[strategyField] = VectorDBStrategyRedis
-	}
+	out[strategyPath] = VectorDBStrategyRedis
 	return out
 }
 
 // applyAcmeDatastore assigns dsConfig at config["storage_config"]["redis"] —
-// acme's one dot-path, one level deeper than the flat "redis" case. Never
-// mutates config or its nested storage_config in place, so a reusable source
-// Policy is never mutated.
-func applyAcmeDatastore(config, dsConfig map[string]any, strategyField string) map[string]any {
+// acme's one dot-path, one level deeper than the flat "redis" case — and
+// selects it at strategyPath, acme's top-level "storage" field. Never mutates
+// config or its nested storage_config in place, so a reusable source Policy
+// is never mutated.
+func applyAcmeDatastore(config, dsConfig map[string]any, strategyPath string) map[string]any {
 	out := make(map[string]any, len(config)+1)
 	maps.Copy(out, config)
 	storageConfig, _ := out["storage_config"].(map[string]any)
@@ -258,31 +276,32 @@ func applyAcmeDatastore(config, dsConfig map[string]any, strategyField string) m
 	maps.Copy(newStorageConfig, storageConfig)
 	newStorageConfig["redis"] = dsConfig
 	out["storage_config"] = newStorageConfig
-	if strategyField != "" {
-		out[strategyField] = VectorDBStrategyRedis
-	}
+	out[strategyPath] = VectorDBStrategyRedis
 	return out
 }
 
 // applyDatakitDatastore assigns dsConfig at
 // config["resources"]["cache"]["redis"] — datakit's one dot-path, two levels
-// deeper than the flat "redis" case. Never mutates config or its nested
-// resources/cache in place, so a reusable source Policy is never mutated.
-func applyDatakitDatastore(config, dsConfig map[string]any, strategyField string) map[string]any {
+// deeper than the flat "redis" case — and selects it at the block's own
+// config["resources"]["cache"]["strategy"]: datakit's cache node refuses to
+// configure without one (no schema default), so a substitution that left it
+// unset would attach a Datastore the plugin never reads. Never mutates
+// config or its nested resources/cache in place, so a reusable source Policy
+// is never mutated.
+func applyDatakitDatastore(config, dsConfig map[string]any) map[string]any {
+	const newDatakitCacheKeys = 2 // "redis" and "strategy", both set below.
 	out := make(map[string]any, len(config)+1)
 	maps.Copy(out, config)
 	resources, _ := out["resources"].(map[string]any)
 	newResources := make(map[string]any, len(resources)+1)
 	maps.Copy(newResources, resources)
 	cache, _ := newResources["cache"].(map[string]any)
-	newCache := make(map[string]any, len(cache)+1)
+	newCache := make(map[string]any, len(cache)+newDatakitCacheKeys)
 	maps.Copy(newCache, cache)
 	newCache["redis"] = dsConfig
+	newCache["strategy"] = VectorDBStrategyRedis
 	newResources["cache"] = newCache
 	out["resources"] = newResources
-	if strategyField != "" {
-		out[strategyField] = VectorDBStrategyRedis
-	}
 	return out
 }
 

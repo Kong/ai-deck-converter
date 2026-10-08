@@ -11,25 +11,36 @@ import (
 
 func TestDetectProviderType(t *testing.T) {
 	cases := []struct {
-		enum, path, want string
+		enum, path   string
+		onGeminiPath bool
+		want         string
 	}{
-		{"openai", "/ai/chat/completions", "openai"},
-		{"bedrock", "~/ai/model/(?<model_name>[^/]+)/converse(?:-stream)?", "bedrock"},
+		{"openai", "/ai/chat/completions", false, "openai"},
+		{"bedrock", "~/ai/model/(?<model_name>[^/]+)/converse(?:-stream)?", false, "bedrock"},
 		{
 			"gemini", "~/ai/v1beta/models/(?<model_name>[^:/]+):(?:generateContent|streamGenerateContent)",
-			"gemini",
+			true, "gemini",
 		},
 		{
 			"gemini",
 			"~/ai/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/google/models/" +
 				"(?<model_name>[^:/]+):(?:generateContent|streamGenerateContent)",
-			"vertex",
+			false, "vertex",
 		},
-		{"gemini", "", "gemini"},
+		// A Gemini Enterprise-style path whose target is also served on a Gemini
+		// path is the forward converter's Gemini Enterprise rendering of a gemini
+		// capability.
+		{
+			"gemini",
+			"~/ai/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/(?<publisher>[^/]+)/models/" +
+				"(?<model_name>[^:/]+):(?:generateContent|streamGenerateContent)",
+			true, "gemini",
+		},
+		{"gemini", "", false, "gemini"},
 	}
 	for _, tc := range cases {
-		got := detectProviderType(tc.enum, tc.path)
-		require.Equalf(t, tc.want, got, "detectProviderType(%q, %q)", tc.enum, tc.path)
+		got := detectProviderType(tc.enum, tc.path, tc.onGeminiPath)
+		require.Equalf(t, tc.want, got, "detectProviderType(%q, %q, %v)", tc.enum, tc.path, tc.onGeminiPath)
 	}
 }
 
@@ -42,9 +53,9 @@ func TestBasePathRecovery(t *testing.T) {
 		{"openai", "generate", "/custom/base/chat/completions", "/custom/base", true},
 		{"bedrock", "generate", "~/ai/model/(?<model_name>[^/]+)/converse(?:-stream)?", "/ai", true},
 		{
-			"vertex", "generate",
-			"~/llm/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/google/models/" +
-				"(?<model_name>[^:/]+):(?:generateContent|streamGenerateContent)",
+			"gemini", "rerank",
+			"~/llm/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/rankingConfigs/" +
+				"(?<config_name>[^:/]+):rank",
 			"/llm", true,
 		},
 		{"openai", "generate", "/ai/embeddings", "", false},

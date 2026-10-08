@@ -95,8 +95,7 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 		return entry
 	}
 
-	routeProxies := findPlugins(plugins, "ai-proxy-advanced")
-	redirect := r.mergeableAliasFKs(routeProxies)
+	routeProxies, redirect := r.mergeableAliasFKs(findPlugins(plugins, "ai-proxy-advanced"))
 
 	for _, proxy := range routeProxies {
 		cfg := proxy.Config
@@ -124,6 +123,11 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 		groupFK := fkName
 		if canon, ok := redirect[fkName]; ok {
 			groupFK = canon
+		}
+		// A realtime plugin has no model FK. Its tag names the ai-models entry.
+		realtimeModel, _ := aimap.DecodeRealtimeModel(proxy.Tags)
+		if groupFK == "" && realtimeModel != "" {
+			groupFK = realtimeModel
 		}
 
 		// Guard refs for this plugin's model: route-wide guards plus any scoped to
@@ -156,7 +160,8 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 			modelMap := getMap(target, "model")
 			alias := getStr(modelMap, "model_alias")
 			routeType := getStr(target, "route_type")
-			providerType := detectProviderType(getStr(modelMap, "provider"), path)
+			providerType := detectProviderType(
+				getStr(modelMap, "provider"), path, r.geminiPathTargets[geminiTargetKey(target)])
 			section := aimap.SectionFor(llmFormat, providerType)
 
 			var capability string
@@ -188,21 +193,6 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 				continue
 			}
 
-			g, err := r.modelGroupFor(acc, rt, groupFK, alias, llmFormat, bases, cfg, nextEntry, refs, acls, idpRefs)
-			if err != nil {
-				return err
-			}
-			// Logging is carried per target by ai-proxy-advanced but is a single
-			// model-level block in the AI Gateway model; lift it back from the
-			// first target that has it (all of a model's targets share the block).
-			if g.model.Config.Logging == nil {
-				g.model.Config.Logging = loggingFromBlockWithDefaults(getMap(target, "logging"), false, false)
-			}
-			if capability != "" && !g.capsSeen[capability] {
-				g.capsSeen[capability] = true
-				g.caps = append(g.caps, capability)
-			}
-
 			name := getStr(modelMap, "name")
 			// A description equal to the model name is the forward converter's
 			// default; drop it so round trips stay clean.
@@ -228,10 +218,67 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 			// capabilities still fingerprints identically (capability lives on
 			// the model, not the target), so those collapse as before.
 			key := targetFingerprint(tm)
+
+			// With neither model FK nor alias, groups key by route, so a
+			// capability's primary and secondary routes — emitted by the forward
+			// converter side by side with the same targets — would become two
+			// models instead of one. Fold whichever is processed second into the
+			// group the first one created; route order in the source document is
+			// not guaranteed (only the forward converter emits primary first), so
+			// this must not depend on which spec, primary or secondary, comes first.
+			var g *modelGroup
+			if groupFK == "" && alias == "" {
+				g = acc.aliaslessGroupServing(capability, bases, key)
+			}
+			if g == nil {
+				var err error
+				g, err = r.modelGroupFor(acc, rt, groupFK, alias, llmFormat, bases, cfg, nextEntry, refs, acls, idpRefs)
+				if err != nil {
+					return err
+				}
+			}
+			if realtimeModel != "" {
+				r.mergeAliasGroupMembers(g, realtimeModel)
+			}
+			// Logging is carried per target by ai-proxy-advanced but is a single
+			// model-level block in the AI Gateway model; lift it back from the
+			// first target that has it (all of a model's targets share the block).
+			if g.model.Config.Logging == nil {
+				g.model.Config.Logging = loggingFromBlockWithDefaults(getMap(target, "logging"), false, false)
+			}
+			if capability != "" && !g.capsSeen[capability] {
+				g.capsSeen[capability] = true
+				g.caps = append(g.caps, capability)
+			}
+
 			if !g.targetsSeen[key] {
 				g.targetsSeen[key] = true
 				g.model.TargetModels = append(g.model.TargetModels, tm)
 			}
+		}
+	}
+	return nil
+}
+
+// modelRoutePaths returns the Config.Route.Paths of a model recovered from the
+// given base paths: nil for the single default base path.
+func modelRoutePaths(bases []string) []string {
+	if len(bases) > 1 || (len(bases) == 1 && !isDefaultBasePath(bases[0])) {
+		return bases
+	}
+	return nil
+}
+
+// aliaslessGroupServing returns the alias-less group that already serves
+// capability at the given base paths through the target fingerprinted as
+// targetKey, or nil when there is none.
+func (acc *modelAcc) aliaslessGroupServing(capability string, bases []string, targetKey string) *modelGroup {
+	paths := modelRoutePaths(bases)
+	for _, key := range acc.order {
+		g := acc.groups[key]
+		if g.aliasless && g.capsSeen[capability] && g.targetsSeen[targetKey] &&
+			slices.Equal(g.model.Config.Route.Paths, paths) {
+			return g
 		}
 	}
 	return nil
@@ -310,9 +357,7 @@ func (r *Reverter) modelGroupFor(
 			Access:   aigw.ModelAccess{ACLs: acls, AuthStrategies: idpRefs},
 		},
 	}
-	if len(bases) > 1 || (len(bases) == 1 && !isDefaultBasePath(bases[0])) {
-		g.model.Config.Route.Paths = bases
-	}
+	g.model.Config.Route.Paths = modelRoutePaths(bases)
 	if alias != "" {
 		setAliasField(&g.model.Config.Route.Model, alias, name, nextEntry())
 	}
@@ -386,13 +431,26 @@ func mergeACLs(dst *aigw.ACLs, src aigw.ACLs) {
 // produced (see convert.convertModels). The marker is required, not just a
 // tie-breaker: without it, this shape is indistinguishable from N
 // independently-authored models that happen to be config-identical
-// and merging those would silently corrupt them into one. Returns
-// a map from every non-canonical member's FK to the first-seen (canonical)
-// member's FK; members outside any multi-FK class are absent from the map.
-func (r *Reverter) mergeableAliasFKs(proxies []*kong.Plugin) map[string]string {
-	canonicalByShape := map[string]string{}
-	redirect := map[string]string{}
-	for _, proxy := range proxies {
+// and merging those would silently corrupt them into one.
+//
+// A class's canonical member is the one whose FK the marker names (the
+// source model's first alias, which convert tags every copy with), falling
+// back to the first-seen member when none matches. Plugin order is not
+// trusted: a live Admin API dump makes no ordering promise.
+//
+// Returns proxies reordered so each class's canonical member is processed
+// first, at the position of the class's first-seen member (the group it
+// creates then seeds route.model.values with the canonical alias), and a map
+// from every non-canonical member's FK to its canonical member's FK; members
+// outside any multi-FK class are absent from the map.
+func (r *Reverter) mergeableAliasFKs(proxies []*kong.Plugin) ([]*kong.Plugin, map[string]string) {
+	type class struct {
+		first     int // index of the first-seen member in proxies
+		canonical int // index of the canonical member in proxies
+	}
+	classes := map[string]*class{}
+	shapeOf := make([]string, len(proxies))
+	for i, proxy := range proxies {
 		if proxy.Model == nil {
 			continue
 		}
@@ -402,13 +460,53 @@ func (r *Reverter) mergeableAliasFKs(proxies []*kong.Plugin) map[string]string {
 			continue
 		}
 		shape := group + "\x00" + proxyShapeFingerprint(proxy.Config)
-		if canon, ok := canonicalByShape[shape]; ok {
-			redirect[fkName] = canon
-		} else {
-			canonicalByShape[shape] = fkName
+		shapeOf[i] = shape
+		c, ok := classes[shape]
+		if !ok {
+			classes[shape] = &class{first: i, canonical: i}
+			continue
+		}
+		if fkName == group && string(*proxies[c.canonical].Model) != group {
+			c.canonical = i
 		}
 	}
-	return redirect
+
+	ordered := make([]*kong.Plugin, 0, len(proxies))
+	redirect := map[string]string{}
+	for i, proxy := range proxies {
+		c, ok := classes[shapeOf[i]]
+		if !ok {
+			ordered = append(ordered, proxy)
+			continue
+		}
+		canon := proxies[c.canonical]
+		switch i {
+		case c.first:
+			ordered = append(ordered, canon)
+			if c.canonical != i {
+				ordered = append(ordered, proxy)
+			}
+		case c.canonical:
+			// Already emitted at the class's first-seen position.
+		default:
+			ordered = append(ordered, proxy)
+		}
+		if i != c.canonical {
+			redirect[string(*proxy.Model)] = string(*canon.Model)
+		}
+	}
+	return ordered, redirect
+}
+
+// mergeAliasGroupMembers folds into g every other ai-models entry of the alias
+// group that canonical names. A realtime-only model has no FK-scoped plugin
+// copies, so the ai-models entries are the only record of its other aliases.
+func (r *Reverter) mergeAliasGroupMembers(g *modelGroup, canonical string) {
+	for _, m := range r.src.AIModels {
+		if m.Name != canonical && r.aiModelAliasGroup(m.Name) == canonical {
+			mergeAliasIntoGroup(g, m.Name, nil, aigw.ACLs{}, nil)
+		}
+	}
 }
 
 // aiModelAliasGroup returns the aimap.EncodeModelAliasGroup marker on name's

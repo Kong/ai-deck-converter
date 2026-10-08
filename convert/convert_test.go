@@ -1555,6 +1555,154 @@ mcp_servers:
 	require.Error(t, err, "expected strict mode to fail on MCP tool missing description")
 }
 
+func TestConvertConversionOnlyMCPServerStripPath(t *testing.T) {
+	// A conversion-only server's route is only ever re-entered by the DP to
+	// resolve a Tool's config.url-relative path; that only works if strip_path
+	// removes the route's own path prefix first. An explicit strip_path: false
+	// is forced to true (with a warning, checked separately); true and unset
+	// pass through unmodified.
+	tests := []struct {
+		name      string
+		routeYAML string
+		wantNil   bool
+		want      bool
+	}{
+		{name: "explicit false forced to true", routeYAML: `route: {paths: [/toolset], strip_path: false}`, want: true},
+		{name: "explicit true", routeYAML: `route: {paths: [/toolset], strip_path: true}`, want: true},
+		{name: "unset", routeYAML: `route: {paths: [/toolset]}`, wantNil: true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			src := []byte(`
+mcp_servers:
+  - type: conversion-only
+    name: toolset
+    config:
+      ` + tc.routeYAML + `
+  - type: listener
+    name: gateway
+    config:
+      route: {paths: [/gateway]}
+      server: {tag: bucket1}
+      sources: [toolset]
+`)
+			out, _, err := Convert(src, Options{OutputMode: "db-less"})
+			require.NoError(t, err, "convert db-less")
+
+			var got struct {
+				Routes []struct {
+					Name      string `yaml:"name"`
+					StripPath *bool  `yaml:"strip_path"`
+				} `yaml:"routes"`
+			}
+			require.NoError(t, yaml.Unmarshal(out, &got), "unmarshal output")
+
+			var found bool
+			for _, r := range got.Routes {
+				if r.Name == "toolset-route" {
+					found = true
+					if tc.wantNil {
+						require.Nil(t, r.StripPath, "expected strip_path to be left unset")
+						return
+					}
+					require.NotNil(t, r.StripPath, "expected strip_path to be set")
+					require.Equal(t, tc.want, *r.StripPath, "unexpected strip_path value")
+				}
+			}
+			require.True(t, found, "expected toolset-route in output")
+		})
+	}
+}
+
+func TestConvertWarnsConversionOnlyMCPServerStripPathFalse(t *testing.T) {
+	src := []byte(`
+mcp_servers:
+  - type: conversion-only
+    name: toolset
+    config:
+      route: {paths: [/toolset], strip_path: false}
+  - type: listener
+    name: gateway
+    config:
+      route: {paths: [/gateway]}
+      server: {tag: bucket1}
+      sources: [toolset]
+`)
+	_, warnings, err := Convert(src, Options{})
+	require.NoError(t, err, "convert")
+	require.Contains(t, strings.Join(warnings, "\n"), "strip_path will be overridden to true",
+		"expected a warning when strip_path is false")
+}
+
+func TestConvertDoesNotWarnConversionOnlyMCPServerStripPathUnsetOrTrue(t *testing.T) {
+	for _, tc := range []string{
+		`route: {paths: [/toolset]}`,
+		`route: {paths: [/toolset], strip_path: true}`,
+	} {
+		src := []byte(`
+mcp_servers:
+  - type: conversion-only
+    name: toolset
+    config:
+      ` + tc + `
+  - type: listener
+    name: gateway
+    config:
+      route: {paths: [/gateway]}
+      server: {tag: bucket1}
+      sources: [toolset]
+`)
+		_, warnings, err := Convert(src, Options{})
+		require.NoError(t, err, "convert")
+		require.NotContains(t, strings.Join(warnings, "\n"), "strip_path",
+			"did not expect a strip_path warning when it is unset or already true")
+	}
+}
+
+func TestConvertStrictFailsConversionOnlyMCPServerStripPathFalse(t *testing.T) {
+	src := []byte(`
+mcp_servers:
+  - type: conversion-only
+    name: toolset
+    config:
+      route: {paths: [/toolset], strip_path: false}
+  - type: listener
+    name: gateway
+    config:
+      route: {paths: [/gateway]}
+      server: {tag: bucket1}
+      sources: [toolset]
+`)
+	_, _, err := Convert(src, Options{Strict: true})
+	require.Error(t, err, "expected strict mode to fail when strip_path is false")
+}
+
+func TestConvertDoesNotForceStripPathOnOtherMCPServerTypes(t *testing.T) {
+	// Only conversion-only servers re-enter Kong at their own route to resolve
+	// a config.url-relative Tool path, so strip_path is left alone for every
+	// other mode.
+	src := []byte(`
+mcp_servers:
+  - type: conversion-listener
+    name: m1
+    config:
+      route: {paths: [/mcp], strip_path: false}
+`)
+	out, _, err := Convert(src, Options{OutputMode: "db-less"})
+	require.NoError(t, err, "convert db-less")
+
+	var got struct {
+		Routes []struct {
+			Name      string `yaml:"name"`
+			StripPath *bool  `yaml:"strip_path"`
+		} `yaml:"routes"`
+	}
+	require.NoError(t, yaml.Unmarshal(out, &got), "unmarshal output")
+	require.Len(t, got.Routes, 1, "expected 1 route")
+	require.NotNil(t, got.Routes[0].StripPath, "expected strip_path to be set")
+	require.False(t, *got.Routes[0].StripPath, "expected strip_path to remain false for conversion-listener")
+}
+
 func TestA2APluginDropsLogAudits(t *testing.T) {
 	a := &aigw.Agent{
 		Type: "a2a",
@@ -2478,4 +2626,65 @@ model_providers:
 	if sanitizerCount != 2 {
 		t.Fatalf("expected 2 scoped ai-sanitizer plugins, got %d: %s", sanitizerCount, out)
 	}
+}
+
+// TestGlobalPolicyRejectsAuthTypeOnRealtimeDocument pins that a global
+// authentication policy fails the conversion once the document emits a
+// WebSocket route: the plugin stays on Kong's http/https default protocols,
+// so it would silently leave the realtime route unauthenticated.
+func TestGlobalPolicyRejectsAuthTypeOnRealtimeDocument(t *testing.T) {
+	_, _, err := Convert([]byte(`
+policies:
+  - type: key-auth
+    name: require-key
+    global: true
+models:
+  - name: m
+    capabilities: [realtime]
+    targets: [{name: t, provider: openai-prod, config: {type: openai}}]
+`+overrideProvider), Options{})
+	require.ErrorContains(t, err, `global policy "require-key" has type "key-auth"`)
+	require.ErrorContains(t, err, "cannot authenticate the WebSocket routes")
+}
+
+// TestGlobalPolicyWarnsOnRealtimeDocument pins that a non-auth global policy
+// only warns, since it still protects every HTTP route; it just never runs
+// against the document's WebSocket traffic.
+func TestGlobalPolicyWarnsOnRealtimeDocument(t *testing.T) {
+	src := []byte(`
+policies:
+  - type: http-log
+    name: audit-log
+    global: true
+    config: {http_endpoint: https://logs.example.com/ingest}
+models:
+  - name: m
+    capabilities: [realtime]
+    targets: [{name: t, provider: openai-prod, config: {type: openai}}]
+` + overrideProvider)
+	_, warnings, err := Convert(src, Options{})
+	require.NoError(t, err)
+	require.Len(t, warnings, 1)
+	require.Contains(t, warnings[0], `global policy "audit-log" (type "http-log")`)
+	require.Contains(t, warnings[0], "will not run on the WebSocket routes")
+
+	_, _, err = Convert(src, Options{Strict: true})
+	require.Error(t, err)
+}
+
+// TestGlobalPolicyNoWarningWithoutRealtimeRoute pins that global policies are
+// unaffected when the document emits no WebSocket route.
+func TestGlobalPolicyNoWarningWithoutRealtimeRoute(t *testing.T) {
+	_, warnings, err := Convert([]byte(`
+policies:
+  - type: key-auth
+    name: require-key
+    global: true
+models:
+  - name: m
+    capabilities: [generate]
+    targets: [{name: t, provider: openai-prod, config: {type: openai}}]
+`+overrideProvider), Options{Strict: true})
+	require.NoError(t, err)
+	require.Empty(t, warnings)
 }

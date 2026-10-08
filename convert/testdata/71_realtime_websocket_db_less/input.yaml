@@ -1,0 +1,24 @@
+models:
+  # The db-less projection keeps plugin protocols and the ws Service scheme.
+  - type: model
+    name: mixed-realtime
+    capabilities: [generate, realtime]
+    formats: [{type: openai}]
+    targets:
+      - name: gpt-realtime
+        provider: openai-main
+        config: {type: openai}
+    access:
+      acls:
+        allow: [premium-users]
+    config:
+      route:
+        paths: [/mixed]
+
+model_providers:
+  - type: openai
+    name: openai-main
+    config:
+      auth:
+        type: basic
+        headers: [{name: Authorization, value: "{vault://env/openai-key}"}]

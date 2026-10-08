@@ -14,6 +14,7 @@ type Document struct {
 	Consumers      []Consumer      `yaml:"consumers,omitempty"`
 	ConsumerGroups []ConsumerGroup `yaml:"consumer_groups,omitempty"`
 	Plugins        []Plugin        `yaml:"plugins,omitempty"`
+	CustomPlugins  []CustomPlugin  `yaml:"custom_plugins,omitempty"`
 	Vaults         []Vault         `yaml:"vaults,omitempty"`
 	Certificates   []Certificate   `yaml:"certificates,omitempty"`
 	AIModels       []AIModel       `yaml:"ai_models,omitempty"`
@@ -138,6 +139,7 @@ type Plugin struct {
 	ID            string         `yaml:"id,omitempty"`
 	Name          string         `yaml:"name"`
 	Enabled       *bool          `yaml:"enabled,omitempty"`
+	Protocols     []string       `yaml:"protocols,omitempty"`
 	Condition     string         `yaml:"condition,omitempty"`
 	Config        map[string]any `yaml:"config,omitempty"`
 	Service       *StringRef     `yaml:"service,omitempty"`
@@ -148,6 +150,13 @@ type Plugin struct {
 	Tags          []string       `yaml:"tags,omitempty"`
 	TargetSources []TargetSource `yaml:"-"`
 	Source        *Source        `yaml:"-"`
+}
+
+type CustomPlugin struct {
+	ID      string `yaml:"id,omitempty"`
+	Name    string `yaml:"name"`
+	Schema  string `yaml:"schema"`
+	Handler string `yaml:"handler"`
 }
 
 // Source identifies the original AI Gateway entity field which produced a
