@@ -1,0 +1,2 @@
+dynamic_pricing_enabled: true
+dynamic_pricing_uri: https://cluster-1.us.cp.example.com/llmpricing/catalog

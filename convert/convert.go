@@ -47,6 +47,25 @@ type Options struct {
 	// keep targeting the legacy schema (config.source, one shape per route)
 	// for data planes that don't support config.sources yet.
 	ModelSelectorSources *bool `yaml:"model_selector_sources"`
+	// DynamicPricingEnabled, when true, lowers
+	// config.dynamic_pricing.enabled = true into every emitted
+	// ai-proxy-advanced instance, together with DynamicPricingURI as the
+	// block's uri when that option is set (fetch interval stays with the
+	// plugin schema default). A nil pointer (the zero value) emits nothing,
+	// leaving the plugin schema's own default (enabled = false) in effect:
+	// documents converted without this option are byte-identical to before.
+	// Koko sets this for Konnect-managed gateways; the CLI exposes it as
+	// -dynamic-pricing.
+	DynamicPricingEnabled *bool `yaml:"dynamic_pricing_enabled"`
+	// DynamicPricingURI, when set alongside DynamicPricingEnabled, is stamped
+	// as the plugin's dynamic_pricing.uri. Koko fills it with the per-gateway
+	// catalog URL it derives from the cluster's DNS prefix; when empty the
+	// stamp carries only `enabled: true` and the plugin schema's own default
+	// URI (the public catalog) applies. Carrying the URI in the lowered
+	// config keeps the URL reconfigurable: the pattern lives in the config
+	// plane, so changing it is a converter update plus a config push, not a
+	// data-plane release.
+	DynamicPricingURI string `yaml:"dynamic_pricing_uri"`
 }
 
 func (o Options) withDefaults() Options {
