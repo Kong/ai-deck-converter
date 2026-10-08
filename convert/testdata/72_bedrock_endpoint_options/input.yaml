@@ -1,0 +1,39 @@
+# Bedrock targets with a PrivateLink VPC endpoint and an explicit endpoint
+# type. Both keys nest under model.options.bedrock.
+model_providers:
+  - name: bedrock-prod
+    type: bedrock
+    config:
+      auth:
+        type: aws
+        access_key_id: "{vault://ai/aws-access-key-id}"
+        secret_access_key: "{vault://ai/aws-secret-access-key}"
+models:
+  - name: claude-mantle
+    type: model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/mantle]}
+    targets:
+      - name: anthropic.claude-sonnet-4-5
+        provider: bedrock-prod
+        config:
+          type: bedrock
+          region: us-east-1
+          endpoint_type: mantle
+          vpc_endpoint: vpce-0abc123-xyz.bedrock-mantle.us-east-1.vpce.amazonaws.com
+  - name: claude-runtime
+    type: model
+    capabilities: [generate]
+    formats: [{type: bedrock}]
+    config:
+      route: {paths: [/runtime]}
+    targets:
+      - name: anthropic.claude-sonnet-4-5
+        provider: bedrock-prod
+        config:
+          type: bedrock
+          region: us-east-1
+          endpoint_type: runtime
+          vpc_endpoint: vpce-0abc123-xyz.bedrock-runtime.us-east-1.vpce.amazonaws.com

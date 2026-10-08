@@ -641,3 +641,73 @@ model_providers:
 	require.NoError(t, yaml.Unmarshal(out, &doc), "parse output")
 	require.Equal(t, []string{"POST", "OPTIONS"}, doc.Services[0].Routes[0].Methods)
 }
+
+const bedrockProvider = `
+model_providers:
+  - name: b
+    type: bedrock
+    config:
+      auth:
+        type: aws
+        access_key_id: id
+        secret_access_key: secret
+`
+
+func TestBedrockMantleEndpointType(t *testing.T) {
+	for name, tc := range map[string]struct{ model, want string }{
+		"mantle with bedrock format": {
+			`
+  - name: m
+    capabilities: [generate]
+    formats: [{type: bedrock}]
+    targets: [{name: a, provider: b, config: {type: bedrock, region: us-east-1, endpoint_type: mantle}}]`,
+			`targets[0].config.endpoint_type`,
+		},
+		"mantle with bedrock among other formats": {
+			`
+  - name: m
+    capabilities: [generate]
+    formats: [{type: openai}, {type: bedrock}]
+    targets:
+      - {name: a, provider: b, config: {type: bedrock, region: us-east-1}}
+      - {name: c, provider: b, config: {type: bedrock, region: us-east-1, endpoint_type: mantle}}`,
+			`targets[1].config.endpoint_type`,
+		},
+		"mantle with openai format": {
+			`
+  - name: m
+    capabilities: [generate]
+    formats: [{type: openai}]
+    targets: [{name: a, provider: b, config: {type: bedrock, region: us-east-1, endpoint_type: mantle}}]`,
+			"",
+		},
+		"runtime with bedrock format": {
+			`
+  - name: m
+    capabilities: [generate]
+    formats: [{type: bedrock}]
+    targets: [{name: a, provider: b, config: {type: bedrock, region: us-east-1, endpoint_type: runtime}}]`,
+			"",
+		},
+		"endpoint type absent with bedrock format": {
+			`
+  - name: m
+    capabilities: [generate]
+    formats: [{type: bedrock}]
+    targets: [{name: a, provider: b, config: {type: bedrock, region: us-east-1}}]`,
+			"",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, _, err := Convert([]byte("models:"+tc.model+bedrockProvider), Options{Strict: true})
+			if tc.want == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.ErrorContains(t, err, "mantle endpoint type is not supported with the bedrock format")
+			convErr, ok := AsConversionError(err)
+			require.True(t, ok)
+			require.Equal(t, tc.want, convErr.Diagnostics[0].Field)
+		})
+	}
+}
