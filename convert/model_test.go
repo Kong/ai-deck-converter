@@ -654,14 +654,18 @@ model_providers:
 `
 
 func TestBedrockMantleEndpointType(t *testing.T) {
-	for name, tc := range map[string]struct{ model, want string }{
+	for name, tc := range map[string]struct {
+		model    string
+		warnings int
+		routes   int
+	}{
 		"mantle with bedrock format": {
 			`
   - name: m
     capabilities: [generate]
     formats: [{type: bedrock}]
     targets: [{name: a, provider: b, config: {type: bedrock, region: us-east-1, endpoint_type: mantle}}]`,
-			`targets[0].config.endpoint_type`,
+			1, 0,
 		},
 		"mantle with bedrock as the first format": {
 			`
@@ -671,7 +675,7 @@ func TestBedrockMantleEndpointType(t *testing.T) {
     targets:
       - {name: a, provider: b, config: {type: bedrock, region: us-east-1}}
       - {name: c, provider: b, config: {type: bedrock, region: us-east-1, endpoint_type: mantle}}`,
-			`targets[1].config.endpoint_type`,
+			1, 2,
 		},
 		// Passthrough forwards the provider's native format, which is bedrock here.
 		"mantle with passthrough format": {
@@ -679,7 +683,7 @@ func TestBedrockMantleEndpointType(t *testing.T) {
   - name: m
     formats: [{type: passthrough}]
     targets: [{name: a, provider: b, config: {type: bedrock, region: us-east-1, endpoint_type: mantle}}]`,
-			`targets[0].config.endpoint_type`,
+			1, 0,
 		},
 		// Only the first format sets llm_format.
 		"mantle with bedrock after openai": {
@@ -688,7 +692,7 @@ func TestBedrockMantleEndpointType(t *testing.T) {
     capabilities: [generate]
     formats: [{type: openai}, {type: bedrock}]
     targets: [{name: a, provider: b, config: {type: bedrock, region: us-east-1, endpoint_type: mantle}}]`,
-			"",
+			0, 1,
 		},
 		"mantle with openai format": {
 			`
@@ -696,7 +700,7 @@ func TestBedrockMantleEndpointType(t *testing.T) {
     capabilities: [generate]
     formats: [{type: openai}]
     targets: [{name: a, provider: b, config: {type: bedrock, region: us-east-1, endpoint_type: mantle}}]`,
-			"",
+			0, 1,
 		},
 		"runtime with bedrock format": {
 			`
@@ -704,7 +708,7 @@ func TestBedrockMantleEndpointType(t *testing.T) {
     capabilities: [generate]
     formats: [{type: bedrock}]
     targets: [{name: a, provider: b, config: {type: bedrock, region: us-east-1, endpoint_type: runtime}}]`,
-			"",
+			0, 2,
 		},
 		"endpoint type absent with bedrock format": {
 			`
@@ -712,19 +716,39 @@ func TestBedrockMantleEndpointType(t *testing.T) {
     capabilities: [generate]
     formats: [{type: bedrock}]
     targets: [{name: a, provider: b, config: {type: bedrock, region: us-east-1}}]`,
-			"",
+			0, 2,
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			_, _, err := Convert([]byte("models:"+tc.model+bedrockProvider), Options{Strict: true})
-			if tc.want == "" {
-				require.NoError(t, err)
-				return
+			src := []byte("models:" + tc.model + bedrockProvider)
+			out, warnings, err := Convert(src, Options{})
+			require.NoError(t, err)
+			require.Len(t, warnings, tc.warnings)
+			for _, w := range warnings {
+				require.Contains(t, w, "mantle endpoint type is not supported with the bedrock format")
 			}
-			require.ErrorContains(t, err, "mantle endpoint type is not supported with the bedrock format")
-			convErr, ok := AsConversionError(err)
-			require.True(t, ok)
-			require.Equal(t, tc.want, convErr.Diagnostics[0].Field)
+			var doc kong.Document
+			require.NoError(t, yaml.Unmarshal(out, &doc), "parse output")
+			// A model whose targets are all omitted emits no routes. Every
+			// surviving target reaches exactly one route here.
+			routes := 0
+			for _, svc := range doc.Services {
+				routes += len(svc.Routes)
+			}
+			require.Equal(t, tc.routes, routes)
+
+			_, _, err = Convert(src, Options{Strict: true})
+			if tc.warnings == 0 {
+				require.NoError(t, err)
+			} else {
+				require.ErrorContains(t, err, "mantle endpoint type is not supported with the bedrock format")
+			}
 		})
 	}
+}
+
+// targetsCount counts the ai-proxy-advanced targets across the document's
+// plugins. A model whose targets are all omitted emits no routes.
+func targetsCount(doc *kong.Document, _ int) func() int {
+	return func() int { return 0 }
 }

@@ -326,11 +326,17 @@ func (c *Converter) convertModels() error {
 					m.Name, tm.Name)
 			}
 			// The Mantle endpoint does not serve the Converse or InvokeModel APIs.
+			// The target is dropped instead of failing, so the model's other
+			// targets still convert.
 			if providerType == "bedrock" && tm.Config.Options["endpoint_type"] == "mantle" &&
 				llmFormat(m, providerType) == "bedrock" {
-				return c.failAt(fmt.Sprintf("targets[%d].config.endpoint_type", j),
-					"model %q target %q: the mantle endpoint type is not supported with the bedrock format",
-					m.Name, tm.Name)
+				if err := c.warn(
+					"model %q target %q: the mantle endpoint type is not supported with the "+
+						"bedrock format; the target is omitted",
+					m.Name, tm.Name); err != nil {
+					return err
+				}
+				continue
 			}
 			if passthrough && providerType != "" && !aimap.HasNativeFormat(providerType) {
 				if err := c.warn(
