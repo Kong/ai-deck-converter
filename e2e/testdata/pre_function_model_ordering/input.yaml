@@ -19,6 +19,23 @@ models:
     policies: [ ordering-probe ]
     access:
       acls: { allow: [ ], deny: [ ] }
+  - display_name: Unguarded model
+    name: unguarded-model
+    type: model
+    enabled: true
+    capabilities: [ generate ]
+    formats:
+      - type: openai
+    config:
+      route:
+        paths: [ /ai-ordering-probe ]
+        model:
+          values: [ unguarded-alias ]
+    targets:
+      - name: gpt-4o
+        provider: openai-prod
+        config:
+          type: openai
 model_providers:
   - name: openai-prod
     type: openai

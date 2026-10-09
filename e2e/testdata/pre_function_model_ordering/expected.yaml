@@ -28,6 +28,10 @@ plugins:
       sources:
         - body_path: model
           source: body
+    ordering:
+      before:
+        access:
+          - pre-function
     route:
       id: 8ae36805-da7a-55b9-b056-72bde6bb937d
   - id: f3adc007-171c-5519-8763-3a0eef79bde3
@@ -78,24 +82,30 @@ plugins:
       id: 8ae36805-da7a-55b9-b056-72bde6bb937d
     model:
       id: 5b33a0d9-1bc4-51f3-a699-3aef2f6c1913
-  - id: b87bf838-6a66-5b0b-a095-d1f788cb8ba9
-    name: pre-function
+  - id: 75ff22ed-6245-594b-895f-6a9fa36f4581
+    name: ai-proxy-advanced
     config:
-      access:
-        - |
-          local model = ngx.ctx.ai_model
-          return kong.response.exit(200, { selected_model = model and model.name or ngx.null })
-    ordering:
-      before:
-        access:
-          - ai-proxy-advanced
-      after:
-        access:
-          - ai-model-selector
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-4o
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: unguarded-alias
+            name: gpt-4o
+            provider: openai
+          route_type: llm/v1/chat
     route:
       id: 8ae36805-da7a-55b9-b056-72bde6bb937d
     model:
-      id: 59d0dfe0-0ba4-5e7d-aea2-2b0c4e0c2cac
+      id: 140fe612-3634-54ea-837b-79a6da5e6cd8
   - id: 3bf0455b-d140-5afe-b82a-4939a79d1dd4
     name: pre-function
     config:
@@ -103,13 +113,17 @@ plugins:
         - |
           local model = ngx.ctx.ai_model
           return kong.response.exit(200, { selected_model = model and model.name or ngx.null })
-    ordering:
-      before:
-        access:
-          - ai-proxy-advanced
-      after:
-        access:
-          - ai-model-selector
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+    model:
+      id: 59d0dfe0-0ba4-5e7d-aea2-2b0c4e0c2cac
+  - id: b4712490-e073-5b30-8c98-2107b3ce425f
+    name: pre-function
+    config:
+      access:
+        - |
+          local model = ngx.ctx.ai_model
+          return kong.response.exit(200, { selected_model = model and model.name or ngx.null })
     route:
       id: 8ae36805-da7a-55b9-b056-72bde6bb937d
     model:
@@ -123,3 +137,5 @@ ai_models:
     name: ordering-probe-alias-two
     tags:
       - ai-gateway-model-alias-group:ordering-probe-alias-one
+  - id: 140fe612-3634-54ea-837b-79a6da5e6cd8
+    name: unguarded-alias

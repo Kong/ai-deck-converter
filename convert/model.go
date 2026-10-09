@@ -188,6 +188,9 @@ func (c *Converter) convertModels() error {
 	usedRouteNames := map[string]bool{}
 	passthroughMatchers := map[string]string{}
 	identityPluginSeen := map[string]bool{}
+	// selectorBefore holds, per route, the model policy plugin names that
+	// must run after that route's ai-model-selector.
+	selectorBefore := map[string][]string{}
 	// websocketRoutes holds the protocols of each WebSocket route by name.
 	// Plugins on these routes must declare the same protocols to run.
 	websocketRoutes := map[string][]string{}
@@ -656,23 +659,15 @@ func (c *Converter) convertModels() error {
 				// of this policy/ACL plugin per alias, so a request is protected
 				// regardless of which alias it names.
 				//
-				// A plugin outranking ai-model-selector's priority would run
-				// before model selection by default. Its model: FK would then
-				// have no effect. OutranksModelSelector attaches ordering to
-				// place it after ai-model-selector and before ai-proxy-advanced.
-				// This has no runtime effect yet on a model-scoped instance; see
-				// "Assumptions and limitations" in README.md.
-				var ordering *kong.Ordering
-				if aimap.OutranksModelSelector(p.Name) {
-					ordering = &kong.Ordering{
-						After:  &kong.OrderingPhases{Access: []string{"ai-model-selector"}},
-						Before: &kong.OrderingPhases{Access: []string{"ai-proxy-advanced"}},
-					}
+				// Kong cannot read the ordering of a model-scoped plugin before
+				// ai-model-selector sets the model. The route's selector carries
+				// the ordering instead. See "Assumptions and limitations" in README.md.
+				if aimap.OutranksModelSelector(p.Name) && !slices.Contains(selectorBefore[routeName], p.Name) {
+					selectorBefore[routeName] = append(selectorBefore[routeName], p.Name)
 				}
 				for _, alias := range aliases {
 					pCopy := p
 					pCopy.Model = kong.NewStringRef(alias)
-					pCopy.Ordering = ordering
 					guardPlugins = append(guardPlugins, pCopy)
 				}
 			}
@@ -757,11 +752,16 @@ func (c *Converter) convertModels() error {
 					kong.FieldMapping{GeneratedPrefix: "config.path_pattern", SourcePrefix: "config.route.model.path.values"},
 				)
 			}
+			var ordering *kong.Ordering
+			if before := selectorBefore[g.route.Name]; len(before) > 0 {
+				ordering = &kong.Ordering{Before: &kong.OrderingPhases{Access: before}}
+			}
 			c.out.Plugins = append(c.out.Plugins, kong.Plugin{
-				Name:   "ai-model-selector",
-				Route:  kong.NewStringRef(g.route.Name),
-				Config: selectorCfg,
-				Source: source("model", g.route.Source.EntityName, "config.route.model", mappings...),
+				Name:     "ai-model-selector",
+				Route:    kong.NewStringRef(g.route.Name),
+				Config:   selectorCfg,
+				Ordering: ordering,
+				Source:   source("model", g.route.Source.EntityName, "config.route.model", mappings...),
 			})
 		}
 		for _, pg := range g.proxies {

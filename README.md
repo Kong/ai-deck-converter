@@ -119,7 +119,7 @@ See `convert/testdata/*/input.yaml` for worked examples.
 | Certificate | `certificates` entry (`cert`/`key` and the optional `cert_alt`/`key_alt` pair passed through). Kong certificates have no `name`, so the source name is not represented in the output; in `db-less` mode it still seeds the generated `id`. |
 | SNI | Nested under its referenced Certificate's `snis` list (`hostname` → `name`, `labels` → `tags`); decK's file format has no standalone SNI entity. The SNI's own `name`/`display_name` have no Kong counterpart and are dropped. In `db-less` mode SNIs become a top-level `snis` entry referencing the certificate's generated `id`. |
 | Model with `formats: [{type: passthrough}]` | Requires AI Gateway 2.2+. **One route on the bare base path** (every method, no endpoint suffix), whatever `capabilities` it declares — `[]` is fine — with one route-scoped `ai-proxy-advanced` whose targets carry `route_type: passthrough` and no `model_alias`; `llm_format` is the provider's native format (openai for providers without their own). No `ai-model-selector`, no video lifecycle routes, and the model's policies/ACLs are route-scoped rather than `model:`-scoped, since nothing can select an `ai-models` row for a body of unknown shape (the row is still emitted). No `anthropic_version` default is applied. |
-| Model `policies`/`acls` | Top-level plugins scoped to the `ai-models` entity via a `model:` FK. A policy whose plugin type's static Kong priority outranks `ai-model-selector`'s (`aimap.OutranksModelSelector`, e.g. `pre-function`) also gets an `ordering` block intended to force it to run after `ai-model-selector` and before `ai-proxy-advanced` — see "Assumptions and limitations" below, this does not yet have the intended effect at runtime. |
+| Model `policies`/`acls` | Top-level plugins scoped to the `ai-models` entity via a `model:` FK. When a policy's plugin type has a static Kong priority above `ai-model-selector`'s (`aimap.OutranksModelSelector`, e.g. `pre-function`), the route's `ai-model-selector` gets `ordering.before.access` with that plugin name. See "Assumptions and limitations" below. |
 | Agent `access.acls` | Kong `acl` plugin on the agent's Route. |
 | `labels` | `tags` flattened to sorted `key:value` strings. |
 
@@ -236,23 +236,24 @@ and `formats` beyond the first.
   converting the recovered model reproduces the same route/target either way.
 - **Credentials.** Only `api-key` (`keyauth_credentials`) is generated; other
   credential types are warned about and skipped.
-- **`ordering` on a model-scoped policy has no runtime effect yet.** A model
-  policy whose plugin type's static priority outranks `ai-model-selector`'s
-  (`aimap.OutranksModelSelector`, e.g. `pre-function`) gets an `ordering`
-  block (`after: ai-model-selector`, `before: ai-proxy-advanced`) meant to fix
-  that. As of this writing it does not work: Kong builds the `ordering`
-  dependency graph once, at the very start of the access phase, before
-  `ai-model-selector` has set `ngx.ctx.ai_model`. A plugin carrying a `model:`
-  FK can only resolve its own config — `ordering` included — once
-  `ctx.ai_model` is already set, so its `ordering` is invisible to that
-  graph-building pass and the plugin is silently skipped for the whole
-  request instead of being reordered. This is the same catch-22 kong-ee
-  already guards against for consumer-scoped plugins
-  (`kong/db/dao/plugins.lua`'s `check_ordering_validity`), just not yet for
-  model scoping. `e2e/testdata/pre_function_model_ordering` documents this
-  live against a real gateway; the converter still emits the block (harmless
-  today, and ready to start working the moment kong-ee closes the gap)
-  rather than withholding it.
+- **High-priority model policies reorder `ai-model-selector`.** A model
+  policy can outrank `ai-model-selector`, for example `pre-function`. Without
+  reordering, it runs before Kong sets `ngx.ctx.ai_model`, so Kong skips it.
+  An `ordering` block on the model-scoped policy has no effect. Kong reads
+  `ordering` before the model is known, and a model-scoped config is not
+  visible then. The converter adds the policy's plugin name to the route's
+  `ai-model-selector` `ordering.before.access` instead. Side effects:
+  - `ordering` matches plugin names, not instances. On that route, every
+    instance of the named plugin runs after `ai-model-selector`. This
+    includes instances that are not model-scoped.
+  - `ai-model-selector` can then run before authentication plugins.
+  - Any `ordering` in a workspace turns on dynamic plugin ordering for the
+    whole workspace. Dynamic ordering needs an Enterprise license.
+  - A user `ordering` that puts a plugin before `ai-model-selector` makes a
+    cycle. Kong then logs an error and uses the static priorities.
+
+  `e2e/testdata/pre_function_model_ordering` proves this against a real
+  gateway.
 - **MCP upstream.** Passthrough MCP servers without an `upstream_url` get a
   placeholder host and a warning.
 - **Upstream auth.** Agents and MCP Servers carry `config.upstream.auth` (AWS

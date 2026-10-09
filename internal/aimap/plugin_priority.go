@@ -7,6 +7,8 @@ package aimap
 // `plugins-ee/<name>/.../handler.lua`) PRIORITY constant. Re-sync it when
 // kong-ee changes a priority or ships a new plugin; a plugin missing from
 // this table is simply not covered by OutranksModelSelector.
+//
+//nolint:mnd // The values are copies of kong-ee PRIORITY constants.
 var PluginPriority = map[string]int{
 	"pre-function":                   1000000,
 	"app-dynamics":                   999999,
@@ -137,10 +139,6 @@ const AIModelSelectorPriority = 957
 // plugin would execute before the model is selected unless reordered.
 // Unknown plugin types (custom/community plugins not in PluginPriority)
 // report false: their priority can't be known here.
-//
-// Callers attach an ordering block for a true pluginType, but this has no
-// runtime effect yet on a model-scoped plugin instance: see "Assumptions and
-// limitations" in README.md.
 func OutranksModelSelector(pluginType string) bool {
 	p, ok := PluginPriority[pluginType]
 	return ok && p > AIModelSelectorPriority

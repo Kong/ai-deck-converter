@@ -16,6 +16,11 @@ plugins:
       sources:
         - body_path: model
           source: body
+    ordering:
+      before:
+        access:
+          - pre-function
+          - request-validator
     route: openai-chat
   - name: ai-proxy-advanced
     config:
@@ -65,13 +70,6 @@ plugins:
         - |
           local model = ngx.ctx.ai_model
           return kong.response.exit(200, { selected_model = model and model.name or ngx.null })
-    ordering:
-      before:
-        access:
-          - ai-proxy-advanced
-      after:
-        access:
-          - ai-model-selector
     route: openai-chat
     model: '@kong/gpt-4o'
   - name: pre-function
@@ -80,37 +78,16 @@ plugins:
         - |
           local model = ngx.ctx.ai_model
           return kong.response.exit(200, { selected_model = model and model.name or ngx.null })
-    ordering:
-      before:
-        access:
-          - ai-proxy-advanced
-      after:
-        access:
-          - ai-model-selector
     route: openai-chat
     model: '@kong/gpt-4o-alias'
   - name: request-validator
     config:
       body_schema: '[{"type":"object"}]'
-    ordering:
-      before:
-        access:
-          - ai-proxy-advanced
-      after:
-        access:
-          - ai-model-selector
     route: openai-chat
     model: '@kong/gpt-4o'
   - name: request-validator
     config:
       body_schema: '[{"type":"object"}]'
-    ordering:
-      before:
-        access:
-          - ai-proxy-advanced
-      after:
-        access:
-          - ai-model-selector
     route: openai-chat
     model: '@kong/gpt-4o-alias'
 ai_models:

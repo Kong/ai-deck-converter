@@ -37,7 +37,7 @@ func TestE2E(t *testing.T) {
 		run  func(t *testing.T)
 	}{
 		{"single_model_multiple_aliases", func(t *testing.T) { testSingleModelMultipleAliases(t, license) }},
-		{"pre_function_model_ordering", func(t *testing.T) { testPreFunctionModelScopedOrderingIsNotYetEffective(t, license) }},
+		{"pre_function_model_ordering", func(t *testing.T) { testPreFunctionModelPolicyRunsAfterModelSelection(t, license) }},
 		{"gemini_model_all_capabilities", func(t *testing.T) { testGeminiModelAllCapabilities(t, license) }},
 		{"reusable_toolsets_are_internal_only", func(t *testing.T) { testReusableToolsetsAreInternalOnly(t, license) }},
 		{"token_vault_gates_tools_and_enrolls", func(t *testing.T) { testTokenVaultGatesToolsAndEnrolls(t, license) }},
