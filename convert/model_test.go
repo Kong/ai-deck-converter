@@ -641,3 +641,108 @@ model_providers:
 	require.NoError(t, yaml.Unmarshal(out, &doc), "parse output")
 	require.Equal(t, []string{"POST", "OPTIONS"}, doc.Services[0].Routes[0].Methods)
 }
+
+const bedrockProvider = `
+model_providers:
+  - name: b
+    type: bedrock
+    config:
+      auth:
+        type: aws
+        access_key_id: id
+        secret_access_key: secret
+`
+
+func TestBedrockMantleEndpointType(t *testing.T) {
+	for name, tc := range map[string]struct {
+		model    string
+		warnings int
+		routes   int
+	}{
+		"mantle with bedrock format": {
+			`
+  - name: m
+    capabilities: [generate]
+    formats: [{type: bedrock}]
+    targets: [{name: a, provider: b, config: {type: bedrock, region: us-east-1, endpoint_type: mantle}}]`,
+			1, 0,
+		},
+		"mantle with bedrock as the first format": {
+			`
+  - name: m
+    capabilities: [generate]
+    formats: [{type: bedrock}, {type: openai}]
+    targets:
+      - {name: a, provider: b, config: {type: bedrock, region: us-east-1}}
+      - {name: c, provider: b, config: {type: bedrock, region: us-east-1, endpoint_type: mantle}}`,
+			1, 2,
+		},
+		// Passthrough forwards the provider's native format, which is bedrock here.
+		"mantle with passthrough format": {
+			`
+  - name: m
+    formats: [{type: passthrough}]
+    targets: [{name: a, provider: b, config: {type: bedrock, region: us-east-1, endpoint_type: mantle}}]`,
+			1, 0,
+		},
+		// Only the first format sets llm_format.
+		"mantle with bedrock after openai": {
+			`
+  - name: m
+    capabilities: [generate]
+    formats: [{type: openai}, {type: bedrock}]
+    targets: [{name: a, provider: b, config: {type: bedrock, region: us-east-1, endpoint_type: mantle}}]`,
+			0, 1,
+		},
+		"mantle with openai format": {
+			`
+  - name: m
+    capabilities: [generate]
+    formats: [{type: openai}]
+    targets: [{name: a, provider: b, config: {type: bedrock, region: us-east-1, endpoint_type: mantle}}]`,
+			0, 1,
+		},
+		"runtime with bedrock format": {
+			`
+  - name: m
+    capabilities: [generate]
+    formats: [{type: bedrock}]
+    targets: [{name: a, provider: b, config: {type: bedrock, region: us-east-1, endpoint_type: runtime}}]`,
+			0, 2,
+		},
+		"endpoint type absent with bedrock format": {
+			`
+  - name: m
+    capabilities: [generate]
+    formats: [{type: bedrock}]
+    targets: [{name: a, provider: b, config: {type: bedrock, region: us-east-1}}]`,
+			0, 2,
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			src := []byte("models:" + tc.model + bedrockProvider)
+			out, warnings, err := Convert(src, Options{})
+			require.NoError(t, err)
+			require.Len(t, warnings, tc.warnings)
+			for _, w := range warnings {
+				require.Contains(t, w, "mantle endpoint type is not supported with the bedrock format")
+			}
+			var doc kong.Document
+			require.NoError(t, yaml.Unmarshal(out, &doc), "parse output")
+			// A model whose targets are all omitted emits no routes. Every
+			// surviving target reaches exactly one route here.
+			routes := 0
+			for _, svc := range doc.Services {
+				routes += len(svc.Routes)
+			}
+			require.Equal(t, tc.routes, routes)
+
+			_, _, err = Convert(src, Options{Strict: true})
+			if tc.warnings == 0 {
+				require.NoError(t, err)
+			} else {
+				require.ErrorContains(t, err, "mantle endpoint type is not supported with the bedrock format")
+			}
+		})
+	}
+}
