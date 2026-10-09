@@ -32,6 +32,14 @@ func run() error {
 		direction = flag.String("direction", "auto",
 			"conversion direction: auto, to-deck (AI Gateway -> decK), to-dbless (AI Gateway -> db-less), "+
 				"or from-deck (decK -> AI Gateway)")
+		dynamicPricingURI = flag.String("dynamic-pricing-uri", "",
+			"when -dynamic-pricing is set, stamp this URI as config.dynamic_pricing.uri on every emitted "+
+				"ai-proxy-advanced plugin (Koko derives the per-gateway catalog URL; the plugin schema's "+
+				"default URI applies when this is empty)")
+		dynamicPricing = flag.Bool("dynamic-pricing", false,
+			"lower config.dynamic_pricing.enabled = true into every emitted ai-proxy-advanced plugin, "+
+				"so managed data planes poll the price catalog from the plugin schema's default uri. "+
+				"Off by default: without it the plugin schema's own default (enabled = false) applies")
 		modelSelectorSources = flag.Bool("model-selector-sources", true,
 			"target the ai-model-selector config.sources schema (Kong/kong-ee#20858), merging models with "+
 				"different selector shapes onto one route; requires a data plane that supports config.sources. "+
@@ -58,17 +66,21 @@ func run() error {
 	switch dir {
 	case "to-deck":
 		out, warnings, err = convert.Convert(in, convert.Options{
-			Strict:               *strict,
-			LabelTagPrefix:       *tagPrefix,
-			OutputMode:           "deck",
-			ModelSelectorSources: modelSelectorSources,
+			Strict:                *strict,
+			LabelTagPrefix:        *tagPrefix,
+			OutputMode:            "deck",
+			ModelSelectorSources:  modelSelectorSources,
+			DynamicPricingEnabled: dynamicPricing,
+			DynamicPricingURI:     *dynamicPricingURI,
 		})
 	case "to-dbless":
 		out, warnings, err = convert.Convert(in, convert.Options{
-			Strict:               *strict,
-			LabelTagPrefix:       *tagPrefix,
-			OutputMode:           "db-less",
-			ModelSelectorSources: modelSelectorSources,
+			Strict:                *strict,
+			LabelTagPrefix:        *tagPrefix,
+			OutputMode:            "db-less",
+			ModelSelectorSources:  modelSelectorSources,
+			DynamicPricingEnabled: dynamicPricing,
+			DynamicPricingURI:     *dynamicPricingURI,
 		})
 	case "from-deck":
 		out, warnings, err = revert.Revert(in, revert.Options{

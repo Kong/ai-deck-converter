@@ -763,7 +763,7 @@ func (c *Converter) convertModels() error {
 					Enabled:       pg.enabled,
 					Protocols:     protocols,
 					Route:         kong.NewStringRef(pg.routeName),
-					Config:        pg.proxyConfig(),
+					Config:        c.proxyConfig(pg),
 					Tags:          tags,
 					TargetSources: pg.targetSources,
 					Source:        pg.source,
@@ -775,7 +775,7 @@ func (c *Converter) convertModels() error {
 			// ai_models row, so each alias needs its own plugin/FK, with its
 			// targets' model_alias set to that same alias.
 			for _, alias := range pg.aliases {
-				cfg := pg.proxyConfig()
+				cfg := c.proxyConfig(pg)
 				cfg["targets"] = withModelAlias(pg.targets, alias)
 				c.out.Plugins = append(c.out.Plugins, kong.Plugin{
 					Name:          "ai-proxy-advanced",
@@ -847,7 +847,7 @@ func (c *Converter) convertModels() error {
 			Name:          "ai-proxy-advanced",
 			Enabled:       pg.enabled,
 			Route:         kong.NewStringRef(routeName),
-			Config:        pg.proxyConfig(),
+			Config:        c.proxyConfig(pg),
 			TargetSources: pg.targetSources,
 			Source:        pg.source,
 		})
@@ -1059,6 +1059,22 @@ func uniqueModelRouteName(base string, used map[string]bool) string {
 			return name
 		}
 	}
+}
+
+// proxyConfig assembles the group's plugin config and applies the
+// converter-level lowering on top. dynamic_pricing is stamped only when the
+// caller opted in (Koko for Konnect-managed gateways); it is never part of a
+// self-managed document's own configuration.
+func (c *Converter) proxyConfig(pg *proxyGroup) map[string]any {
+	cfg := pg.proxyConfig()
+	if c.opts.DynamicPricingEnabled != nil && *c.opts.DynamicPricingEnabled {
+		dp := map[string]any{"enabled": true}
+		if c.opts.DynamicPricingURI != "" {
+			dp["uri"] = c.opts.DynamicPricingURI
+		}
+		cfg["dynamic_pricing"] = dp
+	}
+	return cfg
 }
 
 // proxyConfig assembles the ai-proxy-advanced plugin config for a proxy group.
