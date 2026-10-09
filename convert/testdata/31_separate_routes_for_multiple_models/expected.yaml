@@ -8,12 +8,14 @@ services:
           - /transcribev0/audio/transcriptions
         methods:
           - POST
+          - OPTIONS
         strip_path: false
       - name: openai-audio-transcribe-2
         paths:
           - /transcribev1/audio/transcriptions
         methods:
           - POST
+          - OPTIONS
         strip_path: false
 plugins:
   - name: ai-model-selector

@@ -8,6 +8,7 @@ services:
           - /ai/chat/completions
         methods:
           - POST
+          - OPTIONS
         strip_path: false
 consumers:
   - username: anonymous

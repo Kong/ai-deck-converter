@@ -84,9 +84,9 @@ const (
 )
 
 var (
-	mPost          = []string{"POST"}
-	mGetPost       = []string{"GET", "POST"}
-	mGetPostDelete = []string{"GET", "POST", "DELETE"}
+	mPost          = []string{"POST", "OPTIONS"}
+	mGetPost       = []string{"GET", "POST", "OPTIONS"}
+	mGetPostDelete = []string{"GET", "POST", "DELETE", "OPTIONS"}
 )
 
 // IsWebSocketEndpoint reports whether spec serves WebSocket traffic.

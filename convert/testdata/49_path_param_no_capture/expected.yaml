@@ -9,6 +9,7 @@ services:
           - /v1/embeddings/chat/completions
         methods:
           - POST
+          - OPTIONS
         strip_path: false
       - name: openai-embeddings
         paths:
@@ -16,6 +17,7 @@ services:
           - /v1/embeddings/embeddings
         methods:
           - POST
+          - OPTIONS
         strip_path: false
 plugins:
   - name: ai-model-selector

@@ -10,6 +10,7 @@ services:
           - GET
           - POST
           - DELETE
+          - OPTIONS
         strip_path: false
       - name: anthropic-skills
         paths:
@@ -18,6 +19,7 @@ services:
           - GET
           - POST
           - DELETE
+          - OPTIONS
         strip_path: false
 plugins:
   - name: ai-proxy-advanced

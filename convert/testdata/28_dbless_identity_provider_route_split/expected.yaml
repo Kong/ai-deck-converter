@@ -16,6 +16,7 @@ routes:
       - /oidc-repro/model-a/chat/completions
     methods:
       - POST
+      - OPTIONS
     protocols:
       - http
       - https
@@ -28,6 +29,7 @@ routes:
       - /oidc-repro/model-b/chat/completions
     methods:
       - POST
+      - OPTIONS
     protocols:
       - http
       - https

@@ -16,6 +16,7 @@ routes:
       - /xai-chat/chat/completions
     methods:
       - POST
+      - OPTIONS
     protocols:
       - http
       - https
@@ -28,6 +29,7 @@ routes:
       - /openai-chat/chat/completions
     methods:
       - POST
+      - OPTIONS
     protocols:
       - http
       - https
