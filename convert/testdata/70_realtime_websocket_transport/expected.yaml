@@ -8,6 +8,7 @@ services:
           - /mixed/chat/completions
         methods:
           - POST
+          - OPTIONS
         strip_path: false
   - name: ai-gateway-websocket
     url: ws://ai-gateway.upstream.local

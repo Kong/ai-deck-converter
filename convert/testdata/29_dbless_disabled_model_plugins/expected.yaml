@@ -16,6 +16,7 @@ routes:
       - /disabled-chat/responses
     methods:
       - POST
+      - OPTIONS
     protocols:
       - http
       - https
@@ -28,6 +29,7 @@ routes:
       - /disabled-chat/chat/completions
     methods:
       - POST
+      - OPTIONS
     protocols:
       - http
       - https
@@ -40,6 +42,7 @@ routes:
       - /disabled-chat/images/generations
     methods:
       - POST
+      - OPTIONS
     protocols:
       - http
       - https

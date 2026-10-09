@@ -8,18 +8,21 @@ services:
           - /ai/chat/completions
         methods:
           - POST
+          - OPTIONS
         strip_path: false
       - name: openai-chat-2
         paths:
           - /ai/chat/completions
         methods:
           - POST
+          - OPTIONS
         strip_path: false
       - name: openai-chat-3
         paths:
           - /ai/chat/completions
         methods:
           - POST
+          - OPTIONS
         strip_path: false
 plugins:
   - name: ai-model-selector

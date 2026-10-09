@@ -16,6 +16,7 @@ routes:
       - /v1/chat/completions
     methods:
       - POST
+      - OPTIONS
     protocols:
       - http
       - https

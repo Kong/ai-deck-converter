@@ -8,6 +8,7 @@ services:
           - /ai/videos
         methods:
           - POST
+          - OPTIONS
         strip_path: false
       - name: openai-videos-lifecycle
         paths:

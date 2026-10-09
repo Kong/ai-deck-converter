@@ -8,6 +8,7 @@ import (
 	"github.com/Kong/ai-deck-converter/internal/aimap"
 	"github.com/Kong/ai-deck-converter/internal/kong"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 func TestPathParamCapturedAllSyntaxes(t *testing.T) {
@@ -592,4 +593,51 @@ func TestSelectorConfigBodySize(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestDefaultRouteMethods(t *testing.T) {
+	src := []byte(`
+models:
+  - display_name: GPT-5.2
+    id: 5b3e8cba-2cb7-4fd4-888e-20a6727230f2
+    name: gpt-5-2
+    type: model
+    enabled: true
+    capabilities: [generate]
+    formats:
+      - type: openai
+    config:
+      route:
+        paths: [/ai]
+      response_streaming: allow
+    targets:
+      - name: gpt-5.2
+        provider: openai-prod
+        config:
+          type: openai
+          temperature: 1.0
+          max_tokens: 1024
+    policies: []
+    access:
+      acls: {allow: [], deny: []}
+model_providers:
+  - name: openai-prod
+    type: openai
+    display_name: OpenAI Prod
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://ai/openai-token}"
+`)
+	out, warnings, err := Convert(src, Options{Strict: true})
+
+	require.NotNil(t, out)
+	require.NoError(t, err)
+	require.Empty(t, warnings)
+
+	var doc kong.Document
+	require.NoError(t, yaml.Unmarshal(out, &doc), "parse output")
+	require.Equal(t, []string{"POST", "OPTIONS"}, doc.Services[0].Routes[0].Methods)
 }

@@ -9,6 +9,7 @@ services:
         methods:
           - GET
           - POST
+          - OPTIONS
         strip_path: false
       - name: openai-files
         paths:
@@ -17,6 +18,7 @@ services:
           - GET
           - POST
           - DELETE
+          - OPTIONS
         strip_path: false
 plugins:
   - name: ai-proxy-advanced
