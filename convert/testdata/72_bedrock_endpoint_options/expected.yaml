@@ -8,6 +8,7 @@ services:
           - /mantle/chat/completions
         methods:
           - POST
+          - OPTIONS
         strip_path: false
       - name: bedrock-converse
         paths:
@@ -15,6 +16,7 @@ services:
         methods:
           - GET
           - POST
+          - OPTIONS
         strip_path: false
       - name: bedrock-invoke
         paths:
@@ -22,6 +24,7 @@ services:
         methods:
           - GET
           - POST
+          - OPTIONS
         strip_path: false
 plugins:
   - name: ai-model-selector
