@@ -23,7 +23,7 @@ agents:
           region: us-east-1
 `)
 
-	out, warnings, err := Convert(src, Options{})
+	out, warnings, err := convertYAML(src, Options{})
 	require.NoError(t, err)
 	require.NotEmpty(t, warnings)
 	require.Contains(t, strings.Join(warnings, "\n"), "unsupported upstream auth type")

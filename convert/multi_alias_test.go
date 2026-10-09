@@ -33,7 +33,7 @@ models:
 `
 
 func TestConvertMultiAliasValuesFanOut(t *testing.T) {
-	out, warnings, err := Convert([]byte(multiAliasSrc), Options{})
+	out, warnings, err := convertYAML([]byte(multiAliasSrc), Options{})
 	require.NoError(t, err, "convert")
 	require.Empty(t, warnings, "no warnings expected")
 
@@ -129,7 +129,7 @@ models:
         model:
           values: ["@kong/gpt-4o", "@kong/gpt-4o-alias"]
 `
-	out, warnings, err := Convert([]byte(src), Options{})
+	out, warnings, err := convertYAML([]byte(src), Options{})
 	require.NoError(t, err, "convert")
 	require.Empty(t, warnings, "no warnings expected")
 
@@ -192,7 +192,7 @@ models:
         provider: openai-provider
         config: {type: openai}
 `
-	out, warnings, err := Convert([]byte(src), Options{})
+	out, warnings, err := convertYAML([]byte(src), Options{})
 	require.NoError(t, err, "convert")
 	require.Contains(t, strings.Join(warnings, "\n"), "duplicate alias values",
 		"duplicate route.model.values entries are reported")

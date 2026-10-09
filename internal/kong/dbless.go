@@ -1,5 +1,7 @@
 package kong
 
+import "fmt"
+
 // DBLessFormatVersion reuses the declarative config version used by the decK output.
 const DBLessFormatVersion = FormatVersion
 
@@ -28,6 +30,30 @@ func NewDBLessDocument() *DBLessDocument {
 		FormatVersion: DBLessFormatVersion,
 		Transform:     false,
 	}
+}
+
+// Metadata returns the AI Gateway source of each generated entity.
+// Locations use the flat db-less layout, e.g. routes[0].
+func (d *DBLessDocument) Metadata() *ConversionMetadata {
+	metadata := &ConversionMetadata{}
+	for index, plugin := range d.Plugins {
+		metadata.appendPlugin(index, fmt.Sprintf("plugins[%d]", index), plugin.Source, plugin.TargetSources)
+	}
+	for index, route := range d.Routes {
+		if route.Source != nil {
+			metadata.Routes = append(metadata.Routes, generatedEntitySource(
+				index, fmt.Sprintf("routes[%d]", index), route.Source,
+			))
+		}
+	}
+	for index, service := range d.Services {
+		if service.Source != nil {
+			metadata.Services = append(metadata.Services, generatedEntitySource(
+				index, fmt.Sprintf("services[%d]", index), service.Source,
+			))
+		}
+	}
+	return metadata
 }
 
 type DBLessService struct {

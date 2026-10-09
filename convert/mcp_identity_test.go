@@ -117,7 +117,7 @@ mcp_servers:
 `
 
 func TestMCPOAuth2FallsBackToIssuerForAuthServers(t *testing.T) {
-	out, warnings, err := Convert([]byte(oidcMetadataWithoutAuthServers), Options{})
+	out, warnings, err := convertYAML([]byte(oidcMetadataWithoutAuthServers), Options{})
 	require.NoError(t, err)
 	require.Empty(t, warnings)
 	s := string(out)
@@ -174,7 +174,7 @@ mcp_servers:
 `
 
 func TestMCPOAuth2MapsIdentityFields(t *testing.T) {
-	out, warnings, err := Convert([]byte(oidcWithMappedFields), Options{})
+	out, warnings, err := convertYAML([]byte(oidcWithMappedFields), Options{})
 	require.NoError(t, err)
 	require.Empty(t, warnings)
 	s := string(out)
@@ -257,7 +257,7 @@ mcp_servers:
 `
 
 func TestMCPOAuth2DerivesAudienceAndPassthrough(t *testing.T) {
-	out, warnings, err := Convert([]byte(oidcWithAudienceAndPassthrough), Options{})
+	out, warnings, err := convertYAML([]byte(oidcWithAudienceAndPassthrough), Options{})
 	require.NoError(t, err)
 	require.Empty(t, warnings)
 	s := string(out)

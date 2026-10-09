@@ -16,6 +16,7 @@ import (
 	"bytes"
 	"fmt"
 
+	publicaigw "github.com/Kong/ai-deck-converter/aigw"
 	"github.com/Kong/ai-deck-converter/internal/aigw"
 	"github.com/Kong/ai-deck-converter/internal/aimap"
 	"github.com/Kong/ai-deck-converter/internal/kong"
@@ -72,7 +73,7 @@ func marshalYAML(v any) ([]byte, error) {
 // RevertDocument translates a parsed Kong decK document into an AI Gateway
 // document, returning collected warnings. Unconvertible entities are warnings
 // unless Options.Strict is set, in which case they become errors.
-func RevertDocument(doc *kong.Document, opts Options) (*aigw.Document, []string, error) { //nolint:revive
+func RevertDocument(doc *kong.Document, opts Options) (*publicaigw.Document, []string, error) { //nolint:revive
 
 	r := newReverter(doc, opts)
 	if err := r.run(); err != nil {

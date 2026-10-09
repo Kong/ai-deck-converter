@@ -47,7 +47,6 @@ cat input.yaml | ./ai-deck-converter -
 | `-direction` | `auto` | Conversion direction: `auto`, `to-deck` (AI Gateway → decK), `to-dbless` (AI Gateway → db-less), or `from-deck` (decK → AI Gateway). Auto-detection keys off `_format_version`, which only decK documents carry. |
 | `-strict` | `false` | Treat unresolved references and unconvertible entities as errors instead of warnings. |
 | `-label-tag-prefix` | `""` | Prefix for label-derived tags, e.g. `aigw/` (prepended when converting to decK, stripped when reverting). |
-| `-model-selector-sources` | `true` | Target the `ai-model-selector` `config.sources` schema (Kong/kong-ee#20858), merging models with different selector shapes onto one shared route instead of one route per shape. Only for data planes new enough to support `config.sources` — they don't accept the legacy `config.source` it replaces. Set to `false` to keep targeting the legacy schema for data planes that don't support `config.sources` yet. |
 
 Warnings (unresolved references, unsupported features, placeholders, dropped
 entities) are printed to stderr; the converted config still goes to stdout/`-o`.
@@ -61,14 +60,16 @@ import (
 )
 
 // AI Gateway -> Kong decK
-out, warnings, err := convert.Convert(srcYAML, convert.Options{})
+doc, warnings, err := convert.Convert(srcYAML, convert.Options{})
+deckYAML, err := doc.ToYAML()               // or doc.ToDBLess().ToYAML()
+metadata := doc.Metadata()                  // or doc.ToDBLess().Metadata()
 
 // Kong decK -> AI Gateway
-out, warnings, err = revert.Revert(deckYAML, revert.Options{})
+aigwYAML, warnings, err := revert.Revert(deckYAML, revert.Options{})
 ```
 
-`convert.ConvertDocument` / `revert.RevertDocument` are also available if you
-already hold a parsed `aigw.Document` / `kong.Document`.
+`revert.RevertDocument` is also available if you already hold a parsed
+`kong.Document`.
 
 ## Input format
 

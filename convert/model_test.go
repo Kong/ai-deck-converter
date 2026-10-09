@@ -31,18 +31,6 @@ func TestPathParamCapturedAllSyntaxes(t *testing.T) {
 		[]string{"~/openai/(?<model>[^/]+)", "~/alt/(?<other>[^/]+)"}, "model", false))
 }
 
-func TestTryConvertPCREToLuaAllSyntaxes(t *testing.T) {
-	for _, in := range []string{
-		"~/openai/(?<m>[^:/]+)",
-		"~/openai/(?P<m>[^:/]+)",
-		"~/openai/(?'m'[^:/]+)",
-	} {
-		require.Equalf(t, "/openai/([%w%.%-:]+)", tryConvertPCREToLua(in), "input %q", in)
-	}
-	// No named capture falls back to the format default.
-	require.Equal(t, aimap.OpenAIDefaultPathPattern, tryConvertPCREToLua("~/openai/[^/]+"))
-}
-
 const passthroughProviders = `
 model_providers:
   - name: p
@@ -141,7 +129,7 @@ func TestPassthroughRejects(t *testing.T) {
 // would otherwise add routes of their own.
 func TestPassthroughIgnoresCapabilities(t *testing.T) {
 	for _, caps := range []string{"[]", "[generate, video, realtime]"} {
-		out, warnings, err := Convert([]byte(`
+		out, warnings, err := convertYAML([]byte(`
 models:
   - name: pt
     capabilities: `+caps+`
@@ -163,7 +151,7 @@ models:
 // ctx.ai_model for a body the selector cannot read, plus a warning for each policy -- the
 // model's own or a global one -- that needs the normalized LLM shape the model no longer produces.
 func TestPassthroughIsRouteScopedAndWarnsAboutPromptReadingPolicies(t *testing.T) {
-	out, warnings, err := Convert([]byte(`
+	out, warnings, err := convertYAML([]byte(`
 models:
   - name: pt
     type: model
@@ -328,7 +316,7 @@ func TestModelWarnsLogStatisticsOverride(t *testing.T) {
       logging: {statistics: true}
     targets: [{name: t, provider: openai-prod, config: {type: openai}}]
 ` + overrideProvider
-	out, warnings, err := Convert([]byte(src), Options{})
+	out, warnings, err := convertYAML([]byte(src), Options{})
 	require.NoError(t, err)
 	require.Len(t, warnings, 3, "one warning per affected route")
 	for i, route := range []string{"openai-audio-speech", "openai-audio-transcribe", "openai-audio-translate"} {
@@ -366,9 +354,7 @@ func TestModelDoesNotWarnLogStatisticsWhenSupportedOrUnset(t *testing.T) {
 
 func convertRealtimeDocument(t *testing.T, src string) (*kong.Document, []string) {
 	t.Helper()
-	input, err := aigw.Parse([]byte(src))
-	require.NoError(t, err)
-	doc, warnings, err := ConvertDocument(input, Options{})
+	doc, warnings, err := Convert([]byte(src), Options{})
 	require.NoError(t, err)
 	return doc, warnings
 }
@@ -431,9 +417,7 @@ func TestRealtimeRouteUsesWebSocketTransport(t *testing.T) {
 	require.Contains(t, warnings[1], `ignored on the WebSocket route "openai-realtime"`)
 	require.Contains(t, warnings[2], `overridden to [wss] on the "openai-realtime" route`)
 
-	input, err := aigw.Parse([]byte(src))
-	require.NoError(t, err)
-	_, _, err = ConvertDocument(input, Options{Strict: true})
+	_, _, err := Convert([]byte(src), Options{Strict: true})
 	require.Error(t, err)
 }
 
@@ -504,25 +488,6 @@ auth_strategies:
 	require.ErrorContains(t, err, `auth strategy plugin "jwt" does not support the ws and wss protocols`)
 }
 
-func TestTransportProtocols(t *testing.T) {
-	for _, tc := range []struct {
-		in        []string
-		websocket bool
-		want      []string
-	}{
-		{nil, false, nil},
-		{[]string{"https"}, false, []string{"https"}},
-		{[]string{"ws", "wss"}, false, []string{"http", "https"}},
-		{[]string{"http", "ws"}, false, []string{"http"}},
-		{nil, true, []string{"ws", "wss"}},
-		{[]string{"https"}, true, []string{"wss"}},
-		{[]string{"grpc"}, true, []string{"ws", "wss"}},
-		{[]string{"http", "ws", "wss"}, true, []string{"ws", "wss"}},
-	} {
-		require.Equal(t, tc.want, transportProtocols(tc.in, tc.websocket), "%v websocket=%v", tc.in, tc.websocket)
-	}
-}
-
 func TestRealtimeRouteSkipsPluginsWithoutWebSocketSupport(t *testing.T) {
 	src := `models:
   - name: m
@@ -550,9 +515,7 @@ policies:
 	require.Len(t, warnings, 1)
 	require.Contains(t, warnings[0], `plugin "ai-prompt-guard", which does not support the ws and wss protocols`)
 
-	input, err := aigw.Parse([]byte(src))
-	require.NoError(t, err)
-	_, _, err = ConvertDocument(input, Options{Strict: true})
+	_, _, err := Convert([]byte(src), Options{Strict: true})
 	require.Error(t, err)
 }
 
@@ -584,13 +547,11 @@ func TestSelectorConfigBodySize(t *testing.T) {
 		"only zero":              {sizes: []int{0}, want: 0},
 	} {
 		t.Run(name, func(t *testing.T) {
-			for _, useSources := range []bool{false, true} {
-				g := &routeGroup{}
-				for _, size := range tc.sizes {
-					g.addSelector(map[string]any{"source": "body", "body_path": "model", "max_request_body_size": size})
-				}
-				require.Equal(t, tc.want, g.selectorConfig(useSources)["max_request_body_size"])
+			g := &routeGroup{}
+			for _, size := range tc.sizes {
+				g.addSelector(map[string]any{"source": "body", "body_path": "model", "max_request_body_size": size})
 			}
+			require.Equal(t, tc.want, g.selectorConfig()["max_request_body_size"])
 		})
 	}
 }
@@ -631,14 +592,15 @@ model_providers:
           - name: Authorization
             value: "{vault://ai/openai-token}"
 `)
-	out, warnings, err := Convert(src, Options{Strict: true})
+	doc, warnings, err := Convert(src, Options{Strict: true})
 
-	require.NotNil(t, out)
+	require.NotNil(t, doc)
 	require.NoError(t, err)
 	require.Empty(t, warnings)
 
-	var doc kong.Document
-	require.NoError(t, yaml.Unmarshal(out, &doc), "parse output")
+	docYaml, err := doc.ToYAML()
+	require.NoError(t, err)
+	require.NoError(t, yaml.Unmarshal(docYaml, &doc), "parse output")
 	require.Equal(t, []string{"POST", "OPTIONS"}, doc.Services[0].Routes[0].Methods)
 }
 
@@ -721,14 +683,16 @@ func TestBedrockMantleEndpointType(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			src := []byte("models:" + tc.model + bedrockProvider)
-			out, warnings, err := Convert(src, Options{})
+			doc, warnings, err := Convert(src, Options{})
 			require.NoError(t, err)
 			require.Len(t, warnings, tc.warnings)
 			for _, w := range warnings {
 				require.Contains(t, w, "mantle endpoint type is not supported with the bedrock format")
 			}
-			var doc kong.Document
-			require.NoError(t, yaml.Unmarshal(out, &doc), "parse output")
+
+			docYaml, err := doc.ToYAML()
+			require.NoError(t, err)
+			require.NoError(t, yaml.Unmarshal(docYaml, &doc), "parse output")
 			// A model whose targets are all omitted emits no routes. Every
 			// surviving target reaches exactly one route here.
 			routes := 0

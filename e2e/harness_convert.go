@@ -31,7 +31,7 @@ func convertCase(t *testing.T, caseName string, patch func(src []byte) ([]byte, 
 		t.Fatalf("reading input.yaml: %v", err)
 	}
 
-	out, warnings, err := convert.Convert(src, convert.Options{OutputMode: "db-less"})
+	out, warnings, err := convertDBLess(src)
 	if err != nil {
 		t.Fatalf("converting %s: %v", caseDir, err)
 	}
@@ -64,7 +64,7 @@ func convertCase(t *testing.T, caseName string, patch func(src []byte) ([]byte, 
 		if err != nil {
 			t.Fatalf("patching input.yaml: %v", err)
 		}
-		converted, _, err = convert.Convert(patchedSrc, convert.Options{OutputMode: "db-less"})
+		converted, _, err = convertDBLess(patchedSrc)
 		if err != nil {
 			t.Fatalf("converting patched %s: %v", caseDir, err)
 		}
@@ -74,6 +74,15 @@ func convertCase(t *testing.T, caseName string, patch func(src []byte) ([]byte, 
 	writeFile(t, configPath, string(converted))
 	writeArtifact(t, "converted.yaml", string(converted))
 	return configPath
+}
+
+func convertDBLess(src []byte) ([]byte, []string, error) {
+	doc, warnings, err := convert.Convert(src, convert.Options{})
+	if err != nil {
+		return nil, warnings, err
+	}
+	out, err := doc.ToDBLess().ToYAML()
+	return out, warnings, err
 }
 
 func writeArtifact(t *testing.T, name, content string) {
