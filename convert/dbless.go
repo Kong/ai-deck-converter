@@ -232,6 +232,7 @@ func toDBLessPlugin(plugin kong.Plugin, id string, scope scopeRef) kong.DBLessPl
 		Protocols:     plugin.Protocols,
 		Condition:     plugin.Condition,
 		Config:        plugin.Config,
+		Ordering:      plugin.Ordering,
 		Service:       toDBLessFK(scope.service),
 		Route:         toDBLessFK(scope.route),
 		Consumer:      toDBLessFK(scope.consumer),

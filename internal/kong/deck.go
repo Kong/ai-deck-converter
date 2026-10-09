@@ -142,6 +142,7 @@ type Plugin struct {
 	Protocols     []string       `yaml:"protocols,omitempty"`
 	Condition     string         `yaml:"condition,omitempty"`
 	Config        map[string]any `yaml:"config,omitempty"`
+	Ordering      *Ordering      `yaml:"ordering,omitempty"`
 	Service       *StringRef     `yaml:"service,omitempty"`
 	Route         *StringRef     `yaml:"route,omitempty"`
 	Consumer      *StringRef     `yaml:"consumer,omitempty"`
@@ -150,6 +151,17 @@ type Plugin struct {
 	Tags          []string       `yaml:"tags,omitempty"`
 	TargetSources []TargetSource `yaml:"-"`
 	Source        *Source        `yaml:"-"`
+}
+
+// Ordering reorders one plugin instance relative to named others. Kong's
+// dynamic ordering only supports the access phase.
+type Ordering struct {
+	Before *OrderingPhases `yaml:"before,omitempty"`
+	After  *OrderingPhases `yaml:"after,omitempty"`
+}
+
+type OrderingPhases struct {
+	Access []string `yaml:"access,omitempty"`
 }
 
 type CustomPlugin struct {
