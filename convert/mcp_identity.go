@@ -27,7 +27,7 @@ var mcpListenerTypes = map[string]bool{
 // path to the route when an ai-mcp-oauth2 plugin is produced. It returns nil
 // when the server declares no identity/metadata access.
 //
-// Unlike agents and models (convert/identityprovider.go), MCP auth never
+// Unlike agents and models (convert/authstrategy.go), MCP auth never
 // synthesizes an anonymous consumer / request-termination: the ai-mcp-oauth2
 // plugin's consumer mapping is optional, and a bare key-auth plugin on the
 // route enforces on its own.

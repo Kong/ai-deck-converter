@@ -1,17 +1,16 @@
 package aigw
 
-import "gopkg.in/yaml.v3"
+import (
+	"fmt"
+
+	"gopkg.in/yaml.v3"
+)
 
 // AuthStrategy is an AI Gateway auth strategy. Its `type` equals a Kong
 // authentication plugin name (key-auth or openid-connect) and its config is
 // passed through. Auth strategies are referenced by name from an entity's
 // access.auth_strategies list and instantiated as a scoped authentication
 // plugin on that entity's route.
-//
-// The entity was previously called an "identity provider". The deprecated
-// `identity_providers` spellings — both the document key (see
-// Document.UnmarshalYAML) and the access reference list (see
-// deprecatedAuthStrategyRefs) — are still accepted on input and never emitted.
 type AuthStrategy struct {
 	ID          string         `yaml:"id,omitempty"`
 	Type        string         `yaml:"type,omitempty"`
@@ -21,25 +20,17 @@ type AuthStrategy struct {
 	Labels      Labels         `yaml:"labels,omitempty"`
 }
 
-// IdentityProvider is the former name of AuthStrategy.
-//
-// Deprecated: use AuthStrategy.
-type IdentityProvider = AuthStrategy
-
-// deprecatedAuthStrategyRefs is the superseded spelling of an access block's
-// auth_strategies reference list.
-type deprecatedAuthStrategyRefs struct {
-	IdentityProviders []string `yaml:"identity_providers,omitempty"`
-}
-
-// appendDeprecatedAuthStrategyRefs decodes the deprecated identity_providers
-// key out of an access-block node and appends it to refs, which holds whatever
-// the current auth_strategies key carried. References under the current key
-// come first; a block may set either (or, transitionally, both).
-func appendDeprecatedAuthStrategyRefs(node *yaml.Node, refs []string) ([]string, error) {
-	var deprecated deprecatedAuthStrategyRefs
-	if err := node.Decode(&deprecated); err != nil {
-		return nil, err
+// rejectIdentityProviders returns an error if node has an identity_providers key.
+// The key was renamed to auth_strategies.
+// An ignored key would remove authentication from the output without an error.
+func rejectIdentityProviders(node *yaml.Node) error {
+	if node.Kind != yaml.MappingNode {
+		return nil
 	}
-	return append(refs, deprecated.IdentityProviders...), nil
+	for i := 0; i+1 < len(node.Content); i += 2 {
+		if key := node.Content[i]; key.Value == "identity_providers" {
+			return fmt.Errorf("line %d: identity_providers was renamed to auth_strategies", key.Line)
+		}
+	}
+	return nil
 }

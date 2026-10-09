@@ -1,4 +1,4 @@
-identity_providers:
+auth_strategies:
   - display_name: Okta OIDC
     name: okta-oidc
     type: openid-connect
@@ -18,7 +18,7 @@ mcp_servers:
       route:
         paths: [/mcp/secure]
     access:
-      identity_providers: [okta-oidc]
+      auth_strategies: [okta-oidc]
       metadata:
         endpoint: /mcp/secure/.well-known/oauth-protected-resource
         resource: https://api.example.com/mcp/secure
