@@ -746,9 +746,3 @@ func TestBedrockMantleEndpointType(t *testing.T) {
 		})
 	}
 }
-
-// targetsCount counts the ai-proxy-advanced targets across the document's
-// plugins. A model whose targets are all omitted emits no routes.
-func targetsCount(doc *kong.Document, _ int) func() int {
-	return func() int { return 0 }
-}
