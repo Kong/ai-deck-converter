@@ -10,13 +10,15 @@ type Labels map[string]string
 // ACLs holds allow/deny lists referencing Consumers, Consumer Groups, or
 // Authenticated Groups.
 type ACLs struct {
-	Allow []string `yaml:"allow,omitempty"`
-	Deny  []string `yaml:"deny,omitempty"`
+	Allow     []string `yaml:"allow,omitempty"`
+	Deny      []string `yaml:"deny,omitempty"`
+	AllowWhen []string `yaml:"allow_when,omitempty"`
+	DenyWhen  []string `yaml:"deny_when,omitempty"`
 }
 
 // IsEmpty reports whether the ACL has no allow or deny entries.
 func (a ACLs) IsEmpty() bool {
-	return len(a.Allow) == 0 && len(a.Deny) == 0
+	return len(a.Allow) == 0 && len(a.Deny) == 0 && len(a.AllowWhen) == 0 && len(a.DenyWhen) == 0
 }
 
 // RouteConfig is the AI Gateway route configuration (a subset of Kong Route

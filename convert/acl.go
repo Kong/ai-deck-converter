@@ -19,6 +19,12 @@ func aclBlock(acls aigw.ACLs) map[string]any {
 	if len(acls.Deny) > 0 {
 		config["deny"] = acls.Deny
 	}
+	if len(acls.AllowWhen) > 0 {
+		config["allow_when"] = acls.AllowWhen
+	}
+	if len(acls.DenyWhen) > 0 {
+		config["deny_when"] = acls.DenyWhen
+	}
 	return config
 }
 
@@ -34,8 +40,10 @@ func mergeACLs(base, extra aigw.ACLs) aigw.ACLs {
 		return extra
 	}
 	return aigw.ACLs{
-		Allow: append(append([]string{}, base.Allow...), extra.Allow...),
-		Deny:  append(append([]string{}, base.Deny...), extra.Deny...),
+		Allow:     append(append([]string{}, base.Allow...), extra.Allow...),
+		Deny:      append(append([]string{}, base.Deny...), extra.Deny...),
+		AllowWhen: append(append([]string{}, base.AllowWhen...), extra.AllowWhen...),
+		DenyWhen:  append(append([]string{}, base.DenyWhen...), extra.DenyWhen...),
 	}
 }
 
