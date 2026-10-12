@@ -29,6 +29,26 @@ func hasCELExpressions(acls aigw.ACLs) bool {
 	return len(acls.AllowWhen) > 0 || len(acls.DenyWhen) > 0
 }
 
+// aclFieldsSet names the acl-plugin config fields an ACL populates, in schema
+// order. The Kong acl plugin declares all four mutually exclusive, so more
+// than one name means the ACL has no valid single-plugin representation.
+func aclFieldsSet(acls aigw.ACLs) []string {
+	var set []string
+	if len(acls.Allow) > 0 {
+		set = append(set, "allow")
+	}
+	if len(acls.Deny) > 0 {
+		set = append(set, "deny")
+	}
+	if len(acls.AllowWhen) > 0 {
+		set = append(set, "allow_when")
+	}
+	if len(acls.DenyWhen) > 0 {
+		set = append(set, "deny_when")
+	}
+	return set
+}
+
 // mergeACLs unions two AI Gateway ACLs' allow and deny lists, base first, so a
 // broader ACL (a server-wide acls block) and a narrower one (default_tool_acls)
 // both apply instead of one shadowing the other. Duplicate subjects are kept
