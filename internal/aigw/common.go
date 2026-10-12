@@ -7,7 +7,7 @@ package aigw
 // Labels is the AI Gateway PublicLabels map (key -> value).
 type Labels map[string]string
 
-// ACLs holds allow/deny lists referencing Consumers, Consumer Groups, or
+// ACLs holds allow/deny/allow_when/deny_when lists referencing Consumers, Consumer Groups, or
 // Authenticated Groups.
 type ACLs struct {
 	Allow     []string `yaml:"allow,omitempty"`

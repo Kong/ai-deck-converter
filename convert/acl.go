@@ -6,12 +6,11 @@ import (
 )
 
 // aclBlock builds an {allow, deny} config map from an AI Gateway ACL. Returns
-// nil when both lists are empty. Reused by the Kong acl plugin (for Models,
-// Agents) and by the ai-mcp-proxy plugin's internal ACL fields.
+// nil when both lists are empty. This is the shape every consumer accepts:
+// the ai-mcp-proxy plugin's default_acl entries and tools[].acl records define
+// only allow and deny, and Kong rejects an unknown record key outright. The
+// CEL when-expressions live on the acl plugin alone, so aclPlugin adds them.
 func aclBlock(acls aigw.ACLs) map[string]any {
-	if acls.IsEmpty() {
-		return nil
-	}
 	config := map[string]any{}
 	if len(acls.Allow) > 0 {
 		config["allow"] = acls.Allow
@@ -19,13 +18,15 @@ func aclBlock(acls aigw.ACLs) map[string]any {
 	if len(acls.Deny) > 0 {
 		config["deny"] = acls.Deny
 	}
-	if len(acls.AllowWhen) > 0 {
-		config["allow_when"] = acls.AllowWhen
-	}
-	if len(acls.DenyWhen) > 0 {
-		config["deny_when"] = acls.DenyWhen
+	if len(config) == 0 {
+		return nil
 	}
 	return config
+}
+
+// hasCELExpressions reports whether an ACL carries CEL when-expressions.
+func hasCELExpressions(acls aigw.ACLs) bool {
+	return len(acls.AllowWhen) > 0 || len(acls.DenyWhen) > 0
 }
 
 // mergeACLs unions two AI Gateway ACLs' allow and deny lists, base first, so a
@@ -69,6 +70,14 @@ func aclPlugin(acls aigw.ACLs) kong.Plugin {
 	config := aclBlock(acls)
 	if config == nil {
 		config = map[string]any{}
+	}
+	// The acl plugin is the only consumer whose schema defines the CEL
+	// when-expressions.
+	if len(acls.AllowWhen) > 0 {
+		config["allow_when"] = acls.AllowWhen
+	}
+	if len(acls.DenyWhen) > 0 {
+		config["deny_when"] = acls.DenyWhen
 	}
 	config["include_consumer_groups"] = true
 	return kong.Plugin{Name: "acl", Config: config}

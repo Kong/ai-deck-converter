@@ -406,9 +406,10 @@ func mergeAliasIntoGroup(g *modelGroup, alias string, refs []string, acls aigw.A
 	g.mergedFKs = append(g.mergedFKs, alias)
 }
 
-// mergeACLs folds src into dst, appending allow/deny/allow_when/deny_when entries in first-seen
-// order with dedup, so ACL rules carried by several of a model's aliases (or
-// by several model-scoped acl plugins) union instead of overwriting each
+// mergeACLs folds src into dst, appending allow, deny, allow_when, and
+// deny_when entries in first-seen order with dedup. ACL rules carried by
+// several of a model's aliases or by several model-scoped acl plugins union
+// instead of overwriting each other.
 func mergeACLs(dst *aigw.ACLs, src aigw.ACLs) {
 	for _, name := range src.Allow {
 		if !slices.Contains(dst.Allow, name) {
