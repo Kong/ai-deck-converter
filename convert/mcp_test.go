@@ -479,6 +479,8 @@ mcp_servers:
 
 // mcpWhenACLInput templates an MCP server whose ACL block is supplied by the
 // caller, so one fixture covers the server-wide and per-tool placements.
+//
+//nolint:gosec
 const mcpWhenACLInput = `
 mcp_servers:
   - type: listener
