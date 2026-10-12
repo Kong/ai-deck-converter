@@ -79,7 +79,7 @@ func TestRevertMCPOAuth2MetadataOnly(t *testing.T) {
 	require.NotContains(t, s, "auth_strategies:")
 }
 
-// mcpOAuth2MappedFields carries the mapped identity fields on an ai-mcp-oauth2
+// mcpOAuth2MappedFields carries the mapped auth strategy fields on an ai-mcp-oauth2
 // plugin; revert must lift them back onto a synthesized openid-connect provider
 // (re-wrapping the scalar/path first-of kinds and renaming jwt_claims_leeway).
 const mcpOAuth2MappedFields = `
@@ -120,7 +120,7 @@ services:
                   path: [user, id]
 `
 
-func TestRevertMCPOAuth2MapsIdentityFields(t *testing.T) {
+func TestRevertMCPOAuth2MapsAuthStrategyFields(t *testing.T) {
 	out, warnings, err := Revert([]byte(mcpOAuth2MappedFields), Options{})
 	require.NoError(t, err)
 	require.Empty(t, warnings)
@@ -144,7 +144,7 @@ func TestRevertMCPOAuth2MapsIdentityFields(t *testing.T) {
 	require.Contains(t, s, "client_auth:\n        - client_secret_post")
 	// FirstOfPaths re-wraps the single path into an array-of-paths.
 	require.Contains(t, s, "consumer_claims:\n        - - sub")
-	// The identity fields belong to the provider, not the metadata block.
+	// The auth strategy fields belong to the provider, not the metadata block.
 	require.Contains(t, s, "metadata:")
 }
 

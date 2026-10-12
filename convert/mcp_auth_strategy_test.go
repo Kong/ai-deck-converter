@@ -48,7 +48,7 @@ func TestMCPKeyAuthWithMetadataIsHardError(t *testing.T) {
 	}
 }
 
-// oidcOnUnsupportedListener puts identity/metadata access on an
+// oidcOnUnsupportedListener puts auth strategy and metadata access on an
 // upstream-server MCP server, which does not support it.
 const oidcOnUnsupportedListener = `
 auth_strategies:
@@ -75,7 +75,7 @@ mcp_servers:
         description: An upstream tool
 `
 
-func TestMCPIdentityUnsupportedListenerIsHardError(t *testing.T) {
+func TestMCPAuthStrategyUnsupportedListenerIsHardError(t *testing.T) {
 	_, _, err := Convert([]byte(oidcOnUnsupportedListener), Options{})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "only supported for listener, conversion-listener, and passthrough-listener")
@@ -127,7 +127,7 @@ func TestMCPOAuth2FallsBackToIssuerForAuthServers(t *testing.T) {
 		"issuer should populate authorization_servers when metadata omits them")
 }
 
-// oidcWithMappedFields carries a spread of the Gap 1 & 2 identity fields plus
+// oidcWithMappedFields carries a spread of the Gap 1 & 2 auth strategy fields plus
 // an OIDC-only field (cache_tokens_salt) that has no ai-mcp-oauth2 target.
 const oidcWithMappedFields = `
 auth_strategies:
@@ -173,7 +173,7 @@ mcp_servers:
         host: mapped.internal
 `
 
-func TestMCPOAuth2MapsIdentityFields(t *testing.T) {
+func TestMCPOAuth2MapsAuthStrategyFields(t *testing.T) {
 	out, warnings, err := convertYAML([]byte(oidcWithMappedFields), Options{})
 	require.NoError(t, err)
 	require.Empty(t, warnings)

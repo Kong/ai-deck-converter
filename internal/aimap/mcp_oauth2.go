@@ -79,7 +79,7 @@ var OIDCToMCPOAuth2Fields = []OAuth2FieldMap{
 
 // Two further openid-connect fields map onto ai-mcp-oauth2 by semantic
 // derivation rather than a plain field copy, so they live as explicit,
-// mirrored logic in convert/mcp_identity.go and revert/mcp_identity.go rather
+// mirrored logic in convert/mcp_auth_strategy.go and revert/mcp_auth_strategy.go rather
 // than in OIDCToMCPOAuth2Fields. The behavioral contract is specified here so
 // the two directions share one definition:
 //
