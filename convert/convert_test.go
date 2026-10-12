@@ -1,6 +1,7 @@
 package convert
 
 import (
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -437,6 +438,99 @@ model_providers:
 	require.Error(t, err, "acl with both allow and deny must be rejected")
 	require.Contains(t, err.Error(), "allow")
 	require.Contains(t, err.Error(), "deny")
+}
+
+// The acl plugin's only_one_of spans all four fields (config.allow,
+// config.deny, config.allow_when, config.deny_when), so any pair is invalid,
+// not just allow+deny. The per-field golden cases each populate one list, so
+// the combinations are covered here.
+func TestConvertRejectsACLWithMultipleFields(t *testing.T) {
+	const tmpl = `
+models:
+  - type: model
+    name: guarded
+    capabilities: [generate]
+    formats: [{type: openai}]
+    targets:
+      - name: gpt-4o
+        provider: p1
+        config: {type: openai}
+    access:
+      acls:
+%s
+    config:
+      route: {paths: [/ai]}
+model_providers:
+  - name: p1
+    type: openai
+`
+	cases := []struct {
+		name  string
+		acls  string
+		wants []string
+	}{
+		{
+			name: "allow_when and deny_when",
+			acls: `        allow_when: ["principal.metadata.admin == 'true'"]
+        deny_when: ["principal.metadata.banned == 'true'"]`,
+			wants: []string{"allow_when", "deny_when"},
+		},
+		{
+			name: "allow and allow_when",
+			acls: `        allow: [premium]
+        allow_when: ["principal.metadata.admin == 'true'"]`,
+			wants: []string{"allow", "allow_when"},
+		},
+		{
+			name: "deny and deny_when",
+			acls: `        deny: [banned]
+        deny_when: ["principal.metadata.banned == 'true'"]`,
+			wants: []string{"deny", "deny_when"},
+		},
+		{
+			name: "allow and deny_when",
+			acls: `        allow: [premium]
+        deny_when: ["principal.metadata.banned == 'true'"]`,
+			wants: []string{"allow", "deny_when"},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Invalid for every output layout, so it fails without -strict.
+			_, _, err := Convert([]byte(fmt.Sprintf(tmpl, tc.acls)), Options{})
+			require.Error(t, err, "acl setting several mutually exclusive fields must be rejected")
+			for _, want := range tc.wants {
+				require.Contains(t, err.Error(), want)
+			}
+		})
+	}
+}
+
+// A single when-list stays valid: the guard must reject combinations only.
+func TestConvertAcceptsACLWithOnlyAllowWhen(t *testing.T) {
+	src := []byte(`
+models:
+  - type: model
+    name: guarded
+    capabilities: [generate]
+    formats: [{type: openai}]
+    targets:
+      - name: gpt-4o
+        provider: p1
+        config: {type: openai}
+    access:
+      acls:
+        allow_when: ["principal.metadata.admin == 'true'"]
+    config:
+      route: {paths: [/ai]}
+model_providers:
+  - name: p1
+    type: openai
+`)
+	out, _, err := Convert(src, Options{})
+	require.NoError(t, err, "a lone allow_when must still convert")
+	require.NotNil(t, out)
 }
 
 // The skills API is served only as passthrough, so Kong rejects a llm/v1/skills

@@ -335,7 +335,17 @@ func (c *Converter) mcpPlugin(m *aigw.MCPServer) (kong.Plugin, error) {
 	// than one shadowing the other.
 	setIfNotEmpty(cfg, "acl_attribute_type", m.Access.ACLAttributeType)
 	setIfNotEmpty(cfg, "access_token_claim_field", m.Access.AccessTokenClaimField)
-	if acl := defaultACLBlock(mergeACLs(m.Access.ACLs, m.Access.DefaultToolACLs)); acl != nil {
+	serverACLs := mergeACLs(m.Access.ACLs, m.Access.DefaultToolACLs)
+	// ai-mcp-proxy's default_acl entries define only scope/allow/deny. Emitting
+	// a when-expression there makes Kong reject the whole config, and dropping
+	// it silently would weaken or remove the authored access control.
+	if hasCELExpressions(serverACLs) {
+		return kong.Plugin{}, c.failAt("access.acls",
+			"MCP server %q sets allow_when/deny_when, which ai-mcp-proxy cannot represent; "+
+				"CEL expressions are supported only on policies that lower to the acl plugin",
+			m.Name)
+	}
+	if acl := defaultACLBlock(serverACLs); acl != nil {
 		cfg["default_acl"] = acl
 	}
 	// include_consumer_groups is set by default, mirroring aclPlugin() in convert/acl.go: AI Gateway's
@@ -403,6 +413,14 @@ func (c *Converter) mcpTools(serverName string, tools []aigw.MCPTool) ([]map[str
 		setIfNotEmptyMap(tool, "annotations", t.Annotations)
 		setIfNotEmptyMap(tool, "input_schema", t.InputSchema)
 		setIfNotEmptyMap(tool, "output_schema", t.OutputSchema)
+		// tools[].acl defines only allow/deny, same as default_acl entries.
+		if hasCELExpressions(t.Access.ACLs) {
+			return nil, c.failAt("tools.access.acls",
+				"MCP server %q tool %q sets allow_when/deny_when, which ai-mcp-proxy cannot "+
+					"represent; CEL expressions are supported only on policies that lower to "+
+					"the acl plugin",
+				serverName, t.Name)
+		}
 		if acl := aclBlock(t.Access.ACLs); acl != nil {
 			tool["acl"] = acl
 		}

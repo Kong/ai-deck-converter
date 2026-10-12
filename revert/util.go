@@ -70,8 +70,10 @@ func toStrings(v any) []string {
 // aclsFromBlock reads an {allow, deny} config map into an aigw.ACLs.
 func aclsFromBlock(block map[string]any) aigw.ACLs {
 	return aigw.ACLs{
-		Allow: toStrings(block["allow"]),
-		Deny:  toStrings(block["deny"]),
+		Allow:     toStrings(block["allow"]),
+		Deny:      toStrings(block["deny"]),
+		AllowWhen: toStrings(block["allow_when"]),
+		DenyWhen:  toStrings(block["deny_when"]),
 	}
 }
 
