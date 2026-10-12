@@ -42,7 +42,7 @@ func TestCapabilitiesFor(t *testing.T) {
 	// The gemini section covers Gemini and Gemini Enterprise endpoints alike, whichever provider serves it.
 	for _, providerType := range []string{"gemini", "vertex"} {
 		require.Equal(t,
-			[]string{"generate", "batches", "embeddings", "files", "image", "rerank", "video"},
+			[]string{"generate", "batches", "embeddings", "files", "image", "realtime", "rerank", "video"},
 			CapabilitiesFor("gemini", providerType), providerType)
 	}
 	// A format whose section is provider-independent.
@@ -90,6 +90,9 @@ func TestGeminiEnterpriseEndpoints(t *testing.T) {
 		"rerank":  {loc + "/rankingConfigs/(?<config_name>[^:/]+):rank"},
 		"batches": {"/v1beta/batches", loc + "/batchPredictionJobs"},
 		"files":   {"(?:upload/)?v1beta/files"},
+		// Gemini Live is one WebSocket endpoint, so it has no Gemini
+		// Enterprise secondary to pair with.
+		"realtime": {"/realtime"},
 	}
 	require.Len(t, EndpointTable["gemini"], len(want), "gemini capabilities")
 	for capability, paths := range want {
