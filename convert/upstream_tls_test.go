@@ -74,7 +74,7 @@ func TestConvertUpstreamTLSWarnings(t *testing.T) {
 			require.Equal(t, tt.wantWarning, issue.Reason)
 			doc := result.Output
 			require.Len(t, doc.Services, 1)
-			require.Equal(t, tt.wantCert, doc.Services[0].ClientCertificate)
+			require.Equal(t, tt.wantCert, map[string]string(doc.Services[0].ClientCertificate))
 			require.Equal(t, tt.wantCAs, doc.Services[0].CACertificates)
 		})
 	}

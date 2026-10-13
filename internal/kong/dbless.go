@@ -57,19 +57,19 @@ func (d *DBLessDocument) Metadata() *ConversionMetadata {
 }
 
 type DBLessService struct {
-	ID                string            `yaml:"id"`
-	Name              string            `yaml:"name"`
-	URL               string            `yaml:"url,omitempty"`
-	Host              string            `yaml:"host,omitempty"`
-	Port              *int              `yaml:"port,omitempty"`
-	Protocol          string            `yaml:"protocol,omitempty"`
-	Path              string            `yaml:"path,omitempty"`
-	Enabled           *bool             `yaml:"enabled,omitempty"`
-	Retries           *int              `yaml:"retries,omitempty"`
-	ClientCertificate map[string]string `yaml:"client_certificate,omitempty"`
-	CACertificates    []string          `yaml:"ca_certificates,omitempty"`
-	Tags              []string          `yaml:"tags,omitempty"`
-	Source            *Source           `yaml:"-"`
+	ID                string   `yaml:"id"`
+	Name              string   `yaml:"name"`
+	URL               string   `yaml:"url,omitempty"`
+	Host              string   `yaml:"host,omitempty"`
+	Port              *int     `yaml:"port,omitempty"`
+	Protocol          string   `yaml:"protocol,omitempty"`
+	Path              string   `yaml:"path,omitempty"`
+	Enabled           *bool    `yaml:"enabled,omitempty"`
+	Retries           *int     `yaml:"retries,omitempty"`
+	ClientCertificate IDRef    `yaml:"client_certificate,omitempty"`
+	CACertificates    []string `yaml:"ca_certificates,omitempty"`
+	Tags              []string `yaml:"tags,omitempty"`
+	Source            *Source  `yaml:"-"`
 }
 
 type DBLessRoute struct {

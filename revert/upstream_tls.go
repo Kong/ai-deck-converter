@@ -17,14 +17,19 @@ func (r *Reverter) upstreamTLS(owner string, svc *kong.Service) (certs, caCerts 
 		}
 	}
 	for _, id := range svc.CACertificates {
-		name, ok := r.caCertificateNameByID(id)
-		if !ok {
-			if err := r.warn("%s references unknown CA certificate id %q", owner, id); err != nil {
-				return nil, nil, err
-			}
-			continue
+		name, found := r.caCertificateNameByID(id)
+		var err error
+		switch {
+		case !found:
+			err = r.warn("%s references unknown CA certificate id %q", owner, id)
+		case name == "":
+			err = r.warn("%s references CA certificate id %q, which has no ai-gateway-name tag; dropped", owner, id)
+		default:
+			caCerts = append(caCerts, name)
 		}
-		caCerts = append(caCerts, name)
+		if err != nil {
+			return nil, nil, err
+		}
 	}
 	return certs, caCerts, nil
 }
@@ -44,7 +49,7 @@ func (r *Reverter) caCertificateNameByID(id string) (string, bool) {
 			continue
 		}
 		name, _ := aimap.DecodeCACertificateName(r.src.CACertificates[i].Tags)
-		return name, name != ""
+		return name, true
 	}
 	return "", false
 }
