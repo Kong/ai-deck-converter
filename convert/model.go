@@ -174,6 +174,15 @@ type modelPass struct {
 //
 // Models share routes and plugins. A model that fails can have changed them
 // already, so a failure starts a new pass that leaves out that model.
+//
+// # Known issue: each failed model restarts the pass
+//
+// A new pass converts every model that is not skipped again. A model that
+// succeeded in an earlier pass gives the same result again. The cost grows
+// with the number of models times the number of failed models. A document
+// without failed models has no extra cost.
+// A potential fix is having each failing model undo its own changes and
+// continue the same pass without restarting.
 func (c *Converter) convertModels() {
 	out := *c.out
 	issueCount := len(c.issues)
