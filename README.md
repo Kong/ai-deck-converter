@@ -45,11 +45,50 @@ cat input.yaml | ./ai-deck-converter -
 |---|---|---|
 | `-o` | stdout | Output file path. |
 | `-direction` | `auto` | Conversion direction: `auto`, `to-deck` (AI Gateway → decK), `to-dbless` (AI Gateway → db-less), or `from-deck` (decK → AI Gateway). Auto-detection keys off `_format_version`, which only decK documents carry. |
-| `-strict` | `false` | Treat unresolved references and unconvertible entities as errors instead of warnings. |
+| `-strict` | `false` | Exit non-zero on warnings too. For `to-deck`/`to-dbless`, any issue fails the run. For `from-deck`, unresolved references and unconvertible entities become errors. |
 | `-label-tag-prefix` | `""` | Prefix for label-derived tags, e.g. `aigw/` (prepended when converting to decK, stripped when reverting). |
 
-Warnings (unresolved references, unsupported features, placeholders, dropped
-entities) are printed to stderr; the converted config still goes to stdout/`-o`.
+Conversion issues are printed to stderr, one per line, as
+`SEVERITY CODE kind "name" [fields]: reason`. The converted config always goes
+to stdout/`-o`. The exit code is 1 when an issue has the `ERROR` severity, or on
+any issue with `-strict`. The reverse direction prints `warning:` lines.
+
+## Conversion issues
+
+`convert.Convert` returns a `ConversionResult`: the Kong document, its
+metadata, and every issue found during the run. It returns an `error` only when
+the whole run fails, for example on invalid YAML. The caller decides which
+issues stop its workflow. See
+[RFC 00207](docs/decisions/00207-conversion-issue-reporting.md) for the design.
+
+Each `ConversionIssue` has a `Code`, a `Severity`, a `Source`, and a `Reason`:
+
+- **Severity** is `WARNING` (the converter worked around the issue) or `ERROR`
+  (the output is invalid or diverges from the user intent).
+- **Code** is one of `MISSING_REQUIRED_CONFIG_FIELD`, `UNDEFINED_REFERENCE`,
+  `CONFIG_FIELD_OVERRIDDEN`, `CONFIG_FIELD_DROPPED`, `CONFIG_FIELD_IGNORED`,
+  `CONFIG_FIELD_INVALID`, `BEHAVIOR_MAY_DIFFER`, or `INTERNAL_ERROR`. One code can
+  occur with either severity. Handle an unknown code by its severity.
+- **Source** names the entity: `Kind` is the singular form of its top-level
+  document key (`model`, `mcp_server`, `agent`, `policy`, `custom_policy`,
+  `auth_strategy`, `consumer`, `consumer_group`, `sni`, ...). `Fields` are
+  paths relative to the entity, such as `targets[0].provider`.
+- **Reason** is a human-readable message. It is not API, so do not parse it.
+
+The converter continues after every issue. These rules decide what it emits:
+
+- An entity that cannot be converted is left out with an `ERROR`. The other
+  entities still convert. A panic in one entity gives `INTERNAL_ERROR`.
+- A nested item that cannot be converted, such as an MCP tool without a
+  `description` or a model target with an unknown provider, is left out with a
+  `WARNING`. A model whose targets are all left out is itself left out with an
+  `ERROR`.
+- An entity that references an unknown or unconvertible auth strategy is left
+  out, so it is never generated unprotected.
+- A global or referenced policy that cannot be converted is left out with an
+  `ERROR`. The entities that reference it still convert.
+- When two models conflict, for example two passthrough models on one path,
+  the later model in the document is left out.
 
 ## Library
 
@@ -60,9 +99,12 @@ import (
 )
 
 // AI Gateway -> Kong decK
-doc, warnings, err := convert.Convert(srcYAML, convert.Options{})
-deckYAML, err := doc.ToYAML()               // or doc.ToDBLess().ToYAML()
-metadata := doc.Metadata()                  // or doc.ToDBLess().Metadata()
+result, err := convert.Convert(srcYAML, convert.Options{})
+for _, issue := range result.Issues {
+    if issue.Severity == convert.Error { /* stop, or report */ }
+}
+deckYAML, err := result.Output.ToYAML()     // or result.Output.ToDBLess().ToYAML()
+metadata := result.Metadata                 // or result.Output.ToDBLess().Metadata()
 
 // Kong decK -> AI Gateway
 aigwYAML, warnings, err := revert.Revert(deckYAML, revert.Options{})
@@ -110,7 +152,7 @@ See `convert/testdata/*/input.yaml` for worked examples.
 | Agent (`a2a`) | Service (`config.url`) + Route + `ai-a2a-proxy` plugin (logging). `config.upstream.auth` (AWS SigV4) lowers to the plugin's `auth` record, and `config.proxy` to `proxy_config`. |
 | Agent (`http`) | Service (`config.url`) + Route, no AI plugin. |
 | Policy | Kong plugin (`name` = policy `type`, config passed through). `global: true` -> one top-level plugin; otherwise instantiated per referencing entity. |
-| Datastore | Not a standalone entity. Referenced by name from a Policy's `datastores` field, or from a Model's `datastores` field (only when that model's balancer is `semantic`); its `config` is merged into that policy's plugin config at a path fixed by the plugin's type (`config.redis` for most; `config.storage_config.redis` for `acme`; `config.resources.cache.redis` for `datakit`; `config.vectordb.<redis\|pgvector>` for the VectorDB family, sub-block and `strategy` chosen by the Datastore's `type`). On a Model it replaces the connection sub-block of ai-proxy-advanced `config.vectordb` — the model keeps its own `dimensions`/`distance_metric`/`threshold`, and only `redis-ee` or `vectordb` types are accepted. Rejected if the plugin type doesn't support a Datastore, or if the Datastore's `type` isn't one that plugin accepts. An unknown reference only warns and converts without it (a Policy or a Model); `-strict` turns that warning into an error, same as any other unresolved reference. |
+| Datastore | Not a standalone entity. Referenced by name from a Policy's `datastores` field, or from a Model's `datastores` field (only when that model's balancer is `semantic`); its `config` is merged into that policy's plugin config at a path fixed by the plugin's type (`config.redis` for most; `config.storage_config.redis` for `acme`; `config.resources.cache.redis` for `datakit`; `config.vectordb.<redis\|pgvector>` for the VectorDB family, sub-block and `strategy` chosen by the Datastore's `type`). On a Model it replaces the connection sub-block of ai-proxy-advanced `config.vectordb` — the model keeps its own `dimensions`/`distance_metric`/`threshold`, and only `redis-ee` or `vectordb` types are accepted. Rejected if the plugin type doesn't support a Datastore, or if the Datastore's `type` isn't one that plugin accepts. An unknown reference gives an `UNDEFINED_REFERENCE` error, and the Policy or Model converts without the connection. |
 | Auth Strategy | Kong authentication plugin (`name` = strategy `type`: `key-auth` or `openid-connect`, config passed through) on the route of each entity whose `access.auth_strategies` references it, with `config.anonymous` pointing at a synthesized `anonymous` consumer that a `request-termination` plugin rejects with a 401. Models with different auth-strategy sets never share a route. |
 | Consumer | Consumer (`username` = name, `custom_id`), `groups` membership, nested `keyauth_credentials`, scoped policy plugins. |
 | Consumer Group | `consumer_groups` entry + scoped policy plugins. |
@@ -219,8 +261,10 @@ and `formats` beyond the first.
   routes. The anonymous consumer's `request-termination` cannot run on
   WebSocket either, so a realtime auth plugin has no `anonymous` fallback, a
   model with more than one auth strategy cannot declare `realtime`, and an
-  auth strategy whose plugin type rejects `ws`/`wss` (e.g. `jwt`) fails the
-  conversion rather than silently leaving the route unprotected.
+  auth strategy whose plugin type rejects `ws`/`wss` (e.g. `jwt`) leaves out
+  the model rather than silently leaving the route unprotected. A global
+  authentication policy cannot protect a WebSocket route either, so it leaves
+  out every model with the `realtime` capability. The global policy stays.
 - **Mostly one endpoint per capability.** Each (section, capability) maps to an
   `aimap.EndpointEntry` with a primary canonical endpoint, plus any secondaries
   in its `Secondary` field (currently just bedrock `generate`, also served by
@@ -241,8 +285,8 @@ and `formats` beyond the first.
   placeholder host and a warning.
 - **Upstream auth.** Agents and MCP Servers carry `config.upstream.auth` (AWS
   SigV4, `type: aws`), which maps to the `ai-a2a-proxy` / `ai-mcp-proxy` `auth`
-  record (`provider: aws_iam`, nested `aws_iam` options). Unsupported auth types
-  are warned about and dropped. The plugin's `aws_iam.bearer_token` has no AI
+  record (`provider: aws_iam`, nested `aws_iam` options). An unsupported auth
+  type leaves out the agent or MCP server with an error. The plugin's `aws_iam.bearer_token` has no AI
   Gateway representation, so the reverse direction warns and drops it.
 - **Token Vault.** An MCP Server's top-level `token_vault` (`directory`,
   `provider`, optional `redis` + `encryption_secrets`) lowers to the
@@ -294,8 +338,8 @@ and `formats` beyond the first.
 - **Labels** are lossy as tags when a value contains `:`.
 - **Passthrough models.** A passthrough model cannot share its base path with
   another passthrough model, be combined with another format, or use the
-  `semantic` balancer; a databricks target needs `upstream_url`. All are
-  conversion errors. Policies that read the normalized LLM shape (guardrails,
+  `semantic` balancer. Each leaves out the model with an error. A databricks
+  target without `upstream_url` is left out with a warning. Policies that read the normalized LLM shape (guardrails,
   prompt decorators/templates/compressor, RAG injector, semantic cache,
   LLM-as-judge, and `ai-sanitizer` when `anonymize` includes credentials,
   which is its default) produce a

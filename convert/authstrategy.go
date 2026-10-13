@@ -1,6 +1,7 @@
 package convert
 
 import (
+	"fmt"
 	"maps"
 
 	"github.com/Kong/ai-deck-converter/internal/aigw"
@@ -18,26 +19,23 @@ const (
 )
 
 // scopedAuthStrategyPlugins builds one authentication plugin per auth strategy
-// reference, each configured to fall back to the anonymous consumer. Warnings
-// name owner as the entity that references the strategy.
-func (c *Converter) scopedAuthStrategyPlugins(owner string, refs []string) ([]kong.Plugin, error) {
+// reference of the entity src, each configured to fall back to the anonymous
+// consumer. An unknown reference fails the entity, so it is never left
+// unprotected.
+func (c *Converter) scopedAuthStrategyPlugins(src ConversionIssueSource, refs []string) ([]kong.Plugin, error) {
 	var plugins []kong.Plugin
 	seen := map[string]bool{}
-	for _, ref := range refs {
+	for i, ref := range refs {
 		if seen[ref] {
 			continue
 		}
 		seen[ref] = true
 		idp := c.authStrategies[ref]
 		if idp == nil {
-			if err := c.warn("unknown auth strategy reference %q", ref); err != nil {
-				return nil, err
-			}
-			continue
+			return nil, c.fail(src.at(fmt.Sprintf("access.auth_strategies[%d]", i)), UndefinedReference,
+				"unknown auth strategy reference %q", ref)
 		}
-		if err := c.warnAuthStrategyOverrides(owner, idp); err != nil {
-			return nil, err
-		}
+		c.warnAuthStrategyOverrides(idp)
 		plugins = append(plugins, authStrategyPlugin(idp))
 	}
 	return plugins, nil
@@ -45,29 +43,25 @@ func (c *Converter) scopedAuthStrategyPlugins(owner string, refs []string) ([]ko
 
 // warnAuthStrategyOverrides reports the auth strategy config values that
 // authStrategyPlugin replaces.
-func (c *Converter) warnAuthStrategyOverrides(owner string, idp *aigw.AuthStrategy) error {
+func (c *Converter) warnAuthStrategyOverrides(idp *aigw.AuthStrategy) {
+	src := issueSource(kindAuthStrategy, idp.Name)
 	if v := idp.Config["anonymous"]; !isEmptyConfigValue(v) && v != "" && v != anonymousConsumerName {
-		if err := c.warn(
-			"%s references auth strategy %q, which sets config.anonymous to %v. "+
+		c.warn(src.at("config.anonymous"), ConfigFieldOverridden,
+			"auth strategy %q sets config.anonymous to %v. "+
 				"This will be ignored, and anonymous will be overridden to %q "+
 				"to reject unauthenticated requests with a request-termination plugin.",
-			owner, idp.Name, v, anonymousConsumerName); err != nil {
-			return err
-		}
+			idp.Name, v, anonymousConsumerName)
 	}
 	if idp.Type == "key-auth" && keyAuthPrincipalsEnabled(idp.Config) {
 		if v, ok := idp.Config["identity_realms"]; ok && !isEmptyConfigValue(v) {
-			if err := c.warn(
-				"%s references auth strategy %q, which enables config.principals "+
+			c.warn(src.at("config.identity_realms"), ConfigFieldOverridden,
+				"auth strategy %q enables config.principals "+
 					"and sets config.identity_realms. "+
 					"This will be ignored, and identity_realms will be overridden to [] "+
 					"because the key-auth schema requires it when principals is enabled.",
-				owner, idp.Name); err != nil {
-				return err
-			}
+				idp.Name)
 		}
 	}
-	return nil
 }
 
 // authStrategyPlugin builds a Kong authentication plugin from an AI

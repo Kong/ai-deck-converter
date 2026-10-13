@@ -166,9 +166,10 @@ ai_models:
 	aigwYAML, err := yaml.Marshal(doc)
 	require.NoError(t, err, "marshal reverted document")
 
-	redeck, warnings, err := convert.Convert(aigwYAML, convert.Options{})
+	result, err := convert.Convert(aigwYAML, convert.Options{})
 	require.NoError(t, err, "re-convert")
-	require.Empty(t, warnings, "no warnings expected")
+	require.Empty(t, result.Issues, "no issues expected")
+	redeck := result.Output
 	require.Len(t, redeck.AIModels, 2, "still one ai-models entry per alias")
 
 	// Regression check: must still say "@kong/openai" per the tag, not

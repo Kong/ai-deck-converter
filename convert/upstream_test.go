@@ -1,14 +1,12 @@
 package convert
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
 
-// An unsupported upstream auth type warns (non-strict) and drops the auth
-// block, and is fatal under -strict.
+// An unsupported upstream auth type leaves out the agent.
 func TestConvertUpstreamAuthUnsupportedType(t *testing.T) {
 	src := []byte(`
 agents:
@@ -22,13 +20,10 @@ agents:
           type: gcp
           region: us-east-1
 `)
-
-	out, warnings, err := convertYAML(src, Options{})
+	result, err := Convert(src, Options{})
 	require.NoError(t, err)
-	require.NotEmpty(t, warnings)
-	require.Contains(t, strings.Join(warnings, "\n"), "unsupported upstream auth type")
-	require.NotContains(t, string(out), "auth:", "unsupported auth must not be emitted")
-
-	_, _, err = Convert(src, Options{Strict: true})
-	require.Error(t, err, "unsupported upstream auth type must be fatal in strict mode")
+	issue := requireIssue(t, result.Issues, Error, ConfigFieldInvalid, kindAgent, "booking-agent",
+		"config.upstream.auth.type")
+	require.Contains(t, issue.Reason, "unsupported upstream auth type")
+	require.Empty(t, result.Output.Services)
 }

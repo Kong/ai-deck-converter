@@ -1,8 +1,6 @@
 package convert
 
 import (
-	"fmt"
-
 	"github.com/Kong/ai-deck-converter/internal/aigw"
 	"github.com/Kong/ai-deck-converter/internal/aimap"
 	"github.com/Kong/ai-deck-converter/internal/kong"
@@ -11,72 +9,77 @@ import (
 // convertAgents translates AI Gateway agents into a Gateway Service + Route.
 // "a2a" agents additionally get an ai-a2a-proxy plugin; "http" agents are plain
 // proxies.
-func (c *Converter) convertAgents() error {
+func (c *Converter) convertAgents() {
 	for i := range c.src.Agents {
 		a := &c.src.Agents[i]
-		route := buildRoute(a.Config.Route, a.Name)
-		route.Source = source("agent", a.Name, "config.route")
-
-		guard, err := c.scopedPlugins(entityAgent, a.Policies, a.Access.ACLs)
-		if err != nil {
-			return err
-		}
-		guard = sourceScopedPlugins(guard, "agent", a.Name)
-		route.Plugins = append(route.Plugins, guard...)
-
-		authStrategyPlugins, err := c.scopedAuthStrategyPlugins(fmt.Sprintf("agent %q", a.Name), a.Access.AuthStrategies)
-		if err != nil {
-			return err
-		}
-		route.Plugins = append(route.Plugins, authStrategyPlugins...)
-		if len(authStrategyPlugins) > 0 {
-			c.ensureAnonymousConsumer()
-		}
-
-		switch a.Type {
-		case "a2a":
-			plugin, err := c.a2aPlugin(a)
-			if err != nil {
-				return err
-			}
-			plugin.Source = source("agent", a.Name, "config",
-				kong.FieldMapping{GeneratedPrefix: "config.proxy_config", SourcePrefix: "config.proxy"},
-				kong.FieldMapping{GeneratedPrefix: "config.auth", SourcePrefix: "config.upstream.auth"},
-			)
-			route.Plugins = append(route.Plugins, plugin)
-		case "http":
-			// plain HTTP proxy: Service + Route only
-		default:
-			if err := c.warn("agent %q has unknown type %q; treating as plain http proxy", a.Name, a.Type); err != nil {
-				return err
-			}
-		}
-
-		if a.Config.URL == "" {
-			if err := c.warn("agent %q has no config.url; the Service will be missing an upstream", a.Name); err != nil {
-				return err
-			}
-		}
-		svc := kong.Service{
-			Name:   a.Name,
-			ID:     a.ID,
-			URL:    a.Config.URL,
-			Routes: []kong.Route{route},
-			Tags:   c.labelsToTags(a.Labels),
-			Source: serviceURLSource("agent", a.Name),
-		}
-		// A disabled agent maps to a disabled Gateway Service so the DP stops
-		// proxying it. enabled defaults to true, so only emit the flag when the
-		// agent is explicitly disabled to keep the output minimal.
-		if a.Enabled != nil && !*a.Enabled {
-			svc.Enabled = a.Enabled
-		}
-		c.out.Services = append(c.out.Services, svc)
+		src := issueSource(kindAgent, a.Name)
+		c.convertEntity(src, func() error {
+			return c.convertAgent(src, a)
+		})
 	}
+}
+
+func (c *Converter) convertAgent(src ConversionIssueSource, a *aigw.Agent) error {
+	if a.Config.URL == "" {
+		return c.fail(src.at("config.url"), MissingRequiredConfigField,
+			"agent %q has no config.url; the Service needs an upstream", a.Name)
+	}
+	route := buildRoute(a.Config.Route, a.Name)
+	route.Source = source("agent", a.Name, "config.route")
+
+	guard, err := c.scopedPlugins(src, a.Policies, a.Access.ACLs)
+	if err != nil {
+		return err
+	}
+	guard = sourceScopedPlugins(guard, "agent", a.Name)
+	route.Plugins = append(route.Plugins, guard...)
+
+	authStrategyPlugins, err := c.scopedAuthStrategyPlugins(src, a.Access.AuthStrategies)
+	if err != nil {
+		return err
+	}
+	route.Plugins = append(route.Plugins, authStrategyPlugins...)
+
+	switch a.Type {
+	case "a2a":
+		plugin, err := c.a2aPlugin(src, a)
+		if err != nil {
+			return err
+		}
+		plugin.Source = source("agent", a.Name, "config",
+			kong.FieldMapping{GeneratedPrefix: "config.proxy_config", SourcePrefix: "config.proxy"},
+			kong.FieldMapping{GeneratedPrefix: "config.auth", SourcePrefix: "config.upstream.auth"},
+		)
+		route.Plugins = append(route.Plugins, plugin)
+	case "http":
+		// plain HTTP proxy: Service + Route only
+	default:
+		c.warn(src.at("type"), ConfigFieldOverridden,
+			"agent %q has unknown type %q; treating as plain http proxy", a.Name, a.Type)
+	}
+
+	if len(authStrategyPlugins) > 0 {
+		c.ensureAnonymousConsumer()
+	}
+	svc := kong.Service{
+		Name:   a.Name,
+		ID:     a.ID,
+		URL:    a.Config.URL,
+		Routes: []kong.Route{route},
+		Tags:   c.labelsToTags(a.Labels),
+		Source: serviceURLSource("agent", a.Name),
+	}
+	// A disabled agent maps to a disabled Gateway Service so the DP stops
+	// proxying it. enabled defaults to true, so only emit the flag when the
+	// agent is explicitly disabled to keep the output minimal.
+	if a.Enabled != nil && !*a.Enabled {
+		svc.Enabled = a.Enabled
+	}
+	c.out.Services = append(c.out.Services, svc)
 	return nil
 }
 
-func (c *Converter) a2aPlugin(a *aigw.Agent) (kong.Plugin, error) {
+func (c *Converter) a2aPlugin(src ConversionIssueSource, a *aigw.Agent) (kong.Plugin, error) {
 	cfg := map[string]any{}
 	if logging := loggingBlock(withLoggingDefaults(a.Config.Logging, false, true)); logging != nil {
 		// log_audits is an ai-mcp-proxy field; the ai-a2a-proxy schema has no
@@ -92,7 +95,7 @@ func (c *Converter) a2aPlugin(a *aigw.Agent) (kong.Plugin, error) {
 	if pc := proxyConfigBlock(a.Config.Proxy); pc != nil {
 		cfg["proxy_config"] = pc
 	}
-	auth, err := c.upstreamAuthBlock(a.Config.Upstream, fmt.Sprintf("agent %q", a.Name))
+	auth, err := c.upstreamAuthBlock(src, a.Config.Upstream)
 	if err != nil {
 		return kong.Plugin{}, err
 	}

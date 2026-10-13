@@ -118,7 +118,9 @@ func TestPassthroughRejects(t *testing.T) {
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			_, _, err := Convert([]byte("models:"+tc.model+passthroughProviders), Options{})
+			// A databricks target without upstream_url is left out with a
+			// warning. The model then has no target and fails.
+			_, _, err := convertDoc([]byte("models:"+tc.model+passthroughProviders), true)
 			require.ErrorContains(t, err, tc.want)
 		})
 	}
@@ -136,7 +138,7 @@ models:
     formats: [{type: passthrough}]
     config: {route: {paths: [/ai]}}
     targets: [{name: a, provider: p, config: {type: openai}}]
-`+passthroughProviders), Options{})
+`+passthroughProviders), false)
 		require.NoError(t, err, caps)
 		require.Empty(t, warnings, caps)
 		doc := string(out)
@@ -169,7 +171,7 @@ policies:
   - {name: logs, type: http-log, config: {http_endpoint: "https://logs.internal/x"}}
   - {name: cache, type: ai-semantic-cache, config: {}}
   - {name: lakera, type: ai-lakera-guard, global: true, config: {}}
-`+passthroughProviders), Options{})
+`+passthroughProviders), false)
 	require.NoError(t, err)
 
 	doc := string(out)
@@ -202,7 +204,7 @@ func TestPassthroughWarnsAboutSanitizerOnlyWhenItAnonymizesCredentials(t *testin
 		"anonymize: [all, all_and_credentials]": true,
 		"anonymize: [all, credentials]":         true,
 	} {
-		_, warnings, err := Convert([]byte(`
+		_, warnings, err := convertDoc([]byte(`
 models:
   - name: pt
     formats: [{type: passthrough}]
@@ -213,7 +215,7 @@ policies:
   - name: san
     type: ai-sanitizer
     config: {`+anonymize+`}
-`+passthroughProviders), Options{})
+`+passthroughProviders), false)
 		require.NoError(t, err, anonymize)
 		if warns {
 			require.Len(t, warnings, 1, anonymize)
@@ -239,13 +241,13 @@ func TestPassthroughWarnsAboutProvidersWithoutNativeFormat(t *testing.T) {
 		"mistral":     true,
 		"sagemaker":   true,
 	} {
-		_, warnings, err := Convert([]byte(`
+		_, warnings, err := convertDoc([]byte(`
 models:
   - name: pt
     formats: [{type: passthrough}]
     config: {route: {paths: [/ai]}}
     targets: [{name: t, provider: p, config: {type: `+providerType+`}}]
-`+passthroughProviders), Options{})
+`+passthroughProviders), false)
 		require.NoError(t, err, providerType)
 		if warns {
 			require.Len(t, warnings, 1, providerType)
@@ -255,20 +257,20 @@ models:
 		}
 	}
 
-	_, _, err := Convert([]byte(`
+	_, _, err := convertDoc([]byte(`
 models:
   - name: pt
     formats: [{type: passthrough}]
     config: {route: {paths: [/ai]}}
     targets: [{name: t, provider: p, config: {type: azure}}]
-`+passthroughProviders), Options{Strict: true})
+`+passthroughProviders), true)
 	require.ErrorContains(t, err, "has no native llm_format")
 }
 
 // TestPassthroughAllowsHostDisambiguatedModels pins that two passthrough models on one base
 // path convert when their hosts tell them apart, and that gemini and vertex targets mix.
 func TestPassthroughAllowsHostDisambiguatedModels(t *testing.T) {
-	_, _, err := Convert([]byte(`models:
+	_, _, err := convertDoc([]byte(`models:
   - name: a
     formats: [{type: passthrough}]
     config: {route: {paths: [/ai], hosts: [a.example]}}
@@ -279,7 +281,7 @@ func TestPassthroughAllowsHostDisambiguatedModels(t *testing.T) {
     targets:
       - {name: g, provider: p, config: {type: gemini}}
       - {name: v, provider: p, config: {type: vertex}}
-`+passthroughProviders), Options{})
+`+passthroughProviders), false)
 	require.NoError(t, err)
 }
 
@@ -298,12 +300,12 @@ func TestModelWarnsRouteNameOverride(t *testing.T) {
     config: {route: {name: custom, paths: [/ai]}}
     targets: [{name: t, provider: openai-prod, config: {type: openai}}]
 ` + overrideProvider
-	_, warnings, err := Convert([]byte(src), Options{})
+	_, warnings, err := convertDoc([]byte(src), false)
 	require.NoError(t, err)
 	require.Len(t, warnings, 1)
 	require.Contains(t, warnings[0], `sets config.route.name to "custom"`)
 
-	_, _, err = Convert([]byte(src), Options{Strict: true})
+	_, _, err = convertDoc([]byte(src), true)
 	require.Error(t, err)
 }
 
@@ -316,7 +318,7 @@ func TestModelWarnsLogStatisticsOverride(t *testing.T) {
       logging: {statistics: true}
     targets: [{name: t, provider: openai-prod, config: {type: openai}}]
 ` + overrideProvider
-	out, warnings, err := convertYAML([]byte(src), Options{})
+	out, warnings, err := convertYAML([]byte(src), false)
 	require.NoError(t, err)
 	require.Len(t, warnings, 3, "one warning per affected route")
 	for i, route := range []string{"openai-audio-speech", "openai-audio-transcribe", "openai-audio-translate"} {
@@ -325,7 +327,7 @@ func TestModelWarnsLogStatisticsOverride(t *testing.T) {
 	}
 	require.Contains(t, string(out), "log_statistics: true", "chat route keeps the user value")
 
-	_, _, err = Convert([]byte(src), Options{Strict: true})
+	_, _, err = convertDoc([]byte(src), true)
 	require.Error(t, err)
 }
 
@@ -345,7 +347,7 @@ func TestModelDoesNotWarnLogStatisticsWhenSupportedOrUnset(t *testing.T) {
 `,
 	} {
 		t.Run(name, func(t *testing.T) {
-			_, warnings, err := Convert([]byte(src+overrideProvider), Options{Strict: true})
+			_, warnings, err := convertDoc([]byte(src+overrideProvider), true)
 			require.NoError(t, err)
 			require.Empty(t, warnings)
 		})
@@ -354,7 +356,7 @@ func TestModelDoesNotWarnLogStatisticsWhenSupportedOrUnset(t *testing.T) {
 
 func convertRealtimeDocument(t *testing.T, src string) (*kong.Document, []string) {
 	t.Helper()
-	doc, warnings, err := Convert([]byte(src), Options{})
+	doc, warnings, err := convertDoc([]byte(src), false)
 	require.NoError(t, err)
 	return doc, warnings
 }
@@ -417,7 +419,7 @@ func TestRealtimeRouteUsesWebSocketTransport(t *testing.T) {
 	require.Contains(t, warnings[1], `ignored on the WebSocket route "openai-realtime"`)
 	require.Contains(t, warnings[2], `overridden to [wss] on the "openai-realtime" route`)
 
-	_, _, err := Convert([]byte(src), Options{Strict: true})
+	_, _, err := convertDoc([]byte(src), true)
 	require.Error(t, err)
 }
 
@@ -460,12 +462,12 @@ auth_strategies:
 	require.NotContains(t, auth.Config, "anonymous")
 	require.Equal(t, []string{"ws", "wss"}, auth.Protocols)
 
-	_, _, err := Convert([]byte(`models:
+	_, _, err := convertDoc([]byte(`models:
   - name: m
     capabilities: [realtime]
     access: {auth_strategies: [oidc, keys]}
     targets: [{name: t, provider: openai-prod, config: {type: openai}}]
-`+overrideProvider+strategies), Options{})
+`+overrideProvider+strategies), false)
 	require.ErrorContains(t, err, "supports only one auth strategy")
 }
 
@@ -476,7 +478,7 @@ auth_strategies:
 // run, since its default protocols exclude ws/wss) or make the data plane
 // refuse the whole config, so the conversion fails instead.
 func TestRealtimeRouteRejectsNonWebSocketAuthStrategy(t *testing.T) {
-	_, _, err := Convert([]byte(`models:
+	_, _, err := convertDoc([]byte(`models:
   - name: m
     capabilities: [realtime]
     access: {auth_strategies: [legacy]}
@@ -484,7 +486,7 @@ func TestRealtimeRouteRejectsNonWebSocketAuthStrategy(t *testing.T) {
 `+overrideProvider+`
 auth_strategies:
   - {name: legacy, type: jwt, config: {}}
-`), Options{})
+`), false)
 	require.ErrorContains(t, err, `auth strategy plugin "jwt" does not support the ws and wss protocols`)
 }
 
@@ -515,7 +517,7 @@ policies:
 	require.Len(t, warnings, 1)
 	require.Contains(t, warnings[0], `plugin "ai-prompt-guard", which does not support the ws and wss protocols`)
 
-	_, _, err := Convert([]byte(src), Options{Strict: true})
+	_, _, err := convertDoc([]byte(src), true)
 	require.Error(t, err)
 }
 
@@ -592,7 +594,7 @@ model_providers:
           - name: Authorization
             value: "{vault://ai/openai-token}"
 `)
-	doc, warnings, err := Convert(src, Options{Strict: true})
+	doc, warnings, err := convertDoc(src, true)
 
 	require.NotNil(t, doc)
 	require.NoError(t, err)
@@ -683,11 +685,19 @@ func TestBedrockMantleEndpointType(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			src := []byte("models:" + tc.model + bedrockProvider)
-			doc, warnings, err := Convert(src, Options{})
+			result, err := Convert(src, Options{})
 			require.NoError(t, err)
-			require.Len(t, warnings, tc.warnings)
-			for _, w := range warnings {
-				require.Contains(t, w, "mantle endpoint type is not supported with the bedrock format")
+			doc := result.Output
+			var mantle []ConversionIssue
+			for _, issue := range result.Issues {
+				if strings.Contains(issue.Reason, "mantle endpoint type is not supported with the bedrock format") {
+					require.Equal(t, Warning, issue.Severity)
+					mantle = append(mantle, issue)
+				}
+			}
+			require.Len(t, mantle, tc.warnings)
+			if tc.routes == 0 {
+				requireIssue(t, result.Issues, Error, MissingRequiredConfigField, kindModel, "m", "targets")
 			}
 
 			docYaml, err := doc.ToYAML()
@@ -700,13 +710,6 @@ func TestBedrockMantleEndpointType(t *testing.T) {
 				routes += len(svc.Routes)
 			}
 			require.Equal(t, tc.routes, routes)
-
-			_, _, err = Convert(src, Options{Strict: true})
-			if tc.warnings == 0 {
-				require.NoError(t, err)
-			} else {
-				require.ErrorContains(t, err, "mantle endpoint type is not supported with the bedrock format")
-			}
 		})
 	}
 }

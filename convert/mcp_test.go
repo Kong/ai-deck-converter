@@ -47,7 +47,7 @@ mcp_servers:
 
 func convertMCP(t *testing.T, src string) (*kong.Document, []string) {
 	t.Helper()
-	out, warnings, err := Convert([]byte(src), Options{})
+	out, warnings, err := convertDoc([]byte(src), false)
 	require.NoError(t, err)
 	return out, warnings
 }
@@ -191,12 +191,10 @@ func TestConversionOnlySourceRejectsPreFunctionPolicy(t *testing.T) {
 	// Kong allows one plugin per name on a route: emitting the policy next to
 	// the gate would produce a config Kong refuses to load. It is a hard error
 	// even outside -strict, since dropping either plugin changes behavior.
-	_, _, err := Convert([]byte(fmt.Sprintf(mcpPreFunctionPolicy, false)), Options{})
-	require.Error(t, err)
-	require.Contains(t, err.Error(), `MCP server "toolset-a" is conversion-only`)
-	conversionErr, ok := AsConversionError(err)
-	require.True(t, ok)
-	require.Equal(t, "policies", conversionErr.Diagnostics[0].Field)
+	result, err := Convert([]byte(fmt.Sprintf(mcpPreFunctionPolicy, false)), Options{})
+	require.NoError(t, err)
+	issue := requireIssue(t, result.Issues, Error, ConfigFieldInvalid, kindMCPServer, "toolset-a", "policies")
+	require.Contains(t, issue.Reason, `MCP server "toolset-a" is conversion-only`)
 
 	// A global pre-function is a top-level plugin, not on the route, so it
 	// does not collide with the gate.
@@ -233,7 +231,7 @@ func TestUnexposedConversionOnlySourceWithPreFunctionPolicyIsDropped(t *testing.
 	require.Contains(t, warnings[0], `MCP server "orphan" is conversion-only but no listener names it`)
 
 	// Under -strict the drop is what fails, not a gate collision.
-	_, _, err := Convert([]byte(mcpUnexposedPreFunctionPolicy), Options{Strict: true})
+	_, _, err := convertDoc([]byte(mcpUnexposedPreFunctionPolicy), true)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "no listener names it")
 	require.NotContains(t, err.Error(), "cannot also have")
@@ -253,7 +251,7 @@ func TestSourceSharedByListenersWithDifferentAccess(t *testing.T) {
 		map[string]any{"key_names": []any{"other-key"}, "hide_credentials": false},
 		routePlugins(t, out, "second")[1].Config)
 
-	_, _, err := Convert([]byte(mcpConflictingListeners), Options{Strict: true})
+	_, _, err := convertDoc([]byte(mcpConflictingListeners), true)
 	require.NoError(t, err)
 }
 
@@ -293,7 +291,7 @@ func TestMCPKeyAuthNeverHidesCredentials(t *testing.T) {
 	require.Equal(t, "key-auth", keyAuth.Name)
 	require.Equal(t, false, keyAuth.Config["hide_credentials"])
 
-	_, _, err := Convert([]byte(mcpHiddenCredentials), Options{Strict: true})
+	_, _, err := convertDoc([]byte(mcpHiddenCredentials), true)
 	require.Error(t, err)
 }
 
@@ -332,7 +330,7 @@ func TestUnexposedConversionOnlySourcesAreDropped(t *testing.T) {
 	require.Equal(t, []string{"ai-mcp-proxy", "pre-function"}, pluginNames(t, out, "exposed"))
 
 	// The drop is a lost entity, so -strict refuses it rather than warning.
-	_, _, err := Convert([]byte(mcpUnexposedSources), Options{Strict: true})
+	_, _, err := convertDoc([]byte(mcpUnexposedSources), true)
 	require.Error(t, err)
 }
 
@@ -414,7 +412,7 @@ mcp_servers:
 }
 
 func TestTokenVaultConflictsWithUpstreamAuth(t *testing.T) {
-	_, _, err := Convert([]byte(`
+	_, _, err := convertDoc([]byte(`
 mcp_servers:
   - type: passthrough-listener
     name: both
@@ -427,13 +425,13 @@ mcp_servers:
         auth: {type: aws, region: us-west-2}
     tools:
       - {name: report, description: Get a report}
-`), Options{})
+`), false)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "mutually exclusive")
 }
 
 func TestTokenVaultRedisRequiresEncryptionSecrets(t *testing.T) {
-	_, _, err := Convert([]byte(`
+	_, _, err := convertDoc([]byte(`
 mcp_servers:
   - type: passthrough-listener
     name: no-secrets
@@ -444,7 +442,7 @@ mcp_servers:
       redis: {host: redis.internal, port: 6379}
     tools:
       - {name: report, description: Get a report}
-`), Options{})
+`), false)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "encryption_secrets is required")
 }
@@ -462,7 +460,7 @@ func TestTokenVaultRequiresDirectoryAndProvider(t *testing.T) {
 		{name: "missing directory", block: "    token_vault:\n      provider: my-upstream-provider"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			_, _, err := Convert([]byte(`
+			_, _, err := convertDoc([]byte(`
 mcp_servers:
   - type: passthrough-listener
     name: hollow
@@ -470,7 +468,7 @@ mcp_servers:
 `+tt.block+`
     tools:
       - {name: report, description: Get a report}
-`), Options{})
+`), false)
 			require.Error(t, err)
 			require.Contains(t, err.Error(), "token_vault requires directory and provider")
 		})

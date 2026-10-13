@@ -20,7 +20,7 @@ var roundTripSkip = map[string]string{}
 // every forward golden case. Source-only metadata (display_name, enabled, the
 // original capability spellings) is lossy by design, but everything that
 // reaches Kong must survive the round trip — and a clean trip must produce no
-// warnings.
+// warnings or issues.
 func TestRoundTrip(t *testing.T) {
 	dirs, err := filepath.Glob(filepath.Join("..", "convert", "testdata", "*"))
 	require.NoError(t, err)
@@ -46,10 +46,10 @@ func TestRoundTrip(t *testing.T) {
 			require.NoError(t, err, "revert")
 			require.Empty(t, warnings, "unexpected revert warnings")
 
-			deck2Doc, warnings, err := convert.Convert(aigwYAML, opts.Options)
+			result, err := convert.Convert(aigwYAML, opts.Options)
 			require.NoError(t, err, "re-convert")
-			require.Empty(t, warnings, "unexpected convert warnings")
-			deck2, err := deck2Doc.ToYAML()
+			require.Empty(t, result.Issues, "unexpected convert issues")
+			deck2, err := result.Output.ToYAML()
 			require.NoError(t, err, "encode re-converted document")
 
 			require.Equalf(t, string(deck1), string(deck2),

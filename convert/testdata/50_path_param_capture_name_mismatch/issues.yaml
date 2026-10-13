@@ -1,0 +1,8 @@
+- code: BEHAVIOR_MAY_DIFFER
+  reason: model "mismatch-model" sets model.path.path_param "model_name" but no matching named capture group "model_name" is present in its regex route paths; the model will be read from the request body instead
+  source:
+    kind: model
+    name: mismatch-model
+    fields:
+      - config.route.model.path.path_param
+  severity: WARNING

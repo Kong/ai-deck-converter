@@ -2,6 +2,7 @@ package convert
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/Kong/ai-deck-converter/internal/aigw"
@@ -11,47 +12,49 @@ import (
 
 // convertGlobalPolicies emits each global policy as a top-level (global) Kong
 // plugin. Non-global policies are instantiated per referencing entity instead.
-func (c *Converter) convertGlobalPolicies() error {
-	for i := range c.src.Policies {
-		p := &c.src.Policies[i]
-		if p.Global != nil && *p.Global {
-			plugin, err := c.policyPlugin(p, c.labelsToTags(p.Labels), true)
-			if err != nil {
-				return err
-			}
-			c.out.Plugins = append(c.out.Plugins, plugin)
-		}
-	}
-	return nil
-}
-
-// warnGlobalPoliciesForWebSocket flags every global policy once the document
-// emits a WebSocket route. A global plugin carries no protocols override, so
-// it keeps Kong's schema default (http/https) and never runs against ws/wss
-// traffic. This mirrors convertModels' treatment of auth-strategy plugins on
-// a realtime route (convert/model.go): an auth policy type fails the
-// conversion instead of warning, since a silently-unenforced check is worse
-// than a dropped policy.
-func (c *Converter) warnGlobalPoliciesForWebSocket() error {
-	if !c.hasWebSocketRoute() {
-		return nil
-	}
+func (c *Converter) convertGlobalPolicies() {
 	for i := range c.src.Policies {
 		p := &c.src.Policies[i]
 		if p.Global == nil || !*p.Global {
 			continue
 		}
-		if authPolicyTypes[p.Type] {
-			return c.failAt("policies",
-				"global policy %q has type %q, but a global plugin keeps Kong's http/https "+
-					"default protocols and cannot authenticate the WebSocket routes this document emits",
-				p.Name, p.Type)
+		src := issueSource(kindPolicy, p.Name)
+		c.convertEntity(src, func() error {
+			if plugin, ok := c.policyPlugin(p, c.labelsToTags(p.Labels), true); ok {
+				c.out.Plugins = append(c.out.Plugins, plugin)
+			}
+			return nil
+		})
+	}
+}
+
+// warnGlobalPoliciesForWebSocket flags every non-authentication global policy
+// once the document emits a WebSocket route. A global plugin carries no
+// protocols override, so it keeps Kong's schema default (http/https) and never
+// runs against ws/wss traffic. convertModels already left out every WebSocket
+// model when a global authentication policy exists.
+func (c *Converter) warnGlobalPoliciesForWebSocket() {
+	if !c.hasWebSocketRoute() {
+		return
+	}
+	for i := range c.src.Policies {
+		p := &c.src.Policies[i]
+		if p.Global == nil || !*p.Global || authPolicyTypes[p.Type] {
+			continue
 		}
-		if err := c.warn(
+		c.warn(issueSource(kindPolicy, p.Name).at("global"), BehaviorMayDiffer,
 			"global policy %q (type %q) keeps Kong's http/https default protocols, "+
 				"so it will not run on the WebSocket routes this document emits",
-			p.Name, p.Type); err != nil {
-			return err
+			p.Name, p.Type)
+	}
+}
+
+// globalAuthPolicy returns a global authentication policy, or nil.
+func (c *Converter) globalAuthPolicy() *aigw.Policy {
+	for i := range c.src.Policies {
+		p := &c.src.Policies[i]
+		if p.Global != nil && *p.Global && authPolicyTypes[p.Type] {
+			return p
 		}
 	}
 	return nil
@@ -68,17 +71,6 @@ func (c *Converter) hasWebSocketRoute() bool {
 	return false
 }
 
-// entityKind identifies the kind of entity scopedPlugins is building plugins
-// for, so it can apply entity-specific validation (e.g. rejecting
-// authentication policies on models).
-const (
-	entityModel         = "model"
-	entityMCPServer     = "mcp_server"
-	entityAgent         = "agent"
-	entityConsumer      = "consumer"
-	entityConsumerGroup = "consumer_group"
-)
-
 // authPolicyTypes are policy types that must be configured as identity
 // providers (scoped authentication with anonymous fallback) rather than as
 // plain policies, when referenced from a model.
@@ -87,25 +79,26 @@ var authPolicyTypes = map[string]bool{
 	"openid-connect": true,
 }
 
-// scopedPlugins builds the plugins to nest under a referencing entity: one per
-// non-global policy reference, plus an acl plugin when ACLs are present.
-func (c *Converter) scopedPlugins(entityKind string, refs []string, acls aigw.ACLs) ([]kong.Plugin, error) {
+// scopedPlugins builds the plugins to nest under the referencing entity src:
+// one per non-global policy reference, plus an acl plugin when ACLs are
+// present. A policy that cannot be converted is left out with an Error issue.
+// An unrepresentable access control fails the entity.
+func (c *Converter) scopedPlugins(src ConversionIssueSource, refs []string, acls aigw.ACLs) ([]kong.Plugin, error) {
 	var plugins []kong.Plugin
 	seen := map[string]bool{}
-	for _, ref := range refs {
+	for i, ref := range refs {
 		if seen[ref] {
 			continue
 		}
 		seen[ref] = true
+		field := fmt.Sprintf("policies[%d]", i)
 		p := c.policies[ref]
 		if p == nil {
-			if err := c.warn("unknown policy reference %q", ref); err != nil {
-				return nil, err
-			}
+			c.reportError(src.at(field), UndefinedReference, "unknown policy reference %q", ref)
 			continue
 		}
-		if entityKind == entityModel && authPolicyTypes[p.Type] {
-			return nil, c.failAt("policies",
+		if src.Kind == kindModel && authPolicyTypes[p.Type] {
+			return nil, c.fail(src.at(field), ConfigFieldInvalid,
 				"model policy %q has type %q, but authentication policies can only "+
 					"be applied to models via auth_strategies, not policies",
 				ref, p.Type)
@@ -113,18 +106,16 @@ func (c *Converter) scopedPlugins(entityKind string, refs []string, acls aigw.AC
 		if p.Global != nil && *p.Global {
 			continue // emitted once at the top level
 		}
-		plugin, err := c.policyPlugin(p, nil, false)
-		if err != nil {
-			return nil, err
+		if plugin, ok := c.policyPlugin(p, nil, false); ok {
+			plugins = append(plugins, plugin)
 		}
-		plugins = append(plugins, plugin)
 	}
 	if !acls.IsEmpty() {
 		// A Kong acl plugin enforces only_one_of {config.allow, config.deny}; an
 		// AI Gateway acl that sets both is not representable as one valid plugin,
 		// so reject it rather than emit config the gateway will refuse to load.
 		if len(acls.Allow) > 0 && len(acls.Deny) > 0 {
-			return nil, c.failAt("access.acls",
+			return nil, c.fail(src.at("access.acls.allow", "access.acls.deny"), ConfigFieldInvalid,
 				"acl policy sets both allow (%v) and deny (%v), but a Kong acl plugin permits "+
 					"exactly one; set only allow or only deny", acls.Allow, acls.Deny)
 		}
@@ -133,10 +124,12 @@ func (c *Converter) scopedPlugins(entityKind string, refs []string, acls aigw.AC
 	return plugins, nil
 }
 
-func (c *Converter) policyPlugin(p *aigw.Policy, tags []string, preserveID bool) (kong.Plugin, error) {
-	config, err := c.applyDatastore(p, c.normalizeRateLimitingProviderMatches(p))
-	if err != nil {
-		return kong.Plugin{}, err
+// policyPlugin builds the plugin for p. It reports false when p cannot be
+// converted. The Error issue names the policy.
+func (c *Converter) policyPlugin(p *aigw.Policy, tags []string, preserveID bool) (kong.Plugin, bool) {
+	config, ok := c.applyDatastore(p, c.normalizeRateLimitingProviderMatches(p))
+	if !ok {
+		return kong.Plugin{}, false
 	}
 	plugin := kong.Plugin{
 		Name:      p.Type,
@@ -152,31 +145,41 @@ func (c *Converter) policyPlugin(p *aigw.Policy, tags []string, preserveID bool)
 		disabled := false
 		plugin.Enabled = &disabled
 	}
-	return plugin, nil
+	return plugin, true
 }
 
 // applyDatastore hands p's datastore references, and the registry to resolve
 // them against, to aimap.ApplyDatastore, which owns every rule about the
-// pairing. Only the treatment of a dangling reference stays here: warning
-// versus failing is -strict policy, which aimap deliberately does not model.
-func (c *Converter) applyDatastore(p *aigw.Policy, config map[string]any) (map[string]any, error) {
+// pairing. A dangling reference keeps the policy without a connection.
+func (c *Converter) applyDatastore(p *aigw.Policy, config map[string]any) (map[string]any, bool) {
 	if len(p.Datastores) == 0 {
-		return config, nil
+		return config, true
 	}
+	src := issueSource(kindPolicy, p.Name)
 	out, err := aimap.ApplyDatastore(config, p.Type, p.Datastores, c.datastores)
 	var unknown *aimap.UnknownDatastoreError
 	switch {
 	case errors.As(err, &unknown):
 		// aimap returns config untouched on this path, so the policy still
 		// converts, just without a connection.
-		if err := c.warn("policy %q %v", p.Name, unknown); err != nil {
-			return nil, err
-		}
-		return out, nil
+		c.reportError(src.at(datastoreField(p.Datastores, unknown.Name)), UndefinedReference,
+			"policy %q %v", p.Name, unknown)
+		return out, true
 	case err != nil:
-		return nil, c.failAt("policies", "policy %q: %v", p.Name, err)
+		c.reportError(src.at("datastores"), ConfigFieldInvalid, "policy %q: %v", p.Name, err)
+		return nil, false
 	}
-	return out, nil
+	return out, true
+}
+
+// datastoreField returns the path of the reference to name in refs.
+func datastoreField(refs []aigw.DatastoreRef, name string) string {
+	for i, ref := range refs {
+		if ref.Name == name {
+			return fmt.Sprintf("datastores[%d].name", i)
+		}
+	}
+	return "datastores"
 }
 
 // normalizeRateLimitingProviderMatches lowers AI Gateway model-provider entity

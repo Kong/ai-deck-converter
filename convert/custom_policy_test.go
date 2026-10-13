@@ -25,7 +25,8 @@ func TestConvertCustomPoliciesToDBLessPlugins(t *testing.T) {
 	}}
 
 	c := newConverter(doc, Options{})
-	require.NoError(t, c.run())
+	c.run()
+	require.Empty(t, c.issues)
 	require.Len(t, c.out.CustomPlugins, 1)
 	require.Equal(t, "streaming-policy", c.out.CustomPlugins[0].Name)
 
@@ -54,7 +55,8 @@ func TestConvertCustomPoliciesSkipsPoliciesWithoutStreamingHandler(t *testing.T)
 	} {
 		c := newConverter(&aigw.Document{CustomPolicies: []aigw.CustomPolicy{policy}}, Options{})
 
-		require.NoError(t, c.run())
+		c.run()
+		require.Empty(t, c.issues)
 		require.Empty(t, c.out.ToDBLess().CustomPlugins)
 	}
 }

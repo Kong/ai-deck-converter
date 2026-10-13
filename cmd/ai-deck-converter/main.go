@@ -5,6 +5,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -15,9 +16,15 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// errIssues reports that the output was written but has issues that fail the
+// run.
+var errIssues = errors.New("conversion reported issues that fail the run")
+
 func main() {
 	if err := run(); err != nil {
-		fmt.Fprintln(os.Stderr, "error:", err)
+		if !errors.Is(err, errIssues) {
+			fmt.Fprintln(os.Stderr, "error:", err)
+		}
 		os.Exit(1)
 	}
 }
@@ -26,7 +33,8 @@ func run() error {
 	var (
 		outPath = flag.String("o", "", "output file path (default: stdout)")
 		strict  = flag.Bool("strict", false,
-			"treat unresolved references and unconvertible entities as errors instead of warnings")
+			"exit non-zero on warnings too: to-deck/to-dbless fail on any issue, "+
+				"from-deck makes unresolved references and unconvertible entities errors")
 		tagPrefix = flag.String("label-tag-prefix", "",
 			"prefix for label-derived tags (prepended when converting, stripped when reverting), e.g. aigw/")
 		direction = flag.String("direction", "auto",
@@ -49,46 +57,62 @@ func run() error {
 	}
 
 	var out []byte
-	var warnings []string
+	failed := false
 	switch dir {
 	case "to-deck", "to-dbless":
-		out, warnings, err = convertToYAML(in, convert.Options{
-			Strict:         *strict,
-			LabelTagPrefix: *tagPrefix,
-		}, dir == "to-dbless")
+		var issues []convert.ConversionIssue
+		out, issues, err = convertToYAML(in, convert.Options{LabelTagPrefix: *tagPrefix}, dir == "to-dbless")
+		if err != nil {
+			return err
+		}
+		for _, issue := range issues {
+			fmt.Fprintln(os.Stderr, issue)
+			failed = failed || *strict || issue.Severity == convert.Error
+		}
 	case "from-deck":
+		var warnings []string
 		out, warnings, err = revert.Revert(in, revert.Options{
 			Strict:         *strict,
 			LabelTagPrefix: *tagPrefix,
 		})
+		if err != nil {
+			return err
+		}
+		for _, w := range warnings {
+			fmt.Fprintln(os.Stderr, "warning:", w)
+		}
 	default:
 		return fmt.Errorf("invalid -direction %q (want auto, to-deck, to-dbless, or from-deck)", dir)
 	}
-	if err != nil {
-		return err
-	}
-	for _, w := range warnings {
-		fmt.Fprintln(os.Stderr, "warning:", w)
-	}
 
-	if *outPath == "" || *outPath == "-" {
-		_, err = os.Stdout.Write(out)
+	if err := writeOutput(*outPath, out); err != nil {
 		return err
 	}
-	return os.WriteFile(*outPath, out, 0o644) //nolint:gosec,mnd
+	if failed {
+		return errIssues
+	}
+	return nil
 }
 
-func convertToYAML(in []byte, opts convert.Options, dbless bool) ([]byte, []string, error) {
-	doc, warnings, err := convert.Convert(in, opts)
+func writeOutput(path string, out []byte) error {
+	if path == "" || path == "-" {
+		_, err := os.Stdout.Write(out)
+		return err
+	}
+	return os.WriteFile(path, out, 0o644) //nolint:gosec,mnd
+}
+
+func convertToYAML(in []byte, opts convert.Options, dbless bool) ([]byte, []convert.ConversionIssue, error) {
+	result, err := convert.Convert(in, opts)
 	if err != nil {
-		return nil, warnings, err
+		return nil, nil, err
 	}
 	if dbless {
-		out, err := doc.ToDBLess().ToYAML()
-		return out, warnings, err
+		out, err := result.Output.ToDBLess().ToYAML()
+		return out, result.Issues, err
 	}
-	out, err := doc.ToYAML()
-	return out, warnings, err
+	out, err := result.Output.ToYAML()
+	return out, result.Issues, err
 }
 
 // detectDirection inspects the input document: a decK config carries

@@ -111,10 +111,12 @@ func resolveAuth(p *aigw.Provider, allowOverride *bool) map[string]any {
 // the ai-proxy-advanced embeddings schema has no top-level provider field. The
 // embeddings model's `config` block is lowered regardless of whether a provider
 // entity is referenced.
-func (c *Converter) resolveEmbeddings(raw any) (any, error) {
-	emb, ok := raw.(map[string]any)
+//
+// It works on a copy. A model pass can run more than once over the source.
+func (c *Converter) resolveEmbeddings(src ConversionIssueSource, raw any) any {
+	emb, ok := deepCopy(raw).(map[string]any)
 	if !ok {
-		return raw, nil
+		return raw
 	}
 
 	var provider *aigw.Provider
@@ -122,32 +124,51 @@ func (c *Converter) resolveEmbeddings(raw any) (any, error) {
 		delete(emb, "provider")
 		provider = c.providers[provName]
 		if provider == nil {
-			if err := c.warn("model embeddings reference unknown provider %q; auth may be incomplete", provName); err != nil {
-				return nil, err
-			}
+			c.warn(src.at("config.balancer.embeddings.provider"), UndefinedReference,
+				"model embeddings reference unknown provider %q; auth may be incomplete", provName)
 		}
 	}
 
 	lowerEmbeddingsModel(emb, provider)
 
 	if provider == nil {
-		return emb, nil
+		return emb
 	}
 	resolved := resolveAuth(provider, nil)
 	if resolved == nil {
-		return emb, nil
+		return emb
 	}
 	existing, _ := emb["auth"].(map[string]any)
 	if existing == nil {
 		emb["auth"] = resolved
-		return emb, nil
+		return emb
 	}
 	for k, v := range resolved {
 		if _, set := existing[k]; !set {
 			existing[k] = v
 		}
 	}
-	return emb, nil
+	return emb
+}
+
+// deepCopy copies the maps and slices of a YAML value.
+func deepCopy(v any) any {
+	switch v := v.(type) {
+	case map[string]any:
+		out := make(map[string]any, len(v))
+		for k, e := range v {
+			out[k] = deepCopy(e)
+		}
+		return out
+	case []any:
+		out := make([]any, len(v))
+		for i, e := range v {
+			out[i] = deepCopy(e)
+		}
+		return out
+	default:
+		return v
+	}
 }
 
 // lowerEmbeddingsModel lowers an embeddings model's `config` block (a

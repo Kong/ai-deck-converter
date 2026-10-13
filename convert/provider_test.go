@@ -153,14 +153,12 @@ model_providers:
     name: bedrock-main
     config: {auth: {type: basic, headers: [{name: x-api-key, value: k}]}}
 `)
-	_, _, err := Convert(src, Options{})
-	require.Error(t, err, "convert")
-	require.Contains(t, err.Error(), `capability "rerank" is not supported `+
+	result, err := Convert(src, Options{})
+	require.NoError(t, err, "convert")
+	issue := requireIssue(t, result.Issues, Error, ConfigFieldInvalid, kindModel, "m1", "capabilities[0]")
+	require.Contains(t, issue.Reason, `capability "rerank" is not supported `+
 		`with llm_format "openai" for provider type "bedrock"`)
-
-	conversionErr, ok := AsConversionError(err)
-	require.True(t, ok)
-	require.Equal(t, "capabilities", conversionErr.Diagnostics[0].Field)
+	require.Empty(t, result.Output.AIModels, "the model is left out")
 }
 
 // A passthrough target forwards the client's request unchanged, so the plugin must not

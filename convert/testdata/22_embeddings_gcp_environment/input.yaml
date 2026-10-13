@@ -31,6 +31,8 @@ models:
                 project_id: my-project-id
               upstream_url: https://generativelanguage.googleapis.com
 model_providers:
+  - name: openai-main
+    type: openai
   - name: gemini-prod
     type: gemini
     display_name: Google Gemini AI (Prod)

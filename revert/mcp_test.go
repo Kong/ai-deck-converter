@@ -172,8 +172,9 @@ func TestSourceOwnAuthBecomesAPolicyNotAccess(t *testing.T) {
 
 	// The point of all of it: the reverted document converts. Lifting the
 	// plugin into access.auth_strategies made this a hard error.
-	_, _, err = convert.Convert(out, convert.Options{})
+	result, err := convert.Convert(out, convert.Options{})
 	require.NoError(t, err)
+	require.False(t, result.HasErrors(), "issues: %v", result.Issues)
 }
 
 // mcpHandWrittenPreFunctionDeck is a hand-written config: the conversion-only
@@ -231,6 +232,9 @@ func TestUntaggedPreFunctionOnSourceIsAPolicy(t *testing.T) {
 	// rather than emit a config Kong rejects.
 	out, _, err := Revert([]byte(mcpHandWrittenPreFunctionDeck), Options{})
 	require.NoError(t, err)
-	_, _, err = convert.Convert(out, convert.Options{})
-	require.ErrorContains(t, err, `MCP server "toolset-a" is conversion-only`)
+	result, err := convert.Convert(out, convert.Options{})
+	require.NoError(t, err)
+	require.Len(t, result.Issues, 1)
+	require.Equal(t, convert.Error, result.Issues[0].Severity)
+	require.Contains(t, result.Issues[0].Reason, `MCP server "toolset-a" is conversion-only`)
 }

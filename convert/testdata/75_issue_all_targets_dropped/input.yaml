@@ -1,0 +1,16 @@
+# A model without a convertible target is left out with an error. The other
+# models still convert.
+model_providers:
+  - name: openai-main
+    type: openai
+models:
+  - name: working
+    capabilities: [generate]
+    targets: [{name: gpt-4o, provider: openai-main, config: {type: openai}}]
+    config: {route: {paths: [/working]}}
+  - name: broken
+    capabilities: [generate]
+    targets:
+      - {name: gpt-4o, provider: missing-provider, config: {type: openai}}
+      - {name: gpt-4o-mini, config: {type: openai}}
+    config: {route: {paths: [/broken]}}

@@ -1,0 +1,24 @@
+- code: UNDEFINED_REFERENCE
+  reason: model "broken" target "gpt-4o" references unknown provider "missing-provider"; the target is omitted
+  source:
+    kind: model
+    name: broken
+    fields:
+      - targets[0].provider
+  severity: WARNING
+- code: MISSING_REQUIRED_CONFIG_FIELD
+  reason: model "broken" target "gpt-4o-mini" has no provider; the target is omitted
+  source:
+    kind: model
+    name: broken
+    fields:
+      - targets[1].provider
+  severity: WARNING
+- code: MISSING_REQUIRED_CONFIG_FIELD
+  reason: model "broken" has no target that the converter can convert
+  source:
+    kind: model
+    name: broken
+    fields:
+      - targets
+  severity: ERROR

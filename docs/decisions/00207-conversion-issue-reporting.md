@@ -258,6 +258,10 @@ type ConversionResult struct {
   - an MCP tool without `description`
   - a target with no resolvable provider type or an undefined provider. If it
     is the last target, the model is also left out, with an `error`.
+- A global authentication policy cannot protect a WebSocket route. The
+  converter keeps the policy. It leaves out each WebSocket model and reports
+  an `error`.
+- An entity conflict leaves out the later entity in the input document.
 - A current fatal error now leaves out only the affected entity. The run
   continues. For example:
   - an unsupported capability
@@ -271,8 +275,8 @@ type ConversionResult struct {
 This is a breaking change. The convert function now returns
 `(*ConversionResult, error)`. `ConversionResult` contains the list of issues.
 The function returns an `error` only when the whole run fails. Then
-`ConversionResult` is nil. For example, the input is not valid YAML, an option
-is not valid, or the converter cannot change the output to YAML.
+`ConversionResult` is nil. For example, the input is not valid YAML, or an
+option is not valid. The caller changes the output to YAML.
 
 Callers also have more work. Each caller inspects the issues and decides
 which ones stop its workflow.
@@ -309,7 +313,7 @@ A change to a message can break existing callers.
 [testing]: #testing
 
 - Each golden test case records the expected issues in `issues.yaml`, next
-  to `expected.yaml`.
+  to `expected.yaml`. A case without issues has no `issues.yaml`.
 - `revert/roundtrip_test.go` changes from "zero warnings" to "zero issues".
 - New golden test cases cover the rules for partial output:
   - an entity whose auth strategy does not exist or cannot be converted is

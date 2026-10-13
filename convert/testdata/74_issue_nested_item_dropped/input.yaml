@@ -1,0 +1,24 @@
+# A nested item that cannot be converted is left out with a warning. The rest
+# of its entity still converts.
+model_providers:
+  - name: openai-main
+    type: openai
+models:
+  - name: chat
+    capabilities: [generate]
+    targets:
+      - {name: gpt-4o, provider: openai-main, config: {type: openai}}
+      - {name: gpt-4o-mini, provider: missing-provider, config: {type: openai}}
+    config: {route: {paths: [/chat]}}
+mcp_servers:
+  - name: tools
+    type: conversion-listener
+    config: {route: {paths: [/mcp]}}
+    tools:
+      - {name: described, description: A described tool}
+      - {name: undescribed}
+consumers:
+  - name: alice
+    credentials:
+      - {name: key, type: api-key, api_key: "{vault://env/alice-key}"}
+      - {name: oauth, type: oauth}

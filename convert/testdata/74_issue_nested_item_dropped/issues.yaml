@@ -1,0 +1,24 @@
+- code: CONFIG_FIELD_IGNORED
+  reason: consumer "alice" credential "oauth" has unsupported type "oauth"; only api-key (keyauth) is supported
+  source:
+    kind: consumer
+    name: alice
+    fields:
+      - credentials[1].type
+  severity: WARNING
+- code: UNDEFINED_REFERENCE
+  reason: model "chat" target "gpt-4o-mini" references unknown provider "missing-provider"; the target is omitted
+  source:
+    kind: model
+    name: chat
+    fields:
+      - targets[1].provider
+  severity: WARNING
+- code: MISSING_REQUIRED_CONFIG_FIELD
+  reason: MCP server "tools" tool "undescribed" has no description; ai-mcp-proxy requires one
+  source:
+    kind: mcp_server
+    name: tools
+    fields:
+      - tools[1].description
+  severity: WARNING
