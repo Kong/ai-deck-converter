@@ -26,6 +26,11 @@ func (r *Reverter) revertAgent(svc *kong.Service, rt *kong.Route, name string, s
 	if svc.Enabled != nil && !*svc.Enabled {
 		a.Enabled = svc.Enabled
 	}
+	certs, caCerts, err := r.upstreamTLS(fmt.Sprintf("agent %q", name), svc)
+	if err != nil {
+		return err
+	}
+	a.Config.Certificates, a.Config.CACertificates = certs, caCerts
 	if a2a := findPlugin(plugins, "ai-a2a-proxy"); a2a != nil {
 		a.Type = "a2a"
 		a.Config.Logging = loggingFromBlockWithDefaults(getMap(a2a.Config, "logging"), false, true)

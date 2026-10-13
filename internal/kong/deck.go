@@ -120,19 +120,23 @@ func NewDocument() *Document {
 
 // Service is a Kong Gateway Service. Routes and Plugins may be nested.
 type Service struct {
-	Name     string   `yaml:"name"`
-	ID       string   `yaml:"id,omitempty"`
-	URL      string   `yaml:"url,omitempty"`
-	Host     string   `yaml:"host,omitempty"`
-	Port     *int     `yaml:"port,omitempty"`
-	Protocol string   `yaml:"protocol,omitempty"`
-	Path     string   `yaml:"path,omitempty"`
-	Enabled  *bool    `yaml:"enabled,omitempty"`
-	Retries  *int     `yaml:"retries,omitempty"`
-	Routes   []Route  `yaml:"routes,omitempty"`
-	Plugins  []Plugin `yaml:"plugins,omitempty"`
-	Tags     []string `yaml:"tags,omitempty"`
-	Source   *Source  `yaml:"-"`
+	Name     string `yaml:"name"`
+	ID       string `yaml:"id,omitempty"`
+	URL      string `yaml:"url,omitempty"`
+	Host     string `yaml:"host,omitempty"`
+	Port     *int   `yaml:"port,omitempty"`
+	Protocol string `yaml:"protocol,omitempty"`
+	Path     string `yaml:"path,omitempty"`
+	Enabled  *bool  `yaml:"enabled,omitempty"`
+	Retries  *int   `yaml:"retries,omitempty"`
+	// ClientCertificate and CACertificates hold Kong entity IDs. Kong
+	// certificates have no name to reference.
+	ClientCertificate map[string]string `yaml:"client_certificate,omitempty"`
+	CACertificates    []string          `yaml:"ca_certificates,omitempty"`
+	Routes            []Route           `yaml:"routes,omitempty"`
+	Plugins           []Plugin          `yaml:"plugins,omitempty"`
+	Tags              []string          `yaml:"tags,omitempty"`
+	Source            *Source           `yaml:"-"`
 }
 
 // Route is a Kong Gateway Route. Plugins may be nested.

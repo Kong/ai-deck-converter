@@ -56,5 +56,7 @@ type AgentConfig struct {
 	// authentication, e.g. AWS SigV4).
 	Upstream *UpstreamConfig `yaml:"upstream,omitempty"`
 	// Proxy lowers to the ai-a2a-proxy plugin's proxy_config.
-	Proxy *ProxyConfig `yaml:"proxy,omitempty"`
+	Proxy          *ProxyConfig `yaml:"proxy,omitempty"`
+	Certificates   []string     `yaml:"certificates,omitempty"`
+	CACertificates []string     `yaml:"ca_certificates,omitempty"`
 }

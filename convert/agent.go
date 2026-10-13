@@ -75,6 +75,7 @@ func (c *Converter) convertAgent(src ConversionIssueSource, a *aigw.Agent) error
 	if a.Enabled != nil && !*a.Enabled {
 		svc.Enabled = a.Enabled
 	}
+	c.applyUpstreamTLS(src, &svc, a.Config.Certificates, a.Config.CACertificates)
 	c.out.Services = append(c.out.Services, svc)
 	return nil
 }

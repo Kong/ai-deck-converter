@@ -144,6 +144,7 @@ func (c *Converter) convertMCPServer(
 	if m.Enabled != nil && !*m.Enabled {
 		service.Enabled = m.Enabled
 	}
+	c.applyUpstreamTLS(src, &service, m.Config.Certificates, m.Config.CACertificates)
 	return service, nil
 }
 

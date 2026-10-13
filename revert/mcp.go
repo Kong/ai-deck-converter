@@ -120,6 +120,11 @@ func (r *Reverter) revertMCPServer(svc *kong.Service, rt *kong.Route, plugins, s
 	m.Config.Server = mcpServerConfigForAIGateway(getMap(cfg, "server"))
 	m.Config.Sources = r.mcpSources[svc.Name]
 	m.Config.Proxy = proxyFromConfig(getMap(cfg, "proxy_config"))
+	certs, caCerts, err := r.upstreamTLS(fmt.Sprintf("MCP server %q", svc.Name), svc)
+	if err != nil {
+		return err
+	}
+	m.Config.Certificates, m.Config.CACertificates = certs, caCerts
 	// Token Vault credential resolution lifts into the top-level token_vault
 	// field (its position in the AI Gateway schema); other upstream auth (e.g.
 	// AWS SigV4) lifts into config.upstream.auth. The two never coexist — they
