@@ -59,12 +59,13 @@ func geminiTargetKey(target map[string]any) string {
 // detectProviderType.
 func (r *Reverter) indexGeminiPathTargets() {
 	for i := range r.src.Services {
-		for j := range r.src.Services[i].Routes {
-			rt := &r.src.Services[i].Routes[j]
+		svc := &r.src.Services[i]
+		for j := range svc.Routes {
+			rt := &svc.Routes[j]
 			if len(rt.Paths) == 0 || isGeminiEnterprisePath(rt.Paths[0]) {
 				continue
 			}
-			for _, proxy := range findPlugins(r.routePlugins(rt), "ai-proxy-advanced") {
+			for _, proxy := range findPlugins(r.effectivePlugins(svc, rt), "ai-proxy-advanced") {
 				for _, raw := range getSlice(proxy.Config, "targets") {
 					target, ok := raw.(map[string]any)
 					if ok && getStr(getMap(target, "model"), "provider") == "gemini" {
