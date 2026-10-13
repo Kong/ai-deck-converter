@@ -45,7 +45,7 @@ func TestMCPKeyAuthWithMetadataIsHardError(t *testing.T) {
 	require.Empty(t, result.Output.Services, "the MCP server is left out")
 }
 
-// oidcOnUnsupportedListener puts identity/metadata access on an
+// oidcOnUnsupportedListener puts auth strategy and metadata access on an
 // upstream-server MCP server, which does not support it.
 const oidcOnUnsupportedListener = `
 auth_strategies:
@@ -72,7 +72,7 @@ mcp_servers:
         description: An upstream tool
 `
 
-func TestMCPIdentityUnsupportedListenerIsHardError(t *testing.T) {
+func TestMCPAuthStrategyUnsupportedListenerIsHardError(t *testing.T) {
 	result, err := Convert([]byte(oidcOnUnsupportedListener), Options{})
 	require.NoError(t, err)
 	issue := requireIssue(t, result.Issues, Error, ConfigFieldInvalid, kindMCPServer, "upstream-mcp",
@@ -109,7 +109,7 @@ mcp_servers:
 `
 
 func TestMCPOAuth2FallsBackToIssuerForAuthServers(t *testing.T) {
-	out, warnings, err := convertYAML([]byte(oidcMetadataWithoutAuthServers), false)
+	out, warnings, err := convertYAML([]byte(oidcMetadataWithoutAuthServers))
 	require.NoError(t, err)
 	require.Empty(t, warnings)
 	s := string(out)
@@ -119,7 +119,7 @@ func TestMCPOAuth2FallsBackToIssuerForAuthServers(t *testing.T) {
 		"issuer should populate authorization_servers when metadata omits them")
 }
 
-// oidcWithMappedFields carries a spread of the Gap 1 & 2 identity fields plus
+// oidcWithMappedFields carries a spread of the Gap 1 & 2 auth strategy fields plus
 // an OIDC-only field (cache_tokens_salt) that has no ai-mcp-oauth2 target.
 const oidcWithMappedFields = `
 auth_strategies:
@@ -165,8 +165,8 @@ mcp_servers:
         host: mapped.internal
 `
 
-func TestMCPOAuth2MapsIdentityFields(t *testing.T) {
-	out, warnings, err := convertYAML([]byte(oidcWithMappedFields), false)
+func TestMCPOAuth2MapsAuthStrategyFields(t *testing.T) {
+	out, warnings, err := convertYAML([]byte(oidcWithMappedFields))
 	require.NoError(t, err)
 	require.Empty(t, warnings)
 	s := string(out)
@@ -249,7 +249,7 @@ mcp_servers:
 `
 
 func TestMCPOAuth2DerivesAudienceAndPassthrough(t *testing.T) {
-	out, warnings, err := convertYAML([]byte(oidcWithAudienceAndPassthrough), false)
+	out, warnings, err := convertYAML([]byte(oidcWithAudienceAndPassthrough))
 	require.NoError(t, err)
 	require.Empty(t, warnings)
 	s := string(out)
@@ -265,7 +265,7 @@ func TestMCPOAuth2DerivesAudienceAndPassthrough(t *testing.T) {
 // MCP server WITH access.metadata (which lowers to ai-mcp-oauth2, a plugin that
 // cannot represent token_exchange). The control must not be dropped silently.
 const mcpTokenExchangeDropInput = `
-identity_providers:
+auth_strategies:
   - display_name: Okta OIDC
     name: okta-oidc-te
     type: openid-connect
@@ -293,7 +293,7 @@ mcp_servers:
       route:
         paths: [/mcp/with-meta]
     access:
-      identity_providers: [okta-oidc-te]
+      auth_strategies: [okta-oidc-te]
       metadata:
         endpoint: /mcp/with-meta/.well-known/oauth-protected-resource
         resource: https://api.example.com/mcp/with-meta

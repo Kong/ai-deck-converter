@@ -150,19 +150,16 @@ type MCPAccess struct {
 // can populate the current keys without recursing.
 type mcpAccessFields MCPAccess
 
-// UnmarshalYAML decodes an MCPAccess, folding the deprecated
-// identity_providers key into AuthStrategies.
+// UnmarshalYAML decodes an MCPAccess and rejects identity_providers.
 func (a *MCPAccess) UnmarshalYAML(node *yaml.Node) error {
+	if err := rejectIdentityProviders(node); err != nil {
+		return err
+	}
 	var fields mcpAccessFields
 	if err := node.Decode(&fields); err != nil {
 		return err
 	}
 	*a = MCPAccess(fields)
-	refs, err := appendDeprecatedAuthStrategyRefs(node, a.AuthStrategies)
-	if err != nil {
-		return err
-	}
-	a.AuthStrategies = refs
 	return nil
 }
 

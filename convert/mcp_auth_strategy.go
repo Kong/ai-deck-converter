@@ -22,16 +22,16 @@ var mcpListenerTypes = map[string]bool{
 	"passthrough-listener": true,
 }
 
-// mcpIdentityPlugins builds the authentication plugin(s) for an MCP server's
+// mcpAuthStrategyPlugins builds the authentication plugin(s) for an MCP server's
 // access.auth_strategies / access.metadata, appending the metadata endpoint
 // path to the route when an ai-mcp-oauth2 plugin is produced. It returns nil
-// when the server declares no identity/metadata access.
+// when the server declares no auth strategy or metadata access.
 //
-// Unlike agents and models (convert/identityprovider.go), MCP auth never
+// Unlike agents and models (convert/authstrategy.go), MCP auth never
 // synthesizes an anonymous consumer / request-termination: the ai-mcp-oauth2
 // plugin's consumer mapping is optional, and a bare key-auth plugin on the
 // route enforces on its own.
-func (c *Converter) mcpIdentityPlugins(
+func (c *Converter) mcpAuthStrategyPlugins(
 	src ConversionIssueSource, m *aigw.MCPServer, route *kong.Route,
 ) ([]kong.Plugin, error) {
 	meta := m.Access.Metadata
@@ -145,16 +145,17 @@ func mcpOAuth2Source(
 func (c *Converter) mcpAccessAuthStrategy(
 	src ConversionIssueSource, m *aigw.MCPServer,
 ) (*aigw.AuthStrategy, string, error) {
-	for i, ref := range m.Access.AuthStrategies {
-		field := fmt.Sprintf("access.auth_strategies[%d]", i)
-		idp := c.authStrategies[ref]
-		if idp == nil {
-			return nil, "", c.fail(src.at(field), UndefinedReference,
-				"MCP server %q references unknown auth strategy %q", m.Name, ref)
-		}
-		return idp, field, nil
+	if len(m.Access.AuthStrategies) == 0 {
+		return nil, "", nil
 	}
-	return nil, "", nil
+	const field = "access.auth_strategies[0]"
+	ref := m.Access.AuthStrategies[0]
+	idp := c.authStrategies[ref]
+	if idp == nil {
+		return nil, "", c.fail(src.at(field), UndefinedReference,
+			"MCP server %q references unknown auth strategy %q", m.Name, ref)
+	}
+	return idp, field, nil
 }
 
 // mcpOAuth2Plugin builds an ai-mcp-oauth2 plugin from an MCP server's Protected

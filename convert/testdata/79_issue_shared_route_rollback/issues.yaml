@@ -1,5 +1,5 @@
 - code: CONFIG_FIELD_INVALID
-  reason: acl policy sets both allow ([team-a]) and deny ([team-b]), but a Kong acl plugin permits exactly one; set only allow or only deny
+  reason: acl policy sets allow and deny, but a Kong acl plugin permits exactly one of allow, deny, allow_when, or deny_when
   source:
     kind: model
     name: second

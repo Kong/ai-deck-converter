@@ -6,11 +6,10 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-
 	publicaigw "github.com/Kong/ai-deck-converter/aigw"
 	"github.com/Kong/ai-deck-converter/internal/kong"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // convertDoc converts src and returns the reason of each issue. It returns an
@@ -25,8 +24,8 @@ func convertDoc(src []byte, strict bool) (*kong.Document, []string, error) {
 }
 
 // convertYAML is convertDoc with the output as decK YAML.
-func convertYAML(src []byte, strict bool) ([]byte, []string, error) {
-	doc, warnings, err := convertDoc(src, strict)
+func convertYAML(src []byte) ([]byte, []string, error) {
+	doc, warnings, err := convertDoc(src, false)
 	if err != nil {
 		return nil, warnings, err
 	}
@@ -135,7 +134,8 @@ agents:
 // oneLine keeps a ConversionIssue printable as one stderr line even when its
 // reason embeds a stack trace.
 func TestOneLineCollapsesStackTrace(t *testing.T) {
-	stack := []byte("goroutine 1 [running]:\nmain.foo()\n\t/path/to/file.go:10 +0x1\nmain.bar()\n\t/path/to/file.go:20 +0x2\n")
+	stack := []byte("goroutine 1 [running]:\nmain.foo()\n\t/path/to/file.go:10 +0x1\n" +
+		"main.bar()\n\t/path/to/file.go:20 +0x2\n")
 	got := oneLine(stack)
 	require.NotContains(t, got, "\n")
 	require.Contains(t, got, "main.foo()")

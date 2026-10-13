@@ -111,13 +111,18 @@ func (c *Converter) scopedPlugins(src ConversionIssueSource, refs []string, acls
 		}
 	}
 	if !acls.IsEmpty() {
-		// A Kong acl plugin enforces only_one_of {config.allow, config.deny}; an
-		// AI Gateway acl that sets both is not representable as one valid plugin,
-		// so reject it rather than emit config the gateway will refuse to load.
-		if len(acls.Allow) > 0 && len(acls.Deny) > 0 {
-			return nil, c.fail(src.at("access.acls.allow", "access.acls.deny"), ConfigFieldInvalid,
-				"acl policy sets both allow (%v) and deny (%v), but a Kong acl plugin permits "+
-					"exactly one; set only allow or only deny", acls.Allow, acls.Deny)
+		// A Kong acl plugin enforces only_one_of {config.allow, config.deny,
+		// config.allow_when, config.deny_when}; an AI Gateway acl that sets more
+		// than one is not representable as one valid plugin, so reject it rather
+		// than emit config the gateway will refuse to load.
+		if set := aclFieldsSet(acls); len(set) > 1 {
+			fields := make([]string, len(set))
+			for i, name := range set {
+				fields[i] = "access.acls." + name
+			}
+			return nil, c.fail(src.at(fields...), ConfigFieldInvalid,
+				"acl policy sets %s, but a Kong acl plugin permits exactly one of "+
+					"allow, deny, allow_when, or deny_when", strings.Join(set, " and "))
 		}
 		plugins = append(plugins, aclPlugin(acls))
 	}

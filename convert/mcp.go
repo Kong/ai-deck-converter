@@ -99,7 +99,7 @@ func (c *Converter) convertMCPServer(
 	// auth plugin (no metadata), and appends the metadata endpoint path to
 	// the route so one route serves both MCP traffic and the .well-known
 	// metadata.
-	authPlugins, err := c.mcpIdentityPlugins(src, m, &route)
+	authPlugins, err := c.mcpAuthStrategyPlugins(src, m, &route)
 	if err != nil {
 		return kong.Service{}, err
 	}
@@ -149,7 +149,7 @@ func (c *Converter) convertMCPServer(
 
 // mcpToolsetGate closes a conversion-only server's route to clients. Such a
 // server serves no MCP traffic of its own and cannot declare access itself
-// (mcpIdentityPlugins rejects auth on non-listener modes): its tools are only
+// (mcpAuthStrategyPlugins rejects auth on non-listener modes): its tools are only
 // meant to be reached through the listeners that name it in config.sources.
 // Without the gate its route would be reachable directly, on terms none of
 // those listeners set -- bypassing their auth and ACLs alike.
@@ -341,7 +341,19 @@ func (c *Converter) mcpPlugin(src ConversionIssueSource, m *aigw.MCPServer) (kon
 	// than one shadowing the other.
 	setIfNotEmpty(cfg, "acl_attribute_type", m.Access.ACLAttributeType)
 	setIfNotEmpty(cfg, "access_token_claim_field", m.Access.AccessTokenClaimField)
-	if acl := defaultACLBlock(mergeACLs(m.Access.ACLs, m.Access.DefaultToolACLs)); acl != nil {
+	serverACLs := mergeACLs(m.Access.ACLs, m.Access.DefaultToolACLs)
+	// ai-mcp-proxy's default_acl entries define only scope/allow/deny. Emitting
+	// a when-expression there makes Kong reject the whole config, and dropping
+	// it silently would weaken or remove the authored access control.
+	if hasCELExpressions(serverACLs) {
+		fields := slices.Concat(celFieldPaths("access.acls", m.Access.ACLs),
+			celFieldPaths("access.default_tool_acls", m.Access.DefaultToolACLs))
+		return kong.Plugin{}, c.fail(src.at(fields...), ConfigFieldInvalid,
+			"MCP server %q sets allow_when/deny_when, which ai-mcp-proxy cannot represent; "+
+				"CEL expressions are supported only on policies that lower to the acl plugin",
+			m.Name)
+	}
+	if acl := defaultACLBlock(serverACLs); acl != nil {
 		cfg["default_acl"] = acl
 	}
 	// include_consumer_groups is set by default, mirroring aclPlugin() in convert/acl.go: AI Gateway's
@@ -406,6 +418,17 @@ func (c *Converter) mcpTools(src ConversionIssueSource, serverName string, tools
 		setIfNotEmptyMap(tool, "annotations", t.Annotations)
 		setIfNotEmptyMap(tool, "input_schema", t.InputSchema)
 		setIfNotEmptyMap(tool, "output_schema", t.OutputSchema)
+		// tools[].acl defines only allow/deny, same as default_acl entries. The
+		// tool is left out, so no client reaches it without its access control.
+		if hasCELExpressions(t.Access.ACLs) {
+			c.warn(src.at(celFieldPaths(fmt.Sprintf("tools[%d].access.acls", i), t.Access.ACLs)...),
+				ConfigFieldInvalid,
+				"MCP server %q tool %q sets allow_when/deny_when, which ai-mcp-proxy cannot "+
+					"represent; CEL expressions are supported only on policies that lower to "+
+					"the acl plugin; the tool is omitted",
+				serverName, t.Name)
+			continue
+		}
 		if acl := aclBlock(t.Access.ACLs); acl != nil {
 			tool["acl"] = acl
 		}

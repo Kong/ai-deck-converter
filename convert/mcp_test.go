@@ -474,3 +474,98 @@ mcp_servers:
 		})
 	}
 }
+
+// mcpWhenACLInput templates an MCP server whose ACL block is supplied by the
+// caller, so one fixture covers the server-wide and per-tool placements.
+//
+//nolint:gosec
+const mcpWhenACLInput = `
+mcp_servers:
+  - type: listener
+    display_name: Guarded MCP
+    name: guarded-mcp
+    config:
+      route:
+        paths: [/mcp/guarded]
+%s
+    tools:
+      - name: echo
+        description: echo
+        method: GET
+        path: /anything
+        scheme: https
+        host: httpbin.internal
+%s
+`
+
+// TestMCPACLWhenExpressionsRejected pins the schema boundary: ai-mcp-proxy's
+// default_acl entries and tools[].acl records define only scope/allow/deny, so
+// a CEL when-expression cannot be represented there. A server-wide expression
+// leaves out the MCP server. A per-tool expression leaves out only the tool.
+func TestMCPACLWhenExpressionsRejected(t *testing.T) {
+	cases := []struct {
+		name     string
+		access   string
+		tool     string
+		severity ConversionIssueSeverity
+		field    string
+	}{
+		{
+			name: "server acls allow_when",
+			access: `    access:
+      acls:
+        allow_when: ["principal.metadata.admin == 'true'"]`,
+			severity: Error,
+			field:    "access.acls.allow_when",
+		},
+		{
+			name: "server default_tool_acls deny_when",
+			access: `    access:
+      default_tool_acls:
+        deny_when: ["principal.metadata.admin != 'true'"]`,
+			severity: Error,
+			field:    "access.default_tool_acls.deny_when",
+		},
+		{
+			name: "per-tool acls allow_when",
+			tool: `        access:
+          acls:
+            allow_when: ["principal.metadata.admin == 'true'"]`,
+			severity: Warning,
+			field:    "tools[0].access.acls.allow_when",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			src := []byte(fmt.Sprintf(mcpWhenACLInput, tc.access, tc.tool))
+			result, err := Convert(src, Options{})
+			require.NoError(t, err)
+			issue := requireIssue(t, result.Issues, tc.severity, ConfigFieldInvalid, kindMCPServer, "guarded-mcp",
+				tc.field)
+			require.Contains(t, issue.Reason, "allow_when/deny_when")
+			if tc.severity == Error {
+				require.Empty(t, result.Output.Services, "the MCP server is left out")
+				return
+			}
+			require.Len(t, result.Output.Services, 1, "the MCP server still converts")
+			plugin := result.Output.Services[0].Routes[0].Plugins[0]
+			require.Empty(t, plugin.Config["tools"], "the tool is left out")
+		})
+	}
+}
+
+// TestMCPACLAllowDenyStillConverts guards the gate's blast radius: a plain
+// allow/deny ACL is the shape ai-mcp-proxy does accept and must keep working.
+func TestMCPACLAllowDenyStillConverts(t *testing.T) {
+	access := `    access:
+      acls:
+        allow: [premium-users]`
+	tool := `        access:
+          acls:
+            deny: [banned-users]`
+	result, err := Convert([]byte(fmt.Sprintf(mcpWhenACLInput, access, tool)), Options{})
+	require.NoError(t, err)
+	require.Empty(t, result.Issues, "allow/deny ACLs must still convert")
+	require.Len(t, result.Output.Services, 1)
+}

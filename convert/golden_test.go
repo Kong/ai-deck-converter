@@ -70,7 +70,7 @@ func issuesYAML(t *testing.T, issues []ConversionIssue) string {
 	}
 	var buf bytes.Buffer
 	enc := yaml.NewEncoder(&buf)
-	enc.SetIndent(2) //nolint:mnd
+	enc.SetIndent(2)
 	require.NoError(t, enc.Encode(issues), "marshal issues")
 	require.NoError(t, enc.Close(), "marshal issues")
 	return buf.String()

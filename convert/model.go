@@ -620,6 +620,14 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 					}
 					g.proxyByOwner[ownerKey] = pg
 					g.proxies = append(g.proxies, pg)
+				} else if pg.genaiCategory != spec.GenaiCategory {
+					// The data plane requires every target to match the plugin's category.
+					c.warn(src.at(capabilityField(m, capability)), ConfigFieldDropped,
+						"model %q: capability %q (genai_category %q) collapses onto route %q, which already "+
+							"serves genai_category %q; a single ai-proxy-advanced cannot serve multiple genai "+
+							"categories, skipping this capability",
+						m.Name, capability, spec.GenaiCategory, g.route.Name, pg.genaiCategory)
+					continue
 				}
 				// A target's model_alias decides which balancer pool it joins: the DP
 				// keys pools by model_alias and puts alias-less targets in the shared

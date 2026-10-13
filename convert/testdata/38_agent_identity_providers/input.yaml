@@ -1,4 +1,4 @@
-identity_providers:
+auth_strategies:
   - display_name: Agent Key Auth
     name: agent-key-auth
     type: key-auth
@@ -11,7 +11,7 @@ agents:
     access:
       acls:
         allow: [allowed-group]
-      identity_providers: [agent-key-auth]
+      auth_strategies: [agent-key-auth]
     config:
       url: https://agent.internal/api
       route:

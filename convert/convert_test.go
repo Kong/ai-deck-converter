@@ -1,6 +1,7 @@
 package convert
 
 import (
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -31,7 +32,7 @@ models:
         paths: [/v1/chat/completions]
         model: {path: {path_param: model_name}}
 `)
-	out, warnings, err := convertYAML(src, false)
+	out, warnings, err := convertYAML(src)
 	require.NoError(t, err, "convert")
 	require.Contains(t, strings.Join(warnings, "\n"), "is not a regex path",
 		"expected non-regex path_param warning")
@@ -331,7 +332,7 @@ models:
         config: {type: openai}
 `)
 
-	out, warnings, err := convertYAML(src, false)
+	out, warnings, err := convertYAML(src)
 	require.NoError(t, err, "convert")
 	require.Contains(t, strings.Join(warnings, "\n"), "multiple targets")
 
@@ -400,11 +401,64 @@ models:
         config: {type: openai}
 `)
 
-	out, warnings, err := convertYAML(src, false)
+	out, warnings, err := convertYAML(src)
 	require.NoError(t, err, "convert")
 	require.Contains(t, strings.Join(warnings, "\n"), "shared by multiple video models")
 	require.Contains(t, string(out), "openai-videos-lifecycle")
 	require.Contains(t, string(out), "openai-videos-lifecycle-2")
+}
+
+// A single model whose capabilities all resolve to the same route (e.g. a
+// Bedrock model exposing embeddings+image+video, all served by /invoke) would
+// otherwise collapse into one ai-proxy-advanced carrying one genai_category but
+// targets with mismatched route_types — a config the data plane rejects. The
+// converter keeps the first capability and drops the rest with a warning.
+func TestConvertGuardsMultimodalCollapse(t *testing.T) {
+	src := []byte(`
+model_providers:
+  - name: bedrock-prod
+    type: bedrock
+models:
+  - type: model
+    name: nova-omni
+    capabilities: [embeddings, image, video]
+    formats: [{type: bedrock}]
+    targets:
+      - name: amazon.nova-omni-v1:0
+        provider: bedrock-prod
+        config: {type: bedrock, region: us-east-1}
+    policies: []
+    access:
+      acls: {allow: [], deny: []}
+    config:
+      route:
+        paths: [/ai]
+        model:
+          values: ["@bedrock/nova-omni"]
+`)
+	result, err := Convert(src, Options{})
+	require.NoError(t, err, "convert")
+	var dropped []ConversionIssue
+	for _, issue := range result.Issues {
+		if issue.Code == ConfigFieldDropped {
+			dropped = append(dropped, issue)
+		}
+	}
+	require.Len(t, dropped, 2, "issues: %v", result.Issues)
+	for i, capability := range []string{"image", "video"} {
+		require.Equal(t, Warning, dropped[i].Severity)
+		require.Equal(t, []string{fmt.Sprintf("capabilities[%d]", i+1)}, dropped[i].Source.Fields)
+		require.Contains(t, dropped[i].Reason, `capability "`+capability+`"`)
+		require.Contains(t, dropped[i].Reason, "cannot serve multiple genai categories")
+	}
+
+	out, err := result.Output.ToYAML()
+	require.NoError(t, err)
+	require.Contains(t, string(out), "genai_category: text/embeddings")
+	require.NotContains(t, string(out), "image/v1/images/generations",
+		"the skipped image capability must not leak a target into the output")
+	require.NotContains(t, string(out), "video/v1/videos/generations",
+		"the skipped video capability must not leak a target into the output")
 }
 
 // A Kong acl plugin permits exactly one of config.allow / config.deny
@@ -438,6 +492,105 @@ model_providers:
 	require.Error(t, err, "acl with both allow and deny must be rejected")
 	require.Contains(t, err.Error(), "allow")
 	require.Contains(t, err.Error(), "deny")
+}
+
+// The acl plugin's only_one_of spans all four fields (config.allow,
+// config.deny, config.allow_when, config.deny_when), so any pair is invalid,
+// not just allow+deny. The per-field golden cases each populate one list, so
+// the combinations are covered here.
+func TestConvertRejectsACLWithMultipleFields(t *testing.T) {
+	const tmpl = `
+models:
+  - type: model
+    name: guarded
+    capabilities: [generate]
+    formats: [{type: openai}]
+    targets:
+      - name: gpt-4o
+        provider: p1
+        config: {type: openai}
+    access:
+      acls:
+%s
+    config:
+      route: {paths: [/ai]}
+model_providers:
+  - name: p1
+    type: openai
+`
+	cases := []struct {
+		name  string
+		acls  string
+		wants []string
+	}{
+		{
+			name: "allow_when and deny_when",
+			acls: `        allow_when: ["principal.metadata.admin == 'true'"]
+        deny_when: ["principal.metadata.banned == 'true'"]`,
+			wants: []string{"allow_when", "deny_when"},
+		},
+		{
+			name: "allow and allow_when",
+			acls: `        allow: [premium]
+        allow_when: ["principal.metadata.admin == 'true'"]`,
+			wants: []string{"allow", "allow_when"},
+		},
+		{
+			name: "deny and deny_when",
+			acls: `        deny: [banned]
+        deny_when: ["principal.metadata.banned == 'true'"]`,
+			wants: []string{"deny", "deny_when"},
+		},
+		{
+			name: "allow and deny_when",
+			acls: `        allow: [premium]
+        deny_when: ["principal.metadata.banned == 'true'"]`,
+			wants: []string{"allow", "deny_when"},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			result, err := Convert([]byte(fmt.Sprintf(tmpl, tc.acls)), Options{})
+			require.NoError(t, err)
+			fields := make([]string, len(tc.wants))
+			for i, want := range tc.wants {
+				fields[i] = "access.acls." + want
+			}
+			issue := requireIssue(t, result.Issues, Error, ConfigFieldInvalid, kindModel, "guarded", fields...)
+			for _, want := range tc.wants {
+				require.Contains(t, issue.Reason, want)
+			}
+			require.Empty(t, result.Output.AIModels, "the model is left out")
+		})
+	}
+}
+
+// A single when-list stays valid: the guard must reject combinations only.
+func TestConvertAcceptsACLWithOnlyAllowWhen(t *testing.T) {
+	src := []byte(`
+models:
+  - type: model
+    name: guarded
+    capabilities: [generate]
+    formats: [{type: openai}]
+    targets:
+      - name: gpt-4o
+        provider: p1
+        config: {type: openai}
+    access:
+      acls:
+        allow_when: ["principal.metadata.admin == 'true'"]
+    config:
+      route: {paths: [/ai]}
+model_providers:
+  - name: p1
+    type: openai
+`)
+	result, err := Convert(src, Options{})
+	require.NoError(t, err)
+	require.Empty(t, result.Issues, "a lone allow_when must still convert")
+	require.Len(t, result.Output.AIModels, 1)
 }
 
 // The skills API is served only as passthrough, so Kong rejects a llm/v1/skills
@@ -537,7 +690,7 @@ auth_strategies:
     config: {issuer: https://id.example.test}
 `)
 
-	out, _, err := convertYAML(src, false)
+	out, _, err := convertYAML(src)
 	require.NoError(t, err, "convert")
 
 	var doc struct {
@@ -600,7 +753,7 @@ auth_strategies:
     type: openid-connect
 `)
 
-	out, _, err := convertYAML(src, false)
+	out, _, err := convertYAML(src)
 	require.NoError(t, err, "convert")
 
 	var doc struct {
@@ -651,7 +804,7 @@ model_providers:
   - name: p1
     type: openai
 `)
-	out, _, err := convertYAML(src, false)
+	out, _, err := convertYAML(src)
 	require.NoError(t, err, "convert")
 
 	var doc struct {
@@ -880,7 +1033,7 @@ model_providers:
     type: openai
 `)
 
-	out, _, err := convertYAML(src, false)
+	out, _, err := convertYAML(src)
 	require.NoError(t, err, "convert")
 
 	var got map[string]any
@@ -940,7 +1093,7 @@ model_providers:
     type: gemini
 `)
 
-	out, _, err := convertYAML(src, false)
+	out, _, err := convertYAML(src)
 	require.NoError(t, err, "convert")
 
 	var got map[string]any
@@ -982,7 +1135,7 @@ model_providers:
     type: openai
 `)
 
-	out, _, err := convertYAML(src, false)
+	out, _, err := convertYAML(src)
 	require.NoError(t, err, "convert")
 
 	var got map[string]any
@@ -1895,7 +2048,7 @@ models:
       model: {alias: openai-chat}
 `)
 
-	out, _, err := convertYAML(src, false)
+	out, _, err := convertYAML(src)
 	require.NoError(t, err, "convert")
 
 	var got struct {

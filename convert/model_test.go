@@ -134,11 +134,11 @@ func TestPassthroughIgnoresCapabilities(t *testing.T) {
 		out, warnings, err := convertYAML([]byte(`
 models:
   - name: pt
-    capabilities: `+caps+`
+    capabilities: ` + caps + `
     formats: [{type: passthrough}]
     config: {route: {paths: [/ai]}}
     targets: [{name: a, provider: p, config: {type: openai}}]
-`+passthroughProviders), false)
+` + passthroughProviders))
 		require.NoError(t, err, caps)
 		require.Empty(t, warnings, caps)
 		doc := string(out)
@@ -171,7 +171,7 @@ policies:
   - {name: logs, type: http-log, config: {http_endpoint: "https://logs.internal/x"}}
   - {name: cache, type: ai-semantic-cache, config: {}}
   - {name: lakera, type: ai-lakera-guard, global: true, config: {}}
-`+passthroughProviders), false)
+` + passthroughProviders))
 	require.NoError(t, err)
 
 	doc := string(out)
@@ -318,7 +318,7 @@ func TestModelWarnsLogStatisticsOverride(t *testing.T) {
       logging: {statistics: true}
     targets: [{name: t, provider: openai-prod, config: {type: openai}}]
 ` + overrideProvider
-	out, warnings, err := convertYAML([]byte(src), false)
+	out, warnings, err := convertYAML([]byte(src))
 	require.NoError(t, err)
 	require.Len(t, warnings, 3, "one warning per affected route")
 	for i, route := range []string{"openai-audio-speech", "openai-audio-transcribe", "openai-audio-translate"} {

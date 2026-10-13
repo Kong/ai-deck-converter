@@ -185,13 +185,11 @@ func (c *Converter) guard(src ConversionIssueSource, fn func() error) (err error
 
 // convertEntity runs fn for the entity src. When fn fails, the output
 // document returns to its state before fn.
-func (c *Converter) convertEntity(src ConversionIssueSource, fn func() error) bool {
+func (c *Converter) convertEntity(src ConversionIssueSource, fn func() error) {
 	snapshot := *c.out
 	if err := c.guard(src, fn); err != nil {
 		*c.out = snapshot
-		return false
 	}
-	return true
 }
 
 // oneLine joins a multi-line stack trace into one line with " | ". A

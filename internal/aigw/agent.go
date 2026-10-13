@@ -32,19 +32,16 @@ type AgentAccessConfig struct {
 // decoder can populate the current keys without recursing.
 type agentAccessFields AgentAccessConfig
 
-// UnmarshalYAML decodes an AgentAccessConfig, folding the deprecated
-// identity_providers key into AuthStrategies.
+// UnmarshalYAML decodes an AgentAccessConfig and rejects identity_providers.
 func (a *AgentAccessConfig) UnmarshalYAML(node *yaml.Node) error {
+	if err := rejectIdentityProviders(node); err != nil {
+		return err
+	}
 	var fields agentAccessFields
 	if err := node.Decode(&fields); err != nil {
 		return err
 	}
 	*a = AgentAccessConfig(fields)
-	refs, err := appendDeprecatedAuthStrategyRefs(node, a.AuthStrategies)
-	if err != nil {
-		return err
-	}
-	a.AuthStrategies = refs
 	return nil
 }
 
