@@ -1,0 +1,24 @@
+models:
+  - type: model
+    display_name: Gemini Live
+    name: gemini-live
+    capabilities: [realtime]
+    formats:
+      - type: gemini
+    targets:
+      - name: gemini-3.1-flash-live-preview
+        provider: gemini-studio
+        config:
+          type: gemini
+    config:
+      route: {paths: [/ai]}
+model_providers:
+  - name: gemini-studio
+    type: gemini
+    display_name: Gemini AI Studio
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: x-goog-api-key
+            value: "{vault://ai/gemini-key}"
