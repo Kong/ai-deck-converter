@@ -7,8 +7,6 @@ tags:
 jira: https://konghq.atlassian.net/browse/KOKO-XXXX
 ---
 
-<!--- Questions about this process? See the design-process RFC in docs/decisions/ (`09852-adopt-design-process.md`). --->
-
 # Motivation
 [motivation]: #motivation
 
