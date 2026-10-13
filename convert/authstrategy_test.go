@@ -1,6 +1,7 @@
 package convert
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/Kong/ai-deck-converter/internal/aigw"
@@ -220,5 +221,46 @@ func TestAuthStrategyDoesNotWarnMatchingValues(t *testing.T) {
 		_, warnings, err := convertDoc([]byte(authStrategyOverrideDoc(cfg)), true)
 		require.NoError(t, err, cfg)
 		require.Empty(t, warnings, cfg)
+	}
+}
+
+// A model that fails after it added the request-termination plugin to the
+// user's anonymous consumer leaves that consumer as the user wrote it. The
+// model fails on its realtime route, which allows only one auth strategy.
+func TestFailedModelLeavesUserAnonymousConsumerUnchanged(t *testing.T) {
+	for name, consumer := range map[string]string{
+		"without plugins": `
+  - name: anonymous`,
+		"with its own request-termination": `
+  - name: anonymous
+    policies: [deny-403]`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			src := []byte(`
+model_providers:
+  - {name: openai-main, type: openai}
+auth_strategies:
+  - {name: keys-a, type: key-auth, config: {key_names: [a]}}
+  - {name: keys-b, type: key-auth, config: {key_names: [b]}}
+policies:
+  - {name: deny-403, type: request-termination, config: {status_code: 403}}
+consumers:` + consumer + `
+models:
+  - name: broken
+    capabilities: [generate, realtime]
+    targets: [{name: gpt-4o, provider: openai-main, config: {type: openai}}]
+    access: {auth_strategies: [keys-a, keys-b]}
+    config: {route: {paths: [/ai]}}
+`)
+			result, err := Convert(src, Options{})
+			require.NoError(t, err)
+			requireIssue(t, result.Issues, Error, ConfigFieldInvalid, kindModel, "broken", "access.auth_strategies")
+			require.Empty(t, result.Output.AIModels, "the model is left out")
+
+			withoutModels, err := Convert([]byte(strings.Split(string(src), "models:\n")[0]), Options{})
+			require.NoError(t, err)
+			require.Equal(t, withoutModels.Output.Consumers, result.Output.Consumers,
+				"the anonymous consumer keeps the plugins the user wrote")
+		})
 	}
 }

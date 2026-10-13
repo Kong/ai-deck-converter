@@ -184,7 +184,9 @@ func (c *Converter) guard(src ConversionIssueSource, fn func() error) (err error
 }
 
 // convertEntity runs fn for the entity src. When fn fails, the output
-// document returns to its state before fn.
+// document returns to its state before fn. The copy of the document is
+// shallow, so fn must not change an element of a c.out slice in place before
+// a step that can fail.
 func (c *Converter) convertEntity(src ConversionIssueSource, fn func() error) {
 	snapshot := *c.out
 	if err := c.guard(src, fn); err != nil {

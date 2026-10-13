@@ -173,16 +173,11 @@ type modelPass struct {
 // scoped route-only.
 //
 // Models share routes and plugins. A model that fails can have changed them
-// already, so a failure starts a new pass that leaves out that model.
-//
-// # Known issue: each failed model restarts the pass
-//
-// A new pass converts every model that is not skipped again. A model that
-// succeeded in an earlier pass gives the same result again. The cost grows
-// with the number of models times the number of failed models. A document
-// without failed models has no extra cost.
-// A potential fix is having each failing model undo its own changes and
-// continue the same pass without restarting.
+// already, so a failure starts a new pass that leaves out that model. The
+// copy of c.out is shallow, so a model must not change an element of a c.out
+// slice in place. The
+// restart cost grows with the number of models times the number of failed
+// models.
 func (c *Converter) convertModels() {
 	out := *c.out
 	issueCount := len(c.issues)
@@ -328,7 +323,7 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 	// time.
 	aliases := c.extractModelAliases(src, m)
 
-	// ownerKey st.groups targets into ai-proxy-advanced plugins: per source model
+	// ownerKey groups targets into ai-proxy-advanced plugins: per source model
 	// for type "model" (each carries its own ai-model FK), shared for type
 	// "api" (route-only, all targets merged into one plugin).
 	modelScoped := isModelType(m)
@@ -358,7 +353,7 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 		// Kong allows one plugin of a name per route, and without a selector nothing
 		// tells two ai-proxy-advanced plugins on one route apart. Two passthrough
 		// models whose routes match the same requests are just as ambiguous even when
-		// they land in different route st.groups (different auth strategies, route
+		// they land in different route groups (different auth strategies, route
 		// names, ...), so the check keys on the request matchers, not the group key.
 		for _, b := range bases {
 			key, err := passthroughMatcherKey(b, m.Config.Route)

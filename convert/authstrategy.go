@@ -3,6 +3,8 @@ package convert
 import (
 	"fmt"
 	"maps"
+	"reflect"
+	"slices"
 
 	"github.com/Kong/ai-deck-converter/internal/aigw"
 	"github.com/Kong/ai-deck-converter/internal/kong"
@@ -117,6 +119,10 @@ func keyAuthPrincipalsEnabled(cfg map[string]any) bool {
 // ensureAnonymousConsumer appends the anonymous Consumer (with a
 // request-termination plugin so unauthenticated requests get a 401) if one
 // isn't already present in the output document.
+//
+// It never changes a consumer in place. convertEntity and convertModels
+// restore c.out from a shallow copy, so an in-place change would survive a
+// rollback.
 func (c *Converter) ensureAnonymousConsumer() {
 	enabled := true
 	requestTerminationPlugin := kong.Plugin{
@@ -131,21 +137,23 @@ func (c *Converter) ensureAnonymousConsumer() {
 	// Overwrite for both 'username: anonymous' and 'custom_id: anonymous' because
 	// our auth plugins look for both at random unpredictable loop iterations
 	providedConfigContainsAnonConsumer := false
+	var consumers []kong.Consumer
 	for i := range c.out.Consumers {
-		if c.out.Consumers[i].Username == anonymousConsumerName || c.out.Consumers[i].CustomID == anonymousConsumerName {
-			providedConfigContainsAnonConsumer = true
-			requestTerminationPluginOverwritten := false
-			for j, p := range c.out.Consumers[i].Plugins {
-				if p.Name == "request-termination" {
-					c.out.Consumers[i].Plugins[j] = requestTerminationPlugin
-					requestTerminationPluginOverwritten = true
-					break
-				}
-			}
-			if !requestTerminationPluginOverwritten {
-				c.out.Consumers[i].Plugins = append(c.out.Consumers[i].Plugins, requestTerminationPlugin)
-			}
+		if c.out.Consumers[i].Username != anonymousConsumerName && c.out.Consumers[i].CustomID != anonymousConsumerName {
+			continue
 		}
+		providedConfigContainsAnonConsumer = true
+		plugins, changed := withPlugin(c.out.Consumers[i].Plugins, requestTerminationPlugin)
+		if !changed {
+			continue
+		}
+		if consumers == nil {
+			consumers = slices.Clone(c.out.Consumers)
+		}
+		consumers[i].Plugins = plugins
+	}
+	if consumers != nil {
+		c.out.Consumers = consumers
 	}
 	if providedConfigContainsAnonConsumer {
 		return
@@ -156,4 +164,20 @@ func (c *Converter) ensureAnonymousConsumer() {
 		CustomID: anonymousConsumerName,
 		Plugins:  []kong.Plugin{requestTerminationPlugin},
 	})
+}
+
+// withPlugin returns a copy of plugins in which p replaces the first plugin of
+// the same name, or p is appended. It reports false when plugins already has
+// p, and then returns plugins unchanged.
+func withPlugin(plugins []kong.Plugin, p kong.Plugin) ([]kong.Plugin, bool) {
+	i := slices.IndexFunc(plugins, func(q kong.Plugin) bool { return q.Name == p.Name })
+	if i >= 0 && reflect.DeepEqual(plugins[i], p) {
+		return plugins, false
+	}
+	out := slices.Clone(plugins)
+	if i >= 0 {
+		out[i] = p
+		return out, true
+	}
+	return append(out, p), true
 }
