@@ -1,4 +1,4 @@
-identity_providers:
+auth_strategies:
   - display_name: Okta OIDC (token exchange)
     name: okta-oidc-te
     type: openid-connect
@@ -32,7 +32,7 @@ mcp_servers:
       route:
         paths: [/mcp/no-meta]
     access:
-      identity_providers: [okta-oidc-te]
+      auth_strategies: [okta-oidc-te]
     tools:
       - name: echo
         description: echo

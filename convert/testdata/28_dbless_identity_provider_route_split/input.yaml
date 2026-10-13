@@ -30,7 +30,7 @@ models:
         config:
           type: openai
     access:
-      identity_providers: [oidc-repro-idp]
+      auth_strategies: [oidc-repro-idp]
 model_providers:
   - name: oidc-repro-openai
     display_name: "OIDC Leak Repro - OpenAI"
@@ -41,7 +41,7 @@ model_providers:
         headers:
           - name: Authorization
             value: "{vault://oidc-repro-secrets/openai-auth-token}"
-identity_providers:
+auth_strategies:
   - name: oidc-repro-idp
     display_name: "OIDC Leak Repro - Identity Provider"
     type: openid-connect

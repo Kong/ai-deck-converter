@@ -81,7 +81,7 @@ func (c *Converter) convertMCPServers() error {
 		// auth plugin (no metadata), and appends the metadata endpoint path to
 		// the route so one route serves both MCP traffic and the .well-known
 		// metadata.
-		authPlugins, err := c.mcpIdentityPlugins(m, &route)
+		authPlugins, err := c.mcpAuthStrategyPlugins(m, &route)
 		if err != nil {
 			return err
 		}
@@ -139,7 +139,7 @@ func (c *Converter) convertMCPServers() error {
 
 // mcpToolsetGate closes a conversion-only server's route to clients. Such a
 // server serves no MCP traffic of its own and cannot declare access itself
-// (mcpIdentityPlugins rejects auth on non-listener modes): its tools are only
+// (mcpAuthStrategyPlugins rejects auth on non-listener modes): its tools are only
 // meant to be reached through the listeners that name it in config.sources.
 // Without the gate its route would be reachable directly, on terms none of
 // those listeners set -- bypassing their auth and ACLs alike.

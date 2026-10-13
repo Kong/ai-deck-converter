@@ -22,16 +22,16 @@ var mcpListenerTypes = map[string]bool{
 	"passthrough-listener": true,
 }
 
-// mcpIdentityPlugins builds the authentication plugin(s) for an MCP server's
+// mcpAuthStrategyPlugins builds the authentication plugin(s) for an MCP server's
 // access.auth_strategies / access.metadata, appending the metadata endpoint
 // path to the route when an ai-mcp-oauth2 plugin is produced. It returns nil
-// when the server declares no identity/metadata access.
+// when the server declares no auth strategy or metadata access.
 //
-// Unlike agents and models (convert/identityprovider.go), MCP auth never
+// Unlike agents and models (convert/authstrategy.go), MCP auth never
 // synthesizes an anonymous consumer / request-termination: the ai-mcp-oauth2
 // plugin's consumer mapping is optional, and a bare key-auth plugin on the
 // route enforces on its own.
-func (c *Converter) mcpIdentityPlugins(m *aigw.MCPServer, route *kong.Route) ([]kong.Plugin, error) {
+func (c *Converter) mcpAuthStrategyPlugins(m *aigw.MCPServer, route *kong.Route) ([]kong.Plugin, error) {
 	meta := m.Access.Metadata
 	if len(m.Access.AuthStrategies) == 0 && meta == nil {
 		return nil, nil
