@@ -524,6 +524,12 @@ var EndpointTable = map[string]map[string]EndpointEntry{
 		"files": {
 			Primary: EndpointSpec{"files", "(?:upload/)?v1beta/files", true, mGetPost, "llm/v1/chat", catTextGen, nil, true},
 		},
+		"realtime": {
+			Primary: EndpointSpec{
+				"realtime", "/realtime", false, nil, RealtimeRouteType, catRealtime,
+				nil, true,
+			},
+		},
 	},
 	"cohere": {
 		"rerank": {
