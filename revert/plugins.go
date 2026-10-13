@@ -71,6 +71,19 @@ func (r *Reverter) servicePlugins(svc *kong.Service) []kong.Plugin {
 	return svc.Plugins
 }
 
+// effectivePlugins returns the plugins that run on a route.
+// A plugin on the route hides a service plugin with the same name.
+func (r *Reverter) effectivePlugins(svc *kong.Service, rt *kong.Route) []kong.Plugin {
+	own := r.routePlugins(rt)
+	plugins := append([]kong.Plugin{}, own...)
+	for _, p := range r.servicePlugins(svc) {
+		if !hasPlugin(own, p.Name) {
+			plugins = append(plugins, p)
+		}
+	}
+	return plugins
+}
+
 // hasPlugin reports whether the plugin list contains a plugin with the name.
 func hasPlugin(plugins []kong.Plugin, name string) bool {
 	return findPlugin(plugins, name) != nil

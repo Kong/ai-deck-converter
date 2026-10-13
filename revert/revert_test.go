@@ -440,6 +440,67 @@ services:
 		"want a defaulting-to-generate warning")
 }
 
+func TestRoutePluginHidesServicePluginOfSameName(t *testing.T) {
+	in := []byte(`
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: openai-chat
+        paths: [/ai/chat/completions]
+        plugins:
+          - name: ai-proxy-advanced
+            config:
+              llm_format: openai
+              targets:
+                - route_type: llm/v1/chat
+                  model: {provider: openai, name: route-model}
+    plugins:
+      - name: ai-proxy-advanced
+        config:
+          llm_format: openai
+          targets:
+            - route_type: llm/v1/chat
+              model: {provider: openai, name: service-model}
+`)
+	doc, warnings, err := revertYAML(t, in, Options{})
+	require.NoError(t, err, "revert")
+	require.Empty(t, warnings)
+	require.Lenf(t, doc.Models, 1, "models = %+v; want one", doc.Models)
+	require.Lenf(t, doc.Models[0].TargetModels, 1, "targets = %+v; want only the route's", doc.Models[0].TargetModels)
+	require.Equal(t, "route-model", doc.Models[0].TargetModels[0].Name)
+}
+
+func TestServiceScopedGuardOnModelServiceBecomesModelPolicy(t *testing.T) {
+	in := []byte(`
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: openai-chat
+        paths: [/ai/chat/completions]
+    plugins:
+      - name: ai-proxy-advanced
+        config:
+          llm_format: openai
+          targets:
+            - route_type: llm/v1/chat
+              model: {provider: openai, name: gpt-5.2}
+      - name: rate-limiting
+        config: {minute: 5}
+`)
+	doc, warnings, err := revertYAML(t, in, Options{})
+	require.NoError(t, err, "revert")
+	require.Empty(t, warnings)
+	require.Lenf(t, doc.Models, 1, "models = %+v; want one", doc.Models)
+	require.Empty(t, doc.Agents, "a service-scoped AI plugin must not leave an agent behind")
+	require.Lenf(t, doc.Policies, 1, "policies = %+v; want one", doc.Policies)
+	require.Equal(t, "rate-limiting", doc.Policies[0].Type)
+	require.Equal(t, []string{doc.Policies[0].Name}, doc.Models[0].Policies)
+}
+
 // revertYAML is a test helper that runs Revert and re-parses the output into
 // an aigw document for structural assertions.
 func revertYAML(t *testing.T, in []byte, opts Options) (*aigw.Document, []string, error) {

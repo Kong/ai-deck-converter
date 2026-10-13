@@ -31,7 +31,7 @@ func (r *Reverter) indexMCPListenerSources() {
 	for i := range r.src.Services {
 		svc := &r.src.Services[i]
 		for j := range svc.Routes {
-			mcp := findPlugin(r.routePlugins(&svc.Routes[j]), "ai-mcp-proxy")
+			mcp := findPlugin(r.effectivePlugins(svc, &svc.Routes[j]), "ai-mcp-proxy")
 			if mcp == nil {
 				continue
 			}
@@ -79,7 +79,7 @@ func (r *Reverter) stripBucketTags(tags []string) []string {
 // come back out as Tools, the ACL config (acl_attribute_type /
 // access_token_claim_field / default_acl) becomes the server-level access
 // block, and any other route- or service-level plugins become policies.
-func (r *Reverter) revertMCPServer(svc *kong.Service, rt *kong.Route, plugins, svcPlugins []kong.Plugin) error {
+func (r *Reverter) revertMCPServer(svc *kong.Service, rt *kong.Route, plugins []kong.Plugin) error {
 	mcpPlugin := findPlugin(plugins, "ai-mcp-proxy")
 	cfg := mcpPlugin.Config
 
@@ -168,7 +168,6 @@ func (r *Reverter) revertMCPServer(svc *kong.Service, rt *kong.Route, plugins, s
 	// Pull auth-strategy / OAuth 2.0 Protected Resource Metadata access out
 	// of the route plugins (into access.auth_strategies/metadata) before the
 	// remaining plugins are reconstructed as policies.
-	allPlugins := append(append([]kong.Plugin{}, plugins...), svcPlugins...)
 	var rest []kong.Plugin
 	if m.Type == mcpConversionOnly {
 		// A conversion-only server may not carry access at all: lifting an auth
@@ -178,9 +177,9 @@ func (r *Reverter) revertMCPServer(svc *kong.Service, rt *kong.Route, plugins, s
 		// auth included -- to policyRefs, which reconstructs it as a policy: a
 		// plugin the forward direction puts back on this same route, unlike
 		// access.
-		rest = dropToolsetGate(allPlugins)
+		rest = dropToolsetGate(plugins)
 	} else {
-		rest = r.revertMCPAccess(&m, allPlugins)
+		rest = r.revertMCPAccess(&m, plugins)
 	}
 
 	refs, acls := r.policyRefs(rest)
