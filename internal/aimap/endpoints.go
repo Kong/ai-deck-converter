@@ -427,12 +427,31 @@ var EndpointTable = map[string]map[string]EndpointEntry{
 			// routes. Reusing the spec verbatim means the two capabilities
 			// are indistinguishable on revert when a route/target carries no
 			// other signal (see convert/testdata/58_bedrock_generate_and_speech).
-			Secondary: []EndpointSpec{bedrockInvokeChatSpec},
+			// bedrock-runtime serves the OpenAI-compatible APIs under
+			// /openai/v1 and the Anthropic-native Messages API under
+			// /anthropic/v1.
+			Secondary: []EndpointSpec{
+				bedrockInvokeChatSpec,
+				{
+					"chat", "/openai/v1/chat/completions", false, mPost, "llm/v1/chat", catTextGen,
+					&defaultBodyModelSelectorConfig, true,
+				},
+				{
+					"messages", "/anthropic/v1/messages", false, mPost, "llm/v1/chat", catTextGen,
+					&defaultBodyModelSelectorConfig, true,
+				},
+			},
 		},
 		"agentic": {
 			Primary: EndpointSpec{
 				"retrieve", "model/(?<model_name>[^/]+)/retrieveAndGenerate(?:Stream)?",
 				true, mGetPost, "llm/v1/chat", catTextGen, &bedrockPathModelSelectorConfig, true,
+			},
+			Secondary: []EndpointSpec{
+				{
+					"responses", "/openai/v1/responses", false, mPost, "llm/v1/responses", catTextGen,
+					&defaultBodyModelSelectorConfig, true,
+				},
 			},
 		},
 		"embeddings": {

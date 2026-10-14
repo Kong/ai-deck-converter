@@ -130,15 +130,17 @@ func TestEndpointLookupAndNormalization(t *testing.T) {
 }
 
 func TestEndpointsForAndSectionEndpoints(t *testing.T) {
-	// bedrock generate is reachable via both its primary (converse) spec and
-	// the secondary (invoke) spec it shares with audio/speech.
+	// bedrock generate is reachable via its primary (converse) spec, the
+	// secondary (invoke) spec it shares with audio/speech, and the
+	// OpenAI- and Anthropic-compatible endpoints bedrock also serves.
 	specs, ok := EndpointsFor("bedrock", "generate")
 	require.True(t, ok, "bedrock generate EndpointsFor ok")
-	require.Len(t, specs, 2, "bedrock generate has a primary and one secondary spec")
-	require.Equal(t, "converse", specs[0].RouteLabel, "primary spec is converse")
-	require.Equal(t, "invoke", specs[1].RouteLabel, "secondary spec is invoke")
+	require.Len(t, specs, 4, "bedrock generate has a primary and three secondary specs")
+	require.Equal(t, []string{"converse", "invoke", "chat", "messages"},
+		[]string{specs[0].RouteLabel, specs[1].RouteLabel, specs[2].RouteLabel, specs[3].RouteLabel},
+		"primary is converse, secondaries are invoke, chat, and messages")
 	require.Equal(t, EndpointTable["bedrock"]["audio/speech"].Primary, specs[1],
-		"generate's secondary spec is reused verbatim from audio/speech")
+		"generate's invoke spec is reused verbatim from audio/speech")
 
 	// A capability with no secondary endpoints returns just the primary spec.
 	specs, ok = EndpointsFor("openai", "generate")
@@ -149,18 +151,24 @@ func TestEndpointsForAndSectionEndpoints(t *testing.T) {
 	_, ok = EndpointsFor("anthropic", "image")
 	require.False(t, ok, "anthropic image EndpointsFor not ok")
 
-	// SectionEndpoints surfaces the same secondary spec alongside every
-	// primary spec in the section, so scanning callers (revert's endpoint
-	// resolution) see it as a candidate too.
+	// SectionEndpoints surfaces every secondary spec alongside the primary
+	// specs in the section, so scanning callers (revert's endpoint
+	// resolution) see them as candidates too.
 	all := SectionEndpoints("bedrock")
-	require.Len(t, all, len(EndpointTable["bedrock"])+1, "bedrock section has one secondary entry")
-	var sawSecondaryGenerate bool
-	for _, ce := range all {
-		if ce.Capability == "generate" && ce.Spec.RouteLabel == "invoke" {
-			sawSecondaryGenerate = true
-		}
+	want := 0
+	for _, entry := range EndpointTable["bedrock"] {
+		want += 1 + len(entry.Secondary)
 	}
-	require.True(t, sawSecondaryGenerate, "SectionEndpoints includes generate's secondary invoke spec")
+	require.Len(t, all, want, "bedrock section lists every primary and secondary spec")
+	seen := map[string]bool{}
+	for _, ce := range all {
+		seen[ce.Capability+"/"+ce.Spec.RouteLabel] = true
+	}
+	for _, labelled := range []string{
+		"generate/invoke", "generate/chat", "generate/messages", "agentic/responses",
+	} {
+		require.True(t, seen[labelled], "SectionEndpoints includes the %s secondary spec", labelled)
+	}
 
 	// A section with no secondaries returns exactly the primary specs.
 	require.Len(t, SectionEndpoints("openai"), len(EndpointTable["openai"]),

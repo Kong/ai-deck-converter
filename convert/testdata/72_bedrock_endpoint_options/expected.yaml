@@ -26,6 +26,20 @@ services:
           - POST
           - OPTIONS
         strip_path: false
+      - name: bedrock-chat
+        paths:
+          - /runtime/openai/v1/chat/completions
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: bedrock-messages
+        paths:
+          - /runtime/anthropic/v1/messages
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
 plugins:
   - name: ai-model-selector
     config:
@@ -128,6 +142,74 @@ plugins:
             provider: bedrock
           route_type: llm/v1/chat
     route: bedrock-invoke
+    model: claude-runtime
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: bedrock-chat
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: bedrock
+      targets:
+        - auth:
+            aws_access_key_id: '{vault://ai/aws-access-key-id}'
+            aws_secret_access_key: '{vault://ai/aws-secret-access-key}'
+          description: anthropic.claude-sonnet-4-5
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: claude-runtime
+            name: anthropic.claude-sonnet-4-5
+            options:
+              anthropic_version: bedrock-2023-05-31
+              bedrock:
+                aws_region: us-east-1
+                endpoint_type: runtime
+                vpc_endpoint: vpce-0abc123-xyz.bedrock-runtime.us-east-1.vpce.amazonaws.com
+            provider: bedrock
+          route_type: llm/v1/chat
+    route: bedrock-chat
+    model: claude-runtime
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: bedrock-messages
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: bedrock
+      targets:
+        - auth:
+            aws_access_key_id: '{vault://ai/aws-access-key-id}'
+            aws_secret_access_key: '{vault://ai/aws-secret-access-key}'
+          description: anthropic.claude-sonnet-4-5
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: claude-runtime
+            name: anthropic.claude-sonnet-4-5
+            options:
+              anthropic_version: bedrock-2023-05-31
+              bedrock:
+                aws_region: us-east-1
+                endpoint_type: runtime
+                vpc_endpoint: vpce-0abc123-xyz.bedrock-runtime.us-east-1.vpce.amazonaws.com
+            provider: bedrock
+          route_type: llm/v1/chat
+    route: bedrock-messages
     model: claude-runtime
 ai_models:
   - name: claude-mantle

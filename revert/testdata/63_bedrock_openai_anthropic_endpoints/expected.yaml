@@ -1,0 +1,30 @@
+models:
+  - type: model
+    name: claude-bedrock
+    capabilities:
+      - generate
+      - agentic
+    formats:
+      - type: bedrock
+    targets:
+      - name: anthropic.claude-3-5-sonnet
+        provider: bedrock-ai
+        config:
+          anthropic_version: bedrock-2023-05-31
+          region: us-east-1
+          type: bedrock
+    config:
+      route:
+        paths:
+          - /ai
+      logging:
+        payloads: false
+        statistics: true
+model_providers:
+  - type: bedrock
+    name: bedrock-ai
+    config:
+      auth:
+        type: aws
+        access_key_id: '{vault://ai/aws-access-key-id}'
+        secret_access_key: '{vault://ai/aws-secret-access-key}'

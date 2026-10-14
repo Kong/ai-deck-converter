@@ -639,7 +639,7 @@ func TestBedrockMantleEndpointType(t *testing.T) {
     targets:
       - {name: a, provider: b, config: {type: bedrock, region: us-east-1}}
       - {name: c, provider: b, config: {type: bedrock, region: us-east-1, endpoint_type: mantle}}`,
-			1, 2,
+			1, 4,
 		},
 		// Passthrough forwards the provider's native format, which is bedrock here.
 		"mantle with passthrough format": {
@@ -672,7 +672,7 @@ func TestBedrockMantleEndpointType(t *testing.T) {
     capabilities: [generate]
     formats: [{type: bedrock}]
     targets: [{name: a, provider: b, config: {type: bedrock, region: us-east-1, endpoint_type: runtime}}]`,
-			0, 2,
+			0, 4,
 		},
 		"endpoint type absent with bedrock format": {
 			`
@@ -680,7 +680,7 @@ func TestBedrockMantleEndpointType(t *testing.T) {
     capabilities: [generate]
     formats: [{type: bedrock}]
     targets: [{name: a, provider: b, config: {type: bedrock, region: us-east-1}}]`,
-			0, 2,
+			0, 4,
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -703,8 +703,9 @@ func TestBedrockMantleEndpointType(t *testing.T) {
 			docYaml, err := doc.ToYAML()
 			require.NoError(t, err)
 			require.NoError(t, yaml.Unmarshal(docYaml, &doc), "parse output")
-			// A model whose targets are all omitted emits no routes. Every
-			// surviving target reaches exactly one route here.
+			// A model whose targets are all omitted emits no routes. A
+			// surviving bedrock-format target reaches four routes: Converse,
+			// InvokeModel, /chat/completions, and /v1/messages.
 			routes := 0
 			for _, svc := range doc.Services {
 				routes += len(svc.Routes)
