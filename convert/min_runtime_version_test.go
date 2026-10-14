@@ -40,12 +40,9 @@ func TestConvertFallsBackFromUnknownMinRuntimeVersion(t *testing.T) {
 	require.Equal(t, ConversionIssueSource{Kind: kindConversionOption, Name: "min_runtime_version"}, issue.Source)
 }
 
-// TestCheckModelCapabilitiesIgnoresThePassthroughSentinel locks in the fix
-// for a passthrough model's capability gate: checkModelCapabilities must see
-// the post-override caps ([""]), set by convertModel before it calls this
-// function, never the model's declared (and otherwise irrelevant) ones. A
-// regression that again passed the pre-override caps would make this test
-// fail, because "skills" needs a newer release than "" ever requires.
+// TestCheckModelCapabilitiesIgnoresThePassthroughSentinel: a passthrough
+// model serves one route under "", which no gate covers. A declared
+// "skills" below its gate must still fail.
 func TestCheckModelCapabilitiesIgnoresThePassthroughSentinel(t *testing.T) {
 	below := aimap.Since(aimap.FeatureSkillsCapability)
 	below.Minor--
@@ -59,4 +56,38 @@ func TestCheckModelCapabilitiesIgnoresThePassthroughSentinel(t *testing.T) {
 		"the passthrough sentinel must never gate the model")
 	require.Error(t, c.checkModelCapabilities(src, m, []string{"skills"}),
 		"a real declared capability below its gate must still fail")
+}
+
+// TestDisabledAPIModelIsNeverGated: a disabled, non-passthrough type:api
+// model shares its route-scoped plugins with other api models, so convertModel
+// excludes it before it emits anything (see the comment at its early return).
+// A gate below it must never fire, since the model was never going to convert
+// either way: a gate failure here would report an issue for output that does
+// not exist.
+func TestDisabledAPIModelIsNeverGated(t *testing.T) {
+	src := []byte(`
+models:
+  - name: disabled-skills-api
+    type: api
+    enabled: false
+    capabilities: [skills]
+    formats: [{type: openai}]
+    targets:
+      - name: gpt-5.6
+        provider: openai-prod
+        config: {type: openai}
+model_providers:
+  - name: openai-prod
+    type: openai
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://ai/openai-token}"
+`)
+	result, err := Convert(src, Options{MinRuntimeVersion: "2.1"})
+	require.NoError(t, err)
+	require.Empty(t, result.Issues)
+	require.Empty(t, result.Output.Plugins)
 }

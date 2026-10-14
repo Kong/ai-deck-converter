@@ -312,9 +312,6 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 	src := issueSource(kindModel, m.Name)
 	bases := basePaths(m)
 	caps := c.expandCapabilities(m)
-	if err := c.checkModelFeatures(src, m); err != nil {
-		return err
-	}
 
 	// extractModelAliases yields the name(s) a client uses to select this
 	// model: authored aliases, or the model name when none is authored. They
@@ -344,9 +341,6 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 	// or the gate would reject a capability the model never actually uses.
 	if passthrough {
 		caps = []string{""}
-	}
-	if err := c.checkModelCapabilities(src, m, caps); err != nil {
-		return err
 	}
 	if passthrough {
 		// Passthrough is a property of the whole model's traffic, not one wire
@@ -388,6 +382,16 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 	// A passthrough model never shares its plugin, so it is exempt.
 	if !modelScoped && !passthrough && m.Enabled != nil && !*m.Enabled {
 		return nil
+	}
+	// A disabled type:api model above never reaches here, so its formats and
+	// capabilities are never gated: the model emits nothing either way, and a
+	// gate failure on it would report an issue for output that was never
+	// going to exist.
+	if err := c.checkModelFeatures(src, m); err != nil {
+		return err
+	}
+	if err := c.checkModelCapabilities(src, m, caps); err != nil {
+		return err
 	}
 	ownerKey := ""
 	if modelScoped || passthrough {
@@ -1263,7 +1267,8 @@ func (c *Converter) buildTarget(
 		"name":     tm.Name,
 	}
 	passthrough := routeType == aimap.PassthroughRouteType
-	if opts := mapOptions(c.supportedTargetOptions(tm.Config.Options), providerType, tm.Name, provider, passthrough); opts != nil {
+	opts := mapOptions(c.supportedTargetOptions(tm.Config.Options), providerType, tm.Name, provider, passthrough)
+	if opts != nil {
 		model["options"] = opts
 	}
 

@@ -13,10 +13,10 @@ type Version struct {
 }
 
 // SupportFloor is the oldest AI Gateway release that the converter supports.
-var SupportFloor = Version{Major: 2, Minor: 0}
+var SupportFloor = mustVersion("2.0")
 
 // LatestVersion is the newest AI Gateway release that the converter knows.
-var LatestVersion = Version{Major: 2, Minor: 3}
+var LatestVersion = mustVersion("2.3")
 
 // versionPattern is the pattern of the Konnect min_runtime_version field. It
 // also rejects leading zeros, so each version has one spelling.
@@ -37,6 +37,16 @@ func ParseVersion(s string) (Version, error) {
 		return Version{}, fmt.Errorf("version %q: %w", s, err)
 	}
 	return Version{Major: major, Minor: minor}, nil
+}
+
+// mustVersion parses s as a MAJOR.MINOR version. It panics on an invalid s,
+// so callers must only use it on a literal known at compile time.
+func mustVersion(s string) Version {
+	v, err := ParseVersion(s)
+	if err != nil {
+		panic(err)
+	}
+	return v
 }
 
 func (v Version) String() string {
@@ -67,23 +77,23 @@ const (
 	FeatureSkillsCapability           Feature = "skills-capability"
 	FeatureFailoverHTTPCodes          Feature = "failover-http-codes"
 	FeatureBedrockVPCEndpoint         Feature = "bedrock-vpc-endpoint"
-	FeatureMCPTokenVault              Feature = "mcp-token-vault"
+	FeatureMCPTokenVault              Feature = "mcp-token-vault" //nolint:gosec // a feature name, not a credential
 )
 
 // featureSince maps each feature to its first AI Gateway release. The source
 // is the x-min-runtime-version annotations of the Konnect AI Gateway API spec.
 var featureSince = map[Feature]Version{
-	FeatureTargetCostList:             {Major: 2, Minor: 1},
-	FeaturePolicyCondition:            {Major: 2, Minor: 1},
-	FeatureMCPUpstreamProtocolVersion: {Major: 2, Minor: 1},
-	FeatureACLWhen:                    {Major: 2, Minor: 2},
-	FeaturePassthroughFormat:          {Major: 2, Minor: 2},
-	FeatureTypesafe:                   {Major: 2, Minor: 2},
-	FeatureDecisionsCapability:        {Major: 2, Minor: 2},
-	FeatureSkillsCapability:           {Major: 2, Minor: 2},
-	FeatureFailoverHTTPCodes:          {Major: 2, Minor: 3},
-	FeatureBedrockVPCEndpoint:         {Major: 2, Minor: 3},
-	FeatureMCPTokenVault:              {Major: 2, Minor: 3},
+	FeatureTargetCostList:             mustVersion("2.1"),
+	FeaturePolicyCondition:            mustVersion("2.1"),
+	FeatureMCPUpstreamProtocolVersion: mustVersion("2.1"),
+	FeatureACLWhen:                    mustVersion("2.2"),
+	FeaturePassthroughFormat:          mustVersion("2.2"),
+	FeatureTypesafe:                   mustVersion("2.2"),
+	FeatureDecisionsCapability:        mustVersion("2.2"),
+	FeatureSkillsCapability:           mustVersion("2.2"),
+	FeatureFailoverHTTPCodes:          mustVersion("2.3"),
+	FeatureBedrockVPCEndpoint:         mustVersion("2.3"),
+	FeatureMCPTokenVault:              mustVersion("2.3"),
 }
 
 // Since returns the first AI Gateway release that has f. It panics for an

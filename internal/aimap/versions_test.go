@@ -21,7 +21,10 @@ func TestParseVersion(t *testing.T) {
 		require.Equal(t, want, got, in)
 		require.Equal(t, in, got.String(), in)
 	}
-	for _, in := range []string{"", "2", "2.", ".1", "2.1.0", "2.1.0-rc.4", "02.1", "2.01", "v2.1", "latest", " 2.1", "2.1 "} {
+	invalid := []string{
+		"", "2", "2.", ".1", "2.1.0", "2.1.0-rc.4", "02.1", "2.01", "v2.1", "latest", " 2.1", "2.1 ",
+	}
+	for _, in := range invalid {
 		_, err := ParseVersion(in)
 		require.Error(t, err, "%q", in)
 	}
