@@ -154,8 +154,9 @@ const (
 // ConversionIssueSource describes the source of an issue found during
 // conversion.
 type ConversionIssueSource struct {
-	// Kind is the entity type that caused the issue, for example, "model" or
-	// "agent". The stability contract lists every kind.
+	// Kind names what caused the issue, for example "model" or "agent". It
+	// is usually the singular form of a top-level document key. A kind can
+	// also be something else, for example "option".
 	Kind string
 
 	// Name is the entity name that caused the issue, for example, "gpt-5".
@@ -216,6 +217,11 @@ entity:
 
 An issue in a nested object uses the kind of the top-level entity. For
 example, an issue in a consumer credential has the kind `consumer`.
+
+A kind can also name something other than a document entity, for example an
+`option` kind for an issue about a conversion option. Such a kind has no row
+above and no `Name` drawn from the document. It still follows every other
+rule in this contract.
 
 Each `Source.Fields` path uses the keys of the input document:
 

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/Kong/ai-deck-converter/convert"
+	"github.com/Kong/ai-deck-converter/internal/aimap"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 )
@@ -58,6 +59,10 @@ func TestRoundTrip(t *testing.T) {
 	}
 }
 
+// latestConvertOptions targets the newest known release, as the convert
+// golden harness does by default.
+var latestConvertOptions = convert.Options{MinRuntimeVersion: aimap.LatestVersion.String()}
+
 // forwardOptions mirrors the convert golden options.yaml layout.
 type forwardOptions struct {
 	convert.Options `yaml:",inline"`
@@ -66,12 +71,12 @@ type forwardOptions struct {
 
 func loadForwardOptions(t *testing.T, dir string) forwardOptions {
 	t.Helper()
+	opts := forwardOptions{Options: latestConvertOptions}
 	data, err := os.ReadFile(filepath.Join(dir, "options.yaml"))
 	if os.IsNotExist(err) {
-		return forwardOptions{}
+		return opts
 	}
 	require.NoError(t, err, "read options")
-	var opts forwardOptions
 	require.NoError(t, yaml.Unmarshal(data, &opts), "parse options")
 	return opts
 }

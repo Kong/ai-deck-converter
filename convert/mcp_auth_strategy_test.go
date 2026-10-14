@@ -37,7 +37,7 @@ mcp_servers:
 `
 
 func TestMCPKeyAuthWithMetadataIsHardError(t *testing.T) {
-	result, err := Convert([]byte(keyAuthWithMetadata), Options{})
+	result, err := Convert([]byte(keyAuthWithMetadata), testOptions)
 	require.NoError(t, err)
 	issue := requireIssue(t, result.Issues, Error, ConfigFieldInvalid, kindMCPServer, "keyed-mcp",
 		"access.metadata", "access.auth_strategies[0]")
@@ -73,7 +73,7 @@ mcp_servers:
 `
 
 func TestMCPAuthStrategyUnsupportedListenerIsHardError(t *testing.T) {
-	result, err := Convert([]byte(oidcOnUnsupportedListener), Options{})
+	result, err := Convert([]byte(oidcOnUnsupportedListener), testOptions)
 	require.NoError(t, err)
 	issue := requireIssue(t, result.Issues, Error, ConfigFieldInvalid, kindMCPServer, "upstream-mcp",
 		"access.auth_strategies", "access.metadata")

@@ -1,0 +1,40 @@
+# condition needs 2.1. At 2.0 each policy with a condition is absent with an
+# error. The model and the policy without a condition still convert.
+models:
+  - name: guarded-gpt
+    type: model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/ai]}
+    targets:
+      - name: gpt-4o
+        provider: openai-prod
+        config: {type: openai}
+    policies: [prompt-guard, plain-guard]
+policies:
+  - type: ai-prompt-guard
+    name: prompt-guard
+    condition: 'http.request.headers.x_tier == "premium"'
+    config:
+      allow_patterns: ["^safe"]
+  - type: ai-prompt-guard
+    name: plain-guard
+    config:
+      allow_patterns: ["^fine"]
+  - type: rate-limiting
+    name: org-wide-limit
+    global: true
+    condition: 'http.request.path ~ "^/ai"'
+    config:
+      minute: 1000
+      policy: local
+model_providers:
+  - name: openai-prod
+    type: openai
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://ai/openai-token}"

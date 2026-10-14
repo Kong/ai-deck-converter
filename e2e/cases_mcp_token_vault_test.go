@@ -19,7 +19,7 @@ func testTokenVaultGatesToolsAndEnrolls(t *testing.T, license string) {
 	runID := fmt.Sprintf("%d", time.Now().UnixNano()%1e6)
 
 	mocks := startTokenVaultMocks(t)
-	configPath := convertCase(t, "token_vault_gates_tools_and_enrolls", patchMCPPort(18081, mocks.UpstreamPort))
+	configPath := convertCase(t, "token_vault_gates_tools_and_enrolls", "2.3", patchMCPPort(18081, mocks.UpstreamPort))
 
 	network := "aidc-e2e-tv-" + runID
 	redisName := "aidc-e2e-tv-redis-" + runID

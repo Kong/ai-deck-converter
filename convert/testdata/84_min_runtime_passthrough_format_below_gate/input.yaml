@@ -1,0 +1,32 @@
+# The passthrough format needs 2.2. At 2.1 the passthrough model is absent
+# with an error. The openai model still converts.
+models:
+  - name: raw-gpt
+    type: model
+    capabilities: [generate]
+    formats: [{type: passthrough}]
+    config:
+      route: {paths: [/raw]}
+    targets:
+      - name: gpt-5.2
+        provider: openai-prod
+        config: {type: openai}
+  - name: gpt-5-2
+    type: model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/ai]}
+    targets:
+      - name: gpt-5.2
+        provider: openai-prod
+        config: {type: openai}
+model_providers:
+  - name: openai-prod
+    type: openai
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://ai/openai-token}"

@@ -1,0 +1,16 @@
+- code: UNSUPPORTED_IN_MIN_RUNTIME_VERSION
+  reason: condition requires minimum runtime version "2.1", but the configured minimum is "2.0"
+  source:
+    kind: policy
+    name: org-wide-limit
+    fields:
+      - condition
+  severity: ERROR
+- code: UNSUPPORTED_IN_MIN_RUNTIME_VERSION
+  reason: condition requires minimum runtime version "2.1", but the configured minimum is "2.0"
+  source:
+    kind: policy
+    name: prompt-guard
+    fields:
+      - condition
+  severity: ERROR

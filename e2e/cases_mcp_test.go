@@ -46,7 +46,7 @@ func sessionID(resp httpResponse) string {
 // even with the listener's own credential.
 func testReusableToolsetsAreInternalOnly(t *testing.T, license string) {
 	mock := startMockUpstream(t)
-	configPath := convertCase(t, "reusable_toolsets_are_internal_only", patchMCPPort(18082, mock.Port))
+	configPath := convertCase(t, "reusable_toolsets_are_internal_only", "2.1", patchMCPPort(18082, mock.Port))
 
 	gateway := startGateway(t, GatewayOptions{
 		Image:  gatewayImage(t, "kong/kong-ai-gateway-dev:2.1.0-rc.3"),

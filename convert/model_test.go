@@ -685,7 +685,7 @@ func TestBedrockMantleEndpointType(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			src := []byte("models:" + tc.model + bedrockProvider)
-			result, err := Convert(src, Options{})
+			result, err := Convert(src, testOptions)
 			require.NoError(t, err)
 			doc := result.Output
 			var mantle []ConversionIssue

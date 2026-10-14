@@ -1,0 +1,16 @@
+- code: UNSUPPORTED_IN_MIN_RUNTIME_VERSION
+  reason: access.acls.allow_when requires minimum runtime version "2.2", but the configured minimum is "2.1"
+  source:
+    kind: model
+    name: gated-gpt
+    fields:
+      - access.acls.allow_when
+  severity: ERROR
+- code: UNSUPPORTED_IN_MIN_RUNTIME_VERSION
+  reason: access.acls.deny_when requires minimum runtime version "2.2", but the configured minimum is "2.1"
+  source:
+    kind: agent
+    name: gated-agent
+    fields:
+      - access.acls.deny_when
+  severity: ERROR

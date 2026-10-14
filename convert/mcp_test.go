@@ -191,7 +191,7 @@ func TestConversionOnlySourceRejectsPreFunctionPolicy(t *testing.T) {
 	// Kong allows one plugin per name on a route: emitting the policy next to
 	// the gate would produce a config Kong refuses to load. It is a hard error
 	// even outside -strict, since dropping either plugin changes behavior.
-	result, err := Convert([]byte(fmt.Sprintf(mcpPreFunctionPolicy, false)), Options{})
+	result, err := Convert([]byte(fmt.Sprintf(mcpPreFunctionPolicy, false)), testOptions)
 	require.NoError(t, err)
 	issue := requireIssue(t, result.Issues, Error, ConfigFieldInvalid, kindMCPServer, "toolset-a", "policies")
 	require.Contains(t, issue.Reason, `MCP server "toolset-a" is conversion-only`)
@@ -539,7 +539,7 @@ func TestMCPACLWhenExpressionsRejected(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			src := []byte(fmt.Sprintf(mcpWhenACLInput, tc.access, tc.tool))
-			result, err := Convert(src, Options{})
+			result, err := Convert(src, testOptions)
 			require.NoError(t, err)
 			issue := requireIssue(t, result.Issues, tc.severity, ConfigFieldInvalid, kindMCPServer, "guarded-mcp",
 				tc.field)
@@ -564,7 +564,7 @@ func TestMCPACLAllowDenyStillConverts(t *testing.T) {
 	tool := `        access:
           acls:
             deny: [banned-users]`
-	result, err := Convert([]byte(fmt.Sprintf(mcpWhenACLInput, access, tool)), Options{})
+	result, err := Convert([]byte(fmt.Sprintf(mcpWhenACLInput, access, tool)), testOptions)
 	require.NoError(t, err)
 	require.Empty(t, result.Issues, "allow/deny ACLs must still convert")
 	require.Len(t, result.Output.Services, 1)

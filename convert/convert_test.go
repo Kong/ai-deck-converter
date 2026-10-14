@@ -129,7 +129,7 @@ models:
     config:
       route: {paths: [/ai]}
 `)
-	result, err := Convert(src, Options{})
+	result, err := Convert(src, testOptions)
 	require.NoError(t, err, "convert")
 	require.Len(t, result.Issues, 4)
 	for _, name := range []string{"m1", "skills-api"} {
@@ -436,7 +436,7 @@ models:
         model:
           values: ["@bedrock/nova-omni"]
 `)
-	result, err := Convert(src, Options{})
+	result, err := Convert(src, testOptions)
 	require.NoError(t, err, "convert")
 	var dropped []ConversionIssue
 	for _, issue := range result.Issues {
@@ -551,7 +551,7 @@ model_providers:
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			result, err := Convert([]byte(fmt.Sprintf(tmpl, tc.acls)), Options{})
+			result, err := Convert([]byte(fmt.Sprintf(tmpl, tc.acls)), testOptions)
 			require.NoError(t, err)
 			fields := make([]string, len(tc.wants))
 			for i, want := range tc.wants {
@@ -587,7 +587,7 @@ model_providers:
   - name: p1
     type: openai
 `)
-	result, err := Convert(src, Options{})
+	result, err := Convert(src, testOptions)
 	require.NoError(t, err)
 	require.Empty(t, result.Issues, "a lone allow_when must still convert")
 	require.Len(t, result.Output.AIModels, 1)
@@ -870,7 +870,7 @@ mcp_servers:
     tools:
       - {name: t, description: a tool, method: GET, path: /t, scheme: https, host: x.internal}
 `)
-	out, _, err := encodeDBLessYAML(src, Options{})
+	out, _, err := encodeDBLessYAML(src, testOptions)
 	require.NoError(t, err, "convert db-less")
 
 	var doc struct {
@@ -942,7 +942,7 @@ policies:
     global: true
 `)
 
-	out, _, err := encodeDBLessYAML(src, Options{})
+	out, _, err := encodeDBLessYAML(src, testOptions)
 	require.NoError(t, err, "convert db-less")
 
 	var got map[string]any
@@ -989,7 +989,7 @@ model_providers:
     type: openai
 `)
 
-	out, _, err := encodeDBLessYAML(src, Options{})
+	out, _, err := encodeDBLessYAML(src, testOptions)
 	require.NoError(t, err, "convert db-less")
 
 	var got struct {
@@ -1198,7 +1198,7 @@ model_providers:
     type: openai
 `)
 
-	out, _, err := encodeDBLessYAML(src, Options{})
+	out, _, err := encodeDBLessYAML(src, testOptions)
 	require.NoError(t, err, "convert db-less")
 
 	var got map[string]any
@@ -1262,7 +1262,7 @@ models:
       route: {paths: [/chat]}
       model: {}
 `)
-	result, err := Convert(src, Options{})
+	result, err := Convert(src, testOptions)
 	require.NoError(t, err)
 	require.Len(t, result.Issues, 2)
 	requireIssue(t, result.Issues, Warning, UndefinedReference, kindModel, "m1", "targets[0].provider")
@@ -1278,7 +1278,7 @@ consumers:
     type: api-key
     policies: [missing-policy]
 `)
-	result, err := Convert(src, Options{})
+	result, err := Convert(src, testOptions)
 	require.NoError(t, err, "convert")
 	requireIssue(t, result.Issues, Error, UndefinedReference, kindConsumer, "c1", "policies[0]")
 	require.Len(t, result.Output.Consumers, 1, "the consumer converts without the policy")
@@ -1309,7 +1309,7 @@ policies:
       vectordb: {strategy: redis, dimensions: 1536, distance_metric: cosine}
     datastores: [{name: missing-datastore}]
 `)
-	result, err := Convert(src, Options{})
+	result, err := Convert(src, testOptions)
 	require.NoError(t, err, "convert")
 	requireIssue(t, result.Issues, Error, UndefinedReference, kindPolicy, "rag-injector", "datastores[0].name")
 	require.Len(t, result.Output.AIModels, 1, "the model converts")
@@ -1325,7 +1325,7 @@ policies:
     config: {minute: 100, policy: redis}
     datastores: [{name: missing-datastore}]
 `)
-	result, err := Convert(src, Options{})
+	result, err := Convert(src, testOptions)
 	require.NoError(t, err)
 	issue := requireIssue(t, result.Issues, Error, UndefinedReference, kindPolicy, "limiter", "datastores[0].name")
 	require.Contains(t, issue.Reason, `references unknown datastore "missing-datastore"`)
@@ -1486,7 +1486,7 @@ model_providers:
   - name: p1
     type: openai
 `)
-	result, err := Convert(src, Options{})
+	result, err := Convert(src, testOptions)
 	require.NoError(t, err, "convert")
 	requireIssue(t, result.Issues, Error, UndefinedReference, kindModel, "m1", "datastores[0].name")
 	require.Len(t, result.Output.AIModels, 1, "the model converts")
@@ -1676,7 +1676,7 @@ mcp_servers:
         description: A tool
       - name: noDescTool
 `)
-	result, err := Convert(src, Options{})
+	result, err := Convert(src, testOptions)
 	require.NoError(t, err, "convert")
 	require.Len(t, result.Issues, 1)
 	issue := requireIssue(t, result.Issues, Warning, MissingRequiredConfigField, kindMCPServer, "m1",
@@ -1722,7 +1722,7 @@ mcp_servers:
       server: {tag: bucket1}
       sources: [toolset]
 `)
-			out, _, err := encodeDBLessYAML(src, Options{})
+			out, _, err := encodeDBLessYAML(src, testOptions)
 			require.NoError(t, err, "convert db-less")
 
 			var got struct {
@@ -1809,7 +1809,7 @@ mcp_servers:
       server: {tag: bucket1}
       sources: [toolset]
 `)
-	result, err := Convert(src, Options{})
+	result, err := Convert(src, testOptions)
 	require.NoError(t, err)
 	require.Len(t, result.Issues, 1)
 	requireIssue(t, result.Issues, Warning, ConfigFieldOverridden, kindMCPServer, "toolset",
@@ -1827,7 +1827,7 @@ mcp_servers:
     config:
       route: {paths: [/mcp], strip_path: false}
 `)
-	out, _, err := encodeDBLessYAML(src, Options{})
+	out, _, err := encodeDBLessYAML(src, testOptions)
 	require.NoError(t, err, "convert db-less")
 
 	var got struct {
@@ -1877,7 +1877,7 @@ agents:
       url: https://b.internal/api
       route: {paths: [/agents/on]}
 `)
-	out, _, err := encodeDBLessYAML(src, Options{})
+	out, _, err := encodeDBLessYAML(src, testOptions)
 	require.NoError(t, err, "convert db-less")
 
 	var got struct {
@@ -1916,7 +1916,7 @@ agents:
       route: {paths: [/protected-agent]}
 `)
 
-	out, _, err := encodeDBLessYAML(src, Options{})
+	out, _, err := encodeDBLessYAML(src, testOptions)
 	require.NoError(t, err)
 
 	var got struct {
@@ -1953,7 +1953,7 @@ mcp_servers:
     config:
       route: {paths: [/mcp/on]}
 `)
-	out, _, err := encodeDBLessYAML(src, Options{})
+	out, _, err := encodeDBLessYAML(src, testOptions)
 	require.NoError(t, err, "convert db-less")
 
 	var got struct {
@@ -1991,7 +1991,7 @@ models:
       model: {alias: gpt-chat}
 `)
 
-	out, _, err := encodeDBLessYAML(src, Options{})
+	out, _, err := encodeDBLessYAML(src, testOptions)
 	require.NoError(t, err, "convert db-less")
 
 	var got struct {
@@ -2099,7 +2099,7 @@ consumers:
         api_key: sk-test
 `)
 
-	out, _, err := encodeDBLessYAML(src, Options{})
+	out, _, err := encodeDBLessYAML(src, testOptions)
 	require.NoError(t, err, "convert db-less")
 
 	var got map[string]any
@@ -2146,7 +2146,7 @@ model_providers:
     type: openai
 `)
 
-	out, _, err := encodeDBLessYAML(src, Options{})
+	out, _, err := encodeDBLessYAML(src, testOptions)
 	if err != nil {
 		t.Fatalf("convert db-less: %v", err)
 	}
@@ -2237,7 +2237,7 @@ model_providers:
     type: openai
 `)
 
-	out, _, err := encodeDBLessYAML(src, Options{})
+	out, _, err := encodeDBLessYAML(src, testOptions)
 	require.NoError(t, err, "convert db-less")
 
 	var got struct {
@@ -2315,7 +2315,7 @@ consumers:
         api_key: sk-bob
 `)
 
-	out, _, err := encodeDBLessYAML(src, Options{})
+	out, _, err := encodeDBLessYAML(src, testOptions)
 	if err != nil {
 		t.Fatalf("convert db-less: %v", err)
 	}
@@ -2392,7 +2392,7 @@ model_providers:
     type: openai
 `)
 
-	out, _, err := encodeDBLessYAML(src, Options{})
+	out, _, err := encodeDBLessYAML(src, testOptions)
 	if err != nil {
 		t.Fatalf("convert db-less: %v", err)
 	}
@@ -2449,7 +2449,7 @@ mcp_servers:
       sources: [team-a]
 `)
 
-	out, _, err := encodeDBLessYAML(src, Options{})
+	out, _, err := encodeDBLessYAML(src, testOptions)
 	if err != nil {
 		t.Fatalf("convert db-less: %v", err)
 	}
@@ -2534,7 +2534,7 @@ mcp_servers:
       sources: [team-a]
 `)
 
-	out, _, err := encodeDBLessYAML(src, Options{})
+	out, _, err := encodeDBLessYAML(src, testOptions)
 	if err != nil {
 		t.Fatalf("convert db-less: %v", err)
 	}
@@ -2631,7 +2631,7 @@ mcp_servers:
       sources: [team-a]
 `)
 
-	out, _, err := encodeDBLessYAML(src, Options{})
+	out, _, err := encodeDBLessYAML(src, testOptions)
 	if err != nil {
 		t.Fatalf("convert db-less: %v", err)
 	}
@@ -2719,7 +2719,7 @@ model_providers:
     type: openai
 `)
 
-	out, _, err := encodeDBLessYAML(src, Options{})
+	out, _, err := encodeDBLessYAML(src, testOptions)
 	if err != nil {
 		t.Fatalf("convert db-less: %v", err)
 	}
@@ -2782,7 +2782,7 @@ models:
   - name: chat
     capabilities: [generate]
     targets: [{name: t, provider: openai-prod, config: {type: openai}}]
-`+overrideProvider), Options{})
+`+overrideProvider), testOptions)
 	require.NoError(t, err)
 	require.Len(t, result.Issues, 1)
 	issue := requireIssue(t, result.Issues, Error, ConfigFieldInvalid, kindModel, "m", "capabilities[0]")

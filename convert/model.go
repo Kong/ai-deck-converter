@@ -334,6 +334,14 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 	// revert recovers the ID and labels from it.
 	passthrough := isPassthrough(m)
 	fkScoped := modelScoped && !passthrough
+	// A passthrough model forwards every request under its base path, so its
+	// capabilities are irrelevant: it serves one route, PassthroughEndpoint,
+	// whatever it declares. The empty capability stands for that route. caps
+	// must carry this effective value before the capability gate below runs,
+	// or the gate would reject a capability the model never actually uses.
+	if passthrough {
+		caps = []string{""}
+	}
 	if passthrough {
 		// Passthrough is a property of the whole model's traffic, not one wire
 		// format among several a route could accept.
@@ -375,15 +383,19 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 	if !modelScoped && !passthrough && m.Enabled != nil && !*m.Enabled {
 		return nil
 	}
+	// A disabled type:api model above never reaches here, so its formats and
+	// capabilities are never gated: the model emits nothing either way, and a
+	// gate failure on it would report an issue for output that was never
+	// going to exist.
+	if err := c.checkModelFeatures(src, m); err != nil {
+		return err
+	}
+	if err := c.checkModelCapabilities(src, m, caps); err != nil {
+		return err
+	}
 	ownerKey := ""
 	if modelScoped || passthrough {
 		ownerKey = m.Name
-	}
-	// A passthrough model forwards every request under its base path, so its
-	// capabilities are irrelevant: it serves one route, PassthroughEndpoint,
-	// whatever it declares. The empty capability stands for that route.
-	if passthrough {
-		caps = []string{""}
 	}
 	ds, err := c.resolveModelDatastore(src, m)
 	if err != nil {
@@ -411,6 +423,11 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 			c.warn(src.at(problem.field), problem.code, "%s", problem.reason)
 			continue
 		}
+		if _, ok := tm.Config.Options["vpc_endpoint"]; ok && !c.supports(aimap.FeatureBedrockVPCEndpoint) {
+			field := fmt.Sprintf("targets[%d].config.vpc_endpoint", j)
+			return c.failUnsupported(src.at(field), aimap.FeatureBedrockVPCEndpoint, field)
+		}
+		c.warnUnsupportedCostLists(src, tm, j)
 		convertedTargets++
 		if passthrough && !aimap.HasNativeFormat(providerType) {
 			c.warn(src.at(fmt.Sprintf("targets[%d].config.type", j)), BehaviorMayDiffer,
@@ -597,7 +614,7 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 						enabled:           disabledModelPluginEnabled(m.Enabled),
 						llmFormat:         llmFormat(m, providerType),
 						genaiCategory:     spec.GenaiCategory,
-						balancer:          balancerConfig(m.Config.Balancer),
+						balancer:          c.balancerConfig(m.Config.Balancer),
 						vectordb:          vectordb,
 						datastoreName:     datastoreName,
 						embeddings:        embeddings,
@@ -842,7 +859,7 @@ func (c *Converter) convertVideoLifecycle(
 		enabled:           disabledModelPluginEnabled(candidate.model.Enabled),
 		llmFormat:         llmFormat(candidate.model, ""),
 		genaiCategory:     candidate.spec.GenaiCategory,
-		balancer:          balancerConfig(candidate.model.Config.Balancer),
+		balancer:          c.balancerConfig(candidate.model.Config.Balancer),
 		vectordb:          lifecycleVectorDB,
 		responseStreaming: candidate.model.Config.ResponseStreaming,
 		modelNameHeader:   boolPtr(false),
@@ -1032,6 +1049,18 @@ func (c *Converter) checkTarget(m *aigw.Model, j int) (*aigw.Provider, string, *
 			field:  fmt.Sprintf("targets[%d].config.type", j),
 			code:   MissingRequiredConfigField,
 			reason: fmt.Sprintf("model %q target %q has no resolvable provider type; the target is omitted", m.Name, tm.Name),
+		}
+	}
+	if providerType == aimap.TypesafeProviderType && !c.supports(aimap.FeatureTypesafe) {
+		field := fmt.Sprintf("targets[%d].config.type", j)
+		if tm.Config.Type == "" {
+			field = fmt.Sprintf("targets[%d].provider", j)
+		}
+		return nil, "", &targetProblem{
+			field: field,
+			code:  UnsupportedInMinRuntimeVersion,
+			reason: unsupportedReason(aimap.FeatureTypesafe, "provider type typesafe", c.minRuntimeVersion) +
+				"; the target is omitted",
 		}
 	}
 	// Databricks has no fixed host: the plugin builds it from
@@ -1238,7 +1267,8 @@ func (c *Converter) buildTarget(
 		"name":     tm.Name,
 	}
 	passthrough := routeType == aimap.PassthroughRouteType
-	if opts := mapOptions(tm.Config.Options, providerType, tm.Name, provider, passthrough); opts != nil {
+	opts := mapOptions(c.supportedTargetOptions(tm.Config.Options), providerType, tm.Name, provider, passthrough)
+	if opts != nil {
 		model["options"] = opts
 	}
 
@@ -1294,6 +1324,70 @@ func targetFingerprint(target map[string]any) string {
 	return string(b)
 }
 
+// checkModelFeatures fails m when the minimum runtime version lacks one of
+// its formats. It warns for each gated failover_criteria value, which
+// balancerConfig leaves out. checkModelCapabilities covers capabilities.
+func (c *Converter) checkModelFeatures(src ConversionIssueSource, m *aigw.Model) error {
+	for i, format := range m.Formats {
+		if f, gated := aimap.FormatFeature(format.Type); gated && !c.supports(f) {
+			field := fmt.Sprintf("formats[%d].type", i)
+			return c.failUnsupported(src.at(field), f, fmt.Sprintf("%s: %s", field, format.Type))
+		}
+	}
+	if b := m.Config.Balancer; b != nil && !c.supports(aimap.FeatureFailoverHTTPCodes) {
+		criteria, _ := b.Fields["failover_criteria"].([]any)
+		for i, v := range criteria {
+			if code, _ := v.(string); aimap.FailoverHTTPCodes[code] {
+				field := fmt.Sprintf("config.balancer.failover_criteria[%d]", i)
+				c.reportUnsupported(src.at(field), Warning, aimap.FeatureFailoverHTTPCodes,
+					fmt.Sprintf("%s: %s", field, code))
+			}
+		}
+	}
+	return nil
+}
+
+// checkModelCapabilities fails m when the minimum runtime version lacks one
+// of caps. Call it with the model's effective capabilities: a passthrough
+// model's caps must already be its post-override value ([""]), since its
+// declared capabilities never reach the data plane and so must never gate it.
+func (c *Converter) checkModelCapabilities(src ConversionIssueSource, m *aigw.Model, caps []string) error {
+	for _, capability := range caps {
+		if f, gated := aimap.CapabilityFeature(capability); gated && !c.supports(f) {
+			field := capabilityField(m, capability)
+			return c.failUnsupported(src.at(field), f, fmt.Sprintf("%s: %s", field, capability))
+		}
+	}
+	return nil
+}
+
+// warnUnsupportedCostLists warns for each cost list of target j that the
+// minimum runtime version lacks. supportedTargetOptions leaves them out.
+func (c *Converter) warnUnsupportedCostLists(src ConversionIssueSource, tm *aigw.TargetModel, j int) {
+	if c.supports(aimap.FeatureTargetCostList) {
+		return
+	}
+	for _, key := range aimap.TargetCostListKeys {
+		if _, ok := tm.Config.Options[key]; ok {
+			field := fmt.Sprintf("targets[%d].config.%s", j, key)
+			c.reportUnsupported(src.at(field), Warning, aimap.FeatureTargetCostList, field)
+		}
+	}
+}
+
+// supportedTargetOptions returns opts without the keys that the minimum
+// runtime version lacks. It does not change opts.
+func (c *Converter) supportedTargetOptions(opts map[string]any) map[string]any {
+	if c.supports(aimap.FeatureTargetCostList) {
+		return opts
+	}
+	out := maps.Clone(opts)
+	for _, key := range aimap.TargetCostListKeys {
+		delete(out, key)
+	}
+	return out
+}
+
 // expandCapabilities normalizes a model's capabilities into canonical keys.
 func (c *Converter) expandCapabilities(m *aigw.Model) []string {
 	var out []string
@@ -1307,7 +1401,7 @@ func (c *Converter) expandCapabilities(m *aigw.Model) []string {
 // expects as siblings of `balancer`, not nested inside it.
 var balancerHoisted = map[string]bool{"vectordb": true, "embeddings": true}
 
-func balancerConfig(b *aigw.Balancer) map[string]any {
+func (c *Converter) balancerConfig(b *aigw.Balancer) map[string]any {
 	if b == nil {
 		return map[string]any{"algorithm": "round-robin"}
 	}
@@ -1317,6 +1411,12 @@ func balancerConfig(b *aigw.Balancer) map[string]any {
 			continue
 		}
 		cfg[k] = v
+	}
+	if criteria, ok := cfg["failover_criteria"].([]any); ok && !c.supports(aimap.FeatureFailoverHTTPCodes) {
+		cfg["failover_criteria"] = slices.DeleteFunc(slices.Clone(criteria), func(v any) bool {
+			code, _ := v.(string)
+			return aimap.FailoverHTTPCodes[code]
+		})
 	}
 	algorithm := b.Algorithm
 	if algorithm == "" {

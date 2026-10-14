@@ -1,0 +1,16 @@
+- code: UNSUPPORTED_IN_MIN_RUNTIME_VERSION
+  reason: targets[0].config.input_cost_list requires minimum runtime version "2.1", but the configured minimum is "2.0"
+  source:
+    kind: model
+    name: gpt-5-2
+    fields:
+      - targets[0].config.input_cost_list
+  severity: WARNING
+- code: UNSUPPORTED_IN_MIN_RUNTIME_VERSION
+  reason: targets[0].config.output_cost_list requires minimum runtime version "2.1", but the configured minimum is "2.0"
+  source:
+    kind: model
+    name: gpt-5-2
+    fields:
+      - targets[0].config.output_cost_list
+  severity: WARNING

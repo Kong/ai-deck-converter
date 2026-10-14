@@ -124,6 +124,10 @@ func (c *Converter) scopedPlugins(src ConversionIssueSource, refs []string, acls
 				"acl policy sets %s, but a Kong acl plugin permits exactly one of "+
 					"allow, deny, allow_when, or deny_when", strings.Join(set, " and "))
 		}
+		if hasCELExpressions(acls) && !c.supports(aimap.FeatureACLWhen) {
+			fields := celFieldPaths("access.acls", acls)
+			return nil, c.failUnsupported(src.at(fields...), aimap.FeatureACLWhen, fields[0])
+		}
 		plugins = append(plugins, aclPlugin(acls))
 	}
 	return plugins, nil
@@ -132,6 +136,12 @@ func (c *Converter) scopedPlugins(src ConversionIssueSource, refs []string, acls
 // policyPlugin builds the plugin for p. It reports false when p cannot be
 // converted. The Error issue names the policy.
 func (c *Converter) policyPlugin(p *aigw.Policy, tags []string, preserveID bool) (kong.Plugin, bool) {
+	// Without its condition, the plugin runs on every request.
+	if p.Condition != "" && !c.supports(aimap.FeaturePolicyCondition) {
+		c.reportUnsupported(issueSource(kindPolicy, p.Name).at("condition"), Error,
+			aimap.FeaturePolicyCondition, "condition")
+		return kong.Plugin{}, false
+	}
 	config, ok := c.applyDatastore(p, c.normalizeRateLimitingProviderMatches(p))
 	if !ok {
 		return kong.Plugin{}, false

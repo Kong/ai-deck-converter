@@ -1,0 +1,8 @@
+- code: UNSUPPORTED_IN_MIN_RUNTIME_VERSION
+  reason: config.server.upstream_protocol_version requires minimum runtime version "2.1", but the configured minimum is "2.0"
+  source:
+    kind: mcp_server
+    name: stateless-mcp
+    fields:
+      - config.server.upstream_protocol_version
+  severity: ERROR

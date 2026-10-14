@@ -283,6 +283,10 @@ func (c *Converter) mcpPlugin(src ConversionIssueSource, m *aigw.MCPServer) (kon
 	if logging := loggingBlock(withLoggingDefaults(m.Config.Logging, true, false)); logging != nil {
 		cfg["logging"] = logging
 	}
+	if _, ok := m.Config.Server["upstream_protocol_version"]; ok && !c.supports(aimap.FeatureMCPUpstreamProtocolVersion) {
+		field := "config.server.upstream_protocol_version"
+		return kong.Plugin{}, c.failUnsupported(src.at(field), aimap.FeatureMCPUpstreamProtocolVersion, field)
+	}
 	if len(m.Config.Server) > 0 {
 		cfg["server"] = mcpServerConfigForPlugin(m.Config.Server)
 	}
@@ -290,6 +294,9 @@ func (c *Converter) mcpPlugin(src ConversionIssueSource, m *aigw.MCPServer) (kon
 	// but we pass it through whenever set and let the plugin validate.
 	if pc := proxyConfigBlock(m.Config.Proxy); pc != nil {
 		cfg["proxy_config"] = pc
+	}
+	if m.TokenVault != nil && !c.supports(aimap.FeatureMCPTokenVault) {
+		return kong.Plugin{}, c.failUnsupported(src.at("token_vault"), aimap.FeatureMCPTokenVault, "token_vault")
 	}
 	// Upstream authentication (e.g. AWS SigV4) and Token Vault credential
 	// resolution both lower to the plugin's auth record, which can only carry

@@ -22,3 +22,25 @@ func TestDetectDirection(t *testing.T) {
 	_, err := detectDirection([]byte(":\tnot yaml"))
 	require.Error(t, err, "invalid yaml: want error")
 }
+
+func TestCheckMinRuntimeVersion(t *testing.T) {
+	cases := []struct {
+		dir, version string
+		wantErr      string
+	}{
+		{"to-deck", "2.1", ""},
+		{"to-dbless", "2.1", ""},
+		{"from-deck", "", ""},
+		{"to-deck", "", "-min-runtime-version is required"},
+		{"to-dbless", "", "-min-runtime-version is required"},
+		{"from-deck", "2.1", "not valid with from-deck"},
+	}
+	for _, tc := range cases {
+		err := checkMinRuntimeVersion(tc.dir, tc.version)
+		if tc.wantErr == "" {
+			require.NoError(t, err, "%s %q", tc.dir, tc.version)
+			continue
+		}
+		require.ErrorContains(t, err, tc.wantErr, "%s %q", tc.dir, tc.version)
+	}
+}

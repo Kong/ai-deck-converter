@@ -17,6 +17,7 @@ routes:
     methods:
       - GET
       - POST
+      - OPTIONS
     protocols:
       - http
       - https
@@ -30,6 +31,7 @@ routes:
     methods:
       - GET
       - POST
+      - OPTIONS
     protocols:
       - http
       - https
@@ -43,6 +45,7 @@ routes:
     methods:
       - GET
       - POST
+      - OPTIONS
     protocols:
       - http
       - https
@@ -56,6 +59,7 @@ routes:
     methods:
       - GET
       - POST
+      - OPTIONS
     protocols:
       - http
       - https
@@ -69,6 +73,7 @@ routes:
     methods:
       - GET
       - POST
+      - OPTIONS
     protocols:
       - http
       - https
@@ -82,6 +87,7 @@ routes:
     methods:
       - GET
       - POST
+      - OPTIONS
     protocols:
       - http
       - https
@@ -95,6 +101,7 @@ routes:
     methods:
       - GET
       - POST
+      - OPTIONS
     protocols:
       - http
       - https
@@ -108,6 +115,7 @@ routes:
     methods:
       - GET
       - POST
+      - OPTIONS
     protocols:
       - http
       - https
@@ -121,6 +129,7 @@ routes:
     methods:
       - GET
       - POST
+      - OPTIONS
     protocols:
       - http
       - https
@@ -134,6 +143,7 @@ routes:
     methods:
       - GET
       - POST
+      - OPTIONS
     protocols:
       - http
       - https

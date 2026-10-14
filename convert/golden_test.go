@@ -7,9 +7,13 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/Kong/ai-deck-converter/internal/aimap"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 )
+
+// testOptions targets the newest known release, so no feature gate applies.
+var testOptions = Options{MinRuntimeVersion: aimap.LatestVersion.String()}
 
 var update = flag.Bool("update", false, "regenerate golden expected.yaml and issues.yaml files")
 
@@ -17,6 +21,7 @@ var update = flag.Bool("update", false, "regenerate golden expected.yaml and iss
 // input.yaml and compares the result to expected.yaml. It compares the issues
 // to issues.yaml. A case without issues has no issues.yaml. An optional
 // options.yaml in the case directory overrides the default conversion Options.
+// The default MinRuntimeVersion is the newest known release.
 // Run with -update to regenerate the expected files after reviewing changes.
 func TestGolden(t *testing.T) {
 	dirs, err := filepath.Glob("testdata/*")
@@ -92,12 +97,12 @@ type goldenOptions struct {
 
 func loadOptions(t *testing.T, dir string) goldenOptions {
 	t.Helper()
+	opts := goldenOptions{Options: testOptions}
 	data, err := os.ReadFile(filepath.Join(dir, "options.yaml"))
 	if os.IsNotExist(err) {
-		return goldenOptions{}
+		return opts
 	}
 	require.NoError(t, err, "read options")
-	var opts goldenOptions
 	require.NoError(t, yaml.Unmarshal(data, &opts), "parse options")
 	return opts
 }

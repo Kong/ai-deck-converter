@@ -1,0 +1,8 @@
+- code: UNSUPPORTED_IN_MIN_RUNTIME_VERSION
+  reason: 'capabilities[0]: skills requires minimum runtime version "2.2", but the configured minimum is "2.1"'
+  source:
+    kind: model
+    name: openai-skills-api
+    fields:
+      - capabilities[0]
+  severity: ERROR

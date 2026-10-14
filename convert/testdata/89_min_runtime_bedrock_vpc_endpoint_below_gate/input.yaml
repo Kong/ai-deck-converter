@@ -1,0 +1,37 @@
+# vpc_endpoint needs 2.3. At 2.2 the model is absent with an error. Without the
+# field, traffic would go to the public Bedrock endpoint. The model without a
+# vpc_endpoint still converts.
+model_providers:
+  - name: bedrock-prod
+    type: bedrock
+    config:
+      auth:
+        type: aws
+        access_key_id: "{vault://ai/aws-access-key-id}"
+        secret_access_key: "{vault://ai/aws-secret-access-key}"
+models:
+  - name: claude-private
+    type: model
+    capabilities: [generate]
+    formats: [{type: bedrock}]
+    config:
+      route: {paths: [/private]}
+    targets:
+      - name: anthropic.claude-sonnet-4-5
+        provider: bedrock-prod
+        config:
+          type: bedrock
+          region: us-east-1
+          vpc_endpoint: vpce-0abc123-xyz.bedrock-runtime.us-east-1.vpce.amazonaws.com
+  - name: claude-public
+    type: model
+    capabilities: [generate]
+    formats: [{type: bedrock}]
+    config:
+      route: {paths: [/public]}
+    targets:
+      - name: anthropic.claude-sonnet-4-5
+        provider: bedrock-prod
+        config:
+          type: bedrock
+          region: us-east-1

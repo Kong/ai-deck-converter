@@ -1,0 +1,52 @@
+# allow_when and deny_when need 2.2. At 2.1 the model and the agent that use
+# them are absent with an error. The entities with plain acls still convert.
+models:
+  - name: gated-gpt
+    type: model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/gated]}
+    targets:
+      - name: gpt-4o
+        provider: openai-prod
+        config: {type: openai}
+    access:
+      acls:
+        allow_when: ["principal.metadata.admin == 'true'"]
+  - name: open-gpt
+    type: model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/open]}
+    targets:
+      - name: gpt-4o
+        provider: openai-prod
+        config: {type: openai}
+    access:
+      acls:
+        allow: [admins]
+agents:
+  - type: a2a
+    name: gated-agent
+    access:
+      acls:
+        deny_when: ["principal.metadata.status == 'suspended'"]
+    config:
+      url: https://gated-agent.internal/a2a
+      route: {paths: [/agents/gated]}
+  - type: a2a
+    name: open-agent
+    config:
+      url: https://open-agent.internal/a2a
+      route: {paths: [/agents/open]}
+model_providers:
+  - name: openai-prod
+    type: openai
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://ai/openai-token}"

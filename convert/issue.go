@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/Kong/ai-deck-converter/internal/aimap"
 	"github.com/Kong/ai-deck-converter/internal/kong"
 )
 
@@ -24,6 +25,8 @@ const (
 	ConfigFieldInvalid         ConversionIssueCode = "CONFIG_FIELD_INVALID"
 	BehaviorMayDiffer          ConversionIssueCode = "BEHAVIOR_MAY_DIFFER"
 	InternalError              ConversionIssueCode = "INTERNAL_ERROR"
+
+	UnsupportedInMinRuntimeVersion ConversionIssueCode = "UNSUPPORTED_IN_MIN_RUNTIME_VERSION"
 )
 
 // ConversionIssueSeverity is the level of a ConversionIssue.
@@ -42,8 +45,9 @@ const (
 // ConversionIssueSource describes the source of an issue found during
 // conversion.
 type ConversionIssueSource struct {
-	// Kind is the entity type that caused the issue, for example, "model" or
-	// "agent". It is the singular form of the top-level document key.
+	// Kind names what caused the issue, for example "model" or "agent". It
+	// is usually the singular form of a top-level document key. A kind can
+	// also be something else, for example "option".
 	Kind string `json:"kind" yaml:"kind"`
 
 	// Name is the entity name that caused the issue, for example, "gpt-5".
@@ -99,15 +103,16 @@ func (r *ConversionResult) HasErrors() bool {
 
 // Source.Kind values. The values are public API.
 const (
-	kindModel         = "model"
-	kindMCPServer     = "mcp_server"
-	kindAgent         = "agent"
-	kindPolicy        = "policy"
-	kindCustomPolicy  = "custom_policy"
-	kindAuthStrategy  = "auth_strategy"
-	kindConsumer      = "consumer"
-	kindConsumerGroup = "consumer_group"
-	kindSNI           = "sni"
+	kindModel            = "model"
+	kindMCPServer        = "mcp_server"
+	kindAgent            = "agent"
+	kindPolicy           = "policy"
+	kindCustomPolicy     = "custom_policy"
+	kindAuthStrategy     = "auth_strategy"
+	kindConsumer         = "consumer"
+	kindConsumerGroup    = "consumer_group"
+	kindSNI              = "sni"
+	kindConversionOption = "option"
 )
 
 // errSkipEntity tells an entity wrapper to leave out the current entity.
@@ -160,6 +165,32 @@ func (c *Converter) reportError(src ConversionIssueSource, code ConversionIssueC
 func (c *Converter) fail(src ConversionIssueSource, code ConversionIssueCode, format string, args ...any) error {
 	c.report(src, Error, code, format, args...)
 	return errSkipEntity
+}
+
+// supports reports whether the minimum runtime version has f.
+func (c *Converter) supports(f aimap.Feature) bool {
+	return aimap.Supports(f, c.minRuntimeVersion)
+}
+
+// reportUnsupported records an UnsupportedInMinRuntimeVersion issue for the
+// field of src that needs f.
+func (c *Converter) reportUnsupported(
+	src ConversionIssueSource, severity ConversionIssueSeverity, f aimap.Feature, field string,
+) {
+	c.report(src, severity, UnsupportedInMinRuntimeVersion, "%s",
+		unsupportedReason(f, field, c.minRuntimeVersion))
+}
+
+// failUnsupported records an Error UnsupportedInMinRuntimeVersion issue and
+// returns errSkipEntity.
+func (c *Converter) failUnsupported(src ConversionIssueSource, f aimap.Feature, field string) error {
+	c.reportUnsupported(src, Error, f, field)
+	return errSkipEntity
+}
+
+func unsupportedReason(f aimap.Feature, field string, version aimap.Version) string {
+	return fmt.Sprintf("%s requires minimum runtime version %q, but the configured minimum is %q",
+		field, aimap.Since(f), version)
 }
 
 // guard runs fn for the entity src. It changes a panic or an unexpected error
