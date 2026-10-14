@@ -654,6 +654,81 @@ policies:
 	require.Contains(t, err.Error(), "auth_strategies")
 }
 
+func TestConvertRejectsPluginInBothSelectorOrderingLists(t *testing.T) {
+	src := []byte(`
+models:
+  - type: model
+    name: guarded
+    capabilities: [generate]
+    formats: [{type: openai}]
+    targets:
+      - name: gpt-4o
+        provider: p1
+        config: {type: openai}
+    policies: [model-jwt]
+    access:
+      auth_strategies: [route-jwt]
+    config:
+      route: {paths: [/ai]}
+model_providers:
+  - name: p1
+    type: openai
+policies:
+  - type: jwt
+    name: model-jwt
+    config: {}
+auth_strategies:
+  - name: route-jwt
+    type: jwt
+    config: {}
+`)
+	_, _, err := convertDoc(src, false)
+	require.Error(t, err, "a plugin in both ordering lists makes a cycle Kong cannot sort")
+	require.Contains(t, err.Error(), "must run both before and after")
+}
+
+func TestConvertWarnsModelScopedRequestTerminationOnReorderedRoute(t *testing.T) {
+	src := []byte(`
+models:
+  - type: model
+    name: guarded
+    capabilities: [generate]
+    formats: [{type: openai}]
+    targets:
+      - name: gpt-4o
+        provider: p1
+        config: {type: openai}
+    policies: [probe, block-model]
+    access:
+      auth_strategies: [key-auth-default]
+    config:
+      route: {paths: [/ai]}
+model_providers:
+  - name: p1
+    type: openai
+policies:
+  - type: pre-function
+    name: probe
+    config: {access: ["return"]}
+  - type: request-termination
+    name: block-model
+    config: {status_code: 403}
+auth_strategies:
+  - name: key-auth-default
+    type: key-auth
+    config: {key_names: [x-api-key]}
+`)
+	_, warnings, err := convertDoc(src, false)
+	require.NoError(t, err)
+	matches := 0
+	for _, w := range warnings {
+		if strings.Contains(w, "model-scoped request-termination policy on this route never runs") {
+			matches++
+		}
+	}
+	require.Equal(t, 1, matches, "warn once per model, got warnings: %v", warnings)
+}
+
 func TestConvertScopesAuthStrategiesWithoutLeakingAcrossSharedRoutes(t *testing.T) {
 	src := []byte(`
 models:

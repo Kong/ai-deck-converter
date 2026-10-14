@@ -160,7 +160,7 @@ See `convert/testdata/*/input.yaml` for worked examples.
 | Certificate | `certificates` entry (`cert`/`key` and the optional `cert_alt`/`key_alt` pair passed through). Kong certificates have no `name`, so the source name is not represented in the output; in `db-less` mode it still seeds the generated `id`. |
 | SNI | Nested under its referenced Certificate's `snis` list (`hostname` → `name`, `labels` → `tags`); decK's file format has no standalone SNI entity. The SNI's own `name`/`display_name` have no Kong counterpart and are dropped. In `db-less` mode SNIs become a top-level `snis` entry referencing the certificate's generated `id`. |
 | Model with `formats: [{type: passthrough}]` | Requires AI Gateway 2.2+. **One route on the bare base path** (every method, no endpoint suffix), whatever `capabilities` it declares — `[]` is fine — with one route-scoped `ai-proxy-advanced` whose targets carry `route_type: passthrough` and no `model_alias`; `llm_format` is the provider's native format (openai for providers without their own). No `ai-model-selector`, no video lifecycle routes, and the model's policies/ACLs are route-scoped rather than `model:`-scoped, since nothing can select an `ai-models` row for a body of unknown shape (the row is still emitted). No `anthropic_version` default is applied. |
-| Model `policies`/`acls` | Top-level plugins scoped to the `ai-models` entity via a `model:` FK. |
+| Model `policies`/`acls` | Top-level plugins scoped to the `ai-models` entity via a `model:` FK. When a policy's plugin type has a static Kong priority above `ai-model-selector`'s (`aimap.OutranksModelSelector`, e.g. `pre-function`), the route's `ai-model-selector` gets `ordering.before.access` with that plugin name. See "Assumptions and limitations" below. |
 | Agent `access.acls` | Kong `acl` plugin on the agent's Route. |
 | `labels` | `tags` flattened to sorted `key:value` strings. |
 
@@ -279,6 +279,37 @@ and `formats` beyond the first.
   converting the recovered model reproduces the same route/target either way.
 - **Credentials.** Only `api-key` (`keyauth_credentials`) is generated; other
   credential types are warned about and skipped.
+- **High-priority model policies reorder `ai-model-selector`.** A model
+  policy can outrank `ai-model-selector`, for example `pre-function`. Without
+  reordering, it runs before Kong sets `ngx.ctx.ai_model`, so Kong skips it.
+  An `ordering` block on the model-scoped policy has no effect. Kong reads
+  `ordering` before the model is known, and a model-scoped config is not
+  visible then. The converter adds the policy's plugin name to the route's
+  `ai-model-selector` `ordering.before.access` instead. Side effects:
+  - `ordering` matches plugin names, not instances. On that route, every
+    instance of the named plugin runs after `ai-model-selector`. This
+    includes instances that are not model-scoped.
+  - Plugins on that route that the rule does not name can then run after
+    `ai-model-selector`. Authentication is not one of them. When the route
+    has auth strategies, the converter also adds the auth plugins and
+    `request-termination` to `ordering.after.access`. Auth strategies fall
+    back to the `anonymous` consumer, and only that consumer's
+    `request-termination` rejects the request. So an unauthenticated request
+    gets its 401 before `ai-model-selector` reads the body and before the
+    policy runs. A plugin in both lists fails the conversion.
+  - Because of that `ordering.after`, `request-termination` runs before
+    `ai-model-selector` on such a route. A model-scoped `request-termination`
+    policy on that route (for example, one that blocks a model) is then
+    skipped: Kong checks it before the model is known. The converter warns
+    about it. Scope it to the route or globally instead.
+  - Any `ordering` in a workspace turns on dynamic plugin ordering for the
+    whole workspace. Dynamic ordering needs an Enterprise license.
+  - A user `ordering` that puts a plugin before `ai-model-selector` makes a
+    cycle. Kong then logs an error and uses the static priorities.
+
+  `e2e/testdata/pre_function_model_ordering` and
+  `e2e/testdata/pre_function_model_ordering_auth` prove this against a real
+  gateway.
 - **MCP upstream.** Passthrough MCP servers without an `upstream_url` get a
   placeholder host and a warning.
 - **Upstream auth.** Agents and MCP Servers carry `config.upstream.auth` (AWS

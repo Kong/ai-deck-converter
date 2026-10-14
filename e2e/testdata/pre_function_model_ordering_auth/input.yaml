@@ -1,0 +1,52 @@
+models:
+  - display_name: Authenticated ordering probe model
+    name: auth-ordering-probe-model
+    type: model
+    enabled: true
+    capabilities: [ generate ]
+    formats:
+      - type: openai
+    config:
+      route:
+        paths: [ /ai-auth-ordering-probe ]
+        model:
+          values: [ auth-ordering-probe-alias ]
+    targets:
+      - name: gpt-4o
+        provider: openai-prod
+        config:
+          type: openai
+    policies: [ ordering-probe ]
+    access:
+      auth_strategies: [ key-auth-default ]
+model_providers:
+  - name: openai-prod
+    type: openai
+    display_name: OpenAI Prod
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://ai/openai-token}"
+policies:
+  - type: pre-function
+    name: ordering-probe
+    config:
+      access:
+        - |
+          local model = ngx.ctx.ai_model
+          return kong.response.exit(200, { selected_model = model and model.name or ngx.null })
+auth_strategies:
+  - name: key-auth-default
+    type: key-auth
+    display_name: Default Key Auth
+    config:
+      key_names: [ x-api-key ]
+consumers:
+  - name: ordering-probe-user
+    type: api-key
+    credentials:
+      - name: ordering-probe-key
+        type: api-key
+        api_key: ordering-probe-secret

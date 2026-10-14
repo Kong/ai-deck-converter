@@ -161,6 +161,12 @@ type modelPass struct {
 	// websocketRoutes holds the protocols of each WebSocket route by name.
 	// Plugins on these routes must declare the same protocols to run.
 	websocketRoutes map[string][]string
+	// selectorBefore holds, per route, the model policy plugin names that
+	// must run after that route's ai-model-selector.
+	selectorBefore map[string][]string
+	// selectorAfter holds, per route, the plugins that reject unauthenticated
+	// requests. A selector that carries selectorBefore still runs after them.
+	selectorAfter map[string][]string
 	// skipped holds the issues of each model index that a pass left out.
 	skipped map[int][]ConversionIssue
 }
@@ -197,6 +203,8 @@ func (c *Converter) convertModelsPass(skipped map[int][]ConversionIssue) bool {
 		passthroughMatchers: map[string]string{},
 		identityPluginSeen:  map[string]bool{},
 		websocketRoutes:     map[string][]string{},
+		selectorBefore:      map[string][]string{},
+		selectorAfter:       map[string][]string{},
 		skipped:             skipped,
 	}
 	lifecycleCandidates := c.videoLifecycleCandidates(skipped)
@@ -229,10 +237,11 @@ func (c *Converter) convertModelsPass(skipped map[int][]ConversionIssue) bool {
 				{GeneratedPrefix: "config.sources", SourcePrefix: "config.route.model"},
 			}
 			c.out.Plugins = append(c.out.Plugins, kong.Plugin{
-				Name:   "ai-model-selector",
-				Route:  kong.NewStringRef(g.route.Name),
-				Config: selectorCfg,
-				Source: source("model", g.route.Source.EntityName, "config.route.model", mappings...),
+				Name:     "ai-model-selector",
+				Route:    kong.NewStringRef(g.route.Name),
+				Config:   selectorCfg,
+				Ordering: c.selectorOrdering(st, g.route.Name),
+				Source:   source("model", g.route.Source.EntityName, "config.route.model", mappings...),
 			})
 		}
 		for _, pg := range g.proxies {
@@ -737,6 +746,19 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 				st.guardPlugins = append(st.guardPlugins, p)
 				continue
 			}
+			// Kong cannot read the ordering of a model-scoped plugin before
+			// ai-model-selector sets the model. The route's selector carries
+			// the ordering instead. See "Assumptions and limitations" in README.md.
+			if aimap.OutranksModelSelector(p.Name) {
+				if slices.Contains(st.selectorAfter[routeName], p.Name) {
+					return c.fail(src.at(scopedPluginField(m.Policies, p)), ConfigFieldInvalid,
+						"model %q: plugin %q must run both before and after ai-model-selector "+
+							"on route %q, so Kong cannot order it", m.Name, p.Name, routeName)
+				}
+				if !slices.Contains(st.selectorBefore[routeName], p.Name) {
+					st.selectorBefore[routeName] = append(st.selectorBefore[routeName], p.Name)
+				}
+			}
 			// Same ai-model identities as the ai-proxy-advanced FKs: one copy
 			// of this policy/ACL plugin per alias, so a request is protected
 			// regardless of which alias it names.
@@ -792,11 +814,60 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 			if websocket {
 				p = withoutAnonymousFallback(p)
 				p.Protocols = protocols
+			} else {
+				if slices.Contains(st.selectorBefore[routeName], p.Name) {
+					return c.fail(src.at(authStrategyField(m.Access.AuthStrategies, p)), ConfigFieldInvalid,
+						"model %q: plugin %q must run both before and after ai-model-selector "+
+							"on route %q, so Kong cannot order it", m.Name, p.Name, routeName)
+				}
+				if !slices.Contains(st.selectorAfter[routeName], p.Name) {
+					st.selectorAfter[routeName] = append(st.selectorAfter[routeName], p.Name)
+				}
 			}
 			st.guardPlugins = append(st.guardPlugins, p)
 		}
+		if !websocket && !slices.Contains(st.selectorAfter[routeName], "request-termination") {
+			// Auth plugins fall back to the anonymous consumer. Its
+			// request-termination rejects the request.
+			st.selectorAfter[routeName] = append(st.selectorAfter[routeName], "request-termination")
+		}
 	}
 	return nil
+}
+
+// selectorOrdering returns the ordering of the ai-model-selector on
+// routeName. It is nil unless a model policy outranks the selector.
+func (c *Converter) selectorOrdering(st *modelPass, routeName string) *kong.Ordering {
+	before := st.selectorBefore[routeName]
+	if len(before) == 0 {
+		return nil
+	}
+	ordering := &kong.Ordering{Before: &kong.OrderingPhases{Access: before}}
+	// Reordering must not move authentication after the selector or the
+	// policies. Kong rejects unauthenticated requests before the selector
+	// reads the body.
+	if after := st.selectorAfter[routeName]; len(after) > 0 {
+		ordering.After = &kong.OrderingPhases{Access: after}
+		c.warnModelScopedRequestTermination(routeName, st.guardPlugins)
+	}
+	return ordering
+}
+
+// warnModelScopedRequestTermination warns once per model when routeName has
+// a model-scoped request-termination policy. The selector's ordering.after
+// runs every request-termination before the model is known, so that policy
+// never matches.
+func (c *Converter) warnModelScopedRequestTermination(routeName string, plugins []kong.Plugin) {
+	for _, p := range plugins {
+		if p.Name != "request-termination" || p.Model == nil || p.Route == nil ||
+			string(*p.Route) != routeName || p.Source == nil {
+			continue
+		}
+		c.warn(issueSource(kindModel, p.Source.EntityName).at("policies"), BehaviorMayDiffer,
+			"route %q: ordering moves request-termination before ai-model-selector. "+
+				"A model-scoped request-termination policy on this route never runs. "+
+				"Scope the policy to the route or globally instead.", routeName)
+	}
 }
 
 // convertVideoLifecycle adds the video lifecycle route of candidate to service.
