@@ -1,6 +1,7 @@
 package convert
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/Kong/ai-deck-converter/internal/aigw"
@@ -186,31 +187,27 @@ auth_strategies:
 func TestAuthStrategyWarnsOverrides(t *testing.T) {
 	cases := map[string]struct {
 		config string
+		field  string
 		want   string
 	}{
 		"anonymous": {
 			`{key_names: [k], anonymous: someone}`,
+			"config.anonymous",
 			`anonymous will be overridden to "anonymous"`,
 		},
 		"identity_realms": {
 			`{principals: {enabled: true}, identity_realms: [{scope: cp}]}`,
+			"config.identity_realms",
 			"identity_realms will be overridden to []",
 		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			src := []byte(authStrategyOverrideDoc(tc.config))
-			_, warnings, err := Convert(src, Options{})
+			result, err := Convert([]byte(authStrategyOverrideDoc(tc.config)), Options{})
 			require.NoError(t, err)
-			require.Len(t, warnings, 2, "each referencing model warns")
-			require.Contains(t, warnings[0], `model "a" references auth strategy "ka"`)
-			require.Contains(t, warnings[1], `model "b" references auth strategy "ka"`)
-			for _, w := range warnings {
-				require.Contains(t, w, tc.want)
-			}
-
-			_, _, err = Convert(src, Options{Strict: true})
-			require.Error(t, err)
+			require.Len(t, result.Issues, 1, "two referencing models give one issue")
+			issue := requireIssue(t, result.Issues, Warning, ConfigFieldOverridden, kindAuthStrategy, "ka", tc.field)
+			require.Contains(t, issue.Reason, tc.want)
 		})
 	}
 }
@@ -221,8 +218,49 @@ func TestAuthStrategyDoesNotWarnMatchingValues(t *testing.T) {
 		`{principals: {enabled: true}, identity_realms: []}`,
 		`{principals: {enabled: false}, identity_realms: [{scope: cp}]}`,
 	} {
-		_, warnings, err := Convert([]byte(authStrategyOverrideDoc(cfg)), Options{Strict: true})
+		_, warnings, err := convertDoc([]byte(authStrategyOverrideDoc(cfg)), true)
 		require.NoError(t, err, cfg)
 		require.Empty(t, warnings, cfg)
+	}
+}
+
+// A model that fails after it added the request-termination plugin to the
+// user's anonymous consumer leaves that consumer as the user wrote it. The
+// model fails on its realtime route, which allows only one auth strategy.
+func TestFailedModelLeavesUserAnonymousConsumerUnchanged(t *testing.T) {
+	for name, consumer := range map[string]string{
+		"without plugins": `
+  - name: anonymous`,
+		"with its own request-termination": `
+  - name: anonymous
+    policies: [deny-403]`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			src := []byte(`
+model_providers:
+  - {name: openai-main, type: openai}
+auth_strategies:
+  - {name: keys-a, type: key-auth, config: {key_names: [a]}}
+  - {name: keys-b, type: key-auth, config: {key_names: [b]}}
+policies:
+  - {name: deny-403, type: request-termination, config: {status_code: 403}}
+consumers:` + consumer + `
+models:
+  - name: broken
+    capabilities: [generate, realtime]
+    targets: [{name: gpt-4o, provider: openai-main, config: {type: openai}}]
+    access: {auth_strategies: [keys-a, keys-b]}
+    config: {route: {paths: [/ai]}}
+`)
+			result, err := Convert(src, Options{})
+			require.NoError(t, err)
+			requireIssue(t, result.Issues, Error, ConfigFieldInvalid, kindModel, "broken", "access.auth_strategies")
+			require.Empty(t, result.Output.AIModels, "the model is left out")
+
+			withoutModels, err := Convert([]byte(strings.Split(string(src), "models:\n")[0]), Options{})
+			require.NoError(t, err)
+			require.Equal(t, withoutModels.Output.Consumers, result.Output.Consumers,
+				"the anonymous consumer keeps the plugins the user wrote")
+		})
 	}
 }

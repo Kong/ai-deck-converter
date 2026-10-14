@@ -189,10 +189,8 @@ func DatastoreSupportForPolicyType(policyType, datastoreType string) (support Da
 }
 
 // UnknownDatastoreError reports a reference to a name absent from the registry.
-// ApplyDatastore returns it alongside the unchanged config rather than a bare
-// error, so a caller that tolerates dangling references — converting a
-// hand-written config without -strict — can warn and carry on. Whether a
-// dangling reference is fatal is the caller's decision, not this package's.
+// ApplyDatastore returns it with the unchanged config. The caller decides how
+// to report a dangling reference.
 type UnknownDatastoreError struct {
 	Name string
 }

@@ -1,0 +1,31 @@
+# Every entity that references an unknown auth strategy is left out, so none
+# of them is generated without its authentication.
+model_providers:
+  - name: openai-main
+    type: openai
+auth_strategies:
+  - name: keys
+    type: key-auth
+    config: {key_names: [apikey]}
+models:
+  - name: protected
+    capabilities: [generate]
+    targets: [{name: gpt-4o, provider: openai-main, config: {type: openai}}]
+    access: {auth_strategies: [keys]}
+    config: {route: {paths: [/protected]}}
+  - name: dangling
+    capabilities: [generate]
+    targets: [{name: gpt-4o, provider: openai-main, config: {type: openai}}]
+    access: {auth_strategies: [keys, missing]}
+    config: {route: {paths: [/dangling]}}
+agents:
+  - name: dangling-agent
+    type: http
+    config: {url: https://agent.internal, route: {paths: [/agent]}}
+    access: {auth_strategies: [missing]}
+mcp_servers:
+  - name: dangling-mcp
+    type: conversion-listener
+    config: {route: {paths: [/mcp]}}
+    access: {auth_strategies: [missing]}
+    tools: [{name: ping, description: Ping}]

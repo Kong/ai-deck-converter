@@ -1,0 +1,55 @@
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: openai-chat
+        paths:
+          - /protected/chat/completions
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+consumers:
+  - username: anonymous
+    custom_id: anonymous
+    plugins:
+      - name: request-termination
+        enabled: true
+        config:
+          message: Unauthorized
+          status_code: 401
+plugins:
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-chat
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - description: gpt-4o
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: protected
+            name: gpt-4o
+            provider: openai
+          route_type: llm/v1/chat
+    route: openai-chat
+    model: protected
+  - name: key-auth
+    config:
+      anonymous: anonymous
+      key_names:
+        - apikey
+    route: openai-chat
+ai_models:
+  - name: protected

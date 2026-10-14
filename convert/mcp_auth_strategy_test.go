@@ -37,15 +37,12 @@ mcp_servers:
 `
 
 func TestMCPKeyAuthWithMetadataIsHardError(t *testing.T) {
-	// key-auth + metadata is a hard error regardless of strict mode.
-	for _, strict := range []bool{false, true} {
-		_, _, err := Convert([]byte(keyAuthWithMetadata), Options{Strict: strict})
-		require.Error(t, err, "strict=%v", strict)
-		require.Contains(t, err.Error(), "OAuth Protected Resource Metadata is not supported for key-auth")
-		conversionErr, ok := AsConversionError(err)
-		require.True(t, ok, "strict=%v", strict)
-		require.Equal(t, "access.metadata", conversionErr.Diagnostics[0].Field)
-	}
+	result, err := Convert([]byte(keyAuthWithMetadata), Options{})
+	require.NoError(t, err)
+	issue := requireIssue(t, result.Issues, Error, ConfigFieldInvalid, kindMCPServer, "keyed-mcp",
+		"access.metadata", "access.auth_strategies[0]")
+	require.Contains(t, issue.Reason, "OAuth Protected Resource Metadata is not supported for key-auth")
+	require.Empty(t, result.Output.Services, "the MCP server is left out")
 }
 
 // oidcOnUnsupportedListener puts auth strategy and metadata access on an
@@ -76,16 +73,11 @@ mcp_servers:
 `
 
 func TestMCPAuthStrategyUnsupportedListenerIsHardError(t *testing.T) {
-	_, _, err := Convert([]byte(oidcOnUnsupportedListener), Options{})
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "only supported for listener, conversion-listener, and passthrough-listener")
-
-	conversionErr, ok := AsConversionError(err)
-	require.True(t, ok)
-	require.Len(t, conversionErr.Diagnostics, 2)
-	require.Equal(t, "access.auth_strategies", conversionErr.Diagnostics[0].Field)
-	require.Equal(t, "access.metadata", conversionErr.Diagnostics[1].Field)
-	require.Equal(t, conversionErr.Diagnostics[0].Messages, conversionErr.Diagnostics[1].Messages)
+	result, err := Convert([]byte(oidcOnUnsupportedListener), Options{})
+	require.NoError(t, err)
+	issue := requireIssue(t, result.Issues, Error, ConfigFieldInvalid, kindMCPServer, "upstream-mcp",
+		"access.auth_strategies", "access.metadata")
+	require.Contains(t, issue.Reason, "only supported for listener, conversion-listener, and passthrough-listener")
 }
 
 // oidcMetadataWithoutAuthServers omits metadata.authorization_servers so the
@@ -117,7 +109,7 @@ mcp_servers:
 `
 
 func TestMCPOAuth2FallsBackToIssuerForAuthServers(t *testing.T) {
-	out, warnings, err := convertYAML([]byte(oidcMetadataWithoutAuthServers), Options{})
+	out, warnings, err := convertYAML([]byte(oidcMetadataWithoutAuthServers))
 	require.NoError(t, err)
 	require.Empty(t, warnings)
 	s := string(out)
@@ -174,7 +166,7 @@ mcp_servers:
 `
 
 func TestMCPOAuth2MapsAuthStrategyFields(t *testing.T) {
-	out, warnings, err := convertYAML([]byte(oidcWithMappedFields), Options{})
+	out, warnings, err := convertYAML([]byte(oidcWithMappedFields))
 	require.NoError(t, err)
 	require.Empty(t, warnings)
 	s := string(out)
@@ -257,7 +249,7 @@ mcp_servers:
 `
 
 func TestMCPOAuth2DerivesAudienceAndPassthrough(t *testing.T) {
-	out, warnings, err := convertYAML([]byte(oidcWithAudienceAndPassthrough), Options{})
+	out, warnings, err := convertYAML([]byte(oidcWithAudienceAndPassthrough))
 	require.NoError(t, err)
 	require.Empty(t, warnings)
 	s := string(out)
@@ -323,14 +315,14 @@ mcp_servers:
 // that quietly omits it the conversion fails hard — in every mode.
 func TestMCPMetadataDropsTokenExchange(t *testing.T) {
 	t.Run("fails by default", func(t *testing.T) {
-		_, _, err := Convert([]byte(mcpTokenExchangeDropInput), Options{})
+		_, _, err := convertDoc([]byte(mcpTokenExchangeDropInput), false)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "token_exchange")
 		require.Contains(t, err.Error(), "mcp-with-metadata")
 	})
 
 	t.Run("fails under strict", func(t *testing.T) {
-		_, _, err := Convert([]byte(mcpTokenExchangeDropInput), Options{Strict: true})
+		_, _, err := convertDoc([]byte(mcpTokenExchangeDropInput), true)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "token_exchange")
 	})

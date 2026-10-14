@@ -58,6 +58,18 @@ func hasCELExpressions(acls aigw.ACLs) bool {
 	return false
 }
 
+// celFieldPaths returns the path of each CEL field that acls sets. Each path
+// starts with prefix.
+func celFieldPaths(prefix string, acls aigw.ACLs) []string {
+	var paths []string
+	for _, f := range aclFields {
+		if f.cel && len(f.values(acls)) > 0 {
+			paths = append(paths, prefix+"."+f.name)
+		}
+	}
+	return paths
+}
+
 // aclFieldsSet names the acl-plugin config fields an ACL populates, in schema
 // order. More than one name means the ACL has no valid single-plugin
 // representation, since the four fields are mutually exclusive.

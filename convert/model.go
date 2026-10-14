@@ -144,9 +144,25 @@ type videoLifecycleTarget struct {
 // videoLifecycleCandidate owns an OpenAI-format video route. Its lifecycle
 // proxy is static (not model-scoped) but retains every creation target.
 type videoLifecycleCandidate struct {
+	index   int
 	model   *aigw.Model
 	targets []videoLifecycleTarget
 	spec    aimap.EndpointSpec
+}
+
+// modelPass holds the state that the models of one conversion pass share.
+type modelPass struct {
+	groups              map[string]*routeGroup
+	order               []string
+	guardPlugins        []kong.Plugin
+	usedRouteNames      map[string]bool
+	passthroughMatchers map[string]string
+	identityPluginSeen  map[string]bool
+	// websocketRoutes holds the protocols of each WebSocket route by name.
+	// Plugins on these routes must declare the same protocols to run.
+	websocketRoutes map[string][]string
+	// skipped holds the issues of each model index that a pass left out.
+	skipped map[int][]ConversionIssue
 }
 
 // convertModels groups all (model, target, capability) tuples into routes under
@@ -155,561 +171,52 @@ type videoLifecycleCandidate struct {
 // "api"), plus an ai-models entry per source model. type "model" plugins are
 // scoped to both the route and the ai-model entity; type "api" plugins are
 // scoped route-only.
-func (c *Converter) convertModels() error {
-	groups := map[string]*routeGroup{}
-	var order []string
-	var guardPlugins []kong.Plugin
-	usedRouteNames := map[string]bool{}
-	passthroughMatchers := map[string]string{}
-	identityPluginSeen := map[string]bool{}
-	// websocketRoutes holds the protocols of each WebSocket route by name.
-	// Plugins on these routes must declare the same protocols to run.
-	websocketRoutes := map[string][]string{}
-	lifecycleCandidates, err := c.videoLifecycleCandidates()
-	if err != nil {
-		return err
+//
+// Models share routes and plugins. A model that fails can have changed them
+// already, so a failure starts a new pass that leaves out that model. The
+// copy of c.out is shallow, so a model must not change an element of a c.out
+// slice in place. The
+// restart cost grows with the number of models times the number of failed
+// models.
+func (c *Converter) convertModels() {
+	out := *c.out
+	issueCount := len(c.issues)
+	skipped := map[int][]ConversionIssue{}
+	for !c.convertModelsPass(skipped) {
+		*c.out = out
+		c.issues = c.issues[:issueCount]
 	}
+}
+
+// convertModelsPass converts every model not in skipped. When a model fails,
+// it adds the model to skipped and returns false.
+func (c *Converter) convertModelsPass(skipped map[int][]ConversionIssue) bool {
+	st := &modelPass{
+		groups:              map[string]*routeGroup{},
+		usedRouteNames:      map[string]bool{},
+		passthroughMatchers: map[string]string{},
+		identityPluginSeen:  map[string]bool{},
+		websocketRoutes:     map[string][]string{},
+		skipped:             skipped,
+	}
+	lifecycleCandidates := c.videoLifecycleCandidates(skipped)
 
 	for i := range c.src.Models {
 		m := &c.src.Models[i]
-		bases := basePaths(m)
-		caps := c.expandCapabilities(m)
-
-		// extractModelAliases yields the name(s) a client uses to select this
-		// model: authored aliases, or the model name when none is authored. They
-		// seed both the ai-models entity identities and each type:model target's
-		// model_alias; type:api targets stay alias-less — see the gate at the
-		// buildTarget call below. Each alias gets its own ai-models entry and its
-		// own ai-proxy-advanced plugin (see the emission loop), since
-		// ai-model-selector can only match a request to one ai-models row at a
-		// time.
-		aliases, err := c.extractModelAliases(m)
-		if err != nil {
-			return err
-		}
-
-		// ownerKey groups targets into ai-proxy-advanced plugins: per source model
-		// for type "model" (each carries its own ai-model FK), shared for type
-		// "api" (route-only, all targets merged into one plugin).
-		modelScoped := isModelType(m)
-		// A passthrough model has no ai-model identity on the data plane. Its route carries
-		// no ai-model-selector, so nothing sets ctx.ai_model and a model-scoped plugin would never
-		// be selected. Every plugin such a model produces is route-scoped instead, exactly as
-		// a type "api" model's is. The ai_models row stays: it is the model's identity, and
-		// revert recovers the ID and labels from it.
-		passthrough := isPassthrough(m)
-		fkScoped := modelScoped && !passthrough
-		if passthrough {
-			// Passthrough is a property of the whole model's traffic, not one wire
-			// format among several a route could accept.
-			if len(m.Formats) > 1 {
-				return c.failAt("formats",
-					"model %q: the passthrough format cannot be combined with other formats", m.Name)
-			}
-			if err := c.warnPassthroughPolicies(m); err != nil {
-				return err
-			}
-			// ai-proxy-advanced refuses the semantic algorithm alongside a passthrough
-			// target: choosing semantically means reading a request body whose shape
-			// passthrough does not define.
-			if balancerAlgorithm(m.Config.Balancer) == "semantic" {
-				return c.failAt("config.balancer.algorithm",
-					"model %q: the passthrough format cannot use the semantic balancer algorithm",
-					m.Name)
-			}
-			// Kong allows one plugin of a name per route, and without a selector nothing
-			// tells two ai-proxy-advanced plugins on one route apart. Two passthrough
-			// models whose routes match the same requests are just as ambiguous even when
-			// they land in different route groups (different auth strategies, route
-			// names, ...), so the check keys on the request matchers, not the group key.
-			for _, b := range bases {
-				key, err := passthroughMatcherKey(b, m.Config.Route)
-				if err != nil {
-					return err
-				}
-				if other, ok := passthroughMatchers[key]; ok && other != m.Name {
-					return c.failAt("formats",
-						"model %q: a passthrough model cannot share route path %q with passthrough model %q",
-						m.Name, b, other)
-				}
-				passthroughMatchers[key] = m.Name
-			}
-		}
-		// API models share route-only ai-proxy-advanced plugins, so disabling one
-		// plugin could disable other models on the same route. Exclude explicitly
-		// disabled API models until they can be represented with independent scopes.
-		// A passthrough model never shares its plugin, so it is exempt.
-		if !modelScoped && !passthrough && m.Enabled != nil && !*m.Enabled {
-			continue
-		}
-		ownerKey := ""
-		if modelScoped || passthrough {
-			ownerKey = m.Name
-		}
-		// A passthrough model forwards every request under its base path, so its
-		// capabilities are irrelevant: it serves one route, PassthroughEndpoint,
-		// whatever it declares. The empty capability stands for that route.
-		if passthrough {
-			caps = []string{""}
-		}
-		ds, err := c.resolveModelDatastore(m)
-		if err != nil {
-			return err
-		}
-		if m.Config.Route.Name != "" {
-			if err := c.warn(
-				"model %q sets config.route.name to %q. "+
-					"This will be ignored, and each route name will be overridden "+
-					"to the generated {format}-{endpoint} name.",
-				m.Name, m.Config.Route.Name); err != nil {
-				return err
-			}
-		}
-
-		var routeNames []string
-		routeSeen := map[string]bool{}
-		// The plugin's llm_format comes from the first target, and passthrough forwards
-		// the body unchanged, so every target must speak the same client format.
-		passthroughFormat := ""
-
-		for j := range m.TargetModels {
-			tm := &m.TargetModels[j]
-			provider := c.providers[tm.Provider]
-			providerType := tm.Config.Type
-			if providerType == "" && provider != nil {
-				providerType = provider.Type
-			}
-			if providerType == "" {
-				if err := c.warn("model %q target %q has no resolvable provider type", m.Name, tm.Name); err != nil {
-					return err
-				}
-			}
-			if provider == nil {
-				if err := c.warn(
-					"model %q target %q references unknown provider %q; auth/options may be incomplete",
-					m.Name, tm.Name, tm.Provider); err != nil {
-					return err
-				}
-			}
-			// Databricks has no fixed host: the plugin builds it from
-			// workspace_instance_id only when it builds the request, which
-			// passthrough never does, so the upstream must be spelled out.
-			if passthrough && providerType == "databricks" && tm.Config.Options["upstream_url"] == nil {
-				return c.failAt(fmt.Sprintf("targets[%d].config.upstream_url", j),
-					"model %q target %q: the passthrough format requires upstream_url for databricks",
-					m.Name, tm.Name)
-			}
-			// The Mantle endpoint does not serve the Converse or InvokeModel APIs.
-			// The target is dropped instead of failing, so the model's other
-			// targets still convert.
-			if providerType == "bedrock" && tm.Config.Options["endpoint_type"] == "mantle" &&
-				llmFormat(m, providerType) == "bedrock" {
-				if err := c.warn(
-					"model %q target %q: the mantle endpoint type is not supported with the "+
-						"bedrock format; the target is omitted",
-					m.Name, tm.Name); err != nil {
-					return err
-				}
-				continue
-			}
-			if passthrough && providerType != "" && !aimap.HasNativeFormat(providerType) {
-				if err := c.warn(
-					"model %q target %q: provider type %q has no native llm_format, so the passthrough "+
-						"format may not extract usage or cost", m.Name, tm.Name, providerType); err != nil {
-					return err
-				}
-			}
-			if passthrough {
-				// Compare client formats, not sections, so gemini and vertex stay compatible.
-				format := aimap.ClientFormat(aimap.PassthroughFormat, providerType)
-				if passthroughFormat == "" {
-					passthroughFormat = format
-				} else if format != passthroughFormat {
-					return c.failAt(fmt.Sprintf("targets[%d].config.type", j),
-						"model %q target %q: the passthrough format forwards %s bodies unchanged, "+
-							"so every target must speak %s, not %s",
-						m.Name, tm.Name, passthroughFormat, passthroughFormat, format)
-				}
-			}
-			for _, capability := range caps {
-				var sec string
-				var specs []aimap.EndpointSpec
-				if passthrough {
-					sec = aimap.SectionFor(aimap.PassthroughFormat, providerType)
-					specs = []aimap.EndpointSpec{aimap.PassthroughEndpoint}
-				} else {
-					sec = aimap.SectionFor(llmFormat(m, providerType), providerType)
-					var ok bool
-					specs, ok = aimap.EndpointsFor(sec, capability)
-					if !ok {
-						return c.failAt("capabilities",
-							"model %q: capability %q is not supported with llm_format %q for provider type %q",
-							m.Name, capability, llmFormat(m, providerType), providerType)
-					}
-				}
-				// Passthrough-only capabilities have no cross-format converter, so a
-				// provider rendering another format can never serve them: Kong's schema
-				// rejects the pairing. An unresolvable provider type is left to the
-				// warning above rather than escalated here.
-				if aimap.RequiresNativeFormat(capability) && providerType != "" &&
-					aimap.PluginProvider(providerType) != llmFormat(m, providerType) {
-					return c.failAt("capabilities",
-						"model %q: capability %q is passthrough-only, so provider type %q cannot serve llm_format %q",
-						m.Name, capability, providerType, llmFormat(m, providerType))
-				}
-				// A capability with secondary endpoints (bedrock generate, also
-				// reachable via invoke) emits one route per endpoint, each
-				// carrying this target; revert's capsSeen folds the routes back
-				// into the one capability.
-				for _, spec := range specs {
-					websocket := aimap.IsWebSocketEndpoint(spec)
-					logging := modelLoggingBlock(withLoggingDefaults(m.Config.Logging, false, false), spec.SupportsLogStatistics)
-					// Authentication plugins execute before the model selector. Models
-					// with different auth-strategy sets therefore cannot share a
-					// route: a route-scoped auth plugin would otherwise protect every
-					// model on that route.
-					identityKey := authStrategyKey(m.Access.AuthStrategies)
-					routeConfigKey, err := modelRouteConfigKey(m.Config.Route)
-					if err != nil {
-						return err
-					}
-					var selectorCfgs []map[string]any
-					if !passthrough && !websocket {
-						selectorCfgs, err = c.buildModelSelectorConfig(m, spec)
-						if err != nil {
-							return err
-						}
-					}
-					// The alias *value* is per-model and deliberately excluded from
-					// routeConfigKey. The selector shape does not split routes either.
-					// Shapes of models on one route merge into config.sources.
-					// A passthrough model's route is its base path whatever its targets'
-					// providers, so the section stays out of its key: targets on
-					// different providers still share the one route.
-					keySection := sec
-					if passthrough {
-						keySection = ""
-					}
-					key := keySection + "|" +
-						spec.RouteLabel +
-						"|" + identityKey +
-						"|" + routeConfigKey
-					// Without a selector, a route cannot pick one model's plugin.
-					// Each model therefore gets its own WebSocket route.
-					if websocket {
-						key += "|" + m.Name
-					}
-					g := groups[key]
-					if g == nil {
-						paths := make([]string, len(bases))
-						for i, b := range bases {
-							paths[i] = aimap.RoutePath(b, spec)
-						}
-						routeName := uniqueModelRouteName(sec+"-"+spec.RouteLabel, usedRouteNames)
-						g = &routeGroup{
-							route: buildModelRoute(
-								m.Config.Route, routeName,
-								paths, spec.Methods, websocket),
-							websocket:    websocket,
-							proxyByOwner: map[string]*proxyGroup{},
-						}
-						if websocket {
-							websocketRoutes[routeName] = g.route.Protocols
-						}
-						g.route.Source = source("model", m.Name, "config.route")
-						groups[key] = g
-						order = append(order, key)
-					}
-
-					for _, selector := range selectorCfgs {
-						g.addSelector(selector)
-					}
-					if !routeSeen[g.route.Name] {
-						routeSeen[g.route.Name] = true
-						routeNames = append(routeNames, g.route.Name)
-						if !spec.SupportsLogStatistics && loggingStatisticsSet(m.Config.Logging) {
-							if err := c.warn(
-								"model %q sets config.logging.statistics to true. "+
-									"This will be ignored on the %q route, and log_statistics will be "+
-									"overridden to false because the endpoint does not support it.",
-								m.Name, g.route.Name); err != nil {
-								return err
-							}
-						}
-						if err := c.warnTransportOverrides(m, g.route); err != nil {
-							return err
-						}
-					}
-
-					pg := g.proxyByOwner[ownerKey]
-					if pg != nil && !modelScoped {
-						// type:"api" models on one route share a single route-scoped
-						// ai-proxy-advanced, so any datastore mismatch would either drop
-						// one model's datastore or make another silently inherit it.
-						if (ds == nil) != (pg.datastoreName == "") ||
-							(ds != nil && ds.Name != pg.datastoreName) {
-							current := "no datastore"
-							if ds != nil {
-								current = fmt.Sprintf("datastore %q", ds.Name)
-							}
-							existing := "no datastore"
-							if pg.datastoreName != "" {
-								existing = fmt.Sprintf("datastore %q", pg.datastoreName)
-							}
-							return c.failAt("models",
-								"model %q cannot share route %q with another api model: shared "+
-									"route-scoped ai-proxy-advanced would mix %s and %s",
-								m.Name, g.route.Name, existing, current)
-						}
-					}
-					if pg == nil {
-						embeddings, err := c.resolveEmbeddings(balancerExtra(m.Config.Balancer, "embeddings"))
-						if err != nil {
-							return err
-						}
-						vectordb, err := c.modelVectorDB(m, ds)
-						if err != nil {
-							return err
-						}
-						datastoreName := ""
-						if ds != nil {
-							datastoreName = ds.Name
-						}
-						// Each plugin's model FK must equal an ai_models.name — the string a
-						// client sends, which ai-model-selector matches on to activate this
-						// model-scoped plugin. Those identities are aliases (the authored
-						// aliases, or the model name when none is set), not m.Name; using
-						// m.Name would dangle the FK whenever an alias is authored.
-						var pluginAliases []string
-						realtimeModel := ""
-						switch {
-						case fkScoped && websocket:
-							realtimeModel = aliases[0]
-						case fkScoped:
-							pluginAliases = aliases
-						}
-
-						modelNameHeader := boolPtr(false)
-						if supportsModelNameHeader(spec) {
-							modelNameHeader = m.Config.Model.NameHeader
-						}
-
-						pg = &proxyGroup{
-							routeName:         g.route.Name,
-							aliases:           pluginAliases,
-							realtimeModel:     realtimeModel,
-							enabled:           disabledModelPluginEnabled(m.Enabled),
-							llmFormat:         llmFormat(m, providerType),
-							genaiCategory:     spec.GenaiCategory,
-							balancer:          balancerConfig(m.Config.Balancer),
-							vectordb:          vectordb,
-							datastoreName:     datastoreName,
-							embeddings:        embeddings,
-							responseStreaming: m.Config.ResponseStreaming,
-							modelNameHeader:   modelNameHeader,
-							maxBodySize:       m.Config.MaxRequestBodySize,
-							proxy:             proxyConfigBlock(m.Config.Proxy),
-							source: source("model", m.Name, "config",
-								kong.FieldMapping{GeneratedPrefix: "config.proxy_config", SourcePrefix: "config.proxy"},
-								kong.FieldMapping{GeneratedPrefix: "config.model_name_header", SourcePrefix: "config.model.name_header"},
-								kong.FieldMapping{GeneratedPrefix: "config.vectordb", SourcePrefix: "config.balancer.vectordb"},
-								kong.FieldMapping{GeneratedPrefix: "config.embeddings", SourcePrefix: "config.balancer.embeddings"},
-							),
-							seen: map[string]int{},
-						}
-						g.proxyByOwner[ownerKey] = pg
-						g.proxies = append(g.proxies, pg)
-					} else if pg.genaiCategory != spec.GenaiCategory {
-						// The data plane requires every target to match the plugin's category.
-						if err := c.warn(
-							"model %q: capability %q (genai_category %q) collapses onto route %q, which already "+
-								"serves genai_category %q; a single ai-proxy-advanced cannot serve multiple genai "+
-								"categories, skipping this capability",
-							m.Name, capability, spec.GenaiCategory, g.route.Name, pg.genaiCategory); err != nil {
-							return err
-						}
-						continue
-					}
-					// A target's model_alias decides which balancer pool it joins: the DP
-					// keys pools by model_alias and puts alias-less targets in the shared
-					// "<default>" pool, routing a request to an alias pool only when the
-					// request presents that alias (its body model, or the model segment of
-					// a native URL). type:model requests always carry the model, so their
-					// targets must be aliased or a request lands in an empty "<default>"
-					// pool (404 "no model matched this request"). type:api (files/batches)
-					// requests carry no model, so their targets must stay alias-less to
-					// remain in the "<default>" pool they fall back to (else the balancer
-					// has no pool for the request: 500 "failed to get balancer instance").
-					// The alias itself is baked in per plugin copy at emission time (see
-					// withModelAlias), since a type:model target list is cloned once per
-					// alias.
-					// A passthrough target carries no model_alias either (the plugin refuses
-					// it): fkScoped leaves pluginAliases empty, so emission never stamps one.
-					target := c.buildTarget(tm, provider, providerType, spec.RouteType, logging)
-					// Dedup on the built target's full shape rather than
-					// (name, route_type): two targets can share a model name yet
-					// be genuinely distinct via different providers (distinct
-					// auth/options) or weights. The same (tm, provider) reached
-					// through several capabilities that share a route_type still
-					// fingerprints identically, so those collapse as before —
-					// but every capability that produced the collapsed target is
-					// still recorded (e.g. bedrock's shared invoke endpoint for
-					// "generate" and "audio/speech"), rather than only the first.
-					dedup := targetFingerprint(target)
-					if idx, ok := pg.seen[dedup]; ok {
-						source := &pg.targetSources[idx]
-						if capability != "" && !slices.Contains(source.Capabilities, capability) {
-							source.Capabilities = append(source.Capabilities, capability)
-						}
-					} else {
-						var sourceCaps []string
-						if capability != "" {
-							sourceCaps = []string{capability}
-						}
-						pg.seen[dedup] = len(pg.targets)
-						pg.targets = append(pg.targets, target)
-						pg.targetSources = append(pg.targetSources, kong.TargetSource{
-							ModelName:        m.Name,
-							ModelTargetIndex: j,
-							Capabilities:     sourceCaps,
-						})
-					}
-				}
-			}
-		}
-
-		// ai-models entries (one per alias, so ai-model-selector can match a
-		// request against any of them). note: name is set to alias and alias is
-		// intentionally unset to be compatible with the AI Gateway 2.0.0
-		// dataplane behavior. By setting name to alias, the AI Gateway will route
-		// requests to the alias that is set in the Model's config.route.model.*
-		// properties. If config.route.model.* properties are not set then the
-		// single alias defaults to the model name. m.ID can only identify one of
-		// the N rows a multi-alias model produces, so it's kept on the first.
-		// A multi-alias model's N rows are otherwise indistinguishable on the
-		// wire from N independently-authored models that happen to be
-		// config-identical, so they carry a shared marker tag identifying their
-		// common source model; revert only merges rows carrying it. The marker
-		// is keyed by the first alias, not m.Name: m.Name never round-trips
-		// (revert has no field to recover it into and stands in the first
-		// alias for it), so keying by it would make the marker re-encode
-		// differently after a round trip. The first alias is exactly what
-		// revert reconstructs the merged model's name as, so this is stable.
-		for idx, alias := range aliases {
-			id := ""
-			if idx == 0 {
-				id = m.ID
-			}
-			tags := c.labelsToTags(m.Labels)
-			if len(aliases) > 1 {
-				tags = append(tags, aimap.EncodeModelAliasGroup(aliases[0]))
-			}
-			c.out.AIModels = append(c.out.AIModels, kong.AIModel{
-				ID:   id,
-				Name: alias,
-				Tags: tags,
-			})
-		}
-
-		// Model policy and ACL plugins scope to each route the model produces, plus
-		// the ai-model entity for type "model".
-		plugins, err := c.scopedPlugins(entityModel, m.Policies, m.Access.ACLs)
-		if err != nil {
-			return err
-		}
-		plugins = sourceScopedPlugins(plugins, "model", m.Name)
-		for _, routeName := range routeNames {
-			for k := range plugins {
-				p := plugins[k]
-				p.Route = kong.NewStringRef(routeName)
-				if protocols, ok := websocketRoutes[routeName]; ok {
-					if !aimap.SupportsWebSocket(p.Name) {
-						if err := c.warn(
-							"model %q uses plugin %q, which does not support the ws and wss protocols. "+
-								"This plugin will be ignored on the WebSocket route %q.",
-							m.Name, p.Name, routeName); err != nil {
-							return err
-						}
-						continue
-					}
-					p.Protocols = protocols
-					guardPlugins = append(guardPlugins, p)
-					continue
-				}
-				if !fkScoped {
-					guardPlugins = append(guardPlugins, p)
-					continue
-				}
-				// Same ai-model identities as the ai-proxy-advanced FKs: one copy
-				// of this policy/ACL plugin per alias, so a request is protected
-				// regardless of which alias it names.
-				for _, alias := range aliases {
-					pCopy := p
-					pCopy.Model = kong.NewStringRef(alias)
-					guardPlugins = append(guardPlugins, pCopy)
-				}
-			}
-		}
-
-		// Each route group contains only models with the same auth-strategy
-		// set, so these plugins can safely remain route-scoped.
-		idpPlugins, err := c.scopedAuthStrategyPlugins(fmt.Sprintf("model %q", m.Name), m.Access.AuthStrategies)
-		if err != nil {
-			return err
-		}
-		for _, routeName := range routeNames {
-			key := routeName + "\x00" + authStrategyKey(m.Access.AuthStrategies)
-			if identityPluginSeen[key] || len(idpPlugins) == 0 {
-				continue
-			}
-			identityPluginSeen[key] = true
-			protocols, websocket := websocketRoutes[routeName]
-			if websocket && len(idpPlugins) > 1 {
-				return c.failAt("access.auth_strategies",
-					"model %q: the WebSocket route %q supports only one auth strategy, because "+
-						"request-termination cannot reject the anonymous consumer on ws and wss routes",
-					m.Name, routeName)
-			}
-			if websocket {
-				// An auth plugin that can't run on ws/wss would otherwise leave the
-				// route unprotected (a plugin's protocols default to http/https, so
-				// it would simply never execute on a ws/wss-only route) or make the
-				// whole declarative config fail to load (an invalid protocols value
-				// on any one plugin rejects the entire file). Fail the conversion
-				// instead of choosing between those silently.
-				for _, p := range idpPlugins {
-					if !aimap.SupportsWebSocket(p.Name) {
-						return c.failAt("access.auth_strategies",
-							"model %q: auth strategy plugin %q does not support the ws and wss "+
-								"protocols, so it cannot protect the WebSocket route %q",
-							m.Name, p.Name, routeName)
-					}
-				}
-			}
-			if !websocket {
-				c.ensureAnonymousConsumer()
-			}
-			for k := range idpPlugins {
-				p := idpPlugins[k]
-				p.Route = kong.NewStringRef(routeName)
-				if websocket {
-					p = withoutAnonymousFallback(p)
-					p.Protocols = protocols
-				}
-				guardPlugins = append(guardPlugins, p)
-			}
+		if !c.convertModelOnce(st, i, func() error { return c.convertModel(st, m) }) {
+			return false
 		}
 	}
 
-	if len(order) == 0 {
-		c.out.Plugins = append(c.out.Plugins, guardPlugins...)
-		return nil
+	if len(st.order) == 0 {
+		c.out.Plugins = append(c.out.Plugins, st.guardPlugins...)
+		return true
 	}
 
 	service := kong.Service{Name: aimap.GatewayServiceName, URL: aimap.GatewayServiceURL}
 	websocketService := kong.Service{Name: aimap.GatewayWebSocketServiceName, URL: aimap.GatewayWebSocketServiceURL}
-	for _, key := range order {
-		g := groups[key]
+	for _, key := range st.order {
+		g := st.groups[key]
 		if g.websocket {
 			websocketService.Routes = append(websocketService.Routes, g.route)
 		} else {
@@ -769,89 +276,10 @@ func (c *Converter) convertModels() error {
 		}
 	}
 	for _, candidate := range lifecycleCandidates {
-		routeName := uniqueModelRouteName("openai-videos-lifecycle", usedRouteNames)
-		route := buildVideoLifecycleRoute(candidate.model.Config.Route, routeName, basePaths(candidate.model))
-		route.Source = source("model", candidate.model.Name, "config.route")
-		service.Routes = append(service.Routes, route)
-
-		logging := modelLoggingBlock(
-			withLoggingDefaults(candidate.model.Config.Logging, false, false),
-			candidate.spec.SupportsLogStatistics,
-		)
-		targets := make([]map[string]any, 0, len(candidate.targets))
-		targetSources := make([]kong.TargetSource, 0, len(candidate.targets))
-		for targetIndex, lifecycleTarget := range candidate.targets {
-			targets = append(targets, c.buildTarget(
-				lifecycleTarget.target,
-				lifecycleTarget.provider,
-				lifecycleTarget.providerType,
-				candidate.spec.RouteType,
-				logging,
-			))
-			targetSources = append(targetSources, kong.TargetSource{
-				ModelName:        candidate.model.Name,
-				ModelTargetIndex: targetIndex,
-				Capabilities:     []string{"video"},
-			})
-		}
-		lifecycleDS, err := c.resolveModelDatastore(candidate.model)
-		if err != nil {
-			return err
-		}
-		lifecycleVectorDB, err := c.modelVectorDB(candidate.model, lifecycleDS)
-		if err != nil {
-			return err
-		}
-		pg := &proxyGroup{
-			routeName:         routeName,
-			enabled:           disabledModelPluginEnabled(candidate.model.Enabled),
-			llmFormat:         llmFormat(candidate.model, ""),
-			genaiCategory:     candidate.spec.GenaiCategory,
-			balancer:          balancerConfig(candidate.model.Config.Balancer),
-			vectordb:          lifecycleVectorDB,
-			responseStreaming: candidate.model.Config.ResponseStreaming,
-			modelNameHeader:   boolPtr(false),
-			maxBodySize:       candidate.model.Config.MaxRequestBodySize,
-			proxy:             proxyConfigBlock(candidate.model.Config.Proxy),
-			targets:           targets,
-			targetSources:     targetSources,
-			source: source("model", candidate.model.Name, "config",
-				kong.FieldMapping{GeneratedPrefix: "config.proxy_config", SourcePrefix: "config.proxy"},
-				kong.FieldMapping{GeneratedPrefix: "config.model_name_header", SourcePrefix: "config.model.name_header"},
-				kong.FieldMapping{GeneratedPrefix: "config.vectordb", SourcePrefix: "config.balancer.vectordb"},
-				kong.FieldMapping{GeneratedPrefix: "config.embeddings", SourcePrefix: "config.balancer.embeddings"},
-			),
-		}
-		c.out.Plugins = append(c.out.Plugins, kong.Plugin{
-			Name:          "ai-proxy-advanced",
-			Enabled:       pg.enabled,
-			Route:         kong.NewStringRef(routeName),
-			Config:        pg.proxyConfig(),
-			TargetSources: pg.targetSources,
-			Source:        pg.source,
-		})
-
-		plugins, err := c.scopedPlugins(entityModel, candidate.model.Policies, candidate.model.Access.ACLs)
-		if err != nil {
-			return err
-		}
-		plugins = sourceScopedPlugins(plugins, "model", candidate.model.Name)
-		for i := range plugins {
-			plugins[i].Route = kong.NewStringRef(routeName)
-			c.out.Plugins = append(c.out.Plugins, plugins[i])
-		}
-		idpPlugins, err := c.scopedAuthStrategyPlugins(
-			fmt.Sprintf("model %q video lifecycle route", candidate.model.Name),
-			candidate.model.Access.AuthStrategies)
-		if err != nil {
-			return err
-		}
-		if len(idpPlugins) > 0 {
-			c.ensureAnonymousConsumer()
-		}
-		for i := range idpPlugins {
-			idpPlugins[i].Route = kong.NewStringRef(routeName)
-			c.out.Plugins = append(c.out.Plugins, idpPlugins[i])
+		if !c.convertModelOnce(st, candidate.index, func() error {
+			return c.convertVideoLifecycle(st, candidate, &service)
+		}) {
+			return false
 		}
 	}
 	for _, svc := range []kong.Service{service, websocketService} {
@@ -859,7 +287,605 @@ func (c *Converter) convertModels() error {
 			c.out.Services = append(c.out.Services, svc)
 		}
 	}
-	c.out.Plugins = append(c.out.Plugins, guardPlugins...)
+	c.out.Plugins = append(c.out.Plugins, st.guardPlugins...)
+	return true
+}
+
+// convertModelOnce runs fn for the model at index i. A skipped model only
+// replays its issues. When fn fails, it records the model as skipped and
+// returns false.
+func (c *Converter) convertModelOnce(st *modelPass, i int, fn func() error) bool {
+	if issues, ok := st.skipped[i]; ok {
+		c.issues = append(c.issues, issues...)
+		return true
+	}
+	start := len(c.issues)
+	if err := c.guard(issueSource(kindModel, c.src.Models[i].Name), fn); err != nil {
+		st.skipped[i] = slices.Clone(c.issues[start:])
+		return false
+	}
+	return true
+}
+
+// convertModel adds the routes, targets, and plugins of m to the pass.
+func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
+	src := issueSource(kindModel, m.Name)
+	bases := basePaths(m)
+	caps := c.expandCapabilities(m)
+
+	// extractModelAliases yields the name(s) a client uses to select this
+	// model: authored aliases, or the model name when none is authored. They
+	// seed both the ai-models entity identities and each type:model target's
+	// model_alias; type:api targets stay alias-less — see the gate at the
+	// buildTarget call below. Each alias gets its own ai-models entry and its
+	// own ai-proxy-advanced plugin (see the emission loop), since
+	// ai-model-selector can only match a request to one ai-models row at a
+	// time.
+	aliases := c.extractModelAliases(src, m)
+
+	// ownerKey groups targets into ai-proxy-advanced plugins: per source model
+	// for type "model" (each carries its own ai-model FK), shared for type
+	// "api" (route-only, all targets merged into one plugin).
+	modelScoped := isModelType(m)
+	// A passthrough model has no ai-model identity on the data plane. Its route carries
+	// no ai-model-selector, so nothing sets ctx.ai_model and a model-scoped plugin would never
+	// be selected. Every plugin such a model produces is route-scoped instead, exactly as
+	// a type "api" model's is. The ai_models row stays: it is the model's identity, and
+	// revert recovers the ID and labels from it.
+	passthrough := isPassthrough(m)
+	fkScoped := modelScoped && !passthrough
+	if passthrough {
+		// Passthrough is a property of the whole model's traffic, not one wire
+		// format among several a route could accept.
+		if len(m.Formats) > 1 {
+			return c.fail(src.at("formats"), ConfigFieldInvalid,
+				"model %q: the passthrough format cannot be combined with other formats", m.Name)
+		}
+		c.warnPassthroughPolicies(src, m)
+		// ai-proxy-advanced refuses the semantic algorithm alongside a passthrough
+		// target: choosing semantically means reading a request body whose shape
+		// passthrough does not define.
+		if balancerAlgorithm(m.Config.Balancer) == "semantic" {
+			return c.fail(src.at("formats", "config.balancer.algorithm"), ConfigFieldInvalid,
+				"model %q: the passthrough format cannot use the semantic balancer algorithm",
+				m.Name)
+		}
+		// Kong allows one plugin of a name per route, and without a selector nothing
+		// tells two ai-proxy-advanced plugins on one route apart. Two passthrough
+		// models whose routes match the same requests are just as ambiguous even when
+		// they land in different route groups (different auth strategies, route
+		// names, ...), so the check keys on the request matchers, not the group key.
+		for _, b := range bases {
+			key, err := passthroughMatcherKey(b, m.Config.Route)
+			if err != nil {
+				return err
+			}
+			if other, ok := st.passthroughMatchers[key]; ok && other != m.Name {
+				return c.fail(src.at("config.route.paths"), ConfigFieldInvalid,
+					"model %q: a passthrough model cannot share route path %q with passthrough model %q",
+					m.Name, b, other)
+			}
+			st.passthroughMatchers[key] = m.Name
+		}
+	}
+	// API models share route-only ai-proxy-advanced plugins, so disabling one
+	// plugin could disable other models on the same route. Exclude explicitly
+	// disabled API models until they can be represented with independent scopes.
+	// A passthrough model never shares its plugin, so it is exempt.
+	if !modelScoped && !passthrough && m.Enabled != nil && !*m.Enabled {
+		return nil
+	}
+	ownerKey := ""
+	if modelScoped || passthrough {
+		ownerKey = m.Name
+	}
+	// A passthrough model forwards every request under its base path, so its
+	// capabilities are irrelevant: it serves one route, PassthroughEndpoint,
+	// whatever it declares. The empty capability stands for that route.
+	if passthrough {
+		caps = []string{""}
+	}
+	ds, err := c.resolveModelDatastore(src, m)
+	if err != nil {
+		return err
+	}
+	if m.Config.Route.Name != "" {
+		c.warn(src.at("config.route.name"), ConfigFieldOverridden,
+			"model %q sets config.route.name to %q. "+
+				"This will be ignored, and each route name will be overridden "+
+				"to the generated {format}-{endpoint} name.",
+			m.Name, m.Config.Route.Name)
+	}
+
+	var routeNames []string
+	routeSeen := map[string]bool{}
+	// The plugin's llm_format comes from the first target, and passthrough forwards
+	// the body unchanged, so every target must speak the same client format.
+	passthroughFormat := ""
+
+	convertedTargets := 0
+	for j := range m.TargetModels {
+		tm := &m.TargetModels[j]
+		provider, providerType, problem := c.checkTarget(m, j)
+		if problem != nil {
+			c.warn(src.at(problem.field), problem.code, "%s", problem.reason)
+			continue
+		}
+		convertedTargets++
+		if passthrough && !aimap.HasNativeFormat(providerType) {
+			c.warn(src.at(fmt.Sprintf("targets[%d].config.type", j)), BehaviorMayDiffer,
+				"model %q target %q: provider type %q has no native llm_format, so the passthrough "+
+					"format may not extract usage or cost", m.Name, tm.Name, providerType)
+		}
+		if passthrough {
+			// Compare client formats, not sections, so gemini and vertex stay compatible.
+			format := aimap.ClientFormat(aimap.PassthroughFormat, providerType)
+			if passthroughFormat == "" {
+				passthroughFormat = format
+			} else if format != passthroughFormat {
+				return c.fail(src.at(fmt.Sprintf("targets[%d].config.type", j)), ConfigFieldInvalid,
+					"model %q target %q: the passthrough format forwards %s bodies unchanged, "+
+						"so every target must speak %s, not %s",
+					m.Name, tm.Name, passthroughFormat, passthroughFormat, format)
+			}
+		}
+		for _, capability := range caps {
+			var sec string
+			var specs []aimap.EndpointSpec
+			if passthrough {
+				sec = aimap.SectionFor(aimap.PassthroughFormat, providerType)
+				specs = []aimap.EndpointSpec{aimap.PassthroughEndpoint}
+			} else {
+				sec = aimap.SectionFor(llmFormat(m, providerType), providerType)
+				var ok bool
+				specs, ok = aimap.EndpointsFor(sec, capability)
+				if !ok {
+					return c.fail(src.at(capabilityField(m, capability)), ConfigFieldInvalid,
+						"model %q: capability %q is not supported with llm_format %q for provider type %q",
+						m.Name, capability, llmFormat(m, providerType), providerType)
+				}
+			}
+			// Passthrough-only capabilities have no cross-format converter, so a
+			// provider rendering another format can never serve them: Kong's schema
+			// rejects the pairing.
+			if aimap.RequiresNativeFormat(capability) &&
+				aimap.PluginProvider(providerType) != llmFormat(m, providerType) {
+				return c.fail(src.at(capabilityField(m, capability)), ConfigFieldInvalid,
+					"model %q: capability %q is passthrough-only, so provider type %q cannot serve llm_format %q",
+					m.Name, capability, providerType, llmFormat(m, providerType))
+			}
+			// A capability with secondary endpoints (bedrock generate, also
+			// reachable via invoke) emits one route per endpoint, each
+			// carrying this target; revert's capsSeen folds the routes back
+			// into the one capability.
+			for _, spec := range specs {
+				websocket := aimap.IsWebSocketEndpoint(spec)
+				// A global plugin keeps Kong's http/https default protocols. A
+				// global authentication policy therefore cannot protect a ws or
+				// wss route, so the model fails closed.
+				if global := c.globalAuthPolicy(); websocket && global != nil {
+					return c.fail(src.at(capabilityField(m, capability)), ConfigFieldInvalid,
+						"model %q: capability %q needs a WebSocket route, but global policy %q of type %q "+
+							"keeps Kong's http/https default protocols and cannot authenticate it",
+						m.Name, capability, global.Name, global.Type)
+				}
+				logging := modelLoggingBlock(withLoggingDefaults(m.Config.Logging, false, false), spec.SupportsLogStatistics)
+				// Authentication plugins execute before the model selector. Models
+				// with different auth-strategy sets therefore cannot share a
+				// route: a route-scoped auth plugin would otherwise protect every
+				// model on that route.
+				identityKey := authStrategyKey(m.Access.AuthStrategies)
+				routeConfigKey, err := modelRouteConfigKey(m.Config.Route)
+				if err != nil {
+					return err
+				}
+				var selectorCfgs []map[string]any
+				if !passthrough && !websocket {
+					selectorCfgs = c.buildModelSelectorConfig(src, m, spec)
+				}
+				// The alias *value* is per-model and deliberately excluded from
+				// routeConfigKey. The selector shape does not split routes either.
+				// Shapes of models on one route merge into config.sources.
+				// A passthrough model's route is its base path whatever its targets'
+				// providers, so the section stays out of its key: targets on
+				// different providers still share the one route.
+				keySection := sec
+				if passthrough {
+					keySection = ""
+				}
+				key := keySection + "|" +
+					spec.RouteLabel +
+					"|" + identityKey +
+					"|" + routeConfigKey
+				// Without a selector, a route cannot pick one model's plugin.
+				// Each model therefore gets its own WebSocket route.
+				if websocket {
+					key += "|" + m.Name
+				}
+				g := st.groups[key]
+				if g == nil {
+					paths := make([]string, len(bases))
+					for i, b := range bases {
+						paths[i] = aimap.RoutePath(b, spec)
+					}
+					routeName := uniqueModelRouteName(sec+"-"+spec.RouteLabel, st.usedRouteNames)
+					g = &routeGroup{
+						route: buildModelRoute(
+							m.Config.Route, routeName,
+							paths, spec.Methods, websocket),
+						websocket:    websocket,
+						proxyByOwner: map[string]*proxyGroup{},
+					}
+					if websocket {
+						st.websocketRoutes[routeName] = g.route.Protocols
+					}
+					g.route.Source = source("model", m.Name, "config.route")
+					st.groups[key] = g
+					st.order = append(st.order, key)
+				}
+
+				for _, selector := range selectorCfgs {
+					g.addSelector(selector)
+				}
+				if !routeSeen[g.route.Name] {
+					routeSeen[g.route.Name] = true
+					routeNames = append(routeNames, g.route.Name)
+					if !spec.SupportsLogStatistics && loggingStatisticsSet(m.Config.Logging) {
+						c.warn(src.at("config.logging.statistics"), ConfigFieldOverridden,
+							"model %q sets config.logging.statistics to true. "+
+								"This will be ignored on the %q route, and log_statistics will be "+
+								"overridden to false because the endpoint does not support it.",
+							m.Name, g.route.Name)
+					}
+					c.warnTransportOverrides(src, m, g.route)
+				}
+
+				pg := g.proxyByOwner[ownerKey]
+				if pg != nil && !modelScoped {
+					// type:"api" models on one route share a single route-scoped
+					// ai-proxy-advanced, so any datastore mismatch would either drop
+					// one model's datastore or make another silently inherit it.
+					if (ds == nil) != (pg.datastoreName == "") ||
+						(ds != nil && ds.Name != pg.datastoreName) {
+						current := "no datastore"
+						if ds != nil {
+							current = fmt.Sprintf("datastore %q", ds.Name)
+						}
+						existing := "no datastore"
+						if pg.datastoreName != "" {
+							existing = fmt.Sprintf("datastore %q", pg.datastoreName)
+						}
+						return c.fail(src.at("datastores"), ConfigFieldInvalid,
+							"model %q cannot share route %q with another api model: shared "+
+								"route-scoped ai-proxy-advanced would mix %s and %s",
+							m.Name, g.route.Name, existing, current)
+					}
+				}
+				if pg == nil {
+					embeddings := c.resolveEmbeddings(src, balancerExtra(m.Config.Balancer, "embeddings"))
+					vectordb, err := c.modelVectorDB(src, m, ds)
+					if err != nil {
+						return err
+					}
+					datastoreName := ""
+					if ds != nil {
+						datastoreName = ds.Name
+					}
+					// Each plugin's model FK must equal an ai_models.name — the string a
+					// client sends, which ai-model-selector matches on to activate this
+					// model-scoped plugin. Those identities are aliases (the authored
+					// aliases, or the model name when none is set), not m.Name; using
+					// m.Name would dangle the FK whenever an alias is authored.
+					var pluginAliases []string
+					realtimeModel := ""
+					switch {
+					case fkScoped && websocket:
+						realtimeModel = aliases[0]
+					case fkScoped:
+						pluginAliases = aliases
+					}
+
+					modelNameHeader := boolPtr(false)
+					if supportsModelNameHeader(spec) {
+						modelNameHeader = m.Config.Model.NameHeader
+					}
+
+					pg = &proxyGroup{
+						routeName:         g.route.Name,
+						aliases:           pluginAliases,
+						realtimeModel:     realtimeModel,
+						enabled:           disabledModelPluginEnabled(m.Enabled),
+						llmFormat:         llmFormat(m, providerType),
+						genaiCategory:     spec.GenaiCategory,
+						balancer:          balancerConfig(m.Config.Balancer),
+						vectordb:          vectordb,
+						datastoreName:     datastoreName,
+						embeddings:        embeddings,
+						responseStreaming: m.Config.ResponseStreaming,
+						modelNameHeader:   modelNameHeader,
+						maxBodySize:       m.Config.MaxRequestBodySize,
+						proxy:             proxyConfigBlock(m.Config.Proxy),
+						source: source("model", m.Name, "config",
+							kong.FieldMapping{GeneratedPrefix: "config.proxy_config", SourcePrefix: "config.proxy"},
+							kong.FieldMapping{GeneratedPrefix: "config.model_name_header", SourcePrefix: "config.model.name_header"},
+							kong.FieldMapping{GeneratedPrefix: "config.vectordb", SourcePrefix: "config.balancer.vectordb"},
+							kong.FieldMapping{GeneratedPrefix: "config.embeddings", SourcePrefix: "config.balancer.embeddings"},
+						),
+						seen: map[string]int{},
+					}
+					g.proxyByOwner[ownerKey] = pg
+					g.proxies = append(g.proxies, pg)
+				} else if pg.genaiCategory != spec.GenaiCategory {
+					// The data plane requires every target to match the plugin's category.
+					c.warn(src.at(capabilityField(m, capability)), ConfigFieldDropped,
+						"model %q: capability %q (genai_category %q) collapses onto route %q, which already "+
+							"serves genai_category %q; a single ai-proxy-advanced cannot serve multiple genai "+
+							"categories, skipping this capability",
+						m.Name, capability, spec.GenaiCategory, g.route.Name, pg.genaiCategory)
+					continue
+				}
+				// A target's model_alias decides which balancer pool it joins: the DP
+				// keys pools by model_alias and puts alias-less targets in the shared
+				// "<default>" pool, routing a request to an alias pool only when the
+				// request presents that alias (its body model, or the model segment of
+				// a native URL). type:model requests always carry the model, so their
+				// targets must be aliased or a request lands in an empty "<default>"
+				// pool (404 "no model matched this request"). type:api (files/batches)
+				// requests carry no model, so their targets must stay alias-less to
+				// remain in the "<default>" pool they fall back to (else the balancer
+				// has no pool for the request: 500 "failed to get balancer instance").
+				// The alias itself is baked in per plugin copy at emission time (see
+				// withModelAlias), since a type:model target list is cloned once per
+				// alias.
+				// A passthrough target carries no model_alias either (the plugin refuses
+				// it): fkScoped leaves pluginAliases empty, so emission never stamps one.
+				target := c.buildTarget(tm, provider, providerType, spec.RouteType, logging)
+				// Dedup on the built target's full shape rather than
+				// (name, route_type): two targets can share a model name yet
+				// be genuinely distinct via different providers (distinct
+				// auth/options) or weights. The same (tm, provider) reached
+				// through several capabilities that share a route_type still
+				// fingerprints identically, so those collapse as before —
+				// but every capability that produced the collapsed target is
+				// still recorded (e.g. bedrock's shared invoke endpoint for
+				// "generate" and "audio/speech"), rather than only the first.
+				dedup := targetFingerprint(target)
+				if idx, ok := pg.seen[dedup]; ok {
+					source := &pg.targetSources[idx]
+					if capability != "" && !slices.Contains(source.Capabilities, capability) {
+						source.Capabilities = append(source.Capabilities, capability)
+					}
+				} else {
+					var sourceCaps []string
+					if capability != "" {
+						sourceCaps = []string{capability}
+					}
+					pg.seen[dedup] = len(pg.targets)
+					pg.targets = append(pg.targets, target)
+					pg.targetSources = append(pg.targetSources, kong.TargetSource{
+						ModelName:        m.Name,
+						ModelTargetIndex: j,
+						Capabilities:     sourceCaps,
+					})
+				}
+			}
+		}
+	}
+
+	// ai-models entries (one per alias, so ai-model-selector can match a
+	// request against any of them). note: name is set to alias and alias is
+	// intentionally unset to be compatible with the AI Gateway 2.0.0
+	// dataplane behavior. By setting name to alias, the AI Gateway will route
+	// requests to the alias that is set in the Model's config.route.model.*
+	// properties. If config.route.model.* properties are not set then the
+	// single alias defaults to the model name. m.ID can only identify one of
+	// the N rows a multi-alias model produces, so it's kept on the first.
+	// A multi-alias model's N rows are otherwise indistinguishable on the
+	// wire from N independently-authored models that happen to be
+	// config-identical, so they carry a shared marker tag identifying their
+	// common source model; revert only merges rows carrying it. The marker
+	// is keyed by the first alias, not m.Name: m.Name never round-trips
+	// (revert has no field to recover it into and stands in the first
+	// alias for it), so keying by it would make the marker re-encode
+	// differently after a round trip. The first alias is exactly what
+	// revert reconstructs the merged model's name as, so this is stable.
+	for idx, alias := range aliases {
+		id := ""
+		if idx == 0 {
+			id = m.ID
+		}
+		tags := c.labelsToTags(m.Labels)
+		if len(aliases) > 1 {
+			tags = append(tags, aimap.EncodeModelAliasGroup(aliases[0]))
+		}
+		c.out.AIModels = append(c.out.AIModels, kong.AIModel{
+			ID:   id,
+			Name: alias,
+			Tags: tags,
+		})
+	}
+
+	// Model policy and ACL plugins scope to each route the model produces, plus
+	// the ai-model entity for type "model".
+	if len(m.TargetModels) > 0 && convertedTargets == 0 {
+		return c.fail(src.at("targets"), MissingRequiredConfigField,
+			"model %q has no target that the converter can convert", m.Name)
+	}
+
+	plugins, err := c.scopedPlugins(src, m.Policies, m.Access.ACLs)
+	if err != nil {
+		return err
+	}
+	plugins = sourceScopedPlugins(plugins, "model", m.Name)
+	for _, routeName := range routeNames {
+		for k := range plugins {
+			p := plugins[k]
+			p.Route = kong.NewStringRef(routeName)
+			if protocols, ok := st.websocketRoutes[routeName]; ok {
+				if !aimap.SupportsWebSocket(p.Name) {
+					c.warn(src.at(scopedPluginField(m.Policies, p)), ConfigFieldDropped,
+						"model %q uses plugin %q, which does not support the ws and wss protocols. "+
+							"This plugin will be ignored on the WebSocket route %q.",
+						m.Name, p.Name, routeName)
+					continue
+				}
+				p.Protocols = protocols
+				st.guardPlugins = append(st.guardPlugins, p)
+				continue
+			}
+			if !fkScoped {
+				st.guardPlugins = append(st.guardPlugins, p)
+				continue
+			}
+			// Same ai-model identities as the ai-proxy-advanced FKs: one copy
+			// of this policy/ACL plugin per alias, so a request is protected
+			// regardless of which alias it names.
+			for _, alias := range aliases {
+				pCopy := p
+				pCopy.Model = kong.NewStringRef(alias)
+				st.guardPlugins = append(st.guardPlugins, pCopy)
+			}
+		}
+	}
+
+	// Each route group contains only models with the same auth-strategy
+	// set, so these plugins can safely remain route-scoped.
+	idpPlugins, err := c.scopedAuthStrategyPlugins(src, m.Access.AuthStrategies)
+	if err != nil {
+		return err
+	}
+	for _, routeName := range routeNames {
+		key := routeName + "\x00" + authStrategyKey(m.Access.AuthStrategies)
+		if st.identityPluginSeen[key] || len(idpPlugins) == 0 {
+			continue
+		}
+		st.identityPluginSeen[key] = true
+		protocols, websocket := st.websocketRoutes[routeName]
+		if websocket && len(idpPlugins) > 1 {
+			return c.fail(src.at("access.auth_strategies"), ConfigFieldInvalid,
+				"model %q: the WebSocket route %q supports only one auth strategy, because "+
+					"request-termination cannot reject the anonymous consumer on ws and wss routes",
+				m.Name, routeName)
+		}
+		if websocket {
+			// An auth plugin that can't run on ws/wss would otherwise leave the
+			// route unprotected (a plugin's protocols default to http/https, so
+			// it would simply never execute on a ws/wss-only route) or make the
+			// whole declarative config fail to load (an invalid protocols value
+			// on any one plugin rejects the entire file). Fail the model
+			// instead of choosing between those silently.
+			for _, p := range idpPlugins {
+				if !aimap.SupportsWebSocket(p.Name) {
+					return c.fail(src.at(authStrategyField(m.Access.AuthStrategies, p)), ConfigFieldInvalid,
+						"model %q: auth strategy plugin %q does not support the ws and wss "+
+							"protocols, so it cannot protect the WebSocket route %q",
+						m.Name, p.Name, routeName)
+				}
+			}
+		}
+		if !websocket {
+			c.ensureAnonymousConsumer()
+		}
+		for k := range idpPlugins {
+			p := idpPlugins[k]
+			p.Route = kong.NewStringRef(routeName)
+			if websocket {
+				p = withoutAnonymousFallback(p)
+				p.Protocols = protocols
+			}
+			st.guardPlugins = append(st.guardPlugins, p)
+		}
+	}
+	return nil
+}
+
+// convertVideoLifecycle adds the video lifecycle route of candidate to service.
+func (c *Converter) convertVideoLifecycle(
+	st *modelPass, candidate videoLifecycleCandidate, service *kong.Service,
+) error {
+	src := issueSource(kindModel, candidate.model.Name)
+	routeName := uniqueModelRouteName("openai-videos-lifecycle", st.usedRouteNames)
+	route := buildVideoLifecycleRoute(candidate.model.Config.Route, routeName, basePaths(candidate.model))
+	route.Source = source("model", candidate.model.Name, "config.route")
+	service.Routes = append(service.Routes, route)
+
+	logging := modelLoggingBlock(
+		withLoggingDefaults(candidate.model.Config.Logging, false, false),
+		candidate.spec.SupportsLogStatistics,
+	)
+	targets := make([]map[string]any, 0, len(candidate.targets))
+	targetSources := make([]kong.TargetSource, 0, len(candidate.targets))
+	for targetIndex, lifecycleTarget := range candidate.targets {
+		targets = append(targets, c.buildTarget(
+			lifecycleTarget.target,
+			lifecycleTarget.provider,
+			lifecycleTarget.providerType,
+			candidate.spec.RouteType,
+			logging,
+		))
+		targetSources = append(targetSources, kong.TargetSource{
+			ModelName:        candidate.model.Name,
+			ModelTargetIndex: targetIndex,
+			Capabilities:     []string{"video"},
+		})
+	}
+	lifecycleDS, err := c.resolveModelDatastore(src, candidate.model)
+	if err != nil {
+		return err
+	}
+	lifecycleVectorDB, err := c.modelVectorDB(src, candidate.model, lifecycleDS)
+	if err != nil {
+		return err
+	}
+	pg := &proxyGroup{
+		routeName:         routeName,
+		enabled:           disabledModelPluginEnabled(candidate.model.Enabled),
+		llmFormat:         llmFormat(candidate.model, ""),
+		genaiCategory:     candidate.spec.GenaiCategory,
+		balancer:          balancerConfig(candidate.model.Config.Balancer),
+		vectordb:          lifecycleVectorDB,
+		responseStreaming: candidate.model.Config.ResponseStreaming,
+		modelNameHeader:   boolPtr(false),
+		maxBodySize:       candidate.model.Config.MaxRequestBodySize,
+		proxy:             proxyConfigBlock(candidate.model.Config.Proxy),
+		targets:           targets,
+		targetSources:     targetSources,
+		source: source("model", candidate.model.Name, "config",
+			kong.FieldMapping{GeneratedPrefix: "config.proxy_config", SourcePrefix: "config.proxy"},
+			kong.FieldMapping{GeneratedPrefix: "config.model_name_header", SourcePrefix: "config.model.name_header"},
+			kong.FieldMapping{GeneratedPrefix: "config.vectordb", SourcePrefix: "config.balancer.vectordb"},
+			kong.FieldMapping{GeneratedPrefix: "config.embeddings", SourcePrefix: "config.balancer.embeddings"},
+		),
+	}
+	c.out.Plugins = append(c.out.Plugins, kong.Plugin{
+		Name:          "ai-proxy-advanced",
+		Enabled:       pg.enabled,
+		Route:         kong.NewStringRef(routeName),
+		Config:        pg.proxyConfig(),
+		TargetSources: pg.targetSources,
+		Source:        pg.source,
+	})
+
+	plugins, err := c.scopedPlugins(src, candidate.model.Policies, candidate.model.Access.ACLs)
+	if err != nil {
+		return err
+	}
+	plugins = sourceScopedPlugins(plugins, "model", candidate.model.Name)
+	for i := range plugins {
+		plugins[i].Route = kong.NewStringRef(routeName)
+		c.out.Plugins = append(c.out.Plugins, plugins[i])
+	}
+	idpPlugins, err := c.scopedAuthStrategyPlugins(src, candidate.model.Access.AuthStrategies)
+	if err != nil {
+		return err
+	}
+	if len(idpPlugins) > 0 {
+		c.ensureAnonymousConsumer()
+	}
+	for i := range idpPlugins {
+		idpPlugins[i].Route = kong.NewStringRef(routeName)
+		c.out.Plugins = append(c.out.Plugins, idpPlugins[i])
+	}
 	return nil
 }
 
@@ -884,23 +910,26 @@ func authStrategyKey(refs []string) string {
 // route remains usable, but video_id alone cannot identify the credentials that
 // created the job. Shared model routes are also retained, with a warning, so
 // users with distinct route matchers still receive every lifecycle route.
-func (c *Converter) videoLifecycleCandidates() ([]videoLifecycleCandidate, error) {
+// Models in skipped and targets that checkTarget rejects are left out.
+func (c *Converter) videoLifecycleCandidates(skipped map[int][]ConversionIssue) []videoLifecycleCandidate {
 	var candidates []videoLifecycleCandidate
-	sharedRoutes := map[string][]string{}
+	sharedRoutes := map[string][]int{}
+	var sharedOrder []string
 
 	for i := range c.src.Models {
 		m := &c.src.Models[i]
+		if _, ok := skipped[i]; ok {
+			continue
+		}
 		// A passthrough model's base-path route already forwards the lifecycle
 		// requests; it declares no video endpoint of its own.
 		if isPassthrough(m) || !slices.Contains(c.expandCapabilities(m), "video") {
 			continue
 		}
+		src := issueSource(kindModel, m.Name)
 		if len(m.TargetModels) == 0 {
-			warning := "model %q: video lifecycle routes require at least one target; " +
-				"skipping them"
-			if err := c.warn(warning, m.Name); err != nil {
-				return nil, err
-			}
+			c.warn(src.at("targets"), BehaviorMayDiffer,
+				"model %q: video lifecycle routes require at least one target; skipping them", m.Name)
 			continue
 		}
 
@@ -912,24 +941,24 @@ func (c *Converter) videoLifecycleCandidates() ([]videoLifecycleCandidate, error
 		if !ok {
 			continue
 		}
-		if len(m.TargetModels) > 1 {
-			warning := "model %q: video lifecycle route has multiple targets; " +
-				"requests without a model alias may reach a different target than creation"
-			if err := c.warn(warning, m.Name); err != nil {
-				return nil, err
-			}
-		}
 		lifecycleTargets := make([]videoLifecycleTarget, 0, len(m.TargetModels))
 		for j := range m.TargetModels {
-			tm := &m.TargetModels[j]
-			provider := c.providers[tm.Provider]
-			providerType := tm.Config.Type
-			if providerType == "" && provider != nil {
-				providerType = provider.Type
+			provider, providerType, problem := c.checkTarget(m, j)
+			if problem != nil {
+				continue
 			}
 			lifecycleTargets = append(lifecycleTargets, videoLifecycleTarget{
-				target: tm, provider: provider, providerType: providerType,
+				target: &m.TargetModels[j], provider: provider, providerType: providerType,
 			})
+		}
+		// convertModel fails the model when no target is left.
+		if len(lifecycleTargets) == 0 {
+			continue
+		}
+		if len(lifecycleTargets) > 1 {
+			c.warn(src.at("targets"), BehaviorMayDiffer,
+				"model %q: video lifecycle route has multiple targets; "+
+					"requests without a model alias may reach a different target than creation", m.Name)
 		}
 
 		routeConfig := m.Config.Route
@@ -937,25 +966,129 @@ func (c *Converter) videoLifecycleCandidates() ([]videoLifecycleCandidate, error
 		routeConfig.Methods = nil
 		key, err := modelRouteConfigKey(routeConfig)
 		if err != nil {
-			return nil, err
+			key = m.Name
 		}
 		key = section + "|" + key
-		sharedRoutes[key] = append(sharedRoutes[key], m.Name)
+		if _, ok := sharedRoutes[key]; !ok {
+			sharedOrder = append(sharedOrder, key)
+		}
+		sharedRoutes[key] = append(sharedRoutes[key], i)
 		candidates = append(candidates, videoLifecycleCandidate{
-			model: m, targets: lifecycleTargets, spec: spec,
+			index: i, model: m, targets: lifecycleTargets, spec: spec,
 		})
 	}
 
-	for _, models := range sharedRoutes {
-		if len(models) > 1 {
-			warning := "video lifecycle routes for models %s: route is shared by multiple " +
-				"video models; emitting overlapping lifecycle routes"
-			if err := c.warn(warning, strings.Join(models, ", ")); err != nil {
-				return nil, err
-			}
+	for _, key := range sharedOrder {
+		indexes := sharedRoutes[key]
+		if len(indexes) < 2 { //nolint:mnd
+			continue
+		}
+		names := make([]string, len(indexes))
+		for k, i := range indexes {
+			names[k] = c.src.Models[i].Name
+		}
+		for _, i := range indexes {
+			c.warn(issueSource(kindModel, c.src.Models[i].Name).at("config.route"), BehaviorMayDiffer,
+				"video lifecycle routes for models %s: route is shared by multiple "+
+					"video models; emitting overlapping lifecycle routes", strings.Join(names, ", "))
 		}
 	}
-	return candidates, nil
+	return candidates
+}
+
+// targetProblem tells why checkTarget leaves out a target.
+type targetProblem struct {
+	field  string
+	code   ConversionIssueCode
+	reason string
+}
+
+// checkTarget resolves the provider of target j of m. It returns a problem when
+// the converter must leave out the target.
+func (c *Converter) checkTarget(m *aigw.Model, j int) (*aigw.Provider, string, *targetProblem) {
+	tm := &m.TargetModels[j]
+	provider := c.providers[tm.Provider]
+	if tm.Provider == "" {
+		return nil, "", &targetProblem{
+			field:  fmt.Sprintf("targets[%d].provider", j),
+			code:   MissingRequiredConfigField,
+			reason: fmt.Sprintf("model %q target %q has no provider; the target is omitted", m.Name, tm.Name),
+		}
+	}
+	if provider == nil {
+		return nil, "", &targetProblem{
+			field: fmt.Sprintf("targets[%d].provider", j),
+			code:  UndefinedReference,
+			reason: fmt.Sprintf("model %q target %q references unknown provider %q; the target is omitted",
+				m.Name, tm.Name, tm.Provider),
+		}
+	}
+	providerType := tm.Config.Type
+	if providerType == "" {
+		providerType = provider.Type
+	}
+	if providerType == "" {
+		return nil, "", &targetProblem{
+			field:  fmt.Sprintf("targets[%d].config.type", j),
+			code:   MissingRequiredConfigField,
+			reason: fmt.Sprintf("model %q target %q has no resolvable provider type; the target is omitted", m.Name, tm.Name),
+		}
+	}
+	// Databricks has no fixed host: the plugin builds it from
+	// workspace_instance_id only when it builds the request, which
+	// passthrough never does, so the upstream must be spelled out.
+	if isPassthrough(m) && providerType == "databricks" && tm.Config.Options["upstream_url"] == nil {
+		return nil, "", &targetProblem{
+			field: fmt.Sprintf("targets[%d].config.upstream_url", j),
+			code:  MissingRequiredConfigField,
+			reason: fmt.Sprintf("model %q target %q: the passthrough format requires upstream_url for "+
+				"databricks; the target is omitted", m.Name, tm.Name),
+		}
+	}
+	// The Mantle endpoint does not serve the Converse or InvokeModel APIs.
+	if providerType == "bedrock" && tm.Config.Options["endpoint_type"] == "mantle" &&
+		llmFormat(m, providerType) == "bedrock" {
+		return nil, "", &targetProblem{
+			field: fmt.Sprintf("targets[%d].config.endpoint_type", j),
+			code:  ConfigFieldInvalid,
+			reason: fmt.Sprintf("model %q target %q: the mantle endpoint type is not supported with the "+
+				"bedrock format; the target is omitted", m.Name, tm.Name),
+		}
+	}
+	return provider, providerType, nil
+}
+
+// capabilityField returns the path of the entry of m.Capabilities that
+// expands to capability.
+func capabilityField(m *aigw.Model, capability string) string {
+	for i, raw := range m.Capabilities {
+		if slices.Contains(aimap.NormalizeCapability(raw), capability) {
+			return fmt.Sprintf("capabilities[%d]", i)
+		}
+	}
+	return "capabilities"
+}
+
+// scopedPluginField returns the path of the source of a plugin that
+// scopedPlugins built from refs.
+func scopedPluginField(refs []string, p kong.Plugin) string {
+	if p.Source != nil && p.Source.EntityType == "policy" {
+		if i := slices.Index(refs, p.Source.EntityName); i >= 0 {
+			return fmt.Sprintf("policies[%d]", i)
+		}
+	}
+	return "access.acls"
+}
+
+// authStrategyField returns the path of the reference in refs that produced
+// the auth strategy plugin p.
+func authStrategyField(refs []string, p kong.Plugin) string {
+	if p.Source != nil {
+		if i := slices.Index(refs, p.Source.EntityName); i >= 0 {
+			return fmt.Sprintf("access.auth_strategies[%d]", i)
+		}
+	}
+	return "access.auth_strategies"
 }
 
 func buildVideoLifecycleRoute(rc aigw.ModelRouteConfig, routeName string, bases []string) kong.Route {
@@ -972,23 +1105,20 @@ func buildVideoLifecycleRoute(rc aigw.ModelRouteConfig, routeName string, bases 
 
 // warnTransportOverrides reports route methods and protocols of m that the
 // transport of route replaces.
-func (c *Converter) warnTransportOverrides(m *aigw.Model, route kong.Route) error {
+func (c *Converter) warnTransportOverrides(src ConversionIssueSource, m *aigw.Model, route kong.Route) {
 	rc := m.Config.Route
 	if len(rc.Methods) > 0 && len(route.Methods) == 0 {
-		if err := c.warn(
+		c.warn(src.at("config.route.methods"), ConfigFieldIgnored,
 			"model %q sets config.route.methods. This will be ignored on the WebSocket route %q, "+
 				"because Kong does not match methods on ws and wss routes.",
-			m.Name, route.Name); err != nil {
-			return err
-		}
+			m.Name, route.Name)
 	}
 	if len(rc.Protocols) > 0 && !slices.Equal(rc.Protocols, route.Protocols) {
-		return c.warn(
+		c.warn(src.at("config.route.protocols"), ConfigFieldOverridden,
 			"model %q sets config.route.protocols to %v. This will be overridden to %v on the %q route, "+
 				"because the route transport supports only these protocols.",
 			m.Name, rc.Protocols, route.Protocols, route.Name)
 	}
-	return nil
 }
 
 // modelRouteConfigKey returns a stable representation of the client-facing
@@ -1206,30 +1336,27 @@ func balancerExtra(b *aigw.Balancer, key string) any {
 }
 
 // resolveModelDatastore resolves m.Datastores (by-name references into the
-// top-level datastores list): at most one reference, and — mirroring
-// convert/policy.go's applyDatastore — an unknown name only warns, so a
-// hand-written config with a dangling reference still converts (without the
-// connection) outside -strict.
-func (c *Converter) resolveModelDatastore(m *aigw.Model) (*aigw.Datastore, error) {
+// top-level datastores list). An unknown name gives an Error issue, and the
+// model converts without the connection.
+func (c *Converter) resolveModelDatastore(src ConversionIssueSource, m *aigw.Model) (*aigw.Datastore, error) {
 	if len(m.Datastores) == 0 {
 		return nil, nil
 	}
 	if len(m.Datastores) > 1 {
-		return nil, c.failAt("models",
+		return nil, c.fail(src.at("datastores"), ConfigFieldInvalid,
 			"model %q has %d datastores, but only one is allowed",
 			m.Name, len(m.Datastores))
 	}
 	if m.Config.Balancer == nil || m.Config.Balancer.Algorithm != "semantic" {
-		return nil, c.failAt("models",
+		return nil, c.fail(src.at("datastores", "config.balancer.algorithm"), ConfigFieldInvalid,
 			"model %q references datastore %q, but datastores require the semantic balancer "+
 				"(set config.balancer.algorithm: semantic)",
 			m.Name, m.Datastores[0].Name)
 	}
 	ds := c.datastores[m.Datastores[0].Name]
 	if ds == nil {
-		if err := c.warn("model %q references unknown datastore %q", m.Name, m.Datastores[0].Name); err != nil {
-			return nil, err
-		}
+		c.reportError(src.at("datastores[0].name"), UndefinedReference,
+			"model %q references unknown datastore %q", m.Name, m.Datastores[0].Name)
 		return nil, nil
 	}
 	return ds, nil
@@ -1241,7 +1368,7 @@ func (c *Converter) resolveModelDatastore(m *aigw.Model) (*aigw.Datastore, error
 // is substituted after VectorDBToPlugin and lands verbatim in the strategy
 // sub-block, replacing any inline connection ("the datastore wins") while the
 // common fields the model authors itself are preserved.
-func (c *Converter) modelVectorDB(m *aigw.Model, ds *aigw.Datastore) (any, error) {
+func (c *Converter) modelVectorDB(src ConversionIssueSource, m *aigw.Model, ds *aigw.Datastore) (any, error) {
 	vdb := balancerExtra(m.Config.Balancer, "vectordb")
 	vectordb := aimap.VectorDBToPlugin(vdb)
 	if ds == nil {
@@ -1251,18 +1378,21 @@ func (c *Converter) modelVectorDB(m *aigw.Model, ds *aigw.Datastore) (any, error
 	if vdb != nil {
 		vectorDB, ok := vdb.(map[string]interface{})
 		if !ok {
-			return nil, c.failAt("models", "model %q's balancer.vectordb is not a map", m.Name)
+			return nil, c.fail(src.at("config.balancer.vectordb"), ConfigFieldInvalid,
+				"model %q's balancer.vectordb is not a map", m.Name)
 		}
 		strategy, _ := aimap.VectorDBStrategyForDatastoreType(ds.Type)
 		if vectorDB["strategy"] != strategy {
-			return nil, c.failAt("models", "model %q's balancer.vectordb.strategy %q does not match "+
-				"the datastore type %q (expected %q)",
+			return nil, c.fail(src.at("config.balancer.vectordb.strategy", "datastores[0].name"), ConfigFieldInvalid,
+				"model %q's balancer.vectordb.strategy %q does not match "+
+					"the datastore type %q (expected %q)",
 				m.Name, vectorDB["strategy"], ds.Type, strategy)
 		}
 	}
 	out, err := aimap.ApplyModelDatastore(vectordb, ds.Type, ds.Config)
 	if err != nil {
-		return nil, c.failAt("models", "model %q's datastore %q: %v", m.Name, ds.Name, err)
+		return nil, c.fail(src.at("datastores[0].name"), ConfigFieldInvalid,
+			"model %q's datastore %q: %v", m.Name, ds.Name, err)
 	}
 	return out, nil
 }
@@ -1308,12 +1438,11 @@ func disabledModelPluginEnabled(enabled *bool) *bool {
 // when none is authored. Values do not override the selector source. Always
 // returns at least one alias. Duplicate values collapse to their first
 // occurrence — Kong requires unique ai_models names, so a duplicated value
-// would otherwise fan out into invalid, identically-named entities (reported
-// as a warning, an error under -strict).
-func (c *Converter) extractModelAliases(m *aigw.Model) ([]string, error) {
+// would otherwise fan out into invalid, identically-named entities.
+func (c *Converter) extractModelAliases(src ConversionIssueSource, m *aigw.Model) []string {
 	values := m.Config.Route.Model.Values
 	if len(values) == 0 {
-		return []string{m.Name}, nil
+		return []string{m.Name}
 	}
 
 	seen := make(map[string]bool, len(values))
@@ -1330,13 +1459,11 @@ func (c *Converter) extractModelAliases(m *aigw.Model) ([]string, error) {
 		unique = append(unique, v)
 	}
 	if len(dupes) > 0 {
-		if err := c.warn(
+		c.warn(src.at("config.route.model.values"), ConfigFieldDropped,
 			"model %q drops duplicate alias values in config.route.model.values: %s",
-			m.Name, strings.Join(dupes, ", ")); err != nil {
-			return nil, err
-		}
+			m.Name, strings.Join(dupes, ", "))
 	}
-	return unique, nil
+	return unique
 }
 
 // llmFormat returns the ai-proxy-advanced llm_format for a model. providerType
@@ -1362,7 +1489,7 @@ func balancerAlgorithm(b *aigw.Balancer) string {
 // global ones -- that read the normalized LLM shape. They still load on the data plane, so this
 // is a warning rather than a rejection: the configuration is valid, those policies just may not
 // see what they look for.
-func (c *Converter) warnPassthroughPolicies(m *aigw.Model) error {
+func (c *Converter) warnPassthroughPolicies(src ConversionIssueSource, m *aigw.Model) {
 	refs := slices.Clone(m.Policies)
 	for _, p := range c.src.Policies {
 		if p.Global != nil && *p.Global && !slices.Contains(refs, p.Name) {
@@ -1379,14 +1506,15 @@ func (c *Converter) warnPassthroughPolicies(m *aigw.Model) error {
 		if !readsPrompt {
 			continue
 		}
-		if err := c.warn(
+		var fields []string
+		if i := slices.Index(m.Policies, ref); i >= 0 {
+			fields = []string{fmt.Sprintf("policies[%d]", i)}
+		}
+		c.warn(src.at(fields...), BehaviorMayDiffer,
 			"model %q uses the passthrough format, so policy %q (%s) may not work properly: "+
 				"the body reaches the provider unchanged, in the provider's own shape",
-			m.Name, ref, policy.Type); err != nil {
-			return err
-		}
+			m.Name, ref, policy.Type)
 	}
-	return nil
 }
 
 // isPassthrough reports whether a model forwards request bodies unchanged. The
@@ -1414,7 +1542,9 @@ func bodySizeOrDefault(m *aigw.Model) int {
 // for its route, or nil if the endpoint needs no selector at all. Explicit
 // body/header/path parameters override the source. No source override leaves
 // source selection to the endpoint's format/capability default.
-func (c *Converter) buildModelSelectorConfig(m *aigw.Model, spec aimap.EndpointSpec) ([]map[string]any, error) {
+func (c *Converter) buildModelSelectorConfig(
+	src ConversionIssueSource, m *aigw.Model, spec aimap.EndpointSpec,
+) []map[string]any {
 	switch {
 	case m.Config.Route.Model.Path.PathParam != "":
 		param := m.Config.Route.Model.Path.PathParam
@@ -1425,14 +1555,12 @@ func (c *Converter) buildModelSelectorConfig(m *aigw.Model, spec aimap.EndpointS
 			// The fallback is silent and harmless only when the format's default
 			// selector still reads the model from the path (gemini/bedrock native
 			// capture). For body-default formats (openai/azure) it quietly switches
-			// path extraction to the request body, changing routing — warn (error
-			// under -strict), per KOKO-4312.
+			// path extraction to the request body, changing routing, per
+			// KOKO-4312.
 			if defaultSourceIsBody(def) {
-				if err := c.warnPathParamNotCaptured(m, param, spec); err != nil {
-					return nil, err
-				}
+				c.warnPathParamNotCaptured(src, m, param, spec)
 			}
-			return []map[string]any{def}, nil
+			return []map[string]any{def}
 		}
 
 		sources := make([]map[string]any, len(m.Config.Route.Paths))
@@ -1444,7 +1572,7 @@ func (c *Converter) buildModelSelectorConfig(m *aigw.Model, spec aimap.EndpointS
 				"max_request_body_size": bodySizeOrDefault(m),
 			}
 		}
-		return sources, nil
+		return sources
 
 	case m.Config.Route.Model.Body.BodyParam != "":
 		return []map[string]any{
@@ -1453,17 +1581,17 @@ func (c *Converter) buildModelSelectorConfig(m *aigw.Model, spec aimap.EndpointS
 				"body_path":             m.Config.Route.Model.Body.BodyParam,
 				"max_request_body_size": bodySizeOrDefault(m),
 			},
-		}, nil
+		}
 	case m.Config.Route.Model.Header.HeaderParam != "":
 		return []map[string]any{
 			{
 				"source":      "header",
 				"header_name": m.Config.Route.Model.Header.HeaderParam,
 			},
-		}, nil
+		}
 	}
 
-	return []map[string]any{defaultModelSelectorConfig(m, spec)}, nil
+	return []map[string]any{defaultModelSelectorConfig(m, spec)}
 }
 
 // defaultSourceIsBody reports whether a fallback selector config reads the model
@@ -1480,16 +1608,20 @@ func defaultSourceIsBody(def map[string]any) bool {
 // the route paths do not provide, distinguishing a non-regex path (KOKO-4312
 // point 1) from a regex path missing the named group (point 2). In both cases
 // the model is read from the request body instead.
-func (c *Converter) warnPathParamNotCaptured(m *aigw.Model, param string, spec aimap.EndpointSpec) error {
+func (c *Converter) warnPathParamNotCaptured(
+	src ConversionIssueSource, m *aigw.Model, param string, spec aimap.EndpointSpec,
+) {
+	src = src.at("config.route.model.path.path_param")
 	for _, p := range m.Config.Route.Paths {
 		if !spec.IsRegex && !strings.HasPrefix(p, "~") {
-			return c.warn(
+			c.warn(src, BehaviorMayDiffer,
 				"model %q sets model.path.path_param %q but route path %q is not a regex path "+
 					"(it must start with %q); the model will be read from the request body instead",
 				m.Name, param, p, "~")
+			return
 		}
 	}
-	return c.warn(
+	c.warn(src, BehaviorMayDiffer,
 		"model %q sets model.path.path_param %q but no matching named capture group %q is present "+
 			"in its regex route paths; the model will be read from the request body instead",
 		m.Name, param, param)

@@ -1,0 +1,28 @@
+# A global or referenced policy that cannot be converted gives an error. The
+# rest of the configuration still converts.
+model_providers:
+  - name: openai-main
+    type: openai
+datastores:
+  - name: cache-redis
+    type: redis-ce
+    config: {host: redis.internal, port: 6379}
+policies:
+  - name: global-cors
+    type: cors
+    global: true
+    config: {origins: ["*"]}
+    datastores: [{name: cache-redis}]
+  - name: limiter
+    type: ai-rate-limiting-advanced
+    config: {strategy: local}
+    datastores: [{name: cache-redis}, {name: cache-redis}]
+  - name: prompt-guard
+    type: ai-prompt-guard
+    config: {deny_patterns: [".*secret.*"]}
+models:
+  - name: chat
+    capabilities: [generate]
+    targets: [{name: gpt-4o, provider: openai-main, config: {type: openai}}]
+    policies: [limiter, prompt-guard, missing-policy]
+    config: {route: {paths: [/chat]}}

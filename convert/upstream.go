@@ -9,16 +9,16 @@ import (
 // ai-a2a-proxy and ai-mcp-proxy plugins. It returns nil when no upstream auth
 // is set, so the plugin's `provider: off` default stays implicit and the output
 // remains minimal. Reversed by revert's upstreamFromConfig.
-//
-// entity is used only for warning messages (e.g. `agent "foo"`).
-func (c *Converter) upstreamAuthBlock(u *aigw.UpstreamConfig, entity string) (map[string]any, error) {
+// An unsupported auth type fails the entity src.
+func (c *Converter) upstreamAuthBlock(src ConversionIssueSource, u *aigw.UpstreamConfig) (map[string]any, error) {
 	if u == nil || u.Auth == nil {
 		return nil, nil
 	}
 	a := u.Auth
 	if a.Type != aimap.UpstreamAuthTypeAWS {
-		return nil, c.warn("%s: unsupported upstream auth type %q; only %q is supported",
-			entity, a.Type, aimap.UpstreamAuthTypeAWS)
+		return nil, c.fail(src.at("config.upstream.auth.type"), ConfigFieldInvalid,
+			"unsupported upstream auth type %q; only %q is supported",
+			a.Type, aimap.UpstreamAuthTypeAWS)
 	}
 
 	// Map the AI Gateway field names to their plugin aws_iam counterparts via

@@ -1,0 +1,24 @@
+- code: UNDEFINED_REFERENCE
+  reason: unknown auth strategy reference "missing"
+  source:
+    kind: model
+    name: dangling
+    fields:
+      - access.auth_strategies[1]
+  severity: ERROR
+- code: UNDEFINED_REFERENCE
+  reason: MCP server "dangling-mcp" references unknown auth strategy "missing"
+  source:
+    kind: mcp_server
+    name: dangling-mcp
+    fields:
+      - access.auth_strategies[0]
+  severity: ERROR
+- code: UNDEFINED_REFERENCE
+  reason: unknown auth strategy reference "missing"
+  source:
+    kind: agent
+    name: dangling-agent
+    fields:
+      - access.auth_strategies[0]
+  severity: ERROR

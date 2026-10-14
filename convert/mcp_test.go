@@ -47,7 +47,7 @@ mcp_servers:
 
 func convertMCP(t *testing.T, src string) (*kong.Document, []string) {
 	t.Helper()
-	out, warnings, err := Convert([]byte(src), Options{})
+	out, warnings, err := convertDoc([]byte(src), false)
 	require.NoError(t, err)
 	return out, warnings
 }
@@ -191,12 +191,10 @@ func TestConversionOnlySourceRejectsPreFunctionPolicy(t *testing.T) {
 	// Kong allows one plugin per name on a route: emitting the policy next to
 	// the gate would produce a config Kong refuses to load. It is a hard error
 	// even outside -strict, since dropping either plugin changes behavior.
-	_, _, err := Convert([]byte(fmt.Sprintf(mcpPreFunctionPolicy, false)), Options{})
-	require.Error(t, err)
-	require.Contains(t, err.Error(), `MCP server "toolset-a" is conversion-only`)
-	conversionErr, ok := AsConversionError(err)
-	require.True(t, ok)
-	require.Equal(t, "policies", conversionErr.Diagnostics[0].Field)
+	result, err := Convert([]byte(fmt.Sprintf(mcpPreFunctionPolicy, false)), Options{})
+	require.NoError(t, err)
+	issue := requireIssue(t, result.Issues, Error, ConfigFieldInvalid, kindMCPServer, "toolset-a", "policies")
+	require.Contains(t, issue.Reason, `MCP server "toolset-a" is conversion-only`)
 
 	// A global pre-function is a top-level plugin, not on the route, so it
 	// does not collide with the gate.
@@ -233,7 +231,7 @@ func TestUnexposedConversionOnlySourceWithPreFunctionPolicyIsDropped(t *testing.
 	require.Contains(t, warnings[0], `MCP server "orphan" is conversion-only but no listener names it`)
 
 	// Under -strict the drop is what fails, not a gate collision.
-	_, _, err := Convert([]byte(mcpUnexposedPreFunctionPolicy), Options{Strict: true})
+	_, _, err := convertDoc([]byte(mcpUnexposedPreFunctionPolicy), true)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "no listener names it")
 	require.NotContains(t, err.Error(), "cannot also have")
@@ -253,7 +251,7 @@ func TestSourceSharedByListenersWithDifferentAccess(t *testing.T) {
 		map[string]any{"key_names": []any{"other-key"}, "hide_credentials": false},
 		routePlugins(t, out, "second")[1].Config)
 
-	_, _, err := Convert([]byte(mcpConflictingListeners), Options{Strict: true})
+	_, _, err := convertDoc([]byte(mcpConflictingListeners), true)
 	require.NoError(t, err)
 }
 
@@ -293,7 +291,7 @@ func TestMCPKeyAuthNeverHidesCredentials(t *testing.T) {
 	require.Equal(t, "key-auth", keyAuth.Name)
 	require.Equal(t, false, keyAuth.Config["hide_credentials"])
 
-	_, _, err := Convert([]byte(mcpHiddenCredentials), Options{Strict: true})
+	_, _, err := convertDoc([]byte(mcpHiddenCredentials), true)
 	require.Error(t, err)
 }
 
@@ -332,7 +330,7 @@ func TestUnexposedConversionOnlySourcesAreDropped(t *testing.T) {
 	require.Equal(t, []string{"ai-mcp-proxy", "pre-function"}, pluginNames(t, out, "exposed"))
 
 	// The drop is a lost entity, so -strict refuses it rather than warning.
-	_, _, err := Convert([]byte(mcpUnexposedSources), Options{Strict: true})
+	_, _, err := convertDoc([]byte(mcpUnexposedSources), true)
 	require.Error(t, err)
 }
 
@@ -414,7 +412,7 @@ mcp_servers:
 }
 
 func TestTokenVaultConflictsWithUpstreamAuth(t *testing.T) {
-	_, _, err := Convert([]byte(`
+	_, _, err := convertDoc([]byte(`
 mcp_servers:
   - type: passthrough-listener
     name: both
@@ -427,13 +425,13 @@ mcp_servers:
         auth: {type: aws, region: us-west-2}
     tools:
       - {name: report, description: Get a report}
-`), Options{})
+`), false)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "mutually exclusive")
 }
 
 func TestTokenVaultRedisRequiresEncryptionSecrets(t *testing.T) {
-	_, _, err := Convert([]byte(`
+	_, _, err := convertDoc([]byte(`
 mcp_servers:
   - type: passthrough-listener
     name: no-secrets
@@ -444,7 +442,7 @@ mcp_servers:
       redis: {host: redis.internal, port: 6379}
     tools:
       - {name: report, description: Get a report}
-`), Options{})
+`), false)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "encryption_secrets is required")
 }
@@ -462,7 +460,7 @@ func TestTokenVaultRequiresDirectoryAndProvider(t *testing.T) {
 		{name: "missing directory", block: "    token_vault:\n      provider: my-upstream-provider"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			_, _, err := Convert([]byte(`
+			_, _, err := convertDoc([]byte(`
 mcp_servers:
   - type: passthrough-listener
     name: hollow
@@ -470,7 +468,7 @@ mcp_servers:
 `+tt.block+`
     tools:
       - {name: report, description: Get a report}
-`), Options{})
+`), false)
 			require.Error(t, err)
 			require.Contains(t, err.Error(), "token_vault requires directory and provider")
 		})
@@ -502,46 +500,57 @@ mcp_servers:
 
 // TestMCPACLWhenExpressionsRejected pins the schema boundary: ai-mcp-proxy's
 // default_acl entries and tools[].acl records define only scope/allow/deny, so
-// a CEL when-expression cannot be represented there. Kong rejects an unknown
-// record key outright, and silently dropping the expression would weaken the
-// authored access control, so the conversion fails instead.
+// a CEL when-expression cannot be represented there. A server-wide expression
+// leaves out the MCP server. A per-tool expression leaves out only the tool.
 func TestMCPACLWhenExpressionsRejected(t *testing.T) {
 	cases := []struct {
-		name   string
-		access string
-		tool   string
-		errMsg string
+		name     string
+		access   string
+		tool     string
+		severity ConversionIssueSeverity
+		field    string
 	}{
 		{
 			name: "server acls allow_when",
 			access: `    access:
       acls:
         allow_when: ["principal.metadata.admin == 'true'"]`,
-			errMsg: "guarded-mcp",
+			severity: Error,
+			field:    "access.acls.allow_when",
 		},
 		{
 			name: "server default_tool_acls deny_when",
 			access: `    access:
       default_tool_acls:
         deny_when: ["principal.metadata.admin != 'true'"]`,
-			errMsg: "guarded-mcp",
+			severity: Error,
+			field:    "access.default_tool_acls.deny_when",
 		},
 		{
 			name: "per-tool acls allow_when",
 			tool: `        access:
           acls:
             allow_when: ["principal.metadata.admin == 'true'"]`,
-			errMsg: "echo",
+			severity: Warning,
+			field:    "tools[0].access.acls.allow_when",
 		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			src := []byte(fmt.Sprintf(mcpWhenACLInput, tc.access, tc.tool))
-			_, _, err := Convert(src, Options{})
-			require.Error(t, err, "when-expressions must not reach ai-mcp-proxy")
-			require.Contains(t, err.Error(), "allow_when/deny_when")
-			require.Contains(t, err.Error(), tc.errMsg)
+			result, err := Convert(src, Options{})
+			require.NoError(t, err)
+			issue := requireIssue(t, result.Issues, tc.severity, ConfigFieldInvalid, kindMCPServer, "guarded-mcp",
+				tc.field)
+			require.Contains(t, issue.Reason, "allow_when/deny_when")
+			if tc.severity == Error {
+				require.Empty(t, result.Output.Services, "the MCP server is left out")
+				return
+			}
+			require.Len(t, result.Output.Services, 1, "the MCP server still converts")
+			plugin := result.Output.Services[0].Routes[0].Plugins[0]
+			require.Empty(t, plugin.Config["tools"], "the tool is left out")
 		})
 	}
 }
@@ -555,7 +564,8 @@ func TestMCPACLAllowDenyStillConverts(t *testing.T) {
 	tool := `        access:
           acls:
             deny: [banned-users]`
-	out, _, err := Convert([]byte(fmt.Sprintf(mcpWhenACLInput, access, tool)), Options{})
-	require.NoError(t, err, "allow/deny ACLs must still convert")
-	require.NotNil(t, out)
+	result, err := Convert([]byte(fmt.Sprintf(mcpWhenACLInput, access, tool)), Options{})
+	require.NoError(t, err)
+	require.Empty(t, result.Issues, "allow/deny ACLs must still convert")
+	require.Len(t, result.Output.Services, 1)
 }

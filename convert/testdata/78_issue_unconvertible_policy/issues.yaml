@@ -1,0 +1,24 @@
+- code: CONFIG_FIELD_INVALID
+  reason: 'policy "global-cors": plugin type "cors" does not support datastores'
+  source:
+    kind: policy
+    name: global-cors
+    fields:
+      - datastores
+  severity: ERROR
+- code: CONFIG_FIELD_INVALID
+  reason: 'policy "limiter": a policy may reference at most one datastore'
+  source:
+    kind: policy
+    name: limiter
+    fields:
+      - datastores
+  severity: ERROR
+- code: UNDEFINED_REFERENCE
+  reason: unknown policy reference "missing-policy"
+  source:
+    kind: model
+    name: chat
+    fields:
+      - policies[2]
+  severity: ERROR

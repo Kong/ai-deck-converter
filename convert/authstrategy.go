@@ -1,7 +1,10 @@
 package convert
 
 import (
+	"fmt"
 	"maps"
+	"reflect"
+	"slices"
 
 	"github.com/Kong/ai-deck-converter/internal/aigw"
 	"github.com/Kong/ai-deck-converter/internal/kong"
@@ -18,26 +21,23 @@ const (
 )
 
 // scopedAuthStrategyPlugins builds one authentication plugin per auth strategy
-// reference, each configured to fall back to the anonymous consumer. Warnings
-// name owner as the entity that references the strategy.
-func (c *Converter) scopedAuthStrategyPlugins(owner string, refs []string) ([]kong.Plugin, error) {
+// reference of the entity src, each configured to fall back to the anonymous
+// consumer. An unknown reference fails the entity, so it is never left
+// unprotected.
+func (c *Converter) scopedAuthStrategyPlugins(src ConversionIssueSource, refs []string) ([]kong.Plugin, error) {
 	var plugins []kong.Plugin
 	seen := map[string]bool{}
-	for _, ref := range refs {
+	for i, ref := range refs {
 		if seen[ref] {
 			continue
 		}
 		seen[ref] = true
 		idp := c.authStrategies[ref]
 		if idp == nil {
-			if err := c.warn("unknown auth strategy reference %q", ref); err != nil {
-				return nil, err
-			}
-			continue
+			return nil, c.fail(src.at(fmt.Sprintf("access.auth_strategies[%d]", i)), UndefinedReference,
+				"unknown auth strategy reference %q", ref)
 		}
-		if err := c.warnAuthStrategyOverrides(owner, idp); err != nil {
-			return nil, err
-		}
+		c.warnAuthStrategyOverrides(idp)
 		plugins = append(plugins, authStrategyPlugin(idp))
 	}
 	return plugins, nil
@@ -45,29 +45,25 @@ func (c *Converter) scopedAuthStrategyPlugins(owner string, refs []string) ([]ko
 
 // warnAuthStrategyOverrides reports the auth strategy config values that
 // authStrategyPlugin replaces.
-func (c *Converter) warnAuthStrategyOverrides(owner string, idp *aigw.AuthStrategy) error {
+func (c *Converter) warnAuthStrategyOverrides(idp *aigw.AuthStrategy) {
+	src := issueSource(kindAuthStrategy, idp.Name)
 	if v := idp.Config["anonymous"]; !isEmptyConfigValue(v) && v != "" && v != anonymousConsumerName {
-		if err := c.warn(
-			"%s references auth strategy %q, which sets config.anonymous to %v. "+
+		c.warn(src.at("config.anonymous"), ConfigFieldOverridden,
+			"auth strategy %q sets config.anonymous to %v. "+
 				"This will be ignored, and anonymous will be overridden to %q "+
 				"to reject unauthenticated requests with a request-termination plugin.",
-			owner, idp.Name, v, anonymousConsumerName); err != nil {
-			return err
-		}
+			idp.Name, v, anonymousConsumerName)
 	}
 	if idp.Type == "key-auth" && keyAuthPrincipalsEnabled(idp.Config) {
 		if v, ok := idp.Config["identity_realms"]; ok && !isEmptyConfigValue(v) {
-			if err := c.warn(
-				"%s references auth strategy %q, which enables config.principals "+
+			c.warn(src.at("config.identity_realms"), ConfigFieldOverridden,
+				"auth strategy %q enables config.principals "+
 					"and sets config.identity_realms. "+
 					"This will be ignored, and identity_realms will be overridden to [] "+
 					"because the key-auth schema requires it when principals is enabled.",
-				owner, idp.Name); err != nil {
-				return err
-			}
+				idp.Name)
 		}
 	}
-	return nil
 }
 
 // authStrategyPlugin builds a Kong authentication plugin from an AI
@@ -123,6 +119,10 @@ func keyAuthPrincipalsEnabled(cfg map[string]any) bool {
 // ensureAnonymousConsumer appends the anonymous Consumer (with a
 // request-termination plugin so unauthenticated requests get a 401) if one
 // isn't already present in the output document.
+//
+// It never changes a consumer in place. convertEntity and convertModels
+// restore c.out from a shallow copy, so an in-place change would survive a
+// rollback.
 func (c *Converter) ensureAnonymousConsumer() {
 	enabled := true
 	requestTerminationPlugin := kong.Plugin{
@@ -137,21 +137,23 @@ func (c *Converter) ensureAnonymousConsumer() {
 	// Overwrite for both 'username: anonymous' and 'custom_id: anonymous' because
 	// our auth plugins look for both at random unpredictable loop iterations
 	providedConfigContainsAnonConsumer := false
+	var consumers []kong.Consumer
 	for i := range c.out.Consumers {
-		if c.out.Consumers[i].Username == anonymousConsumerName || c.out.Consumers[i].CustomID == anonymousConsumerName {
-			providedConfigContainsAnonConsumer = true
-			requestTerminationPluginOverwritten := false
-			for j, p := range c.out.Consumers[i].Plugins {
-				if p.Name == "request-termination" {
-					c.out.Consumers[i].Plugins[j] = requestTerminationPlugin
-					requestTerminationPluginOverwritten = true
-					break
-				}
-			}
-			if !requestTerminationPluginOverwritten {
-				c.out.Consumers[i].Plugins = append(c.out.Consumers[i].Plugins, requestTerminationPlugin)
-			}
+		if c.out.Consumers[i].Username != anonymousConsumerName && c.out.Consumers[i].CustomID != anonymousConsumerName {
+			continue
 		}
+		providedConfigContainsAnonConsumer = true
+		plugins, changed := withPlugin(c.out.Consumers[i].Plugins, requestTerminationPlugin)
+		if !changed {
+			continue
+		}
+		if consumers == nil {
+			consumers = slices.Clone(c.out.Consumers)
+		}
+		consumers[i].Plugins = plugins
+	}
+	if consumers != nil {
+		c.out.Consumers = consumers
 	}
 	if providedConfigContainsAnonConsumer {
 		return
@@ -162,4 +164,20 @@ func (c *Converter) ensureAnonymousConsumer() {
 		CustomID: anonymousConsumerName,
 		Plugins:  []kong.Plugin{requestTerminationPlugin},
 	})
+}
+
+// withPlugin returns a copy of plugins in which p replaces the first plugin of
+// the same name, or p is appended. It reports false when plugins already has
+// p, and then returns plugins unchanged.
+func withPlugin(plugins []kong.Plugin, p kong.Plugin) ([]kong.Plugin, bool) {
+	i := slices.IndexFunc(plugins, func(q kong.Plugin) bool { return q.Name == p.Name })
+	if i >= 0 && reflect.DeepEqual(plugins[i], p) {
+		return plugins, false
+	}
+	out := slices.Clone(plugins)
+	if i >= 0 {
+		out[i] = p
+		return out, true
+	}
+	return append(out, p), true
 }

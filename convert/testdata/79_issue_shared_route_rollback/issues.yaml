@@ -1,0 +1,9 @@
+- code: CONFIG_FIELD_INVALID
+  reason: acl policy sets allow and deny, but a Kong acl plugin permits exactly one of allow, deny, allow_when, or deny_when
+  source:
+    kind: model
+    name: second
+    fields:
+      - access.acls.allow
+      - access.acls.deny
+  severity: ERROR

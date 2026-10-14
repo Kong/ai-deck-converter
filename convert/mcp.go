@@ -21,7 +21,7 @@ const mcpConversionOnly = "conversion-only"
 // upstream-server). MCP ACLs live inside the plugin config (default_acl /
 // tools[].acl), not as Kong acl plugins, because ai-mcp-proxy does not support
 // consumer scoping.
-func (c *Converter) convertMCPServers() error {
+func (c *Converter) convertMCPServers() {
 	// Which entries of c.out.Services belong to a conversion-only server, held
 	// by index, not by name, so pruning can never remove a service that merely
 	// shares a name with one (the shared model service is named
@@ -30,111 +30,121 @@ func (c *Converter) convertMCPServers() error {
 	exposed := c.exposedSources()
 	for i := range c.src.MCPServers {
 		m := &c.src.MCPServers[i]
-		route := buildRoute(m.Config.Route, m.Name)
-		route.Source = source("mcp_server", m.Name, "config.route")
-		if m.Type == mcpConversionOnly {
-			// The DP re-enters this route to run a listener's tool call.
-			// It adds the route path to the tool's config.url-relative path.
-			// strip_path must remove that prefix before Kong adds the service path.
-			if route.StripPath != nil && !*route.StripPath {
-				if err := c.warn(
-					"MCP server %q of type %q has set strip_path set to false. "+
-						"This will be ignored, and strip_path will be overridden to true "+
-						"to enforce tool routing to behave as documented.",
-					m.Name, m.Type); err != nil {
-					return err
-				}
-				route.StripPath = new(true)
+		src := issueSource(kindMCPServer, m.Name)
+		c.convertEntity(src, func() error {
+			service, err := c.convertMCPServer(src, m, exposed)
+			if err != nil {
+				return err
 			}
-		}
-		plugin, err := c.mcpPlugin(m)
-		if err != nil {
-			return err
-		}
-		plugin.Source = source("mcp_server", m.Name, "config",
-			kong.FieldMapping{GeneratedPrefix: "config.mode", SourcePrefix: "type"},
-			kong.FieldMapping{GeneratedPrefix: "config.tools", SourcePrefix: "tools"},
-			kong.FieldMapping{GeneratedPrefix: "config.proxy_config", SourcePrefix: "config.proxy"},
-			kong.FieldMapping{GeneratedPrefix: "config.auth", SourcePrefix: "config.upstream.auth"},
-			kong.FieldMapping{GeneratedPrefix: "config.auth.token_vault", SourcePrefix: "token_vault"},
-			kong.FieldMapping{GeneratedPrefix: "config.default_acl", SourcePrefix: "access"},
-			kong.FieldMapping{GeneratedPrefix: "config.acl_attribute_type", SourcePrefix: "access.acl_attribute_type"},
-			kong.FieldMapping{
-				GeneratedPrefix: "config.access_token_claim_field",
-				SourcePrefix:    "access.access_token_claim_field",
-			},
-			kong.FieldMapping{GeneratedPrefix: "config.server.tag", SourcePrefix: "config.server.tag"},
-		)
-		route.Plugins = append(route.Plugins, plugin)
-
-		// Non-ACL policy plugins still apply at the route; ACLs are folded into
-		// the ai-mcp-proxy plugin above.
-		guard, err := c.scopedPlugins(entityMCPServer, m.Policies, aigw.ACLs{})
-		if err != nil {
-			return err
-		}
-		guard = sourceScopedPlugins(guard, "mcp_server", m.Name)
-		route.Plugins = append(route.Plugins, guard...)
-
-		// Auth-strategy / OAuth 2.0 Protected Resource Metadata access.
-		// Emits an ai-mcp-oauth2 plugin (openid-connect + metadata) or a plain
-		// auth plugin (no metadata), and appends the metadata endpoint path to
-		// the route so one route serves both MCP traffic and the .well-known
-		// metadata.
-		authPlugins, err := c.mcpAuthStrategyPlugins(m, &route)
-		if err != nil {
-			return err
-		}
-		route.Plugins = append(route.Plugins, authPlugins...)
-		// An unexposed conversion-only server is pruned below, so it gets no
-		// gate and its policies cannot collide with one.
-		if m.Type == mcpConversionOnly && exposed[m.Name] {
-			// Kong allows one plugin per name on a route, so a policy of the
-			// gate's type would collide with it; neither can be dropped without
-			// either opening the route or losing the user's plugin.
-			if slices.ContainsFunc(route.Plugins, func(p kong.Plugin) bool {
-				return p.Name == aimap.MCPToolsetGatePlugin
-			}) {
-				return c.failAt("policies",
-					"MCP server %q is conversion-only, so its route carries a generated %q gate; "+
-						"it cannot also have a %q policy",
-					m.Name, aimap.MCPToolsetGatePlugin, aimap.MCPToolsetGatePlugin)
+			if m.Type == mcpConversionOnly {
+				conversionOnlyServices = append(conversionOnlyServices, len(c.out.Services))
 			}
-			route.Plugins = append(route.Plugins, mcpToolsetGate(m))
-		}
-
-		service := kong.Service{
-			Name:   m.Name,
-			ID:     m.ID,
-			Routes: []kong.Route{route},
-			Tags:   c.labelsToTags(m.Labels),
-			Source: serviceURLSource("mcp_server", m.Name),
-		}
-		if m.UpstreamURL != "" {
-			service.URL = m.UpstreamURL
-		} else {
-			service.Host = placeholderHost
-			if m.Type == "passthrough-listener" {
-				if err := c.warn(
-					"MCP server %q is passthrough-listener but has no upstream_url; using placeholder host %q",
-					m.Name, placeholderHost); err != nil {
-					return err
-				}
-			}
-		}
-		// Honor enabled: false, consistent with agents (convert/agent.go) and policies (convert/policy.go).
-		// Without this, an MCP server an operator disabled still lowers to an active service + route +
-		// ai-mcp-proxy plugin and keeps serving on every data plane.
-		if m.Enabled != nil && !*m.Enabled {
-			service.Enabled = m.Enabled
-		}
-		if m.Type == mcpConversionOnly {
-			conversionOnlyServices = append(conversionOnlyServices, len(c.out.Services))
-		}
-		c.out.Services = append(c.out.Services, service)
+			c.out.Services = append(c.out.Services, service)
+			return nil
+		})
 	}
 	c.wireListenerSources()
-	return c.pruneUnexposedSources(conversionOnlyServices, exposed)
+	c.pruneUnexposedSources(conversionOnlyServices, exposed)
+}
+
+func (c *Converter) convertMCPServer(
+	src ConversionIssueSource, m *aigw.MCPServer, exposed map[string]bool,
+) (kong.Service, error) {
+	route := buildRoute(m.Config.Route, m.Name)
+	route.Source = source("mcp_server", m.Name, "config.route")
+	if m.Type == mcpConversionOnly {
+		// The DP re-enters this route to run a listener's tool call.
+		// It adds the route path to the tool's config.url-relative path.
+		// strip_path must remove that prefix before Kong adds the service path.
+		if route.StripPath != nil && !*route.StripPath {
+			c.warn(src.at("config.route.strip_path"), ConfigFieldOverridden,
+				"MCP server %q of type %q has set strip_path set to false. "+
+					"This will be ignored, and strip_path will be overridden to true "+
+					"to enforce tool routing to behave as documented.",
+				m.Name, m.Type)
+			route.StripPath = new(true)
+		}
+	}
+	plugin, err := c.mcpPlugin(src, m)
+	if err != nil {
+		return kong.Service{}, err
+	}
+	plugin.Source = source("mcp_server", m.Name, "config",
+		kong.FieldMapping{GeneratedPrefix: "config.mode", SourcePrefix: "type"},
+		kong.FieldMapping{GeneratedPrefix: "config.tools", SourcePrefix: "tools"},
+		kong.FieldMapping{GeneratedPrefix: "config.proxy_config", SourcePrefix: "config.proxy"},
+		kong.FieldMapping{GeneratedPrefix: "config.auth", SourcePrefix: "config.upstream.auth"},
+		kong.FieldMapping{GeneratedPrefix: "config.auth.token_vault", SourcePrefix: "token_vault"},
+		kong.FieldMapping{GeneratedPrefix: "config.default_acl", SourcePrefix: "access"},
+		kong.FieldMapping{GeneratedPrefix: "config.acl_attribute_type", SourcePrefix: "access.acl_attribute_type"},
+		kong.FieldMapping{
+			GeneratedPrefix: "config.access_token_claim_field",
+			SourcePrefix:    "access.access_token_claim_field",
+		},
+		kong.FieldMapping{GeneratedPrefix: "config.server.tag", SourcePrefix: "config.server.tag"},
+	)
+	route.Plugins = append(route.Plugins, plugin)
+
+	// Non-ACL policy plugins still apply at the route; ACLs are folded into
+	// the ai-mcp-proxy plugin above.
+	guard, err := c.scopedPlugins(src, m.Policies, aigw.ACLs{})
+	if err != nil {
+		return kong.Service{}, err
+	}
+	guard = sourceScopedPlugins(guard, "mcp_server", m.Name)
+	route.Plugins = append(route.Plugins, guard...)
+
+	// Auth-strategy / OAuth 2.0 Protected Resource Metadata access.
+	// Emits an ai-mcp-oauth2 plugin (openid-connect + metadata) or a plain
+	// auth plugin (no metadata), and appends the metadata endpoint path to
+	// the route so one route serves both MCP traffic and the .well-known
+	// metadata.
+	authPlugins, err := c.mcpAuthStrategyPlugins(src, m, &route)
+	if err != nil {
+		return kong.Service{}, err
+	}
+	route.Plugins = append(route.Plugins, authPlugins...)
+	// An unexposed conversion-only server is pruned below, so it gets no
+	// gate and its policies cannot collide with one.
+	if m.Type == mcpConversionOnly && exposed[m.Name] {
+		// Kong allows one plugin per name on a route, so a policy of the
+		// gate's type would collide with it; neither can be dropped without
+		// either opening the route or losing the user's plugin.
+		if slices.ContainsFunc(route.Plugins, func(p kong.Plugin) bool {
+			return p.Name == aimap.MCPToolsetGatePlugin
+		}) {
+			return kong.Service{}, c.fail(src.at("policies"), ConfigFieldInvalid,
+				"MCP server %q is conversion-only, so its route carries a generated %q gate; "+
+					"it cannot also have a %q policy",
+				m.Name, aimap.MCPToolsetGatePlugin, aimap.MCPToolsetGatePlugin)
+		}
+		route.Plugins = append(route.Plugins, mcpToolsetGate(m))
+	}
+
+	service := kong.Service{
+		Name:   m.Name,
+		ID:     m.ID,
+		Routes: []kong.Route{route},
+		Tags:   c.labelsToTags(m.Labels),
+		Source: serviceURLSource("mcp_server", m.Name),
+	}
+	if m.UpstreamURL != "" {
+		service.URL = m.UpstreamURL
+	} else {
+		service.Host = placeholderHost
+		if m.Type == "passthrough-listener" {
+			c.warn(src.at("upstream_url"), MissingRequiredConfigField,
+				"MCP server %q is passthrough-listener but has no upstream_url; using placeholder host %q",
+				m.Name, placeholderHost)
+		}
+	}
+	// Honor enabled: false, consistent with agents (convert/agent.go) and policies (convert/policy.go).
+	// Without this, an MCP server an operator disabled still lowers to an active service + route +
+	// ai-mcp-proxy plugin and keeps serving on every data plane.
+	if m.Enabled != nil && !*m.Enabled {
+		service.Enabled = m.Enabled
+	}
+	return service, nil
 }
 
 // mcpToolsetGate closes a conversion-only server's route to clients. Such a
@@ -222,13 +232,12 @@ func (c *Converter) exposedSources() map[string]bool {
 // the document names in config.sources. Such a server reaches no client — its
 // tools are only ever served through a listener — so its Service and Route
 // exist solely as dead configuration: no listener re-enters it to execute its
-// tools. It is never gated (see convertMCPServers), so it must never survive:
-// the drop warns, and under -strict that warning is an error instead.
+// tools. It is never gated (see convertMCPServers), so it must never survive.
 //
 // Note this is a whole-document judgement. A conversion-only server converted
 // on its own, with its listener in another document, has nothing here to
 // associate with and is pruned.
-func (c *Converter) pruneUnexposedSources(conversionOnlyServices []int, exposed map[string]bool) error {
+func (c *Converter) pruneUnexposedSources(conversionOnlyServices []int, exposed map[string]bool) {
 	// Collect first, in document order, so the warnings are deterministic.
 	drop := make(map[int]bool, len(conversionOnlyServices))
 	for _, i := range conversionOnlyServices {
@@ -236,15 +245,13 @@ func (c *Converter) pruneUnexposedSources(conversionOnlyServices []int, exposed 
 		if exposed[name] {
 			continue
 		}
-		if err := c.warn(
+		c.warn(issueSource(kindMCPServer, name), ConfigFieldDropped,
 			"MCP server %q is conversion-only but no listener names it in config.sources; "+
-				"dropping its service and route", name); err != nil {
-			return err
-		}
+				"dropping its service and route", name)
 		drop[i] = true
 	}
 	if len(drop) == 0 {
-		return nil
+		return
 	}
 
 	kept := make([]kong.Service, 0, len(c.out.Services)-len(drop))
@@ -255,7 +262,6 @@ func (c *Converter) pruneUnexposedSources(conversionOnlyServices []int, exposed 
 		kept = append(kept, c.out.Services[i])
 	}
 	c.out.Services = kept
-	return nil
 }
 
 // addTag appends tag to tags if absent, keeping the result sorted so conversion
@@ -269,7 +275,7 @@ func addTag(tags []string, tag string) []string {
 	return tags
 }
 
-func (c *Converter) mcpPlugin(m *aigw.MCPServer) (kong.Plugin, error) {
+func (c *Converter) mcpPlugin(src ConversionIssueSource, m *aigw.MCPServer) (kong.Plugin, error) {
 	cfg := map[string]any{"mode": m.Type}
 	if m.Config.MaxRequestBodySize != nil {
 		cfg["max_request_body_size"] = *m.Config.MaxRequestBodySize
@@ -289,7 +295,7 @@ func (c *Converter) mcpPlugin(m *aigw.MCPServer) (kong.Plugin, error) {
 	// resolution both lower to the plugin's auth record, which can only carry
 	// one provider — a server declaring both cannot be represented.
 	if m.TokenVault != nil && m.Config.Upstream != nil && m.Config.Upstream.Auth != nil {
-		return kong.Plugin{}, c.failAt("token_vault",
+		return kong.Plugin{}, c.fail(src.at("token_vault", "config.upstream.auth"), ConfigFieldInvalid,
 			"MCP server %q: token_vault and config.upstream.auth are mutually exclusive "+
 				"(both lower to the ai-mcp-proxy plugin's auth record)", m.Name)
 	}
@@ -298,7 +304,7 @@ func (c *Converter) mcpPlugin(m *aigw.MCPServer) (kong.Plugin, error) {
 	// plugin's own entity check. Reject here rather than emit a config decK
 	// would refuse to apply.
 	if tv := m.TokenVault; tv != nil && tv.Redis != nil && len(tv.EncryptionSecrets) == 0 {
-		return kong.Plugin{}, c.failAt("token_vault.encryption_secrets",
+		return kong.Plugin{}, c.fail(src.at("token_vault.encryption_secrets"), MissingRequiredConfigField,
 			"MCP server %q: token_vault.encryption_secrets is required when token_vault.redis is configured", m.Name)
 	}
 	// A present but empty token_vault block would otherwise lower to
@@ -306,7 +312,7 @@ func (c *Converter) mcpPlugin(m *aigw.MCPServer) (kong.Plugin, error) {
 	// when provider is token_vault, so reject it the same way. (After this the
 	// lowered block can never be empty.)
 	if tv := m.TokenVault; tv != nil && (tv.Directory == "" || tv.Provider == "") {
-		return kong.Plugin{}, c.failAt("token_vault",
+		return kong.Plugin{}, c.fail(src.at("token_vault.directory", "token_vault.provider"), MissingRequiredConfigField,
 			"MCP server %q: token_vault requires directory and provider", m.Name)
 	}
 	// Token Vault credential resolution (auth.provider: token_vault); only
@@ -319,7 +325,7 @@ func (c *Converter) mcpPlugin(m *aigw.MCPServer) (kong.Plugin, error) {
 	}
 	// Upstream authentication (e.g. AWS SigV4) lowers to the plugin's auth
 	// record; only emitted when set.
-	auth, err := c.upstreamAuthBlock(m.Config.Upstream, fmt.Sprintf("MCP server %q", m.Name))
+	auth, err := c.upstreamAuthBlock(src, m.Config.Upstream)
 	if err != nil {
 		return kong.Plugin{}, err
 	}
@@ -340,7 +346,9 @@ func (c *Converter) mcpPlugin(m *aigw.MCPServer) (kong.Plugin, error) {
 	// a when-expression there makes Kong reject the whole config, and dropping
 	// it silently would weaken or remove the authored access control.
 	if hasCELExpressions(serverACLs) {
-		return kong.Plugin{}, c.failAt("access.acls",
+		fields := slices.Concat(celFieldPaths("access.acls", m.Access.ACLs),
+			celFieldPaths("access.default_tool_acls", m.Access.DefaultToolACLs))
+		return kong.Plugin{}, c.fail(src.at(fields...), ConfigFieldInvalid,
 			"MCP server %q sets allow_when/deny_when, which ai-mcp-proxy cannot represent; "+
 				"CEL expressions are supported only on policies that lower to the acl plugin",
 			m.Name)
@@ -359,11 +367,7 @@ func (c *Converter) mcpPlugin(m *aigw.MCPServer) (kong.Plugin, error) {
 	if m.Access.ACLAttributeType != "oauth_access_token" {
 		cfg["include_consumer_groups"] = true
 	}
-	tools, err := c.mcpTools(m.Name, m.Tools)
-	if err != nil {
-		return kong.Plugin{}, err
-	}
-	if tools != nil {
+	if tools := c.mcpTools(src, m.Name, m.Tools); tools != nil {
 		cfg["tools"] = tools
 	}
 	return kong.Plugin{
@@ -386,17 +390,18 @@ func mcpServerConfigForPlugin(server map[string]any) map[string]any {
 	return config
 }
 
-func (c *Converter) mcpTools(serverName string, tools []aigw.MCPTool) ([]map[string]any, error) {
+// mcpTools leaves out a tool without a description. ai-mcp-proxy requires
+// one.
+func (c *Converter) mcpTools(src ConversionIssueSource, serverName string, tools []aigw.MCPTool) []map[string]any {
 	out := make([]map[string]any, 0, len(tools))
 	for i := range tools {
 		t := &tools[i]
 		tool := map[string]any{"name": t.Name}
 		if t.Description == "" {
-			if err := c.warn(
+			c.warn(src.at(fmt.Sprintf("tools[%d].description", i)), MissingRequiredConfigField,
 				"MCP server %q tool %q has no description; ai-mcp-proxy requires one",
-				serverName, t.Name); err != nil {
-				return nil, err
-			}
+				serverName, t.Name)
+			continue
 		}
 		setIfNotEmpty(tool, "description", t.Description)
 		setIfNotEmpty(tool, "method", t.Method)
@@ -413,20 +418,23 @@ func (c *Converter) mcpTools(serverName string, tools []aigw.MCPTool) ([]map[str
 		setIfNotEmptyMap(tool, "annotations", t.Annotations)
 		setIfNotEmptyMap(tool, "input_schema", t.InputSchema)
 		setIfNotEmptyMap(tool, "output_schema", t.OutputSchema)
-		// tools[].acl defines only allow/deny, same as default_acl entries.
+		// tools[].acl defines only allow/deny, same as default_acl entries. The
+		// tool is left out, so no client reaches it without its access control.
 		if hasCELExpressions(t.Access.ACLs) {
-			return nil, c.failAt("tools.access.acls",
+			c.warn(src.at(celFieldPaths(fmt.Sprintf("tools[%d].access.acls", i), t.Access.ACLs)...),
+				ConfigFieldInvalid,
 				"MCP server %q tool %q sets allow_when/deny_when, which ai-mcp-proxy cannot "+
 					"represent; CEL expressions are supported only on policies that lower to "+
-					"the acl plugin",
+					"the acl plugin; the tool is omitted",
 				serverName, t.Name)
+			continue
 		}
 		if acl := aclBlock(t.Access.ACLs); acl != nil {
 			tool["acl"] = acl
 		}
 		out = append(out, tool)
 	}
-	return out, nil
+	return out
 }
 
 func setIfNotEmpty(m map[string]any, key, val string) {

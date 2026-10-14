@@ -1,0 +1,8 @@
+- code: BEHAVIOR_MAY_DIFFER
+  reason: model "no-capture-model" sets model.path.path_param "model_name" but route path "/v1/chat/completions" is not a regex path (it must start with "~"); the model will be read from the request body instead
+  source:
+    kind: model
+    name: no-capture-model
+    fields:
+      - config.route.model.path.path_param
+  severity: WARNING

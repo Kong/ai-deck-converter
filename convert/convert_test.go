@@ -32,14 +32,14 @@ models:
         paths: [/v1/chat/completions]
         model: {path: {path_param: model_name}}
 `)
-	out, warnings, err := convertYAML(src, Options{})
+	out, warnings, err := convertYAML(src)
 	require.NoError(t, err, "convert")
 	require.Contains(t, strings.Join(warnings, "\n"), "is not a regex path",
 		"expected non-regex path_param warning")
 	// The body-default fallback still produces a config in non-strict mode.
 	require.Contains(t, string(out), "source: body")
 
-	_, _, err = Convert(src, Options{Strict: true})
+	_, _, err = convertDoc(src, true)
 	require.Error(t, err, "expected -strict to turn the warning into an error")
 }
 
@@ -64,12 +64,12 @@ models:
         paths: ['~/openai/(?<other_group>[^:/]+)']
         model: {path: {path_param: model_name}}
 `)
-	_, warnings, err := Convert(src, Options{})
+	_, warnings, err := convertDoc(src, false)
 	require.NoError(t, err, "convert")
 	require.Contains(t, strings.Join(warnings, "\n"), "no matching named capture group",
 		"expected capture-name-mismatch warning")
 
-	_, _, err = Convert(src, Options{Strict: true})
+	_, _, err = convertDoc(src, true)
 	require.Error(t, err, "expected -strict to turn the warning into an error")
 }
 
@@ -97,11 +97,11 @@ models:
         paths: [/gemini-path]
         model: {path: {path_param: model_name}}
 `)
-	_, _, err := Convert(src, Options{Strict: true})
+	_, _, err := convertDoc(src, true)
 	require.NoError(t, err, "gemini path_param fallback must not warn even under -strict")
 }
 
-func TestConvertWarnsUnknownProvider(t *testing.T) {
+func TestConvertUnknownProviderLeavesOutTargets(t *testing.T) {
 	src := []byte(`
 models:
   - type: model
@@ -118,8 +118,7 @@ models:
     config:
       route: {paths: [/chat]}
       model: {}
-  # No config.type and an unknown provider: the skills passthrough guard cannot
-  # judge the pairing, so it must not escalate this into its hard failure.
+  # The target is left out before the skills passthrough guard runs.
   - type: api
     name: skills-api
     capabilities: [skills]
@@ -130,30 +129,32 @@ models:
     config:
       route: {paths: [/ai]}
 `)
-	_, warnings, err := Convert(src, Options{})
+	result, err := Convert(src, Options{})
 	require.NoError(t, err, "convert")
-	require.Contains(t, strings.Join(warnings, "\n"), "unknown provider",
-		"expected unknown-provider warning")
-	require.Contains(t, strings.Join(warnings, "\n"),
-		`model "skills-api" target "gpt-5.6" has no resolvable provider type`)
+	require.Len(t, result.Issues, 4)
+	for _, name := range []string{"m1", "skills-api"} {
+		requireIssue(t, result.Issues, Warning, UndefinedReference, kindModel, name, "targets[0].provider")
+		requireIssue(t, result.Issues, Error, MissingRequiredConfigField, kindModel, name, "targets")
+	}
+	require.Empty(t, result.Output.AIModels)
 }
 
-func convertYAML(src []byte, opts Options) ([]byte, []string, error) {
-	doc, warnings, err := Convert(src, opts)
+func encodeYAML(src []byte, opts Options) ([]byte, []ConversionIssue, error) {
+	result, err := Convert(src, opts)
 	if err != nil {
-		return nil, warnings, err
+		return nil, nil, err
 	}
-	data, err := doc.ToYAML()
-	return data, warnings, err
+	data, err := result.Output.ToYAML()
+	return data, result.Issues, err
 }
 
-func convertDBLessYAML(src []byte, opts Options) ([]byte, []string, error) {
-	doc, warnings, err := Convert(src, opts)
+func encodeDBLessYAML(src []byte, opts Options) ([]byte, []ConversionIssue, error) {
+	result, err := Convert(src, opts)
 	if err != nil {
-		return nil, warnings, err
+		return nil, nil, err
 	}
-	data, err := doc.ToDBLess().ToYAML()
-	return data, warnings, err
+	data, err := result.Output.ToDBLess().ToYAML()
+	return data, result.Issues, err
 }
 
 func TestConvertMetadataTracksGeneratedTargetSources(t *testing.T) {
@@ -175,7 +176,7 @@ models:
       model: {}
 `)
 
-	doc, _, err := Convert(src, Options{})
+	doc, _, err := convertDoc(src, false)
 	require.NoError(t, err)
 	metadata := doc.ToDBLess().Metadata()
 	require.Equal(t, []PluginTargetSource{
@@ -209,7 +210,7 @@ func TestConvertMetadataMergesCapabilitiesOnCollapsedTarget(t *testing.T) {
 	src, err := os.ReadFile("testdata/58_bedrock_generate_and_speech/input.yaml")
 	require.NoError(t, err)
 
-	doc, warnings, err := Convert(src, Options{})
+	doc, warnings, err := convertDoc(src, false)
 	require.NoError(t, err)
 	metadata := doc.ToDBLess().Metadata()
 	require.Empty(t, warnings)
@@ -238,7 +239,7 @@ mcp_servers:
       - {name: search, description: Search, method: GET, path: /search, scheme: https, host: tools.internal}
 `)
 
-	doc, _, err := Convert(src, Options{})
+	doc, _, err := convertDoc(src, false)
 	require.NoError(t, err)
 	metadata := doc.ToDBLess().Metadata()
 
@@ -281,7 +282,7 @@ agents:
       route: {paths: [/agents/book]}
 `)
 
-	doc, _, err := Convert(src, Options{})
+	doc, _, err := convertDoc(src, false)
 	require.NoError(t, err)
 	metadata := doc.Metadata()
 	require.Len(t, metadata.Services, 1)
@@ -331,7 +332,7 @@ models:
         config: {type: openai}
 `)
 
-	out, warnings, err := convertYAML(src, Options{})
+	out, warnings, err := convertYAML(src)
 	require.NoError(t, err, "convert")
 	require.Contains(t, strings.Join(warnings, "\n"), "multiple targets")
 
@@ -400,7 +401,7 @@ models:
         config: {type: openai}
 `)
 
-	out, warnings, err := convertYAML(src, Options{})
+	out, warnings, err := convertYAML(src)
 	require.NoError(t, err, "convert")
 	require.Contains(t, strings.Join(warnings, "\n"), "shared by multiple video models")
 	require.Contains(t, string(out), "openai-videos-lifecycle")
@@ -411,8 +412,7 @@ models:
 // Bedrock model exposing embeddings+image+video, all served by /invoke) would
 // otherwise collapse into one ai-proxy-advanced carrying one genai_category but
 // targets with mismatched route_types — a config the data plane rejects. The
-// converter must keep the first capability and warn/skip the rest, and make the
-// collision fatal under -strict rather than silently emitting the bad config.
+// converter keeps the first capability and drops the rest with a warning.
 func TestConvertGuardsMultimodalCollapse(t *testing.T) {
 	src := []byte(`
 model_providers:
@@ -436,24 +436,29 @@ models:
         model:
           values: ["@bedrock/nova-omni"]
 `)
-
-	// The first category determines the retained targets.
-	out, warnings, err := convertYAML(src, Options{})
+	result, err := Convert(src, Options{})
 	require.NoError(t, err, "convert")
-	joined := strings.Join(warnings, "\n")
-	require.Contains(t, joined, "cannot serve multiple genai categories")
-	require.Contains(t, joined, `capability "image"`)
-	require.Contains(t, joined, `capability "video"`)
+	var dropped []ConversionIssue
+	for _, issue := range result.Issues {
+		if issue.Code == ConfigFieldDropped {
+			dropped = append(dropped, issue)
+		}
+	}
+	require.Len(t, dropped, 2, "issues: %v", result.Issues)
+	for i, capability := range []string{"image", "video"} {
+		require.Equal(t, Warning, dropped[i].Severity)
+		require.Equal(t, []string{fmt.Sprintf("capabilities[%d]", i+1)}, dropped[i].Source.Fields)
+		require.Contains(t, dropped[i].Reason, `capability "`+capability+`"`)
+		require.Contains(t, dropped[i].Reason, "cannot serve multiple genai categories")
+	}
+
+	out, err := result.Output.ToYAML()
+	require.NoError(t, err)
 	require.Contains(t, string(out), "genai_category: text/embeddings")
 	require.NotContains(t, string(out), "image/v1/images/generations",
 		"the skipped image capability must not leak a target into the output")
 	require.NotContains(t, string(out), "video/v1/videos/generations",
 		"the skipped video capability must not leak a target into the output")
-
-	// Strict mode rejects conflicting categories.
-	_, _, err = Convert(src, Options{Strict: true})
-	require.Error(t, err, "collapse must be fatal under -strict")
-	require.Contains(t, err.Error(), "cannot serve multiple genai categories")
 }
 
 // A Kong acl plugin permits exactly one of config.allow / config.deny
@@ -483,7 +488,7 @@ model_providers:
     type: openai
 `)
 	// The config is invalid for every output layout, so it fails without -strict.
-	_, _, err := Convert(src, Options{})
+	_, _, err := convertDoc(src, false)
 	require.Error(t, err, "acl with both allow and deny must be rejected")
 	require.Contains(t, err.Error(), "allow")
 	require.Contains(t, err.Error(), "deny")
@@ -546,12 +551,17 @@ model_providers:
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			// Invalid for every output layout, so it fails without -strict.
-			_, _, err := Convert([]byte(fmt.Sprintf(tmpl, tc.acls)), Options{})
-			require.Error(t, err, "acl setting several mutually exclusive fields must be rejected")
-			for _, want := range tc.wants {
-				require.Contains(t, err.Error(), want)
+			result, err := Convert([]byte(fmt.Sprintf(tmpl, tc.acls)), Options{})
+			require.NoError(t, err)
+			fields := make([]string, len(tc.wants))
+			for i, want := range tc.wants {
+				fields[i] = "access.acls." + want
 			}
+			issue := requireIssue(t, result.Issues, Error, ConfigFieldInvalid, kindModel, "guarded", fields...)
+			for _, want := range tc.wants {
+				require.Contains(t, issue.Reason, want)
+			}
+			require.Empty(t, result.Output.AIModels, "the model is left out")
 		})
 	}
 }
@@ -577,9 +587,10 @@ model_providers:
   - name: p1
     type: openai
 `)
-	out, _, err := Convert(src, Options{})
-	require.NoError(t, err, "a lone allow_when must still convert")
-	require.NotNil(t, out)
+	result, err := Convert(src, Options{})
+	require.NoError(t, err)
+	require.Empty(t, result.Issues, "a lone allow_when must still convert")
+	require.Len(t, result.Output.AIModels, 1)
 }
 
 // The skills API is served only as passthrough, so Kong rejects a llm/v1/skills
@@ -604,7 +615,7 @@ model_providers:
   - name: anthropic-prod
     type: anthropic
 `)
-	_, _, err := Convert(src, Options{})
+	_, _, err := convertDoc(src, false)
 	require.Error(t, err, "skills on a provider rendering another format must be rejected")
 	require.Contains(t, err.Error(), "passthrough-only")
 	require.Contains(t, err.Error(), "llm_format")
@@ -638,7 +649,7 @@ policies:
     name: my-key-auth
     config: {key_names: [apikey]}
 `)
-	_, _, err := Convert(src, Options{})
+	_, _, err := convertDoc(src, false)
 	require.Error(t, err, "model policies referencing key-auth/openid-connect must be rejected")
 	require.Contains(t, err.Error(), "auth_strategies")
 }
@@ -679,7 +690,7 @@ auth_strategies:
     config: {issuer: https://id.example.test}
 `)
 
-	out, _, err := convertYAML(src, Options{})
+	out, _, err := convertYAML(src)
 	require.NoError(t, err, "convert")
 
 	var doc struct {
@@ -742,7 +753,7 @@ auth_strategies:
     type: openid-connect
 `)
 
-	out, _, err := convertYAML(src, Options{})
+	out, _, err := convertYAML(src)
 	require.NoError(t, err, "convert")
 
 	var doc struct {
@@ -793,7 +804,7 @@ model_providers:
   - name: p1
     type: openai
 `)
-	out, _, err := convertYAML(src, Options{})
+	out, _, err := convertYAML(src)
 	require.NoError(t, err, "convert")
 
 	var doc struct {
@@ -859,7 +870,7 @@ mcp_servers:
     tools:
       - {name: t, description: a tool, method: GET, path: /t, scheme: https, host: x.internal}
 `)
-	out, _, err := convertDBLessYAML(src, Options{})
+	out, _, err := encodeDBLessYAML(src, Options{})
 	require.NoError(t, err, "convert db-less")
 
 	var doc struct {
@@ -909,7 +920,7 @@ model_providers:
     type: openai
 `)
 
-	doc, _, err := Convert(src, Options{})
+	doc, _, err := convertDoc(src, false)
 	require.NoError(t, err)
 
 	require.Equal(t, "services[0].routes[0]", doc.Metadata().Routes[0].Location, "decK locations are nested")
@@ -931,7 +942,7 @@ policies:
     global: true
 `)
 
-	out, _, err := convertDBLessYAML(src, Options{})
+	out, _, err := encodeDBLessYAML(src, Options{})
 	require.NoError(t, err, "convert db-less")
 
 	var got map[string]any
@@ -978,7 +989,7 @@ model_providers:
     type: openai
 `)
 
-	out, _, err := convertDBLessYAML(src, Options{})
+	out, _, err := encodeDBLessYAML(src, Options{})
 	require.NoError(t, err, "convert db-less")
 
 	var got struct {
@@ -1022,7 +1033,7 @@ model_providers:
     type: openai
 `)
 
-	out, _, err := convertYAML(src, Options{})
+	out, _, err := convertYAML(src)
 	require.NoError(t, err, "convert")
 
 	var got map[string]any
@@ -1082,7 +1093,7 @@ model_providers:
     type: gemini
 `)
 
-	out, _, err := convertYAML(src, Options{})
+	out, _, err := convertYAML(src)
 	require.NoError(t, err, "convert")
 
 	var got map[string]any
@@ -1124,7 +1135,7 @@ model_providers:
     type: openai
 `)
 
-	out, _, err := convertYAML(src, Options{})
+	out, _, err := convertYAML(src)
 	require.NoError(t, err, "convert")
 
 	var got map[string]any
@@ -1187,7 +1198,7 @@ model_providers:
     type: openai
 `)
 
-	out, _, err := convertDBLessYAML(src, Options{})
+	out, _, err := encodeDBLessYAML(src, Options{})
 	require.NoError(t, err, "convert db-less")
 
 	var got map[string]any
@@ -1233,7 +1244,7 @@ model_providers:
 	require.False(t, hasModelAlias, "type:api target must be alias-less")
 }
 
-func TestConvertStrictFailsUnknownProvider(t *testing.T) {
+func TestConvertLeavesOutTargetWithUnknownProvider(t *testing.T) {
 	src := []byte(`
 models:
   - type: model
@@ -1251,24 +1262,30 @@ models:
       route: {paths: [/chat]}
       model: {}
 `)
-	_, _, err := Convert(src, Options{Strict: true})
-	require.Error(t, err, "expected strict mode to fail on unknown provider")
+	result, err := Convert(src, Options{})
+	require.NoError(t, err)
+	require.Len(t, result.Issues, 2)
+	requireIssue(t, result.Issues, Warning, UndefinedReference, kindModel, "m1", "targets[0].provider")
+	requireIssue(t, result.Issues, Error, MissingRequiredConfigField, kindModel, "m1", "targets")
+	require.Empty(t, result.Output.AIModels, "a model without targets is left out")
+	require.Empty(t, result.Output.Services)
 }
 
-func TestConvertWarnsUnknownPolicy(t *testing.T) {
+func TestConvertUnknownPolicyKeepsEntity(t *testing.T) {
 	src := []byte(`
 consumers:
   - name: c1
     type: api-key
     policies: [missing-policy]
 `)
-	_, warnings, err := Convert(src, Options{})
+	result, err := Convert(src, Options{})
 	require.NoError(t, err, "convert")
-	require.Contains(t, strings.Join(warnings, "\n"), "unknown policy",
-		"expected unknown-policy warning")
+	requireIssue(t, result.Issues, Error, UndefinedReference, kindConsumer, "c1", "policies[0]")
+	require.Len(t, result.Output.Consumers, 1, "the consumer converts without the policy")
+	require.Empty(t, result.Output.Consumers[0].Plugins)
 }
 
-func TestConvertWarnsUnknownDatastore(t *testing.T) {
+func TestConvertUnknownDatastoreOnReferencedPolicy(t *testing.T) {
 	src := []byte(`
 models:
   - type: model
@@ -1292,16 +1309,14 @@ policies:
       vectordb: {strategy: redis, dimensions: 1536, distance_metric: cosine}
     datastores: [{name: missing-datastore}]
 `)
-	_, warnings, err := Convert(src, Options{})
+	result, err := Convert(src, Options{})
 	require.NoError(t, err, "convert")
-	require.Contains(t, strings.Join(warnings, "\n"), "unknown datastore",
-		"expected unknown-datastore warning")
+	requireIssue(t, result.Issues, Error, UndefinedReference, kindPolicy, "rag-injector", "datastores[0].name")
+	require.Len(t, result.Output.AIModels, 1, "the model converts")
 }
 
-// The warn-versus-fail choice for a dangling datastore reference is the only
-// datastore rule convert still owns; aimap decides the rest. Both halves of it
-// are pinned here, the strict one against the same source.
-func TestConvertFailsUnknownDatastoreInStrictMode(t *testing.T) {
+// A dangling datastore reference keeps the policy without a connection.
+func TestConvertUnknownDatastoreOnGlobalPolicy(t *testing.T) {
 	src := []byte(`
 policies:
   - type: rate-limiting
@@ -1310,13 +1325,11 @@ policies:
     config: {minute: 100, policy: redis}
     datastores: [{name: missing-datastore}]
 `)
-	_, _, err := Convert(src, Options{Strict: true})
-	require.Error(t, err, "strict mode turns the unknown-datastore warning into a failure")
-	require.Contains(t, err.Error(), `references unknown datastore "missing-datastore"`)
-
-	_, warnings, err := Convert(src, Options{})
-	require.NoError(t, err, "the same source converts without -strict")
-	require.Contains(t, strings.Join(warnings, "\n"), "unknown datastore")
+	result, err := Convert(src, Options{})
+	require.NoError(t, err)
+	issue := requireIssue(t, result.Issues, Error, UndefinedReference, kindPolicy, "limiter", "datastores[0].name")
+	require.Contains(t, issue.Reason, `references unknown datastore "missing-datastore"`)
+	require.Len(t, result.Output.Plugins, 1, "the policy converts without the connection")
 }
 
 func TestConvertRejectsRedisCEDatastoreOnModel(t *testing.T) {
@@ -1344,7 +1357,7 @@ datastores:
     name: ds
     config: {host: redis-ce.internal}
 `)
-	_, _, err := Convert(src, Options{})
+	_, _, err := convertDoc(src, false)
 	require.Error(t, err, "models never accept a redis-ce datastore")
 	require.Contains(t, err.Error(), "m1")
 	require.Contains(t, err.Error(), "redis-ce")
@@ -1384,7 +1397,7 @@ datastores:
     name: ds
     config: {host: store.internal}
 `)
-			_, _, err := Convert(src, Options{})
+			_, _, err := convertDoc(src, false)
 			require.Error(t, err, "vectordb strategy must match the datastore type")
 			require.Contains(t, err.Error(), "m1")
 			require.Contains(t, err.Error(), tc.strategy)
@@ -1419,7 +1432,7 @@ datastores:
     name: ds2
     config: {host: pg2.internal}
 `)
-	_, _, err := Convert(src, Options{})
+	_, _, err := convertDoc(src, false)
 	require.Error(t, err, "convert")
 	require.Contains(t, err.Error(), "only one is allowed")
 }
@@ -1446,12 +1459,13 @@ datastores:
     name: ds
     config: {host: pg.internal}
 `)
-	_, _, err := Convert(src, Options{})
+	_, _, err := convertDoc(src, false)
 	require.Error(t, err, "a datastore needs the semantic balancer's vector store")
 	require.Contains(t, err.Error(), "semantic")
 }
 
-func TestConvertWarnsUnknownDatastoreOnModel(t *testing.T) {
+// A dangling datastore reference keeps the model without a connection.
+func TestConvertUnknownDatastoreOnModel(t *testing.T) {
 	src := []byte(`
 models:
   - type: model
@@ -1472,42 +1486,10 @@ model_providers:
   - name: p1
     type: openai
 `)
-	_, warnings, err := Convert(src, Options{})
+	result, err := Convert(src, Options{})
 	require.NoError(t, err, "convert")
-	require.Contains(t, strings.Join(warnings, "\n"), "unknown datastore",
-		"expected unknown-datastore warning")
-}
-
-// Mirrors TestConvertFailsUnknownDatastoreInStrictMode: the model path uses
-// the same c.warn, so it turns into a failure under -strict too.
-func TestConvertFailsUnknownDatastoreOnModelInStrictMode(t *testing.T) {
-	src := []byte(`
-models:
-  - type: model
-    name: m1
-    capabilities: [generate]
-    formats: [{type: openai}]
-    targets:
-      - name: gpt-4o
-        provider: p1
-        config: {type: openai}
-    datastores: [{name: missing-datastore}]
-    config:
-      route: {paths: [/ai]}
-      balancer:
-        algorithm: semantic
-        vectordb: {strategy: pgvector, dimensions: 1024, distance_metric: cosine}
-model_providers:
-  - name: p1
-    type: openai
-`)
-	_, _, err := Convert(src, Options{Strict: true})
-	require.Error(t, err, "strict mode turns the unknown-datastore warning into a failure")
-	require.Contains(t, err.Error(), `references unknown datastore "missing-datastore"`)
-
-	_, warnings, err := Convert(src, Options{})
-	require.NoError(t, err, "the same source converts without -strict")
-	require.Contains(t, strings.Join(warnings, "\n"), "unknown datastore")
+	requireIssue(t, result.Issues, Error, UndefinedReference, kindModel, "m1", "datastores[0].name")
+	require.Len(t, result.Output.AIModels, 1, "the model converts")
 }
 
 func TestConvertRejectsMixedAPIDatastoresOnSharedRoute(t *testing.T) {
@@ -1627,7 +1609,7 @@ datastores:
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			_, _, err := Convert(tc.src, Options{})
+			_, _, err := convertDoc(tc.src, false)
 			require.Error(t, err, "convert must reject datastore mixing on a shared route-only api plugin")
 			require.Contains(t, err.Error(), "cannot share route")
 		})
@@ -1664,7 +1646,7 @@ datastores:
     name: ds
     config: {host: pg.internal, port: 5432}
 `)
-	out, _, err := Convert(src, Options{})
+	out, _, err := convertDoc(src, false)
 	require.NoError(t, err, "convert")
 	var plugin map[string]any
 	for _, p := range out.Plugins {
@@ -1680,7 +1662,9 @@ datastores:
 		vectordb["pgvector"], "datastore connection replaces the inline one")
 }
 
-func TestConvertWarnsMCPToolMissingDescription(t *testing.T) {
+// A tool without a description is left out. The other tools of the server
+// still convert.
+func TestConvertLeavesOutMCPToolMissingDescription(t *testing.T) {
 	src := []byte(`
 mcp_servers:
   - type: conversion-listener
@@ -1688,26 +1672,23 @@ mcp_servers:
     config:
       route: {paths: [/mcp]}
     tools:
+      - name: describedTool
+        description: A tool
       - name: noDescTool
 `)
-	_, warnings, err := Convert(src, Options{})
+	result, err := Convert(src, Options{})
 	require.NoError(t, err, "convert")
-	require.Contains(t, strings.Join(warnings, "\n"), "no description",
-		"expected missing-description warning")
-}
+	require.Len(t, result.Issues, 1)
+	issue := requireIssue(t, result.Issues, Warning, MissingRequiredConfigField, kindMCPServer, "m1",
+		"tools[1].description")
+	require.Contains(t, issue.Reason, "no description")
 
-func TestConvertStrictFailsMCPToolMissingDescription(t *testing.T) {
-	src := []byte(`
-mcp_servers:
-  - type: conversion-listener
-    name: m1
-    config:
-      route: {paths: [/mcp]}
-    tools:
-      - name: noDescTool
-`)
-	_, _, err := Convert(src, Options{Strict: true})
-	require.Error(t, err, "expected strict mode to fail on MCP tool missing description")
+	require.Len(t, result.Output.Services, 1, "the server still converts")
+	plugin := result.Output.Services[0].Routes[0].Plugins[0]
+	require.Equal(t, "ai-mcp-proxy", plugin.Name)
+	tools := plugin.Config["tools"].([]map[string]any)
+	require.Len(t, tools, 1)
+	require.Equal(t, "describedTool", tools[0]["name"])
 }
 
 func TestConvertConversionOnlyMCPServerStripPath(t *testing.T) {
@@ -1741,7 +1722,7 @@ mcp_servers:
       server: {tag: bucket1}
       sources: [toolset]
 `)
-			out, _, err := convertDBLessYAML(src, Options{})
+			out, _, err := encodeDBLessYAML(src, Options{})
 			require.NoError(t, err, "convert db-less")
 
 			var got struct {
@@ -1783,7 +1764,7 @@ mcp_servers:
       server: {tag: bucket1}
       sources: [toolset]
 `)
-	_, warnings, err := Convert(src, Options{})
+	_, warnings, err := convertDoc(src, false)
 	require.NoError(t, err, "convert")
 	require.Contains(t, strings.Join(warnings, "\n"), "strip_path will be overridden to true",
 		"expected a warning when strip_path is false")
@@ -1807,14 +1788,14 @@ mcp_servers:
       server: {tag: bucket1}
       sources: [toolset]
 `)
-		_, warnings, err := Convert(src, Options{})
+		_, warnings, err := convertDoc(src, false)
 		require.NoError(t, err, "convert")
 		require.NotContains(t, strings.Join(warnings, "\n"), "strip_path",
 			"did not expect a strip_path warning when it is unset or already true")
 	}
 }
 
-func TestConvertStrictFailsConversionOnlyMCPServerStripPathFalse(t *testing.T) {
+func TestConvertReportsConversionOnlyMCPServerStripPathFalse(t *testing.T) {
 	src := []byte(`
 mcp_servers:
   - type: conversion-only
@@ -1828,8 +1809,11 @@ mcp_servers:
       server: {tag: bucket1}
       sources: [toolset]
 `)
-	_, _, err := Convert(src, Options{Strict: true})
-	require.Error(t, err, "expected strict mode to fail when strip_path is false")
+	result, err := Convert(src, Options{})
+	require.NoError(t, err)
+	require.Len(t, result.Issues, 1)
+	requireIssue(t, result.Issues, Warning, ConfigFieldOverridden, kindMCPServer, "toolset",
+		"config.route.strip_path")
 }
 
 func TestConvertDoesNotForceStripPathOnOtherMCPServerTypes(t *testing.T) {
@@ -1843,7 +1827,7 @@ mcp_servers:
     config:
       route: {paths: [/mcp], strip_path: false}
 `)
-	out, _, err := convertDBLessYAML(src, Options{})
+	out, _, err := encodeDBLessYAML(src, Options{})
 	require.NoError(t, err, "convert db-less")
 
 	var got struct {
@@ -1869,7 +1853,7 @@ func TestA2APluginDropsLogAudits(t *testing.T) {
 			},
 		},
 	}
-	plugin, err := (&Converter{}).a2aPlugin(a)
+	plugin, err := (&Converter{}).a2aPlugin(issueSource(kindAgent, a.Name), a)
 	require.NoError(t, err)
 	logging, ok := plugin.Config["logging"].(map[string]any)
 	require.True(t, ok, "expected logging block, got %v", plugin.Config["logging"])
@@ -1893,7 +1877,7 @@ agents:
       url: https://b.internal/api
       route: {paths: [/agents/on]}
 `)
-	out, _, err := convertDBLessYAML(src, Options{})
+	out, _, err := encodeDBLessYAML(src, Options{})
 	require.NoError(t, err, "convert db-less")
 
 	var got struct {
@@ -1932,7 +1916,7 @@ agents:
       route: {paths: [/protected-agent]}
 `)
 
-	out, _, err := convertDBLessYAML(src, Options{})
+	out, _, err := encodeDBLessYAML(src, Options{})
 	require.NoError(t, err)
 
 	var got struct {
@@ -1969,7 +1953,7 @@ mcp_servers:
     config:
       route: {paths: [/mcp/on]}
 `)
-	out, _, err := convertDBLessYAML(src, Options{})
+	out, _, err := encodeDBLessYAML(src, Options{})
 	require.NoError(t, err, "convert db-less")
 
 	var got struct {
@@ -2007,7 +1991,7 @@ models:
       model: {alias: gpt-chat}
 `)
 
-	out, _, err := convertDBLessYAML(src, Options{})
+	out, _, err := encodeDBLessYAML(src, Options{})
 	require.NoError(t, err, "convert db-less")
 
 	var got struct {
@@ -2064,7 +2048,7 @@ models:
       model: {alias: openai-chat}
 `)
 
-	out, _, err := convertYAML(src, Options{})
+	out, _, err := convertYAML(src)
 	require.NoError(t, err, "convert")
 
 	var got struct {
@@ -2115,7 +2099,7 @@ consumers:
         api_key: sk-test
 `)
 
-	out, _, err := convertDBLessYAML(src, Options{})
+	out, _, err := encodeDBLessYAML(src, Options{})
 	require.NoError(t, err, "convert db-less")
 
 	var got map[string]any
@@ -2162,7 +2146,7 @@ model_providers:
     type: openai
 `)
 
-	out, _, err := convertDBLessYAML(src, Options{})
+	out, _, err := encodeDBLessYAML(src, Options{})
 	if err != nil {
 		t.Fatalf("convert db-less: %v", err)
 	}
@@ -2253,7 +2237,7 @@ model_providers:
     type: openai
 `)
 
-	out, _, err := convertDBLessYAML(src, Options{})
+	out, _, err := encodeDBLessYAML(src, Options{})
 	require.NoError(t, err, "convert db-less")
 
 	var got struct {
@@ -2331,7 +2315,7 @@ consumers:
         api_key: sk-bob
 `)
 
-	out, _, err := convertDBLessYAML(src, Options{})
+	out, _, err := encodeDBLessYAML(src, Options{})
 	if err != nil {
 		t.Fatalf("convert db-less: %v", err)
 	}
@@ -2408,7 +2392,7 @@ model_providers:
     type: openai
 `)
 
-	out, _, err := convertDBLessYAML(src, Options{})
+	out, _, err := encodeDBLessYAML(src, Options{})
 	if err != nil {
 		t.Fatalf("convert db-less: %v", err)
 	}
@@ -2465,7 +2449,7 @@ mcp_servers:
       sources: [team-a]
 `)
 
-	out, _, err := convertDBLessYAML(src, Options{})
+	out, _, err := encodeDBLessYAML(src, Options{})
 	if err != nil {
 		t.Fatalf("convert db-less: %v", err)
 	}
@@ -2550,7 +2534,7 @@ mcp_servers:
       sources: [team-a]
 `)
 
-	out, _, err := convertDBLessYAML(src, Options{})
+	out, _, err := encodeDBLessYAML(src, Options{})
 	if err != nil {
 		t.Fatalf("convert db-less: %v", err)
 	}
@@ -2647,7 +2631,7 @@ mcp_servers:
       sources: [team-a]
 `)
 
-	out, _, err := convertDBLessYAML(src, Options{})
+	out, _, err := encodeDBLessYAML(src, Options{})
 	if err != nil {
 		t.Fatalf("convert db-less: %v", err)
 	}
@@ -2735,7 +2719,7 @@ model_providers:
     type: openai
 `)
 
-	out, _, err := convertDBLessYAML(src, Options{})
+	out, _, err := encodeDBLessYAML(src, Options{})
 	if err != nil {
 		t.Fatalf("convert db-less: %v", err)
 	}
@@ -2784,11 +2768,9 @@ model_providers:
 }
 
 // TestGlobalPolicyRejectsAuthTypeOnRealtimeDocument pins that a global
-// authentication policy fails the conversion once the document emits a
-// WebSocket route: the plugin stays on Kong's http/https default protocols,
-// so it would silently leave the realtime route unauthenticated.
+// authentication policy stays and the WebSocket model fails closed.
 func TestGlobalPolicyRejectsAuthTypeOnRealtimeDocument(t *testing.T) {
-	_, _, err := Convert([]byte(`
+	result, err := Convert([]byte(`
 policies:
   - type: key-auth
     name: require-key
@@ -2797,9 +2779,17 @@ models:
   - name: m
     capabilities: [realtime]
     targets: [{name: t, provider: openai-prod, config: {type: openai}}]
+  - name: chat
+    capabilities: [generate]
+    targets: [{name: t, provider: openai-prod, config: {type: openai}}]
 `+overrideProvider), Options{})
-	require.ErrorContains(t, err, `global policy "require-key" has type "key-auth"`)
-	require.ErrorContains(t, err, "cannot authenticate the WebSocket routes")
+	require.NoError(t, err)
+	require.Len(t, result.Issues, 1)
+	issue := requireIssue(t, result.Issues, Error, ConfigFieldInvalid, kindModel, "m", "capabilities[0]")
+	require.Contains(t, issue.Reason, `global policy "require-key" of type "key-auth"`)
+	require.Equal(t, "key-auth", result.Output.Plugins[0].Name, "the global policy stays")
+	require.Len(t, result.Output.AIModels, 1, "the WebSocket model is left out")
+	require.Equal(t, "chat", result.Output.AIModels[0].Name)
 }
 
 // TestGlobalPolicyWarnsOnRealtimeDocument pins that a non-auth global policy
@@ -2817,20 +2807,20 @@ models:
     capabilities: [realtime]
     targets: [{name: t, provider: openai-prod, config: {type: openai}}]
 ` + overrideProvider)
-	_, warnings, err := Convert(src, Options{})
+	_, warnings, err := convertDoc(src, false)
 	require.NoError(t, err)
 	require.Len(t, warnings, 1)
 	require.Contains(t, warnings[0], `global policy "audit-log" (type "http-log")`)
 	require.Contains(t, warnings[0], "will not run on the WebSocket routes")
 
-	_, _, err = Convert(src, Options{Strict: true})
+	_, _, err = convertDoc(src, true)
 	require.Error(t, err)
 }
 
 // TestGlobalPolicyNoWarningWithoutRealtimeRoute pins that global policies are
 // unaffected when the document emits no WebSocket route.
 func TestGlobalPolicyNoWarningWithoutRealtimeRoute(t *testing.T) {
-	_, warnings, err := Convert([]byte(`
+	_, warnings, err := convertDoc([]byte(`
 policies:
   - type: key-auth
     name: require-key
@@ -2839,7 +2829,7 @@ models:
   - name: m
     capabilities: [generate]
     targets: [{name: t, provider: openai-prod, config: {type: openai}}]
-`+overrideProvider), Options{Strict: true})
+`+overrideProvider), true)
 	require.NoError(t, err)
 	require.Empty(t, warnings)
 }

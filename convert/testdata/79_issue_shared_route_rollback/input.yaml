@@ -1,0 +1,15 @@
+# Two models share one route. The second model fails after it joins the route,
+# so its targets and selector entry are removed from the shared route.
+model_providers:
+  - name: openai-main
+    type: openai
+models:
+  - name: first
+    capabilities: [generate]
+    targets: [{name: gpt-4o, provider: openai-main, config: {type: openai}}]
+    config: {route: {paths: [/shared]}}
+  - name: second
+    capabilities: [generate]
+    targets: [{name: gpt-4o-mini, provider: openai-main, config: {type: openai}}]
+    access: {acls: {allow: [team-a], deny: [team-b]}}
+    config: {route: {paths: [/shared]}}

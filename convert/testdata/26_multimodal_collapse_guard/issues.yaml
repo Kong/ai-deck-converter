@@ -1,0 +1,16 @@
+- code: CONFIG_FIELD_DROPPED
+  reason: 'model "nova-omni": capability "image" (genai_category "image/generation") collapses onto route "bedrock-invoke", which already serves genai_category "text/embeddings"; a single ai-proxy-advanced cannot serve multiple genai categories, skipping this capability'
+  source:
+    kind: model
+    name: nova-omni
+    fields:
+      - capabilities[1]
+  severity: WARNING
+- code: CONFIG_FIELD_DROPPED
+  reason: 'model "nova-omni": capability "video" (genai_category "video/generation") collapses onto route "bedrock-invoke", which already serves genai_category "text/embeddings"; a single ai-proxy-advanced cannot serve multiple genai categories, skipping this capability'
+  source:
+    kind: model
+    name: nova-omni
+    fields:
+      - capabilities[2]
+  severity: WARNING

@@ -86,3 +86,6 @@ models:
       env: production
     managed_by:
       owner: terraform
+model_providers:
+  - name: my-openai-provider
+    type: openai

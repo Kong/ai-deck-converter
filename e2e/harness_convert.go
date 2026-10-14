@@ -31,12 +31,9 @@ func convertCase(t *testing.T, caseName string, patch func(src []byte) ([]byte, 
 		t.Fatalf("reading input.yaml: %v", err)
 	}
 
-	out, warnings, err := convertDBLess(src)
+	out, err := convertDBLess(t, src)
 	if err != nil {
 		t.Fatalf("converting %s: %v", caseDir, err)
-	}
-	for _, w := range warnings {
-		t.Logf("conversion warning: %s", w)
 	}
 
 	expectedPath := filepath.Join(caseDir, "expected.yaml")
@@ -64,7 +61,7 @@ func convertCase(t *testing.T, caseName string, patch func(src []byte) ([]byte, 
 		if err != nil {
 			t.Fatalf("patching input.yaml: %v", err)
 		}
-		converted, _, err = convertDBLess(patchedSrc)
+		converted, err = convertDBLess(t, patchedSrc)
 		if err != nil {
 			t.Fatalf("converting patched %s: %v", caseDir, err)
 		}
@@ -76,13 +73,20 @@ func convertCase(t *testing.T, caseName string, patch func(src []byte) ([]byte, 
 	return configPath
 }
 
-func convertDBLess(src []byte) ([]byte, []string, error) {
-	doc, warnings, err := convert.Convert(src, convert.Options{})
+// convertDBLess logs every conversion issue. An Error issue fails the test.
+func convertDBLess(t *testing.T, src []byte) ([]byte, error) {
+	t.Helper()
+	result, err := convert.Convert(src, convert.Options{})
 	if err != nil {
-		return nil, warnings, err
+		return nil, err
 	}
-	out, err := doc.ToDBLess().ToYAML()
-	return out, warnings, err
+	for _, issue := range result.Issues {
+		t.Logf("conversion issue: %s", issue)
+	}
+	if result.HasErrors() {
+		t.Fatalf("conversion reported Error issues")
+	}
+	return result.Output.ToDBLess().ToYAML()
 }
 
 func writeArtifact(t *testing.T, name, content string) {
