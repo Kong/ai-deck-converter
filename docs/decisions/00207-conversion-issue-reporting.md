@@ -1,7 +1,7 @@
 ---
 description: Structured conversion issue reporting
 approvers:
-  - #add at least one team to review
+  - team-koko
 tags:
   - convert
   - error-handling
