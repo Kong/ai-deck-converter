@@ -1,0 +1,63 @@
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: openai-chat
+        paths:
+          - /open/chat/completions
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+  - name: open-agent
+    url: https://open-agent.internal/a2a
+    routes:
+      - name: open-agent-route
+        paths:
+          - /agents/open
+        plugins:
+          - name: ai-a2a-proxy
+            config:
+              logging:
+                log_payloads: false
+                log_statistics: true
+                max_payload_size: 1048576
+plugins:
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-chat
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-4o
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: open-gpt
+            name: gpt-4o
+            provider: openai
+          route_type: llm/v1/chat
+    route: openai-chat
+    model: open-gpt
+  - name: acl
+    config:
+      allow:
+        - admins
+      include_consumer_groups: true
+    route: openai-chat
+    model: open-gpt
+ai_models:
+  - name: open-gpt

@@ -1,0 +1,8 @@
+- code: UNSUPPORTED_IN_MIN_RUNTIME_VERSION
+  reason: 'formats[0].type: passthrough requires minimum runtime version "2.2", but the configured minimum is "2.1"'
+  source:
+    kind: model
+    name: raw-gpt
+    fields:
+      - formats[0].type
+  severity: ERROR

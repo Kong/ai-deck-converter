@@ -1,0 +1,32 @@
+# The skills capability needs 2.2. At 2.1 the skills model is absent with an
+# error. The files model still converts.
+models:
+  - name: openai-skills-api
+    type: api
+    capabilities: [skills]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/skills]}
+    targets:
+      - name: gpt-5.6
+        provider: openai-prod
+        config: {type: openai}
+  - name: openai-files-api
+    type: api
+    capabilities: [files]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/files]}
+    targets:
+      - name: gpt-5.6
+        provider: openai-prod
+        config: {type: openai}
+model_providers:
+  - name: openai-prod
+    type: openai
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://ai/openai-token}"

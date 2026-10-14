@@ -1,0 +1,8 @@
+- code: UNSUPPORTED_IN_MIN_RUNTIME_VERSION
+  reason: token_vault requires minimum runtime version "2.3", but the configured minimum is "2.2"
+  source:
+    kind: mcp_server
+    name: vaulted-vendor-mcp
+    fields:
+      - token_vault
+  severity: ERROR

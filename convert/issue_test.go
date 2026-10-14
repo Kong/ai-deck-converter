@@ -16,7 +16,7 @@ import (
 // error when an issue has the Error severity. With strict, every issue gives
 // an error.
 func convertDoc(src []byte, strict bool) (*kong.Document, []string, error) {
-	result, err := Convert(src, Options{})
+	result, err := Convert(src, testOptions)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -219,7 +219,7 @@ func TestConvertConcurrentRunsAreIndependent(t *testing.T) {
 			if i%2 == 0 {
 				src, want = bad, 1
 			}
-			result, err := Convert(src, Options{})
+			result, err := Convert(src, testOptions)
 			assert.NoError(t, err)
 			assert.Len(t, result.Issues, want)
 		}()

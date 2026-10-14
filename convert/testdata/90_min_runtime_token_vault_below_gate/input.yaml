@@ -1,0 +1,17 @@
+# token_vault needs 2.3. At 2.2 the MCP server is absent with an error. Without
+# the vault, the upstream gets no credential. The other MCP server still
+# converts.
+mcp_servers:
+  - type: passthrough-listener
+    name: vaulted-vendor-mcp
+    upstream_url: https://mcp.internal.kongair.com
+    config:
+      route: {paths: [/mcp/vaulted]}
+    token_vault:
+      directory: my-directory
+      provider: my-upstream-provider
+  - type: passthrough-listener
+    name: plain-vendor-mcp
+    upstream_url: https://plain-mcp.internal.kongair.com
+    config:
+      route: {paths: [/mcp/plain]}

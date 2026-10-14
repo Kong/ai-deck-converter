@@ -17,7 +17,7 @@ go test ./revert -run TestGolden -update              # regenerate ALL reverse g
 go test ./revert -run TestRoundTrip                   # forward→reverse→forward must be byte-identical
 ```
 
-Run the tool: `ai-deck-converter input.yaml` (stdout), `-o kong.yaml` to write a file, `-` for stdin. The direction is auto-detected (`_format_version` present → decK→AI Gateway) and can be forced with `-direction to-deck|to-dbless|from-deck`. Flags: `-strict` (to-deck/to-dbless: exit 1 on any conversion issue, not only `ERROR` issues; from-deck: unresolved refs / unconvertible entities become errors), `-label-tag-prefix` (namespaces label-derived tags; stripped on revert).
+Run the tool: `ai-deck-converter -min-runtime-version 2.1 input.yaml` (stdout), `-o kong.yaml` to write a file, `-` for stdin. `-min-runtime-version` (`MAJOR.MINOR`) is required for to-deck/to-dbless and rejected for from-deck. The direction is auto-detected (`_format_version` present → decK→AI Gateway) and can be forced with `-direction to-deck|to-dbless|from-deck`. Flags: `-strict` (to-deck/to-dbless: exit 1 on any conversion issue, not only `ERROR` issues; from-deck: unresolved refs / unconvertible entities become errors), `-label-tag-prefix` (namespaces label-derived tags; stripped on revert).
 
 ## Architecture
 
@@ -33,6 +33,8 @@ One direction of dependency (`convert`/`revert` → `internal/*`):
 ### Conversion flow
 
 `Converter.run()` (in `convert.go`) executes a **fixed ordering**: registries → global policies → vaults → consumer groups → consumers → models → MCP servers → agents. Each step lives in its own file (`policy.go`, `vault.go`, `consumer.go`, `model.go`, `mcp.go`, `agent.go`).
+
+Version gates follow `docs/decisions/00225-dataplane-conversion-compatability.md`. `internal/aimap/versions.go` holds every gate (`Feature` → first release) and is the only place that compares versions. A convert step checks `c.supports(aimap.FeatureX)` and reports `UNSUPPORTED_IN_MIN_RUNTIME_VERSION` through `c.reportUnsupported`/`c.failUnsupported`. A new output that older data planes reject adds a `Feature` in the same change. Golden cases default to `aimap.LatestVersion`; set `min_runtime_version` in `options.yaml` to test below a gate (see the `8x_min_runtime_*` cases).
 
 Issue reporting follows `docs/decisions/00207-conversion-issue-reporting.md`. Every issue carries a code, a severity, and a `ConversionIssueSource` (entity kind, name, and field paths relative to the entity, built with `issueSource(kind, name).at(fields...)`). Use `c.warn(src, code, ...)` for a `WARNING`, `c.reportError(src, code, ...)` for an `ERROR` that lets the entity convert, and `return c.fail(src, code, ...)` to leave out the entity: `fail` returns `errSkipEntity`. Each top-level entity converts inside `c.convertEntity`, which restores `c.out` when the entity fails and turns a panic or an unexpected error into `INTERNAL_ERROR`. Models share routes and plugins, so `convertModels` instead starts a new pass without the failed model (`convertModelsPass`, `modelPass`). Code on the model path must therefore never change the source document: `resolveEmbeddings` works on a `deepCopy`. A nested item that cannot be converted (an MCP tool, a model target, a consumer credential) is left out with a `WARNING` whose path points at the item; an unknown or unconvertible auth strategy always fails the entity.
 

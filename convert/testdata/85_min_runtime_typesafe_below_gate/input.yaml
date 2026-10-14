@@ -1,0 +1,53 @@
+# typesafe needs 2.2. At 2.1:
+# - the typesafe-format model is absent with an error;
+# - a typesafe target on another model is absent with a warning;
+# - a model whose only target is typesafe is absent with an error.
+model_providers:
+  - name: jev-typesafe
+    type: typesafe
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://ai/typesafe-token}"
+  - name: openai-prod
+    type: openai
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://ai/openai-token}"
+models:
+  - name: jev-hosted-on-typesafe
+    type: model
+    capabilities: [decisions]
+    formats: [{type: typesafe}]
+    config:
+      route: {paths: [/decide]}
+    targets:
+      - name: jev-latest
+        provider: jev-typesafe
+        config: {type: typesafe}
+  - name: mixed-gpt
+    type: model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/mixed]}
+    targets:
+      - name: gpt-4o
+        provider: openai-prod
+        config: {type: openai}
+      - name: jev-latest
+        provider: jev-typesafe
+  - name: only-typesafe
+    type: model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/only]}
+    targets:
+      - name: jev-latest
+        provider: jev-typesafe

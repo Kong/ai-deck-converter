@@ -18,7 +18,7 @@ const mockAuthHeaderValue = "Bearer e2e-mock-secret"
 // ai-gateway-model-alias-group tag.
 func testSingleModelMultipleAliases(t *testing.T, license string) {
 	mock := startMockUpstream(t)
-	configPath := convertCase(t, "single_model_multiple_aliases", patchMockUpstream(mock.Port, mockAuthHeaderValue))
+	configPath := convertCase(t, "single_model_multiple_aliases", "2.0", patchMockUpstream(mock.Port, mockAuthHeaderValue))
 
 	gateway := startGateway(t, GatewayOptions{
 		Image:  gatewayImage(t, "kong/kong-ai-gateway:2.0.2"),
@@ -66,7 +66,7 @@ func testSingleModelMultipleAliases(t *testing.T, license string) {
 // a declarative config it rejects, so readiness alone shows acceptance; the
 // admin API check then confirms every route was actually loaded.
 func testGeminiModelAllCapabilities(t *testing.T, license string) {
-	configPath := convertCase(t, "gemini_model_all_capabilities", nil)
+	configPath := convertCase(t, "gemini_model_all_capabilities", "2.0", nil)
 
 	gateway := startGateway(t, GatewayOptions{
 		Image:  gatewayImage(t, "kong/kong-ai-gateway:2.0.2"),

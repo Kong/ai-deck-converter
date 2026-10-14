@@ -21,22 +21,22 @@ make build
 
 ```sh
 # AI Gateway -> Kong decK (direction auto-detected from the input)
-./ai-deck-converter input.yaml
+./ai-deck-converter -min-runtime-version 2.1 input.yaml
 
 # Kong decK -> AI Gateway (auto-detected: decK docs carry _format_version)
 ./ai-deck-converter kong.yaml
 
 # write to a file
-./ai-deck-converter -o kong.yaml input.yaml
+./ai-deck-converter -min-runtime-version 2.1 -o kong.yaml input.yaml
 
 # read from stdin
-cat input.yaml | ./ai-deck-converter -
+cat input.yaml | ./ai-deck-converter -min-runtime-version 2.1 -
 
 # force a direction
 ./ai-deck-converter -direction from-deck kong.yaml
 
 # emit Koko-style db-less output
-./ai-deck-converter -direction to-dbless input.yaml
+./ai-deck-converter -direction to-dbless -min-runtime-version 2.1 input.yaml
 ```
 
 ### Flags
@@ -44,6 +44,7 @@ cat input.yaml | ./ai-deck-converter -
 | Flag | Default | Description |
 |---|---|---|
 | `-o` | stdout | Output file path. |
+| `-min-runtime-version` | none | Oldest AI Gateway release (`MAJOR.MINOR`, e.g. `2.1`) that must run the output. Required for `to-deck` and `to-dbless`; not valid with `from-deck`. Same value as the Konnect `min_runtime_version` field. See [Minimum runtime version](#minimum-runtime-version). |
 | `-direction` | `auto` | Conversion direction: `auto`, `to-deck` (AI Gateway → decK), `to-dbless` (AI Gateway → db-less), or `from-deck` (decK → AI Gateway). Auto-detection keys off `_format_version`, which only decK documents carry. |
 | `-strict` | `false` | Exit non-zero on warnings too. For `to-deck`/`to-dbless`, any issue fails the run. For `from-deck`, unresolved references and unconvertible entities become errors. |
 | `-label-tag-prefix` | `""` | Prefix for label-derived tags, e.g. `aigw/` (prepended when converting to decK, stripped when reverting). |
@@ -52,6 +53,21 @@ Conversion issues are printed to stderr, one per line, as
 `SEVERITY CODE kind "name" [fields]: reason`. The converted config always goes
 to stdout/`-o`. The exit code is 1 when an issue has the `ERROR` severity, or on
 any issue with `-strict`. The reverse direction prints `warning:` lines.
+
+## Minimum runtime version
+
+Every forward conversion needs the oldest AI Gateway release that must run the
+output, as `MAJOR.MINOR`. It is the `min_runtime_version` of the Konnect AI
+Gateway. The converter supports `2.0` to `2.3`.
+
+- An empty value, a value that is not `MAJOR.MINOR` (for example `2.1.0` or
+  `latest`), or a value below `2.0` fails the run.
+- A value above `2.3` gives a `WARNING` and converts for `2.3`.
+- A feature that needs a newer release gives an
+  `UNSUPPORTED_IN_MIN_RUNTIME_VERSION` issue. The rules in
+  `internal/aimap/versions.go` decide whether the field is dropped with a
+  `WARNING` or the entity is left out with an `ERROR`. See
+  `docs/decisions/00225-dataplane-conversion-compatability.md`.
 
 ## Conversion issues
 
@@ -99,7 +115,7 @@ import (
 )
 
 // AI Gateway -> Kong decK
-result, err := convert.Convert(srcYAML, convert.Options{})
+result, err := convert.Convert(srcYAML, convert.Options{MinRuntimeVersion: "2.1"})
 for _, issue := range result.Issues {
     if issue.Severity == convert.Error { /* stop, or report */ }
 }

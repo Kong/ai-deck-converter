@@ -1,0 +1,28 @@
+# http_5xx and http_413 need 2.3. At 2.2 each is absent from failover_criteria
+# with a warning. The other values stay.
+models:
+  - name: balanced-gpt
+    type: model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/ai]}
+      balancer:
+        algorithm: round-robin
+        failover_criteria: [error, timeout, http_429, http_5xx, http_413]
+    targets:
+      - name: gpt-4o
+        provider: openai-prod
+        config: {type: openai}
+      - name: gpt-4o-mini
+        provider: openai-prod
+        config: {type: openai}
+model_providers:
+  - name: openai-prod
+    type: openai
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://ai/openai-token}"

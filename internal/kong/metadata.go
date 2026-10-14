@@ -14,6 +14,9 @@ type ConversionMetadata struct {
 	Plugins       []GeneratedEntitySource
 	Routes        []GeneratedEntitySource
 	Services      []GeneratedEntitySource
+	// MinRuntimeVersion is the minimum runtime version that the conversion
+	// used, in the form MAJOR.MINOR.
+	MinRuntimeVersion string
 }
 
 // PluginTargetSource identifies one target in the converted plugin list and

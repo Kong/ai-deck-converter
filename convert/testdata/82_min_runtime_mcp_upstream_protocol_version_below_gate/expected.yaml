@@ -1,0 +1,19 @@
+_format_version: "3.0"
+services:
+  - name: upstream-mcp
+    url: https://upstream.example.com/mcp
+    routes:
+      - name: upstream-mcp-route
+        paths:
+          - /mcp/upstream
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              include_consumer_groups: true
+              logging:
+                log_audits: false
+                log_payloads: false
+                log_statistics: true
+              mode: upstream-server
+              tools: []
+              tools_cache_ttl_seconds: 300

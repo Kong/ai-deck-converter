@@ -1,0 +1,16 @@
+- code: UNSUPPORTED_IN_MIN_RUNTIME_VERSION
+  reason: 'config.balancer.failover_criteria[3]: http_5xx requires minimum runtime version "2.3", but the configured minimum is "2.2"'
+  source:
+    kind: model
+    name: balanced-gpt
+    fields:
+      - config.balancer.failover_criteria[3]
+  severity: WARNING
+- code: UNSUPPORTED_IN_MIN_RUNTIME_VERSION
+  reason: 'config.balancer.failover_criteria[4]: http_413 requires minimum runtime version "2.3", but the configured minimum is "2.2"'
+  source:
+    kind: model
+    name: balanced-gpt
+    fields:
+      - config.balancer.failover_criteria[4]
+  severity: WARNING

@@ -23,7 +23,7 @@ const (
 // no anonymous fallback, because request-termination does not run on ws and wss.
 func testRealtimeModelWebSocketTransport(t *testing.T, license string) {
 	mock := startMockUpstream(t)
-	configPath := convertCase(t, "realtime_model_websocket_transport", patchMockUpstream(mock.Port, mockAuthHeaderValue))
+	configPath := convertCase(t, "realtime_model_websocket_transport", "2.0", patchMockUpstream(mock.Port, mockAuthHeaderValue))
 
 	gateway := startGateway(t, GatewayOptions{
 		Image:    gatewayImage(t, "kong/kong-ai-gateway:2.0.2"),

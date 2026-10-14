@@ -1,0 +1,29 @@
+# input_cost_list and output_cost_list need 2.1. At 2.0 they are absent with a
+# warning each. The flat cost fields stay.
+models:
+  - name: gpt-5-2
+    type: model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/ai]}
+    targets:
+      - name: gpt-5.2
+        provider: openai-prod
+        config:
+          type: openai
+          input_cost: 1.25
+          output_cost: 10.0
+          input_cost_list:
+            - {modal: text, cost: 1}
+          output_cost_list:
+            - {modal: text, cost: 1}
+model_providers:
+  - name: openai-prod
+    type: openai
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://ai/openai-token}"

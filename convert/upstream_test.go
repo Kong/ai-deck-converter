@@ -20,7 +20,7 @@ agents:
           type: gcp
           region: us-east-1
 `)
-	result, err := Convert(src, Options{})
+	result, err := Convert(src, testOptions)
 	require.NoError(t, err)
 	issue := requireIssue(t, result.Issues, Error, ConfigFieldInvalid, kindAgent, "booking-agent",
 		"config.upstream.auth.type")

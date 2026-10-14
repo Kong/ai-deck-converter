@@ -172,7 +172,7 @@ func TestSourceOwnAuthBecomesAPolicyNotAccess(t *testing.T) {
 
 	// The point of all of it: the reverted document converts. Lifting the
 	// plugin into access.auth_strategies made this a hard error.
-	result, err := convert.Convert(out, convert.Options{})
+	result, err := convert.Convert(out, latestConvertOptions)
 	require.NoError(t, err)
 	require.False(t, result.HasErrors(), "issues: %v", result.Issues)
 }
@@ -232,7 +232,7 @@ func TestUntaggedPreFunctionOnSourceIsAPolicy(t *testing.T) {
 	// rather than emit a config Kong rejects.
 	out, _, err := Revert([]byte(mcpHandWrittenPreFunctionDeck), Options{})
 	require.NoError(t, err)
-	result, err := convert.Convert(out, convert.Options{})
+	result, err := convert.Convert(out, latestConvertOptions)
 	require.NoError(t, err)
 	require.Len(t, result.Issues, 1)
 	require.Equal(t, convert.Error, result.Issues[0].Severity)

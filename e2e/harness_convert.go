@@ -22,7 +22,8 @@ var flagUpdate bool
 // container. When patch is set the fixture is converted twice: unpatched for
 // the snapshot (which stays port- and run-stable) and patched for the running
 // gateway. On -update the snapshot is (re)written instead of compared.
-func convertCase(t *testing.T, caseName string, patch func(src []byte) ([]byte, error)) string {
+// minRuntimeVersion is the minor release of the case's default image.
+func convertCase(t *testing.T, caseName, minRuntimeVersion string, patch func(src []byte) ([]byte, error)) string {
 	t.Helper()
 
 	caseDir := filepath.Join(repoRoot(t), "e2e", "testdata", caseName)
@@ -31,7 +32,7 @@ func convertCase(t *testing.T, caseName string, patch func(src []byte) ([]byte, 
 		t.Fatalf("reading input.yaml: %v", err)
 	}
 
-	out, err := convertDBLess(t, src)
+	out, err := convertDBLess(t, src, minRuntimeVersion)
 	if err != nil {
 		t.Fatalf("converting %s: %v", caseDir, err)
 	}
@@ -61,7 +62,7 @@ func convertCase(t *testing.T, caseName string, patch func(src []byte) ([]byte, 
 		if err != nil {
 			t.Fatalf("patching input.yaml: %v", err)
 		}
-		converted, err = convertDBLess(t, patchedSrc)
+		converted, err = convertDBLess(t, patchedSrc, minRuntimeVersion)
 		if err != nil {
 			t.Fatalf("converting patched %s: %v", caseDir, err)
 		}
@@ -74,9 +75,9 @@ func convertCase(t *testing.T, caseName string, patch func(src []byte) ([]byte, 
 }
 
 // convertDBLess logs every conversion issue. An Error issue fails the test.
-func convertDBLess(t *testing.T, src []byte) ([]byte, error) {
+func convertDBLess(t *testing.T, src []byte, minRuntimeVersion string) ([]byte, error) {
 	t.Helper()
-	result, err := convert.Convert(src, convert.Options{})
+	result, err := convert.Convert(src, convert.Options{MinRuntimeVersion: minRuntimeVersion})
 	if err != nil {
 		return nil, err
 	}

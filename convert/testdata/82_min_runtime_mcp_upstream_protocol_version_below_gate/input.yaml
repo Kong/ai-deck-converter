@@ -1,0 +1,17 @@
+# config.server.upstream_protocol_version needs 2.1. At 2.0 the MCP server is
+# absent with an error. The other MCP server still converts.
+mcp_servers:
+  - type: upstream-server
+    name: stateless-mcp
+    upstream_url: https://stateless.example.com/mcp
+    config:
+      route: {paths: [/mcp/stateless]}
+      tools_cache_ttl_seconds: 300
+      server:
+        upstream_protocol_version: "2026-07-28"
+  - type: upstream-server
+    name: upstream-mcp
+    upstream_url: https://upstream.example.com/mcp
+    config:
+      route: {paths: [/mcp/upstream]}
+      tools_cache_ttl_seconds: 300

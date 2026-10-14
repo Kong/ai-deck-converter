@@ -153,7 +153,7 @@ model_providers:
     name: bedrock-main
     config: {auth: {type: basic, headers: [{name: x-api-key, value: k}]}}
 `)
-	result, err := Convert(src, Options{})
+	result, err := Convert(src, testOptions)
 	require.NoError(t, err, "convert")
 	issue := requireIssue(t, result.Issues, Error, ConfigFieldInvalid, kindModel, "m1", "capabilities[0]")
 	require.Contains(t, issue.Reason, `capability "rerank" is not supported `+

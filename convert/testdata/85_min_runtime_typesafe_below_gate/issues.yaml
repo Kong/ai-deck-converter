@@ -1,0 +1,32 @@
+- code: UNSUPPORTED_IN_MIN_RUNTIME_VERSION
+  reason: 'formats[0].type: typesafe requires minimum runtime version "2.2", but the configured minimum is "2.1"'
+  source:
+    kind: model
+    name: jev-hosted-on-typesafe
+    fields:
+      - formats[0].type
+  severity: ERROR
+- code: UNSUPPORTED_IN_MIN_RUNTIME_VERSION
+  reason: provider type typesafe requires minimum runtime version "2.2", but the configured minimum is "2.1"; the target is omitted
+  source:
+    kind: model
+    name: mixed-gpt
+    fields:
+      - targets[1].provider
+  severity: WARNING
+- code: UNSUPPORTED_IN_MIN_RUNTIME_VERSION
+  reason: provider type typesafe requires minimum runtime version "2.2", but the configured minimum is "2.1"; the target is omitted
+  source:
+    kind: model
+    name: only-typesafe
+    fields:
+      - targets[0].provider
+  severity: WARNING
+- code: MISSING_REQUIRED_CONFIG_FIELD
+  reason: model "only-typesafe" has no target that the converter can convert
+  source:
+    kind: model
+    name: only-typesafe
+    fields:
+      - targets
+  severity: ERROR

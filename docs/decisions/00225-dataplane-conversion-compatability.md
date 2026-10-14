@@ -165,7 +165,6 @@ type Feature string
 
 const (
 	FeatureACLWhen           Feature = "acl-when"
-	FeatureGeminiRealtime    Feature = "gemini-realtime"
 	FeatureMCPToolsetGate    Feature = "mcp-toolset-gate"
 	FeaturePassthroughFormat Feature = "passthrough-format"
 	// ...
@@ -180,7 +179,6 @@ type Version struct {
 // featureSince maps each feature to its first AI Gateway minor release.
 var featureSince = map[Feature]Version{
 	FeatureACLWhen:           {Major: 2, Minor: 2},
-	FeatureGeminiRealtime:    {Major: 2, Minor: 2},
 	FeaturePassthroughFormat: {Major: 2, Minor: 2},
 	// ...
 }
@@ -189,10 +187,8 @@ var featureSince = map[Feature]Version{
 func Supports(f Feature, v Version) bool
 ```
 
-The version of `FeatureGeminiRealtime` is a placeholder. The Konnect API spec
-does not annotate it. See [Gates for existing outputs](#gates-for-existing-outputs)
-for the versions that the spec confirms. An e2e case confirms each gate where
-possible.
+See [Gates for existing outputs](#gates-for-existing-outputs) for the versions
+that the spec confirms. An e2e case confirms each gate where possible.
 
 Rules for the gates:
 
@@ -236,7 +232,6 @@ Each path in "Input fields" is relative to the entity, as in RFC 00207.
 Note: Some gates protect outputs that are not API fields. Their versions come
 from the plugin schemas of each release.
 
-- `FeatureGeminiRealtime`: the `realtime` endpoint of the `gemini` section.
 - `FeatureMCPToolsetGate`: the `pre-function` gate on conversion-only MCP
   routes.
 - The WebSocket plugin list of `SupportsWebSocket`.
@@ -245,10 +240,9 @@ from the plugin schemas of each release.
 
 - The `Converter` struct stores `minRuntimeVersion`. Each convert step uses it to
   decide whether a feature is supported.
-- `EndpointSpec` gets an optional `Feature` field, for example for `gemini`
-  `realtime`. `aimap.EndpointsFor` and `aimap.SectionEndpoints` skip a spec
-  that the minimum runtime version does not have. A capability with no spec left
-  fails the model. A missing secondary spec only gives a `warning`.
+- No endpoint has its own gate. The gated capabilities and formats, for example
+  `skills` and `typesafe`, cover their endpoints. Gemini `realtime` runs on
+  every supported release, so it has no gate.
 - A new `UNSUPPORTED_IN_MIN_RUNTIME_VERSION` issue code reports a field that the
   minimum runtime version does not support. The rules for whether a condition is a
   `warning` or an `error` are the same as for RFC 00207.

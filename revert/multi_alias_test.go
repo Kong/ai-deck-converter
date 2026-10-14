@@ -166,7 +166,7 @@ ai_models:
 	aigwYAML, err := yaml.Marshal(doc)
 	require.NoError(t, err, "marshal reverted document")
 
-	result, err := convert.Convert(aigwYAML, convert.Options{})
+	result, err := convert.Convert(aigwYAML, latestConvertOptions)
 	require.NoError(t, err, "re-convert")
 	require.Empty(t, result.Issues, "no issues expected")
 	redeck := result.Output

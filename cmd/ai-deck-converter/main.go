@@ -40,6 +40,9 @@ func run() error {
 		direction = flag.String("direction", "auto",
 			"conversion direction: auto, to-deck (AI Gateway -> decK), to-dbless (AI Gateway -> db-less), "+
 				"or from-deck (decK -> AI Gateway)")
+		minRuntimeVersion = flag.String("min-runtime-version", "",
+			"oldest AI Gateway release (MAJOR.MINOR, e.g. 2.1) that must run the output; "+
+				"required for to-deck and to-dbless")
 	)
 	flag.Parse()
 
@@ -56,12 +59,19 @@ func run() error {
 		}
 	}
 
+	if err := checkMinRuntimeVersion(dir, *minRuntimeVersion); err != nil {
+		return err
+	}
+
 	var out []byte
 	failed := false
 	switch dir {
 	case "to-deck", "to-dbless":
 		var issues []convert.ConversionIssue
-		out, issues, err = convertToYAML(in, convert.Options{LabelTagPrefix: *tagPrefix}, dir == "to-dbless")
+		out, issues, err = convertToYAML(in, convert.Options{
+			LabelTagPrefix:    *tagPrefix,
+			MinRuntimeVersion: *minRuntimeVersion,
+		}, dir == "to-dbless")
 		if err != nil {
 			return err
 		}
@@ -90,6 +100,19 @@ func run() error {
 	}
 	if failed {
 		return errIssues
+	}
+	return nil
+}
+
+// checkMinRuntimeVersion requires -min-runtime-version for the forward
+// directions and rejects it for from-deck.
+func checkMinRuntimeVersion(dir, version string) error {
+	switch {
+	case (dir == "to-deck" || dir == "to-dbless") && version == "":
+		return errors.New("-min-runtime-version is required when converting to decK or db-less, " +
+			"for example -min-runtime-version 2.1")
+	case dir == "from-deck" && version != "":
+		return errors.New("-min-runtime-version is not valid with from-deck")
 	}
 	return nil
 }

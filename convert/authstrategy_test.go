@@ -203,7 +203,7 @@ func TestAuthStrategyWarnsOverrides(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			result, err := Convert([]byte(authStrategyOverrideDoc(tc.config)), Options{})
+			result, err := Convert([]byte(authStrategyOverrideDoc(tc.config)), testOptions)
 			require.NoError(t, err)
 			require.Len(t, result.Issues, 1, "two referencing models give one issue")
 			issue := requireIssue(t, result.Issues, Warning, ConfigFieldOverridden, kindAuthStrategy, "ka", tc.field)
@@ -252,12 +252,12 @@ models:
     access: {auth_strategies: [keys-a, keys-b]}
     config: {route: {paths: [/ai]}}
 `)
-			result, err := Convert(src, Options{})
+			result, err := Convert(src, testOptions)
 			require.NoError(t, err)
 			requireIssue(t, result.Issues, Error, ConfigFieldInvalid, kindModel, "broken", "access.auth_strategies")
 			require.Empty(t, result.Output.AIModels, "the model is left out")
 
-			withoutModels, err := Convert([]byte(strings.Split(string(src), "models:\n")[0]), Options{})
+			withoutModels, err := Convert([]byte(strings.Split(string(src), "models:\n")[0]), testOptions)
 			require.NoError(t, err)
 			require.Equal(t, withoutModels.Output.Consumers, result.Output.Consumers,
 				"the anonymous consumer keeps the plugins the user wrote")
