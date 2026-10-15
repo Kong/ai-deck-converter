@@ -70,6 +70,7 @@ plugins:
               bedrock:
                 aws_region: us-east-1
                 endpoint_type: mantle
+                mantle_openai_path_prefix: auto_detect
                 vpc_endpoint: vpce-0abc123-xyz.bedrock-mantle.us-east-1.vpce.amazonaws.com
             provider: bedrock
           route_type: llm/v1/chat
