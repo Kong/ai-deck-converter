@@ -15,7 +15,8 @@ jira: https://konghq.atlassian.net/browse/KOKO-4510
 An AI Gateway control plane does not detect routing conflicts today. A user
 can configure models, MCP servers, and agents that listen to the same
 requests. Kong then sends each such request to only one route. The other
-entity does not get the request. The converter reports no issue.
+entity does not get the request. The converter reports no issue for the 
+example conflicts below.
 
 Two layers decide where a request goes:
 
@@ -226,8 +227,10 @@ Kong allows one wildcard at the start or at the end of a host pattern:
 - A wildcard pattern and a plain host overlap when the pattern matches the
   host. `*.example.com` matches `api.example.com`. It does not match
   `example.com`.
-- Two leading wildcards overlap when one suffix ends with the other.
-- Two trailing wildcards overlap when one prefix starts with the other.
+- Two leading wildcards overlap when one suffix, with its leading dot, ends
+  with the other. `*.xexample.com` and `*.example.com` do not overlap.
+- Two trailing wildcards overlap when one prefix, with its trailing dot,
+  starts with the other. `a.*` and `ab.*` do not overlap.
 - A leading and a trailing wildcard always overlap. `example.com` matches
   both `*.com` and `example.*`.
 
@@ -246,8 +249,11 @@ For a header name that both routes set, at least one value of each route must
 overlap:
 
 - Two plain values overlap when they are equal, without case.
-- A regex value (`~*` prefix) overlaps only an equal regex value.
+- A regex value (`~` or `~*` prefix) overlaps only an equal regex value.
 - A regex value and a plain value never overlap.
+
+Two lists of plain values that share no value do not overlap, and the check
+reports no conflict. This misses one case. See [Drawbacks](#drawbacks).
 
 ### Issue source
 
@@ -334,6 +340,10 @@ deterministic for one input.
   converter does not report it. Two different regex values can also match one
   request, for example `~/v1/.*` and `~/v1/chat$`. The converter does not
   report this either.
+- **Missed repeated headers.** One request can carry the same header name
+  twice, for example `X-Tenant: a` and `X-Tenant: b`. That request can match
+  a route with `X-Tenant: [a]` and a route with `X-Tenant: [b]`. The two
+  routes share no header value, so the converter reports no conflict.
 - **Disabled models leave the output.** A caller that relies on the
   `ai_models` entry or the plugins of a disabled model loses them. See
   [Disabled models](#disabled-models).
