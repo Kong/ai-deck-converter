@@ -1,0 +1,50 @@
+agents:
+  - type: a2a
+    name: booking-agent
+    policies:
+      - key-auth
+    config:
+      url: https://booking-agent.internal:8443/a2a
+      route:
+        name: booking-route
+        paths:
+          - /agents/booking
+        methods:
+          - POST
+      max_request_body_size: 1048576
+      logging:
+        payloads: false
+        statistics: true
+        max_payload_size: 524288
+  - type: a2a
+    name: travel-flights
+    config:
+      url: https://travel-agent.internal/a2a
+      route:
+        name: travel-flights
+        paths:
+          - /agents/travel/flights
+      max_request_body_size: 1048576
+      logging:
+        payloads: false
+        statistics: true
+        max_payload_size: 1048576
+  - type: a2a
+    name: travel-hotels
+    config:
+      url: https://travel-agent.internal/a2a
+      route:
+        name: travel-hotels
+        paths:
+          - /agents/travel/hotels
+      max_request_body_size: 2097152
+      logging:
+        payloads: false
+        statistics: true
+        max_payload_size: 1048576
+policies:
+  - type: key-auth
+    name: key-auth
+    config:
+      key_names:
+        - apikey
