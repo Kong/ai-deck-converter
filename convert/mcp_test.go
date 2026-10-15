@@ -448,16 +448,15 @@ mcp_servers:
 }
 
 // A present but empty token_vault block (or one missing its required
-// directory/provider) would lower to auth.token_vault: {} — the plugin schema
+// provider) would lower to an invalid auth.token_vault — the plugin schema
 // rejects that, so convert must too, rather than emitting it silently.
-func TestTokenVaultRequiresDirectoryAndProvider(t *testing.T) {
+func TestTokenVaultRequiresProvider(t *testing.T) {
 	for _, tt := range []struct {
 		name  string
 		block string
 	}{
 		{name: "empty block", block: "    token_vault: {}"},
 		{name: "missing provider", block: "    token_vault:\n      directory: my-directory"},
-		{name: "missing directory", block: "    token_vault:\n      provider: my-upstream-provider"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			_, _, err := convertDoc([]byte(`
@@ -470,7 +469,7 @@ mcp_servers:
       - {name: report, description: Get a report}
 `), false)
 			require.Error(t, err)
-			require.Contains(t, err.Error(), "token_vault requires directory and provider")
+			require.Contains(t, err.Error(), "token_vault requires provider")
 		})
 	}
 }
@@ -568,4 +567,65 @@ func TestMCPACLAllowDenyStillConverts(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, result.Issues, "allow/deny ACLs must still convert")
 	require.Len(t, result.Output.Services, 1)
+}
+
+func TestTokenVaultDatastore(t *testing.T) {
+	const doc = `
+datastores:
+  - name: tv
+    type: %s
+    config:
+      directory: my-directory
+      current_version: v1
+mcp_servers:
+  - type: passthrough-listener
+    name: gh
+    upstream_url: https://mcp.internal
+    datastores: [%s]
+    token_vault:
+      provider: github
+    tools:
+      - {name: report, description: Get a report}
+`
+	t.Run("resolved", func(t *testing.T) {
+		out, _, err := convertDoc([]byte(fmt.Sprintf(doc, "token-vault", "{name: tv}")), false)
+		require.NoError(t, err)
+		y, err := out.ToYAML()
+		require.NoError(t, err)
+		require.Contains(t, string(y), "directory: my-directory")
+		require.Contains(t, string(y), "storage:")
+		require.Contains(t, string(y), "current_version: v1")
+		require.Contains(t, string(y), "backend: konnect")
+	})
+	t.Run("wrong type", func(t *testing.T) {
+		_, _, err := convertDoc([]byte(fmt.Sprintf(doc, "redis-ee", "{name: tv}")), false)
+		require.Error(t, err)
+	})
+	t.Run("unknown name", func(t *testing.T) {
+		_, _, err := convertDoc([]byte(fmt.Sprintf(doc, "token-vault", "{name: nope}")), false)
+		require.Error(t, err)
+	})
+}
+
+func TestTokenVaultCallbackRouteAddedOnce(t *testing.T) {
+	server := func(name string) string {
+		return `
+  - type: passthrough-listener
+    name: ` + name + `
+    upstream_url: https://mcp.internal
+    datastores: [{name: tv}]
+    token_vault: {provider: github}
+    tools:
+      - {name: report, description: Get a report}`
+	}
+	out, _, err := convertDoc([]byte(`
+datastores:
+  - name: tv
+    type: token-vault
+    config: {directory: d, current_version: v1}
+mcp_servers:`+server("a")+server("b")+"\n"), false)
+	require.NoError(t, err)
+	require.Len(t, out.Routes, 1)
+	require.Equal(t, aimap.TokenVaultCallbackName, out.Routes[0].Name)
+	require.Equal(t, "d", out.Routes[0].Plugins[0].Config["directory"])
 }

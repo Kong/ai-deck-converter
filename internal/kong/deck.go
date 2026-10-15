@@ -13,6 +13,7 @@ const FormatVersion = "3.0"
 type Document struct {
 	FormatVersion  string          `yaml:"_format_version"`
 	Services       []Service       `yaml:"services,omitempty"`
+	Routes         []Route         `yaml:"routes,omitempty"`
 	Consumers      []Consumer      `yaml:"consumers,omitempty"`
 	ConsumerGroups []ConsumerGroup `yaml:"consumer_groups,omitempty"`
 	Plugins        []Plugin        `yaml:"plugins,omitempty"`

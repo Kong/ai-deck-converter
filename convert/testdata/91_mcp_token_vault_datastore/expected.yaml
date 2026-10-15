@@ -1,0 +1,87 @@
+_format_version: "3.0"
+services:
+  - name: github-tools
+    url: https://github-mcp.internal.kongair.com
+    routes:
+      - name: github-tools-route
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              auth:
+                provider: token_vault
+                token_vault:
+                  cache:
+                    redis:
+                      host: redis.internal
+                      port: 6379
+                  credential:
+                    inbound:
+                      location: header
+                      name: Authorization
+                      prefix: 'Bearer '
+                    outbound:
+                      location: header
+                      name: Authorization
+                      prefix: 'Bearer '
+                  directory: my-directory
+                  provider: github
+                  storage:
+                    backend: konnect
+                    current_version: v1
+                    keys:
+                      - key: '{vault://hcv/vault-enc-key}'
+                        version: v1
+                  subject_token_type: api_key
+              include_consumer_groups: true
+              logging:
+                log_audits: false
+                log_payloads: false
+                log_statistics: true
+              mode: passthrough-listener
+              tools:
+                - description: A GitHub tool
+                  name: githubTool
+  - name: gitlab-tools
+    url: https://gitlab-mcp.internal.kongair.com
+    routes:
+      - name: gitlab-tools-route
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              auth:
+                provider: token_vault
+                token_vault:
+                  directory: my-directory
+                  provider: gitlab
+                  storage:
+                    backend: konnect
+                    current_version: v1
+                    keys:
+                      - key: '{vault://hcv/vault-enc-key}'
+                        version: v1
+              include_consumer_groups: true
+              logging:
+                log_audits: false
+                log_payloads: false
+                log_statistics: true
+              mode: passthrough-listener
+              tools:
+                - description: A GitLab tool
+                  name: gitlabTool
+routes:
+  - name: token-vault-callback-handler
+    paths:
+      - /_vault
+    protocols:
+      - http
+      - https
+    plugins:
+      - name: token-vault-callback-handler
+        config:
+          directory: my-directory
+          storage:
+            backend: konnect
+            current_version: v1
+            keys:
+              - key: '{vault://hcv/vault-enc-key}'
+                version: v1

@@ -15,6 +15,7 @@ type MCPServer struct {
 	Config      MCPServerConfig `yaml:"config,omitempty"`
 	Tools       []MCPTool       `yaml:"tools,omitempty"`
 	Policies    []string        `yaml:"policies,omitempty"`
+	Datastores  []DatastoreRef  `yaml:"datastores,omitempty"`
 	Access      MCPAccess       `yaml:"access,omitempty"`
 	Labels      Labels          `yaml:"labels,omitempty"`
 
@@ -40,12 +41,33 @@ type TokenVaultConfig struct {
 	// Provider is the upstream credential provider registered in the Token
 	// Vault directory.
 	Provider string `yaml:"provider,omitempty"`
+	// SubjectTokenType is the type of the subject token sent in the token
+	// exchange.
+	SubjectTokenType string `yaml:"subject_token_type,omitempty"`
+	// Credential says where the inbound credential arrives and where the
+	// exchanged credential goes upstream.
+	Credential *TokenVaultCredential `yaml:"credential,omitempty"`
+	// Cache is copied verbatim into the plugin's auth.token_vault.cache.
+	Cache map[string]any `yaml:"cache,omitempty"`
 	// Redis shares exchanged credentials across the cluster.
 	Redis *RedisCloudConfig `yaml:"redis,omitempty"`
 	// EncryptionSecrets encrypt exchanged credentials before they are cached
 	// in Redis. Required when Redis is configured. Referenceable
 	// ({vault://...} references pass through verbatim).
 	EncryptionSecrets []string `yaml:"encryption_secrets,omitempty"`
+}
+
+// TokenVaultCredential holds the inbound and outbound credential placement.
+type TokenVaultCredential struct {
+	Inbound  *TokenVaultCredentialLocation `yaml:"inbound,omitempty"`
+	Outbound *TokenVaultCredentialLocation `yaml:"outbound,omitempty"`
+}
+
+// TokenVaultCredentialLocation places a credential in a request.
+type TokenVaultCredentialLocation struct {
+	Location string `yaml:"location,omitempty"`
+	Name     string `yaml:"name,omitempty"`
+	Prefix   string `yaml:"prefix,omitempty"`
 }
 
 // RedisCloudConfig mirrors the AIGatewayRedisCloudConfiguration schema: the
