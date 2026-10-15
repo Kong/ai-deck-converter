@@ -1,0 +1,92 @@
+_format_version: "3.0"
+_transform: false
+services:
+  - id: e103482a-07b8-5fcb-bf84-45e7578aa318
+    name: vendor-mcp
+    url: https://vendor-mcp.example.com/mcp
+    host: vendor-mcp.example.com
+    port: 443
+    protocol: https
+    path: /mcp
+    client_certificate:
+      id: e2e5a11f-199d-50ca-bfef-1fef703aaca0
+    ca_certificates:
+      - 7471bf62-0a8e-5d7b-913b-a39d4828ed63
+  - id: 00c1c450-0e53-5e5e-978c-fe172148c4bd
+    name: booking-agent
+    url: https://booking-agent.internal:8443/a2a
+    host: booking-agent.internal
+    port: 8443
+    protocol: https
+    path: /a2a
+    client_certificate:
+      id: e2e5a11f-199d-50ca-bfef-1fef703aaca0
+    ca_certificates:
+      - 7471bf62-0a8e-5d7b-913b-a39d4828ed63
+      - 956bb1c1-f792-57fd-b8ec-b7148b4c7d42
+routes:
+  - id: 047b9067-f79b-5b0c-b6b7-b092cb17943f
+    name: vendor-mcp-route
+    service:
+      id: e103482a-07b8-5fcb-bf84-45e7578aa318
+    paths:
+      - /mcp/vendor
+    protocols:
+      - http
+      - https
+  - id: 63fb3b12-3e29-51e9-b9f7-e4c90e501789
+    name: booking-route
+    service:
+      id: 00c1c450-0e53-5e5e-978c-fe172148c4bd
+    paths:
+      - /agents/booking
+    protocols:
+      - http
+      - https
+plugins:
+  - id: 52251e15-f665-5692-80ee-e2db27c91574
+    name: ai-mcp-proxy
+    config:
+      include_consumer_groups: true
+      logging:
+        log_audits: false
+        log_payloads: false
+        log_statistics: true
+      mode: passthrough-listener
+      tools: []
+    route:
+      id: 047b9067-f79b-5b0c-b6b7-b092cb17943f
+  - id: 82967e75-af81-51ce-b5a5-b9e01d66931b
+    name: ai-a2a-proxy
+    config:
+      logging:
+        log_payloads: false
+        log_statistics: true
+        max_payload_size: 1048576
+    route:
+      id: 63fb3b12-3e29-51e9-b9f7-e4c90e501789
+certificates:
+  - id: e2e5a11f-199d-50ca-bfef-1fef703aaca0
+    cert: |
+      -----BEGIN CERTIFICATE-----
+      MIIBrsBgNVBAMMCnVwc3RyZWFtLTE=
+      -----END CERTIFICATE-----
+    key: |
+      -----BEGIN PRIVATE KEY-----
+      MIIBVAIBADANBgkqhkiG9w0BAQEFAA==
+      -----END PRIVATE KEY-----
+ca_certificates:
+  - id: 7471bf62-0a8e-5d7b-913b-a39d4828ed63
+    cert: |
+      -----BEGIN CERTIFICATE-----
+      MIIBinternalrootca
+      -----END CERTIFICATE-----
+    tags:
+      - ai-gateway-name:internal-root-ca
+  - id: 956bb1c1-f792-57fd-b8ec-b7148b4c7d42
+    cert: |
+      -----BEGIN CERTIFICATE-----
+      MIIBpartnerrootca
+      -----END CERTIFICATE-----
+    tags:
+      - ai-gateway-name:partner-root-ca

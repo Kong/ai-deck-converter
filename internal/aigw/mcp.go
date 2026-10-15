@@ -196,7 +196,9 @@ type MCPServerConfig struct {
 	// whose tools the listener exposes. The converter attaches the listener's
 	// private server.tag to each referenced source plugin's tags so the DP
 	// exposes exactly those sources' tools on the listener.
-	Sources []string `yaml:"sources,omitempty"`
+	Sources        []string `yaml:"sources,omitempty"`
+	Certificates   []string `yaml:"certificates,omitempty"`
+	CACertificates []string `yaml:"ca_certificates,omitempty"`
 }
 
 // MCPTool is a single MCP tool definition. Fields mirror the ai-mcp-proxy

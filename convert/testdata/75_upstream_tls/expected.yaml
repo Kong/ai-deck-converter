@@ -1,0 +1,67 @@
+_format_version: "3.0"
+services:
+  - name: vendor-mcp
+    id: 9b3e8cba-2cb7-4fd4-888e-20a6727230f2
+    url: https://vendor-mcp.example.com/mcp
+    client_certificate:
+      id: 0f6a3c7e-1d2b-4c5a-9e8f-7a6b5c4d3e2f
+    ca_certificates:
+      - 3c1d2e4f-5a6b-4c7d-8e9f-0a1b2c3d4e5f
+    routes:
+      - name: vendor-mcp-route
+        paths:
+          - /mcp/vendor
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              include_consumer_groups: true
+              logging:
+                log_audits: false
+                log_payloads: false
+                log_statistics: true
+              mode: passthrough-listener
+              tools: []
+  - name: booking-agent
+    id: 5b3e8cba-2cb7-4fd4-888e-20a6727230f2
+    url: https://booking-agent.internal:8443/a2a
+    client_certificate:
+      id: 0f6a3c7e-1d2b-4c5a-9e8f-7a6b5c4d3e2f
+    ca_certificates:
+      - 3c1d2e4f-5a6b-4c7d-8e9f-0a1b2c3d4e5f
+      - 7e8f9a0b-1c2d-4e3f-8a5b-6c7d8e9f0a1b
+    routes:
+      - name: booking-route
+        paths:
+          - /agents/booking
+        plugins:
+          - name: ai-a2a-proxy
+            config:
+              logging:
+                log_payloads: false
+                log_statistics: true
+                max_payload_size: 1048576
+certificates:
+  - id: 0f6a3c7e-1d2b-4c5a-9e8f-7a6b5c4d3e2f
+    cert: |
+      -----BEGIN CERTIFICATE-----
+      MIIBrsBgNVBAMMCnVwc3RyZWFtLTE=
+      -----END CERTIFICATE-----
+    key: |
+      -----BEGIN PRIVATE KEY-----
+      MIIBVAIBADANBgkqhkiG9w0BAQEFAA==
+      -----END PRIVATE KEY-----
+ca_certificates:
+  - id: 3c1d2e4f-5a6b-4c7d-8e9f-0a1b2c3d4e5f
+    cert: |
+      -----BEGIN CERTIFICATE-----
+      MIIBinternalrootca
+      -----END CERTIFICATE-----
+    tags:
+      - ai-gateway-name:internal-root-ca
+  - id: 7e8f9a0b-1c2d-4e3f-8a5b-6c7d8e9f0a1b
+    cert: |
+      -----BEGIN CERTIFICATE-----
+      MIIBpartnerrootca
+      -----END CERTIFICATE-----
+    tags:
+      - ai-gateway-name:partner-root-ca

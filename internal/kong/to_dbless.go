@@ -241,17 +241,19 @@ func toDBLessPlugin(plugin Plugin, id string, scope scopeRef) DBLessPlugin {
 
 func toDBLessService(service Service, id string) DBLessService {
 	out := DBLessService{
-		ID:       id,
-		Name:     service.Name,
-		URL:      service.URL,
-		Host:     service.Host,
-		Port:     service.Port,
-		Protocol: service.Protocol,
-		Path:     service.Path,
-		Enabled:  service.Enabled,
-		Retries:  service.Retries,
-		Tags:     service.Tags,
-		Source:   service.Source,
+		ID:                id,
+		Name:              service.Name,
+		URL:               service.URL,
+		Host:              service.Host,
+		Port:              service.Port,
+		Protocol:          service.Protocol,
+		Path:              service.Path,
+		Enabled:           service.Enabled,
+		Retries:           service.Retries,
+		ClientCertificate: service.ClientCertificate,
+		CACertificates:    service.CACertificates,
+		Tags:              service.Tags,
+		Source:            service.Source,
 	}
 	if service.URL != "" {
 		if parsed, err := url.Parse(service.URL); err == nil {

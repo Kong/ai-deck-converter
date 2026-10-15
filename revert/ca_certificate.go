@@ -14,6 +14,7 @@ func (r *Reverter) revertCACertificates() {
 		cert := &r.src.CACertificates[i]
 		name, rest := aimap.DecodeCACertificateName(cert.Tags)
 		r.out.CACertificates = append(r.out.CACertificates, aigw.CACertificate{
+			ID:         cert.ID,
 			Name:       name,
 			Cert:       cert.Cert,
 			CertDigest: cert.CertDigest,

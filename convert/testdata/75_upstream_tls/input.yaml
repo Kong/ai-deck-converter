@@ -1,0 +1,46 @@
+agents:
+  - type: a2a
+    id: 5b3e8cba-2cb7-4fd4-888e-20a6727230f2
+    name: booking-agent
+    config:
+      url: https://booking-agent.internal:8443/a2a
+      route: {name: booking-route, paths: [/agents/booking]}
+      certificates: [upstream-client]
+      ca_certificates: [internal-root-ca, partner-root-ca]
+
+mcp_servers:
+  - type: passthrough-listener
+    id: 9b3e8cba-2cb7-4fd4-888e-20a6727230f2
+    name: vendor-mcp
+    upstream_url: https://vendor-mcp.example.com/mcp
+    config:
+      route: {name: vendor-mcp-route, paths: [/mcp/vendor]}
+      certificates: [upstream-client]
+      ca_certificates: [internal-root-ca]
+    tools: []
+
+certificates:
+  - id: 0f6a3c7e-1d2b-4c5a-9e8f-7a6b5c4d3e2f
+    name: upstream-client
+    cert: |
+      -----BEGIN CERTIFICATE-----
+      MIIBrsBgNVBAMMCnVwc3RyZWFtLTE=
+      -----END CERTIFICATE-----
+    key: |
+      -----BEGIN PRIVATE KEY-----
+      MIIBVAIBADANBgkqhkiG9w0BAQEFAA==
+      -----END PRIVATE KEY-----
+
+ca_certificates:
+  - id: 3c1d2e4f-5a6b-4c7d-8e9f-0a1b2c3d4e5f
+    name: internal-root-ca
+    cert: |
+      -----BEGIN CERTIFICATE-----
+      MIIBinternalrootca
+      -----END CERTIFICATE-----
+  - id: 7e8f9a0b-1c2d-4e3f-8a5b-6c7d8e9f0a1b
+    name: partner-root-ca
+    cert: |
+      -----BEGIN CERTIFICATE-----
+      MIIBpartnerrootca
+      -----END CERTIFICATE-----
