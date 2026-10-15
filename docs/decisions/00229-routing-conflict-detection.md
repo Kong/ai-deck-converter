@@ -48,7 +48,9 @@ This RFC makes the converter report each of these conflicts.
   - Model selector conflicts: two models on one shared route that read the
     model name from different places.
   - A new issue code, `ROUTING_CONFLICT`.
-  - Leaving out disabled models. See [Disabled models](#disabled-models).
+  - The code of two existing routing conflict checks. See
+    [Existing routing conflict checks](#existing-routing-conflict-checks).
+  - Omitting disabled models from output. See [Disabled models](#disabled-models).
 - Out of scope:
   - Validating against a copy of the Kong router priority rules.
   - Comparison of regex values (paths, headers, etc.) with plain values.
@@ -321,6 +323,52 @@ this model does not use. Each pair of models is reported one time. WebSocket
 and passthrough routes have no `ai-model-selector`, so they never get this
 conflict.
 
+## Existing routing conflict checks
+
+The converter already reports two routing conflicts with other codes. This
+RFC changes both to `ROUTING_CONFLICT`, so a caller finds every routing
+conflict by one code. The severity and the output stay the same.
+
+| Check                                    | Today                            | With this RFC                 |
+|------------------------------------------|----------------------------------|-------------------------------|
+| Passthrough models on one route path     | `CONFIG_FIELD_INVALID`, `ERROR`  | `ROUTING_CONFLICT`, `ERROR`   |
+| Video lifecycle routes that models share | `BEHAVIOR_MAY_DIFFER`, `WARNING` | `ROUTING_CONFLICT`, `WARNING` |
+
+### Passthrough models on one route path
+
+A passthrough route has no `ai-model-selector`. Two passthrough models whose
+routes match the same requests therefore cannot both work. `convertModel`
+leaves out the later model with an `ERROR` on `config.route.paths`. This
+ stays because it follows the rule for model name conflicts: the output
+cannot work, so the later model is left out.
+
+The route conflict check compares the request matchers of the two routes for exact
+equality. The route check later sees only the earlier model, so it reports
+no second issue for the pair.
+
+### Video lifecycle routes that models share
+
+Two OpenAI video models with the same route configuration each make a video
+lifecycle route on the same paths. `videoLifecycleCandidates` reports a
+`WARNING` on `config.route` of each of these models. Both models still
+convert.
+
+The route check also sees these overlapping lifecycle routes. It does not
+report them again. The lifecycle check already names every model on the
+paths, so a second issue for the same pair adds nothing.
+
+The lifecycle check also reports a `BEHAVIOR_MAY_DIFFER` `WARNING` when one
+lifecycle route has more than one target. This is not a conflict between two
+entities, so its code stays.
+
+### Compatibility
+
+RFC 00207 makes codes public API. It calls renaming, removing, or reusing a
+code a breaking change. This RFC does none of these. `CONFIG_FIELD_INVALID`
+and `BEHAVIOR_MAY_DIFFER` stay, and other checks still use them. A caller that
+matches on the old code for these two checks must match on
+`ROUTING_CONFLICT`. A caller that handles issues by severity sees no change.
+
 ## Order
 
 The checks run in conversion order. A model left out for a name conflict
@@ -373,6 +421,8 @@ This RFC rejects these alternatives:
   the input config that they provide.
 - **Use `BEHAVIOR_MAY_DIFFER`.** A specific issue code makes it easier for
   users to identify and fix issues, and `BEHAVIOR_MAY_DIFFER` is too generic.
+- **Keep the old codes for the existing checks.** Callers would then need
+  three codes to find every routing conflict. One code is easier to match.
 
 # Unresolved questions
 [unresolved-questions]: #unresolved-questions
@@ -396,6 +446,10 @@ None.
 - Update the golden case `29_dbless_disabled_model_plugins`, and add a
   disabled model that shares an alias and a route with an enabled model. Its
   output has only the enabled model, with no issue.
+- Update the existing tests of the passthrough path check in
+  `convert/model_test.go` and of the shared video lifecycle route in
+  `convert/convert_test.go` to expect `ROUTING_CONFLICT`. Check that the
+  route check reports no second issue for a shared lifecycle route.
 - The existing golden cases `08_mcp_auth_proxy_upstream` and
   `64_mcp_token_vault` have a real conflict. Give their MCP servers distinct
   paths, so they stay free of issues.
