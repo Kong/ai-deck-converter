@@ -1,0 +1,39 @@
+_format_version: "3.0"
+services:
+  - name: booking-agent
+    url: https://booking-agent.internal:8443/a2a
+    routes:
+      - name: booking-route
+        paths:
+          - /agents/booking
+        methods:
+          - POST
+    plugins:
+      - name: ai-a2a-proxy
+        config:
+          logging:
+            log_payloads: false
+            log_statistics: true
+            max_payload_size: 524288
+          max_request_body_size: 1048576
+      - name: key-auth
+        config:
+          key_names:
+            - apikey
+  - name: travel-agent
+    url: https://travel-agent.internal/a2a
+    routes:
+      - name: travel-flights
+        paths:
+          - /agents/travel/flights
+      - name: travel-hotels
+        paths:
+          - /agents/travel/hotels
+        plugins:
+          - name: ai-a2a-proxy
+            config:
+              max_request_body_size: 2097152
+    plugins:
+      - name: ai-a2a-proxy
+        config:
+          max_request_body_size: 1048576

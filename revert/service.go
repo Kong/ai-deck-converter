@@ -18,7 +18,7 @@ func (r *Reverter) revertServices() error {
 
 	for i := range r.src.Services {
 		svc := &r.src.Services[i]
-		svcPlugins := r.servicePlugins(svc)
+		svcAIPlugins, svcPlugins := splitAIPlugins(r.servicePlugins(svc))
 		for j := range svc.Routes {
 			routesSeen[svc.Routes[j].Name] = true
 		}
@@ -30,11 +30,11 @@ func (r *Reverter) revertServices() error {
 			continue
 		}
 
-		var plainRoutes []*kong.Route
+		var plainRoutes []plainRoute
 		hasModelRoute, hasMCPRoute := false, false
 		for j := range svc.Routes {
 			rt := &svc.Routes[j]
-			plugins := r.routePlugins(rt)
+			plugins := inheritPlugins(r.routePlugins(rt), svcAIPlugins)
 			switch {
 			case hasPlugin(plugins, "ai-proxy-advanced"):
 				if err := r.accumulateModelRoute(acc, rt, plugins); err != nil {
@@ -47,7 +47,7 @@ func (r *Reverter) revertServices() error {
 				}
 				hasMCPRoute = true
 			default:
-				plainRoutes = append(plainRoutes, rt)
+				plainRoutes = append(plainRoutes, plainRoute{rt, plugins})
 			}
 		}
 
@@ -62,12 +62,12 @@ func (r *Reverter) revertServices() error {
 			}
 		}
 
-		for _, rt := range plainRoutes {
+		for _, pr := range plainRoutes {
 			name := svc.Name
 			if len(svc.Routes) > 1 {
-				name = rt.Name
+				name = pr.route.Name
 			}
-			if err := r.revertAgent(svc, rt, name, svcPlugins); err != nil {
+			if err := r.revertAgent(svc, pr.route, name, pr.plugins, svcPlugins); err != nil {
 				return err
 			}
 		}
@@ -88,4 +88,38 @@ func (r *Reverter) revertServices() error {
 	}
 
 	return r.finalizeModels(acc)
+}
+
+// plainRoute is a route that becomes an agent, with its effective plugins.
+type plainRoute struct {
+	route   *kong.Route
+	plugins []kong.Plugin
+}
+
+// splitAIPlugins separates service-scoped AI plugins from the other service
+// plugins. Each route of the service inherits the AI plugins.
+func splitAIPlugins(svcPlugins []kong.Plugin) (ai, rest []kong.Plugin) {
+	for _, p := range svcPlugins {
+		if aiPluginNames[p.Name] {
+			ai = append(ai, p)
+		} else {
+			rest = append(rest, p)
+		}
+	}
+	return ai, rest
+}
+
+// inheritPlugins adds each inherited plugin that the route does not set.
+// A route-level plugin overrides a service-level plugin with the same name.
+func inheritPlugins(routePlugins, inherited []kong.Plugin) []kong.Plugin {
+	if len(inherited) == 0 {
+		return routePlugins
+	}
+	out := append([]kong.Plugin{}, routePlugins...)
+	for _, p := range inherited {
+		if !hasPlugin(routePlugins, p.Name) {
+			out = append(out, p)
+		}
+	}
+	return out
 }
