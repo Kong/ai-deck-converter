@@ -6,7 +6,7 @@ tags:
   - convert
   - routing
   - api
-jira: https://konghq.atlassian.net/browse/KOKO-4510
+jira: https://konghq.atlassian.net/browse/KOKO-4720
 ---
 
 # Motivation
