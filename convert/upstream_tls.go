@@ -16,9 +16,9 @@ func (c *Converter) applyUpstreamTLS(src ConversionIssueSource, svc *kong.Servic
 	}
 	// Kong rejects the whole configuration if a non-https Service has these fields.
 	if u, err := url.Parse(svc.URL); err != nil || u.Scheme != "https" {
-		c.warn(src.at("config.certificates", "config.ca_certificates"), ConfigFieldIgnored,
-			"%s %q sets certificates or ca_certificates, but its url %q is not https; "+
-				"they are ignored", src.Kind, src.Name, svc.URL)
+		c.reportError(src.at("config.certificates", "config.ca_certificates"), ConfigFieldInvalid,
+			"%s %q sets certificates or ca_certificates, but its url %q is not https",
+			src.Kind, src.Name, svc.URL)
 		return
 	}
 
@@ -31,7 +31,7 @@ func (c *Converter) applyUpstreamTLS(src ConversionIssueSource, svc *kong.Servic
 		if id, ok := c.certificateID(certs[0]); ok {
 			svc.ClientCertificate = map[string]string{"id": id}
 		} else {
-			c.warn(src.at("config.certificates[0]"), UndefinedReference,
+			c.reportError(src.at("config.certificates[0]"), UndefinedReference,
 				"%s %q references unknown certificate %q", src.Kind, src.Name, certs[0])
 		}
 	}
@@ -39,7 +39,7 @@ func (c *Converter) applyUpstreamTLS(src ConversionIssueSource, svc *kong.Servic
 	for i, name := range caCerts {
 		id, ok := c.caCertificateID(name)
 		if !ok {
-			c.warn(src.at(fmt.Sprintf("config.ca_certificates[%d]", i)), UndefinedReference,
+			c.reportError(src.at(fmt.Sprintf("config.ca_certificates[%d]", i)), UndefinedReference,
 				"%s %q references unknown CA certificate %q", src.Kind, src.Name, name)
 			continue
 		}
