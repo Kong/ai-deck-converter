@@ -85,6 +85,15 @@ func (d *Document) ToDBLess() *DBLessDocument {
 		}
 	}
 
+	for _, route := range d.Routes {
+		routeID := StableUUID("route::" + route.Name)
+		out.Routes = append(out.Routes, toDBLessRoute(route, routeID, ""))
+		for pluginIdx, plugin := range route.Plugins {
+			id := firstNonEmpty(plugin.ID, StableUUID(fmt.Sprintf("plugin:route:%s:%s:%d", route.Name, plugin.Name, pluginIdx)))
+			out.Plugins = append(out.Plugins, toDBLessPlugin(plugin, id, scopeRef{route: routeID}))
+		}
+	}
+
 	for _, consumer := range d.Consumers {
 		consumerID := ids.consumer[consumer.Username]
 		out.Consumers = append(out.Consumers, DBLessConsumer{

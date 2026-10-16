@@ -52,6 +52,12 @@ func TestDatastoreSupportForPolicyType(t *testing.T) {
 			configPath:    "vectordb",
 		},
 		{
+			name:          "no policy plugin takes token-vault",
+			policyType:    "rate-limiting",
+			datastoreType: DatastoreTypeTokenVault,
+			configPath:    "redis",
+		},
+		{
 			name:          "vectordb plugin never takes redis-ce",
 			policyType:    "ai-rag-injector",
 			datastoreType: DatastoreTypeRedisCE,
@@ -136,6 +142,13 @@ func TestApplyDatastoreRejects(t *testing.T) {
 			refs:       refs("ds1"),
 			registry:   registry(map[string]string{"ds1": DatastoreTypeRedisEE}),
 			wantErr:    `plugin type "rate-limiting" does not support a "redis-ee" datastore`,
+		},
+		{
+			name:       "policy rejects token-vault",
+			policyType: "rate-limiting",
+			refs:       refs("ds1"),
+			registry:   registry(map[string]string{"ds1": DatastoreTypeTokenVault}),
+			wantErr:    `plugin type "rate-limiting" does not support a "token-vault" datastore`,
 		},
 		{
 			name:       "vectordb plugin rejects redis-ce",
@@ -298,4 +311,20 @@ func TestApplyModelDatastoreRejectsUnknownTypeListsAllSupportedTypes(t *testing.
 	for supported := range modelDatastoreTypes {
 		require.Contains(t, err.Error(), supported)
 	}
+}
+
+func TestApplyModelDatastoreRejectsTokenVault(t *testing.T) {
+	t.Parallel()
+
+	_, err := ApplyModelDatastore(nil, DatastoreTypeTokenVault, map[string]any{"directory": "x"})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), DatastoreTypeTokenVault)
+}
+
+func TestVectorDBStrategyForDatastoreTypeExcludesTokenVault(t *testing.T) {
+	t.Parallel()
+
+	strategy, ok := VectorDBStrategyForDatastoreType(DatastoreTypeTokenVault)
+	require.False(t, ok)
+	require.Empty(t, strategy)
 }
