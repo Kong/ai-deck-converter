@@ -155,6 +155,9 @@ func (c *Converter) mcpAccessAuthStrategy(
 		return nil, "", c.fail(src.at(field), UndefinedReference,
 			"MCP server %q references unknown auth strategy %q", m.Name, ref)
 	}
+	if err := c.checkAuthStrategyType(src, field, idp); err != nil {
+		return nil, "", err
+	}
 	return idp, field, nil
 }
 

@@ -1,0 +1,56 @@
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: openai-chat
+        paths:
+          - /ai/chat/completions
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+plugins:
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-chat
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - description: gpt-4o
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: guarded
+            name: gpt-4o
+            provider: openai
+          route_type: llm/v1/chat
+    route: openai-chat
+    model: guarded
+  - name: early-streamer
+    route: openai-chat
+    model: guarded
+custom_plugins:
+  - id: cf165581-15cd-5f2c-a61d-6672a16dc21f
+    name: early-streamer
+    schema: |
+      return {
+        name = "early-streamer",
+        fields = {},
+      }
+    handler: |
+      return {
+        PRIORITY = 1000,
+        VERSION = "1.0.0",
+      }
+ai_models:
+  - name: guarded

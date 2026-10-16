@@ -1,0 +1,47 @@
+models:
+  # pre-function outranks ai-model-selector. The selector gets it in
+  # ordering.before. The route has auth strategies. The selector gets the auth
+  # plugins and request-termination in ordering.after.
+  - type: model
+    name: guarded-gpt
+    capabilities: [generate]
+    formats: [{type: openai}]
+    targets:
+      - name: gpt-4o
+        provider: openai-main
+        config: {type: openai}
+    policies: [ordering-probe]
+    access:
+      auth_strategies: [okta-oidc, key-auth-default]
+    config:
+      route:
+        paths: [/ai]
+        model:
+          values: ["@kong/gpt-4o"]
+
+model_providers:
+  - type: openai
+    name: openai-main
+    config:
+      auth:
+        type: basic
+        headers: [{name: Authorization, value: "{vault://env/openai-key}"}]
+
+policies:
+  - type: pre-function
+    name: ordering-probe
+    config:
+      access:
+        - |
+          local model = ngx.ctx.ai_model
+          return kong.response.exit(200, { selected_model = model and model.name or ngx.null })
+
+auth_strategies:
+  - name: okta-oidc
+    type: openid-connect
+    config:
+      issuer: https://dev-123456.okta.com/oauth2/default
+  - name: key-auth-default
+    type: key-auth
+    config:
+      key_names: [x-api-key]
