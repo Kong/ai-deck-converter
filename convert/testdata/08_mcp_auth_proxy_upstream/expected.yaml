@@ -34,7 +34,7 @@ services:
     routes:
       - name: secure-flights-mcp-consumer-route
         paths:
-          - /mcp/secure-flights
+          - /mcp/secure-flights-consumer
         plugins:
           - name: ai-mcp-proxy
             config:

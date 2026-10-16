@@ -3,6 +3,8 @@ package revert
 import (
 	"os"
 	"path/filepath"
+	"reflect"
+	"slices"
 	"testing"
 
 	"github.com/Kong/ai-deck-converter/convert"
@@ -49,7 +51,7 @@ func TestRoundTrip(t *testing.T) {
 
 			result, err := convert.Convert(aigwYAML, opts.Options)
 			require.NoError(t, err, "re-convert")
-			require.Empty(t, result.Issues, "unexpected convert issues")
+			require.Empty(t, unexpectedIssues(t, dir, result.Issues), "unexpected convert issues")
 			deck2, err := result.Output.ToYAML()
 			require.NoError(t, err, "encode re-converted document")
 
@@ -57,6 +59,28 @@ func TestRoundTrip(t *testing.T) {
 				"round trip mismatch for %s\n--- intermediate aigw ---\n%s", dir, aigwYAML)
 		})
 	}
+}
+
+// unexpectedIssues returns the issues that are not routing conflict warnings
+// of the forward golden. Both entities of such a conflict stay in the output,
+// so the re-conversion reports the conflict again.
+func unexpectedIssues(t *testing.T, dir string, issues []convert.ConversionIssue) []convert.ConversionIssue {
+	t.Helper()
+	var forward []convert.ConversionIssue
+	data, err := os.ReadFile(filepath.Join(dir, "issues.yaml"))
+	if !os.IsNotExist(err) {
+		require.NoError(t, err, "read forward issues")
+		require.NoError(t, yaml.Unmarshal(data, &forward), "parse forward issues")
+	}
+	var out []convert.ConversionIssue
+	for _, issue := range issues {
+		known := issue.Code == convert.RoutingConflict && issue.Severity == convert.Warning &&
+			slices.ContainsFunc(forward, func(f convert.ConversionIssue) bool { return reflect.DeepEqual(f, issue) })
+		if !known {
+			out = append(out, issue)
+		}
+	}
+	return out
 }
 
 // latestConvertOptions targets the newest known release, as the convert

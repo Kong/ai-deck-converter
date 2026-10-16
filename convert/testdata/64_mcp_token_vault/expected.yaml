@@ -4,6 +4,8 @@ services:
     url: https://mcp.internal.kongair.com
     routes:
       - name: vaulted-vendor-mcp-route
+        paths:
+          - /mcp/vaulted-vendor-mcp
         plugins:
           - name: ai-mcp-proxy
             config:
@@ -41,6 +43,8 @@ services:
     url: https://bare-mcp.internal.kongair.com
     routes:
       - name: bare-vaulted-vendor-mcp-route
+        paths:
+          - /mcp/bare-vaulted-vendor-mcp
         plugins:
           - name: ai-mcp-proxy
             config:
