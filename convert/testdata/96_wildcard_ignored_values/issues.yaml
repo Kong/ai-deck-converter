@@ -1,0 +1,16 @@
+- code: CONFIG_FIELD_IGNORED
+  reason: model "capabilities" sets capability "generate" next to "*". This will be ignored, because "*" selects every capability.
+  source:
+    kind: model
+    name: capabilities
+    fields:
+      - capabilities[0]
+  severity: WARNING
+- code: CONFIG_FIELD_IGNORED
+  reason: model "formats" sets format "passthrough" next to "*". This will be ignored, because "*" selects every format.
+  source:
+    kind: model
+    name: formats
+    fields:
+      - formats[1]
+  severity: WARNING

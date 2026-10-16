@@ -1,0 +1,50 @@
+# An unknown format and a misspelled capability fail their models. A
+# WebSocket route accepts only one auth strategy. "*" capabilities therefore
+# leave out the realtime endpoint of a model with two, with a warning.
+models:
+  - name: unknown-format
+    capabilities: ["*"]
+    formats: [{type: opnai}]
+    config:
+      route: {paths: [/unknown]}
+    targets:
+      - name: gpt-5.6
+        provider: openai-prod
+        config: {type: openai}
+  - name: misspelled-capability
+    capabilities: [genrate]
+    formats: [{type: "*"}]
+    config:
+      route: {paths: [/misspelled]}
+    targets:
+      - name: gpt-5.6
+        provider: openai-prod
+        config: {type: openai}
+  - name: two-auth-strategies
+    capabilities: ["*"]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/auth]}
+    access:
+      auth_strategies: [okta-oidc, api-keys]
+    targets:
+      - name: gpt-5.6
+        provider: openai-prod
+        config: {type: openai}
+auth_strategies:
+  - name: okta-oidc
+    type: openid-connect
+    config:
+      issuer: https://dev-123456.okta.com/oauth2/default
+  - name: api-keys
+    type: key-auth
+    config: {}
+model_providers:
+  - name: openai-prod
+    type: openai
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://ai/openai-token}"

@@ -1,0 +1,8 @@
+- code: ROUTING_CONFLICT
+  reason: 'model "explicit": format "gemini" serves capability "realtime" on the same path as format "openai". The "gemini" endpoint will be ignored.'
+  source:
+    kind: model
+    name: explicit
+    fields:
+      - formats[2]
+  severity: WARNING

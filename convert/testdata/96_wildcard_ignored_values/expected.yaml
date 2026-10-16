@@ -1,0 +1,187 @@
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: anthropic-messages
+        paths:
+          - /caps/v1/messages
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-embeddings
+        paths:
+          - /formats/embeddings
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: bedrock-invoke
+        paths:
+          - ~/formats/model/(?<model_name>[^/]+)/invoke(?:-with-response-stream)?
+        methods:
+          - GET
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: gemini-embeddings
+        paths:
+          - ~/formats/v1beta/models/(?<model_name>[^:/]+):(?:embedContent|batchEmbedContents)
+        methods:
+          - GET
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: gemini-enterprise-embeddings
+        paths:
+          - ~/formats/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/(?<publisher>[^/]+)/models/(?<model_name>[^:/]+):embedContent
+        methods:
+          - GET
+          - POST
+          - OPTIONS
+        strip_path: false
+plugins:
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: anthropic-messages
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-5.6
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: capabilities
+            name: gpt-5.6
+            provider: openai
+          route_type: llm/v1/chat
+    route: anthropic-messages
+    model: capabilities
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-embeddings
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/embeddings
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-5.6
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: formats
+            name: gpt-5.6
+            provider: openai
+          route_type: llm/v1/embeddings
+    route: openai-embeddings
+    model: formats
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - path_pattern: model/([^/]+)/
+          source: path
+    route: bedrock-invoke
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/embeddings
+      llm_format: bedrock
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-5.6
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: formats
+            name: gpt-5.6
+            provider: openai
+          route_type: llm/v1/embeddings
+    route: bedrock-invoke
+    model: formats
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - path_pattern: 'models/([%w%.%-]+):'
+          source: path
+    route: gemini-embeddings
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/embeddings
+      llm_format: gemini
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-5.6
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: formats
+            name: gpt-5.6
+            provider: openai
+          route_type: llm/v1/embeddings
+    route: gemini-embeddings
+    model: formats
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - path_pattern: 'models/([%w%.%-]+):'
+          source: path
+    route: gemini-enterprise-embeddings
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/embeddings
+      llm_format: gemini
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-5.6
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: formats
+            name: gpt-5.6
+            provider: openai
+          route_type: llm/v1/embeddings
+    route: gemini-enterprise-embeddings
+    model: formats
+ai_models:
+  - name: capabilities
+  - name: formats

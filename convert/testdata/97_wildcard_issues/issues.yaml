@@ -1,0 +1,24 @@
+- code: CONFIG_FIELD_INVALID
+  reason: 'model "unknown-format": format "opnai" is not a known format. The known formats are anthropic, bedrock, cohere, gemini, huggingface, openai, passthrough, typesafe.'
+  source:
+    kind: model
+    name: unknown-format
+    fields:
+      - formats[0].type
+  severity: ERROR
+- code: CONFIG_FIELD_INVALID
+  reason: 'model "misspelled-capability": no format of the model serves capability "genrate" for provider type "openai"'
+  source:
+    kind: model
+    name: misspelled-capability
+    fields:
+      - capabilities[0]
+  severity: ERROR
+- code: BEHAVIOR_MAY_DIFFER
+  reason: 'model "two-auth-strategies": capability "realtime" needs a WebSocket route that the authentication of the model cannot protect. This capability will be ignored.'
+  source:
+    kind: model
+    name: two-auth-strategies
+    fields:
+      - capabilities[0]
+  severity: WARNING

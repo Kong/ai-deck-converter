@@ -1,0 +1,503 @@
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: openai-chat
+        paths:
+          - /order/chat/completions
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: gemini-generate
+        paths:
+          - ~/order/v1beta/models/(?<model_name>[^:/]+):(?:generateContent|streamGenerateContent)
+        methods:
+          - GET
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: gemini-enterprise-generate
+        paths:
+          - ~/order/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/(?<publisher>[^/]+)/models/(?<model_name>[^:/]+):(?:generateContent|streamGenerateContent)
+        methods:
+          - GET
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: gemini-generate-2
+        paths:
+          - ~/vertex/v1beta/models/(?<model_name>[^:/]+):(?:generateContent|streamGenerateContent)
+        methods:
+          - GET
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: gemini-enterprise-generate-2
+        paths:
+          - ~/vertex/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/(?<publisher>[^/]+)/models/(?<model_name>[^:/]+):(?:generateContent|streamGenerateContent)
+        methods:
+          - GET
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: gemini-embeddings
+        paths:
+          - ~/vertex/v1beta/models/(?<model_name>[^:/]+):(?:embedContent|batchEmbedContents)
+        methods:
+          - GET
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: gemini-enterprise-embeddings
+        paths:
+          - ~/vertex/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/(?<publisher>[^/]+)/models/(?<model_name>[^:/]+):embedContent
+        methods:
+          - GET
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: gemini-predict
+        paths:
+          - ~/vertex/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/(?<publisher>[^/]+)/models/(?<model_name>[^:/]+):predict
+        methods:
+          - GET
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: gemini-ranking
+        paths:
+          - ~/vertex/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/rankingConfigs/(?<config_name>[^:/]+):rank
+        methods:
+          - GET
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: gemini-predict-long-running
+        paths:
+          - ~/vertex/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/(?<publisher>[^/]+)/models/(?<model_name>[^:/]+):predictLongRunning
+        methods:
+          - GET
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-chat-2
+        paths:
+          - /skills/chat/completions
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: anthropic-messages
+        paths:
+          - /skills/v1/messages
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: anthropic-skills
+        paths:
+          - /skills/v1/skills
+        methods:
+          - GET
+          - POST
+          - DELETE
+          - OPTIONS
+        strip_path: false
+  - name: ai-gateway-websocket
+    url: ws://ai-gateway.upstream.local
+    routes:
+      - name: gemini-realtime
+        paths:
+          - /vertex/realtime
+        protocols:
+          - ws
+          - wss
+        strip_path: false
+plugins:
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-chat
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-5.6
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: order
+            name: gpt-5.6
+            provider: openai
+          route_type: llm/v1/chat
+    route: openai-chat
+    model: order
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - path_pattern: 'models/([%w%.%-]+):'
+          source: path
+    route: gemini-generate
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: gemini
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-5.6
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: order
+            name: gpt-5.6
+            provider: openai
+          route_type: llm/v1/chat
+    route: gemini-generate
+    model: order
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - path_pattern: 'models/([%w%.%-]+):'
+          source: path
+    route: gemini-enterprise-generate
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: gemini
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-5.6
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: order
+            name: gpt-5.6
+            provider: openai
+          route_type: llm/v1/chat
+    route: gemini-enterprise-generate
+    model: order
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - path_pattern: 'models/([%w%.%-]+):'
+          source: path
+    route: gemini-generate-2
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: gemini
+      targets:
+        - auth:
+            header_name: x-goog-api-key
+            header_value: '{vault://ai/gemini-key}'
+          description: gemini-3-pro
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: vertex
+            name: gemini-3-pro
+            provider: gemini
+          route_type: llm/v1/chat
+    route: gemini-generate-2
+    model: vertex
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - path_pattern: 'models/([%w%.%-]+):'
+          source: path
+    route: gemini-enterprise-generate-2
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: gemini
+      targets:
+        - auth:
+            header_name: x-goog-api-key
+            header_value: '{vault://ai/gemini-key}'
+          description: gemini-3-pro
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: vertex
+            name: gemini-3-pro
+            provider: gemini
+          route_type: llm/v1/chat
+    route: gemini-enterprise-generate-2
+    model: vertex
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - path_pattern: 'models/([%w%.%-]+):'
+          source: path
+    route: gemini-embeddings
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/embeddings
+      llm_format: gemini
+      targets:
+        - auth:
+            header_name: x-goog-api-key
+            header_value: '{vault://ai/gemini-key}'
+          description: gemini-3-pro
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: vertex
+            name: gemini-3-pro
+            provider: gemini
+          route_type: llm/v1/embeddings
+    route: gemini-embeddings
+    model: vertex
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - path_pattern: 'models/([%w%.%-]+):'
+          source: path
+    route: gemini-enterprise-embeddings
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/embeddings
+      llm_format: gemini
+      targets:
+        - auth:
+            header_name: x-goog-api-key
+            header_value: '{vault://ai/gemini-key}'
+          description: gemini-3-pro
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: vertex
+            name: gemini-3-pro
+            provider: gemini
+          route_type: llm/v1/embeddings
+    route: gemini-enterprise-embeddings
+    model: vertex
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - path_pattern: 'models/([%w%.%-]+):'
+          source: path
+    route: gemini-predict
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: image/generation
+      llm_format: gemini
+      targets:
+        - auth:
+            header_name: x-goog-api-key
+            header_value: '{vault://ai/gemini-key}'
+          description: gemini-3-pro
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: vertex
+            name: gemini-3-pro
+            provider: gemini
+          route_type: image/v1/images/generations
+    route: gemini-predict
+    model: vertex
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: gemini
+      targets:
+        - auth:
+            header_name: x-goog-api-key
+            header_value: '{vault://ai/gemini-key}'
+          description: gemini-3-pro
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: vertex
+            name: gemini-3-pro
+            provider: gemini
+          route_type: llm/v1/chat
+    route: gemini-ranking
+    model: vertex
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - path_pattern: 'models/([%w%.%-]+):'
+          source: path
+    route: gemini-predict-long-running
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: video/generation
+      llm_format: gemini
+      targets:
+        - auth:
+            header_name: x-goog-api-key
+            header_value: '{vault://ai/gemini-key}'
+          description: gemini-3-pro
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: vertex
+            name: gemini-3-pro
+            provider: gemini
+          route_type: video/v1/videos/generations
+    route: gemini-predict-long-running
+    model: vertex
+  - name: ai-proxy-advanced
+    protocols:
+      - ws
+      - wss
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: realtime/generation
+      llm_format: gemini
+      targets:
+        - auth:
+            header_name: x-goog-api-key
+            header_value: '{vault://ai/gemini-key}'
+          description: gemini-3-pro
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: gemini-3-pro
+            provider: gemini
+          route_type: realtime/v1/realtime
+    route: gemini-realtime
+    tags:
+      - ai-gateway-realtime-model:vertex
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-chat-2
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: x-api-key
+            header_value: '{vault://ai/anthropic-key}'
+          description: claude-opus-5
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: skills
+            name: claude-opus-5
+            options:
+              anthropic_version: "2023-06-01"
+            provider: anthropic
+          route_type: llm/v1/chat
+    route: openai-chat-2
+    model: skills
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: anthropic-messages
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      targets:
+        - auth:
+            header_name: x-api-key
+            header_value: '{vault://ai/anthropic-key}'
+          description: claude-opus-5
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: skills
+            name: claude-opus-5
+            options:
+              anthropic_version: "2023-06-01"
+            provider: anthropic
+          route_type: llm/v1/chat
+    route: anthropic-messages
+    model: skills
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      model_name_header: false
+      targets:
+        - auth:
+            header_name: x-api-key
+            header_value: '{vault://ai/anthropic-key}'
+          description: claude-opus-5
+          logging:
+            log_payloads: false
+            log_statistics: false
+          model:
+            model_alias: skills
+            name: claude-opus-5
+            options:
+              anthropic_version: "2023-06-01"
+            provider: anthropic
+          route_type: llm/v1/skills
+    route: anthropic-skills
+    model: skills
+ai_models:
+  - name: order
+  - name: vertex
+  - name: skills

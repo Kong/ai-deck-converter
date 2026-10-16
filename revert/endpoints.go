@@ -1,6 +1,7 @@
 package revert
 
 import (
+	"reflect"
 	"regexp"
 	"sort"
 	"strings"
@@ -14,6 +15,9 @@ type endpointMatch struct {
 	capability string
 	spec       aimap.EndpointSpec
 	secondary  bool // spec is one of the capability's Secondary endpoints
+	// alternatives are the other capabilities with an equal spec. The route
+	// gives no signal to select between them.
+	alternatives []string
 }
 
 // specRegexes caches compiled Go regexes for the regex endpoint specs, keyed by
@@ -51,7 +55,7 @@ func resolveEndpoint(section, routeType, genaiCategory, routeName, routePath str
 	var cands []endpointMatch
 	for _, ce := range caps {
 		if ce.Spec.RouteType == routeType {
-			cands = append(cands, endpointMatch{ce.Capability, ce.Spec, ce.Secondary})
+			cands = append(cands, endpointMatch{capability: ce.Capability, spec: ce.Spec, secondary: ce.Secondary})
 		}
 	}
 	if len(cands) == 0 {
@@ -63,7 +67,7 @@ func resolveEndpoint(section, routeType, genaiCategory, routeName, routePath str
 				strings.HasSuffix(routeName, "-"+ce.Spec.RouteLabel)
 			_, byPath := basePathFor(routePath, ce.Spec)
 			if byName || byPath {
-				cands = append(cands, endpointMatch{ce.Capability, ce.Spec, ce.Secondary})
+				cands = append(cands, endpointMatch{capability: ce.Capability, spec: ce.Spec, secondary: ce.Secondary})
 			}
 		}
 	}
@@ -99,7 +103,13 @@ func resolveEndpoint(section, routeType, genaiCategory, routeName, routePath str
 	if len(cands) == 0 {
 		return endpointMatch{}, false
 	}
-	return cands[0], true
+	match := cands[0]
+	for _, c := range cands[1:] {
+		if reflect.DeepEqual(c.spec, match.spec) {
+			match.alternatives = append(match.alternatives, c.capability)
+		}
+	}
+	return match, true
 }
 
 // isDefaultBasePath reports whether a recovered base path is the converter's

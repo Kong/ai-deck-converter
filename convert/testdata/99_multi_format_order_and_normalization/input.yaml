@@ -1,0 +1,57 @@
+# Explicit formats use the fixed pair order, so the openai routes come first.
+# vertex is normalized to gemini before "*" capabilities expand. A
+# passthrough-only capability is left out for a format that the provider
+# does not speak.
+models:
+  - name: order
+    capabilities: [generate]
+    formats: [{type: gemini}, {type: openai}]
+    config:
+      route: {paths: [/order]}
+    targets:
+      - name: gpt-5.6
+        provider: openai-prod
+        config: {type: openai}
+  - name: vertex
+    capabilities: ["*"]
+    formats: [{type: vertex}]
+    config:
+      route: {paths: [/vertex]}
+    targets:
+      - name: gemini-3-pro
+        provider: gemini-studio
+        config: {type: gemini}
+  - name: skills
+    capabilities: [generate, skills]
+    formats: [{type: openai}, {type: anthropic}]
+    config:
+      route: {paths: [/skills]}
+    targets:
+      - name: claude-opus-5
+        provider: anthropic-prod
+        config: {type: anthropic}
+model_providers:
+  - name: openai-prod
+    type: openai
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://ai/openai-token}"
+  - name: gemini-studio
+    type: gemini
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: x-goog-api-key
+            value: "{vault://ai/gemini-key}"
+  - name: anthropic-prod
+    type: anthropic
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: x-api-key
+            value: "{vault://ai/anthropic-key}"

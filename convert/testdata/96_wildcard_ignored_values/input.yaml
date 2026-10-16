@@ -1,0 +1,30 @@
+# A value next to "*" is ignored with a CONFIG_FIELD_IGNORED warning. The
+# ignored passthrough format does not make a passthrough model.
+models:
+  - name: capabilities
+    capabilities: [generate, "*"]
+    formats: [{type: anthropic}]
+    config:
+      route: {paths: [/caps]}
+    targets:
+      - name: gpt-5.6
+        provider: openai-prod
+        config: {type: openai}
+  - name: formats
+    capabilities: [embeddings]
+    formats: [{type: "*"}, {type: passthrough}]
+    config:
+      route: {paths: [/formats]}
+    targets:
+      - name: gpt-5.6
+        provider: openai-prod
+        config: {type: openai}
+model_providers:
+  - name: openai-prod
+    type: openai
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://ai/openai-token}"

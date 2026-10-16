@@ -1,0 +1,213 @@
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: openai-chat
+        paths:
+          - /ai/chat/completions
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: cohere-rerank
+        paths:
+          - /ai/v2/rerank
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: gemini-generate
+        paths:
+          - ~/ai/v1beta/models/(?<model_name>[^:/]+):(?:generateContent|streamGenerateContent)
+        methods:
+          - GET
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: gemini-enterprise-generate
+        paths:
+          - ~/ai/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/(?<publisher>[^/]+)/models/(?<model_name>[^:/]+):(?:generateContent|streamGenerateContent)
+        methods:
+          - GET
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: gemini-ranking
+        paths:
+          - ~/ai/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/rankingConfigs/(?<config_name>[^:/]+):rank
+        methods:
+          - GET
+          - POST
+          - OPTIONS
+        strip_path: false
+  - name: ai-gateway-websocket
+    url: ws://ai-gateway.upstream.local
+    routes:
+      - name: openai-realtime
+        paths:
+          - /ai/realtime
+        protocols:
+          - ws
+          - wss
+        strip_path: false
+plugins:
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-chat
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-5.6
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: explicit
+            name: gpt-5.6
+            provider: openai
+          route_type: llm/v1/chat
+    route: openai-chat
+    model: explicit
+  - name: ai-proxy-advanced
+    protocols:
+      - ws
+      - wss
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: realtime/generation
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-5.6
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: gpt-5.6
+            provider: openai
+          route_type: realtime/v1/realtime
+    route: openai-realtime
+    tags:
+      - ai-gateway-realtime-model:explicit
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: cohere-rerank
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: cohere
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-5.6
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: explicit
+            name: gpt-5.6
+            provider: openai
+          route_type: llm/v1/chat
+    route: cohere-rerank
+    model: explicit
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - path_pattern: 'models/([%w%.%-]+):'
+          source: path
+    route: gemini-generate
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: gemini
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-5.6
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: explicit
+            name: gpt-5.6
+            provider: openai
+          route_type: llm/v1/chat
+    route: gemini-generate
+    model: explicit
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - path_pattern: 'models/([%w%.%-]+):'
+          source: path
+    route: gemini-enterprise-generate
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: gemini
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-5.6
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: explicit
+            name: gpt-5.6
+            provider: openai
+          route_type: llm/v1/chat
+    route: gemini-enterprise-generate
+    model: explicit
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: gemini
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-5.6
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: explicit
+            name: gpt-5.6
+            provider: openai
+          route_type: llm/v1/chat
+    route: gemini-ranking
+    model: explicit
+ai_models:
+  - name: explicit

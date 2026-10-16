@@ -1,0 +1,20 @@
+# "*" capabilities serve every capability of each declared format.
+models:
+  - name: cohere-and-openai
+    capabilities: ["*"]
+    formats: [{type: cohere}, {type: openai}]
+    config:
+      route: {paths: [/ai]}
+    targets:
+      - name: gpt-5.6
+        provider: openai-prod
+        config: {type: openai}
+model_providers:
+  - name: openai-prod
+    type: openai
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://ai/openai-token}"

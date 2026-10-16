@@ -1,0 +1,22 @@
+# Explicit formats and capabilities. cohere serves no generate endpoint, so
+# that pair is left out with no issue. openai and gemini serve realtime on one
+# path, so the gemini endpoint is left out with a ROUTING_CONFLICT warning.
+models:
+  - name: explicit
+    capabilities: [generate, rerank, realtime]
+    formats: [{type: openai}, {type: cohere}, {type: gemini}]
+    config:
+      route: {paths: [/ai]}
+    targets:
+      - name: gpt-5.6
+        provider: openai-prod
+        config: {type: openai}
+model_providers:
+  - name: openai-prod
+    type: openai
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://ai/openai-token}"

@@ -1,0 +1,21 @@
+# A type api model gets only the api capabilities: batches, files, and skills.
+models:
+  - name: openai-api
+    type: api
+    capabilities: ["*"]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/api]}
+    targets:
+      - name: gpt-5.6
+        provider: openai-prod
+        config: {type: openai}
+model_providers:
+  - name: openai-prod
+    type: openai
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://ai/openai-token}"

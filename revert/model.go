@@ -15,12 +15,19 @@ import (
 // modelGroup accumulates one AI Gateway Model across the routes/targets that
 // share its model_alias (or, alias-less, its route).
 type modelGroup struct {
-	model       aigw.Model
-	caps        []string
-	capsSeen    map[string]bool
-	targetsSeen map[string]bool
-	aliasless   bool   // no model_alias on the targets; name is provisional
-	routeName   string // route the group was created from (for warnings)
+	model    aigw.Model
+	caps     []string
+	capsSeen map[string]bool
+	// capsCertain holds the capabilities that a route recovers with no
+	// alternative. capsAlternatives holds the alternatives of the others.
+	capsCertain      map[string]bool
+	capsAlternatives map[string][]string
+	// statisticsOn and statisticsOff record the log_statistics values of the
+	// targets. Both values occur only with the default.
+	statisticsOn, statisticsOff bool
+	targetsSeen                 map[string]bool
+	aliasless                   bool   // no model_alias on the targets; name is provisional
+	routeName                   string // route the group was created from (for warnings)
 	// mergedFKs are the model FKs of other ai-proxy-advanced plugins folded
 	// into this group (see mergeableAliasFKs): distinct aliases of the one
 	// underlying model produced by route.model.values fan-out. Guard plugins
@@ -165,6 +172,7 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 			section := aimap.SectionFor(llmFormat, providerType)
 
 			var capability string
+			var alternatives []string
 			var bases []string
 			if routeType == aimap.PassthroughRouteType {
 				// A passthrough route is the model's base path itself and serves no
@@ -172,6 +180,7 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 				bases = rt.Paths
 			} else if match, ok := resolveEndpoint(section, routeType, genai, rt.Name, path); ok {
 				capability = match.capability
+				alternatives = match.alternatives
 				for _, p := range rt.Paths {
 					if b, ok := basePathFor(p, match.spec); ok {
 						bases = append(bases, b)
@@ -240,6 +249,11 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 			if realtimeModel != "" {
 				r.mergeAliasGroupMembers(g, realtimeModel)
 			}
+			// A model with more than one format has routes in more than one
+			// section. The forward converter sorts the formats again.
+			if !slices.ContainsFunc(g.model.Formats, func(f aigw.Format) bool { return f.Type == llmFormat }) {
+				g.model.Formats = append(g.model.Formats, aigw.Format{Type: llmFormat})
+			}
 			// Logging is carried per target by ai-proxy-advanced but is a single
 			// model-level block in the AI Gateway model; lift it back from the
 			// first target that has it (all of a model's targets share the block).
@@ -249,6 +263,17 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 			if capability != "" && !g.capsSeen[capability] {
 				g.capsSeen[capability] = true
 				g.caps = append(g.caps, capability)
+			}
+			if capability != "" && len(alternatives) == 0 {
+				g.capsCertain[capability] = true
+			} else if capability != "" {
+				g.capsAlternatives[capability] = append(g.capsAlternatives[capability], alternatives...)
+			}
+			switch getMap(target, "logging")["log_statistics"] {
+			case true:
+				g.statisticsOn = true
+			case false:
+				g.statisticsOff = true
 			}
 
 			if !g.targetsSeen[key] {
@@ -345,10 +370,12 @@ func (r *Reverter) modelGroupFor(
 	}
 
 	g := &modelGroup{
-		capsSeen:    map[string]bool{},
-		targetsSeen: map[string]bool{},
-		aliasless:   aliasless,
-		routeName:   rt.Name,
+		capsSeen:         map[string]bool{},
+		capsCertain:      map[string]bool{},
+		capsAlternatives: map[string][]string{},
+		targetsSeen:      map[string]bool{},
+		aliasless:        aliasless,
+		routeName:        rt.Name,
 		model: aigw.Model{
 			Type:     "model",
 			Name:     name,
@@ -638,7 +665,10 @@ func (r *Reverter) finalizeModels(acc *modelAcc) error {
 	built := map[string]bool{}
 	for _, key := range r.orderedModelKeys(acc) {
 		g := acc.groups[key]
-		g.model.Capabilities = g.caps
+		g.model.Capabilities = g.recoveredCapabilities()
+		if g.statisticsOn && g.statisticsOff && g.model.Config.Logging != nil {
+			g.model.Config.Logging.Statistics = nil
+		}
 		if isAPIOnly(g.caps) {
 			g.model.Type = "api"
 		}
@@ -796,18 +826,25 @@ func aiModelAlias(m kong.AIModel) string {
 // naming fallbacks run without warning.
 func (r *Reverter) hasAIModels() bool { return len(r.src.AIModels) > 0 }
 
+// recoveredCapabilities returns the capabilities of g without a capability
+// that only alternative routes recover. Another route must recover one of
+// its alternatives. Each format of the model gets every capability, so the
+// extra capability would add endpoints to the other formats.
+func (g *modelGroup) recoveredCapabilities() []string {
+	return slices.DeleteFunc(slices.Clone(g.caps), func(c string) bool {
+		return !g.capsCertain[c] && slices.ContainsFunc(g.capsAlternatives[c], func(a string) bool {
+			return g.capsSeen[a]
+		})
+	})
+}
+
 // isAPIOnly reports whether the capabilities indicate an "api" model
 // (files/batches/skills lifecycle APIs rather than synchronous generation).
 func isAPIOnly(caps []string) bool {
 	if len(caps) == 0 {
 		return false
 	}
-	for _, c := range caps {
-		if c != "batches" && c != "files" && c != "skills" {
-			return false
-		}
-	}
-	return true
+	return !slices.ContainsFunc(caps, func(c string) bool { return !aimap.IsAPICapability(c) })
 }
 
 // balancerFromConfig reverses convert.balancerConfig, dropping the implicit

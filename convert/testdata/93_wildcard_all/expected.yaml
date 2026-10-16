@@ -1,0 +1,985 @@
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: openai-chat
+        paths:
+          - /ai/chat/completions
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-responses
+        paths:
+          - /ai/responses
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-audio-speech
+        paths:
+          - /ai/audio/speech
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-audio-transcribe
+        paths:
+          - /ai/audio/transcriptions
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-audio-translate
+        paths:
+          - /ai/audio/translations
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-embeddings
+        paths:
+          - /ai/embeddings
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-images
+        paths:
+          - /ai/images/generations
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-videos
+        paths:
+          - /ai/videos
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: anthropic-messages
+        paths:
+          - /ai/v1/messages
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: bedrock-converse
+        paths:
+          - ~/ai/model/(?<model_name>[^/]+)/converse(?:-stream)?
+        methods:
+          - GET
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: bedrock-invoke
+        paths:
+          - ~/ai/model/(?<model_name>[^/]+)/invoke(?:-with-response-stream)?
+        methods:
+          - GET
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: bedrock-chat
+        paths:
+          - /ai/openai/v1/chat/completions
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: bedrock-messages
+        paths:
+          - /ai/anthropic/v1/messages
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: bedrock-retrieve
+        paths:
+          - ~/ai/model/(?<model_name>[^/]+)/retrieveAndGenerate(?:Stream)?
+        methods:
+          - GET
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: bedrock-responses
+        paths:
+          - /ai/openai/v1/responses
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: bedrock-rerank
+        paths:
+          - ~/ai/model/(?<model_name>[^/]+)/rerank
+        methods:
+          - GET
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: cohere-rerank
+        paths:
+          - /ai/v2/rerank
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: gemini-generate
+        paths:
+          - ~/ai/v1beta/models/(?<model_name>[^:/]+):(?:generateContent|streamGenerateContent)
+        methods:
+          - GET
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: gemini-enterprise-generate
+        paths:
+          - ~/ai/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/(?<publisher>[^/]+)/models/(?<model_name>[^:/]+):(?:generateContent|streamGenerateContent)
+        methods:
+          - GET
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: gemini-embeddings
+        paths:
+          - ~/ai/v1beta/models/(?<model_name>[^:/]+):(?:embedContent|batchEmbedContents)
+        methods:
+          - GET
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: gemini-enterprise-embeddings
+        paths:
+          - ~/ai/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/(?<publisher>[^/]+)/models/(?<model_name>[^:/]+):embedContent
+        methods:
+          - GET
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: gemini-predict
+        paths:
+          - ~/ai/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/(?<publisher>[^/]+)/models/(?<model_name>[^:/]+):predict
+        methods:
+          - GET
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: gemini-ranking
+        paths:
+          - ~/ai/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/rankingConfigs/(?<config_name>[^:/]+):rank
+        methods:
+          - GET
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: gemini-predict-long-running
+        paths:
+          - ~/ai/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/(?<publisher>[^/]+)/models/(?<model_name>[^:/]+):predictLongRunning
+        methods:
+          - GET
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: huggingface-generate
+        paths:
+          - /ai/v1/chat/completions
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: typesafe-decisions
+        paths:
+          - ~/ai/v1/systemone
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-videos-lifecycle
+        paths:
+          - /ai/videos
+        methods:
+          - GET
+          - DELETE
+        strip_path: false
+        tags:
+          - aigw:video-lifecycle
+  - name: ai-gateway-websocket
+    url: ws://ai-gateway.upstream.local
+    routes:
+      - name: openai-realtime
+        paths:
+          - /ai/realtime
+        protocols:
+          - ws
+          - wss
+        strip_path: false
+plugins:
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-chat
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-5.6
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: everything
+            name: gpt-5.6
+            provider: openai
+          route_type: llm/v1/chat
+    route: openai-chat
+    model: everything
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-responses
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-5.6
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: everything
+            name: gpt-5.6
+            provider: openai
+          route_type: llm/v1/responses
+    route: openai-responses
+    model: everything
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-audio-speech
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: audio/speech
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-5.6
+          logging:
+            log_payloads: false
+            log_statistics: false
+          model:
+            model_alias: everything
+            name: gpt-5.6
+            provider: openai
+          route_type: audio/v1/audio/speech
+    route: openai-audio-speech
+    model: everything
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-audio-transcribe
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: audio/transcription
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-5.6
+          logging:
+            log_payloads: false
+            log_statistics: false
+          model:
+            model_alias: everything
+            name: gpt-5.6
+            provider: openai
+          route_type: audio/v1/audio/transcriptions
+    route: openai-audio-transcribe
+    model: everything
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-audio-translate
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: audio/transcription
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-5.6
+          logging:
+            log_payloads: false
+            log_statistics: false
+          model:
+            model_alias: everything
+            name: gpt-5.6
+            provider: openai
+          route_type: audio/v1/audio/translations
+    route: openai-audio-translate
+    model: everything
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-embeddings
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/embeddings
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-5.6
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: everything
+            name: gpt-5.6
+            provider: openai
+          route_type: llm/v1/embeddings
+    route: openai-embeddings
+    model: everything
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-images
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: image/generation
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-5.6
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: everything
+            name: gpt-5.6
+            provider: openai
+          route_type: image/v1/images/generations
+    route: openai-images
+    model: everything
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-videos
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: video/generation
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-5.6
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: everything
+            name: gpt-5.6
+            provider: openai
+          route_type: video/v1/videos/generations
+    route: openai-videos
+    model: everything
+  - name: ai-proxy-advanced
+    protocols:
+      - ws
+      - wss
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: realtime/generation
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-5.6
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: gpt-5.6
+            provider: openai
+          route_type: realtime/v1/realtime
+    route: openai-realtime
+    tags:
+      - ai-gateway-realtime-model:everything
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: anthropic-messages
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-5.6
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: everything
+            name: gpt-5.6
+            provider: openai
+          route_type: llm/v1/chat
+    route: anthropic-messages
+    model: everything
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - path_pattern: model/([^/]+)/
+          source: path
+    route: bedrock-converse
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: bedrock
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-5.6
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: everything
+            name: gpt-5.6
+            provider: openai
+          route_type: llm/v1/chat
+    route: bedrock-converse
+    model: everything
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - path_pattern: model/([^/]+)/
+          source: path
+    route: bedrock-invoke
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: bedrock
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-5.6
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: everything
+            name: gpt-5.6
+            provider: openai
+          route_type: llm/v1/chat
+    route: bedrock-invoke
+    model: everything
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: bedrock-chat
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: bedrock
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-5.6
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: everything
+            name: gpt-5.6
+            provider: openai
+          route_type: llm/v1/chat
+    route: bedrock-chat
+    model: everything
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: bedrock-messages
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: bedrock
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-5.6
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: everything
+            name: gpt-5.6
+            provider: openai
+          route_type: llm/v1/chat
+    route: bedrock-messages
+    model: everything
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - path_pattern: model/([^/]+)/
+          source: path
+    route: bedrock-retrieve
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: bedrock
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-5.6
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: everything
+            name: gpt-5.6
+            provider: openai
+          route_type: llm/v1/chat
+    route: bedrock-retrieve
+    model: everything
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: bedrock-responses
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: bedrock
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-5.6
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: everything
+            name: gpt-5.6
+            provider: openai
+          route_type: llm/v1/responses
+    route: bedrock-responses
+    model: everything
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - path_pattern: model/([^/]+)/
+          source: path
+    route: bedrock-rerank
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: bedrock
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-5.6
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: everything
+            name: gpt-5.6
+            provider: openai
+          route_type: llm/v1/chat
+    route: bedrock-rerank
+    model: everything
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: cohere-rerank
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: cohere
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-5.6
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: everything
+            name: gpt-5.6
+            provider: openai
+          route_type: llm/v1/chat
+    route: cohere-rerank
+    model: everything
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - path_pattern: 'models/([%w%.%-]+):'
+          source: path
+    route: gemini-generate
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: gemini
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-5.6
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: everything
+            name: gpt-5.6
+            provider: openai
+          route_type: llm/v1/chat
+    route: gemini-generate
+    model: everything
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - path_pattern: 'models/([%w%.%-]+):'
+          source: path
+    route: gemini-enterprise-generate
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: gemini
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-5.6
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: everything
+            name: gpt-5.6
+            provider: openai
+          route_type: llm/v1/chat
+    route: gemini-enterprise-generate
+    model: everything
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - path_pattern: 'models/([%w%.%-]+):'
+          source: path
+    route: gemini-embeddings
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/embeddings
+      llm_format: gemini
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-5.6
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: everything
+            name: gpt-5.6
+            provider: openai
+          route_type: llm/v1/embeddings
+    route: gemini-embeddings
+    model: everything
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - path_pattern: 'models/([%w%.%-]+):'
+          source: path
+    route: gemini-enterprise-embeddings
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/embeddings
+      llm_format: gemini
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-5.6
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: everything
+            name: gpt-5.6
+            provider: openai
+          route_type: llm/v1/embeddings
+    route: gemini-enterprise-embeddings
+    model: everything
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - path_pattern: 'models/([%w%.%-]+):'
+          source: path
+    route: gemini-predict
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: image/generation
+      llm_format: gemini
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-5.6
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: everything
+            name: gpt-5.6
+            provider: openai
+          route_type: image/v1/images/generations
+    route: gemini-predict
+    model: everything
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: gemini
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-5.6
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: everything
+            name: gpt-5.6
+            provider: openai
+          route_type: llm/v1/chat
+    route: gemini-ranking
+    model: everything
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - path_pattern: 'models/([%w%.%-]+):'
+          source: path
+    route: gemini-predict-long-running
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: video/generation
+      llm_format: gemini
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-5.6
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: everything
+            name: gpt-5.6
+            provider: openai
+          route_type: video/v1/videos/generations
+    route: gemini-predict-long-running
+    model: everything
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: huggingface-generate
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: huggingface
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-5.6
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: everything
+            name: gpt-5.6
+            provider: openai
+          route_type: llm/v1/chat
+    route: huggingface-generate
+    model: everything
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: typesafe-decisions
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: typesafe
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-5.6
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: everything
+            name: gpt-5.6
+            provider: openai
+          route_type: llm/v1/chat
+    route: typesafe-decisions
+    model: everything
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: video/generation
+      llm_format: openai
+      model_name_header: false
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-5.6
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: gpt-5.6
+            provider: openai
+          route_type: video/v1/videos/generations
+    route: openai-videos-lifecycle
+ai_models:
+  - name: everything

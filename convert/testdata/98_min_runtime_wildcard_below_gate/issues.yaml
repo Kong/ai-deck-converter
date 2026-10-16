@@ -1,0 +1,24 @@
+- code: UNSUPPORTED_IN_MIN_RUNTIME_VERSION
+  reason: 'formats[0]: typesafe requires minimum runtime version "2.2", but the configured minimum is "2.1"'
+  source:
+    kind: model
+    name: all-formats
+    fields:
+      - formats[0]
+  severity: WARNING
+- code: UNSUPPORTED_IN_MIN_RUNTIME_VERSION
+  reason: 'capabilities[0]: skills requires minimum runtime version "2.2", but the configured minimum is "2.1"'
+  source:
+    kind: model
+    name: api
+    fields:
+      - capabilities[0]
+  severity: WARNING
+- code: UNSUPPORTED_IN_MIN_RUNTIME_VERSION
+  reason: 'capabilities[0]: decisions requires minimum runtime version "2.2", but the configured minimum is "2.1"'
+  source:
+    kind: model
+    name: decisions
+    fields:
+      - capabilities[0]
+  severity: ERROR

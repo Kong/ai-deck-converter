@@ -16,7 +16,10 @@ import (
 // roundTripSkip lists forward golden cases whose reverse direction is not (yet)
 // implemented, so the round-trip gate skips them instead of failing. The
 // forward golden itself is still asserted by convert's TestGolden.
-var roundTripSkip = map[string]string{}
+var roundTripSkip = map[string]string{
+	"100_wildcard_api_model": "the routes of a type api model carry no model reference. " +
+		"The reverter makes one model for each capability.",
+}
 
 // TestRoundTrip verifies that reverting the forward converter's output and
 // converting it again reproduces the original decK config byte-for-byte, for

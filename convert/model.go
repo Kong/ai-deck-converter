@@ -324,8 +324,12 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 	if isDisabled(m) {
 		return nil
 	}
+	if err := c.checkModelLists(src, m); err != nil {
+		return err
+	}
+	lists := effectiveLists(m)
 	bases := basePaths(m)
-	caps := c.expandCapabilities(m)
+	caps := lists.capabilities
 
 	// extractModelAliases yields the name(s) a client uses to select this
 	// model: authored aliases, or the model name when none is authored. They
@@ -362,7 +366,7 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 	if passthrough {
 		// Passthrough is a property of the whole model's traffic, not one wire
 		// format among several a route could accept.
-		if len(m.Formats) > 1 {
+		if len(lists.formats) > 1 {
 			return c.fail(src.at("formats"), ConfigFieldInvalid,
 				"model %q: the passthrough format cannot be combined with other formats", m.Name)
 		}
@@ -452,36 +456,17 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 					m.Name, tm.Name, passthroughFormat, passthroughFormat, format)
 			}
 		}
-		for _, capability := range caps {
-			var sec string
-			var specs []aimap.EndpointSpec
-			if passthrough {
-				sec = aimap.SectionFor(aimap.PassthroughFormat, providerType)
-				specs = []aimap.EndpointSpec{aimap.PassthroughEndpoint}
-			} else {
-				sec = aimap.SectionFor(llmFormat(m, providerType), providerType)
-				var ok bool
-				specs, ok = aimap.EndpointsFor(sec, capability)
-				if !ok {
-					return c.fail(src.at(capabilityField(m, capability)), ConfigFieldInvalid,
-						"model %q: capability %q is not supported with llm_format %q for provider type %q",
-						m.Name, capability, llmFormat(m, providerType), providerType)
-				}
-			}
-			// Passthrough-only capabilities have no cross-format converter, so a
-			// provider rendering another format can never serve them: Kong's schema
-			// rejects the pairing.
-			if aimap.RequiresNativeFormat(capability) &&
-				aimap.PluginProvider(providerType) != llmFormat(m, providerType) {
-				return c.fail(src.at(capabilityField(m, capability)), ConfigFieldInvalid,
-					"model %q: capability %q is passthrough-only, so provider type %q cannot serve llm_format %q",
-					m.Name, capability, providerType, llmFormat(m, providerType))
-			}
+		endpoints, err := c.modelEndpoints(src, m, lists, tm, providerType)
+		if err != nil {
+			return err
+		}
+		for _, endpoint := range endpoints {
+			sec, capability := endpoint.section, endpoint.capability
 			// A capability with secondary endpoints (bedrock generate, also
 			// reachable via invoke) emits one route per endpoint, each
 			// carrying this target; revert's capsSeen folds the routes back
 			// into the one capability.
-			for _, spec := range specs {
+			for _, spec := range endpoint.specs {
 				websocket := aimap.IsWebSocketEndpoint(spec)
 				// A global plugin keeps Kong's http/https default protocols. A
 				// global authentication policy therefore cannot protect a ws or
@@ -621,7 +606,7 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 						routeName:         g.route.Name,
 						aliases:           pluginAliases,
 						realtimeModel:     realtimeModel,
-						llmFormat:         llmFormat(m, providerType),
+						llmFormat:         aimap.ClientFormat(endpoint.format, providerType),
 						genaiCategory:     spec.GenaiCategory,
 						balancer:          c.balancerConfig(m.Config.Balancer),
 						vectordb:          vectordb,
@@ -643,6 +628,10 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 					g.proxies = append(g.proxies, pg)
 				} else if pg.genaiCategory != spec.GenaiCategory {
 					// The data plane requires every target to match the plugin's category.
+					// With "*", the user cannot remove this warning.
+					if lists.anyFormat || lists.anyCapability {
+						continue
+					}
 					c.warn(src.at(capabilityField(m, capability)), ConfigFieldDropped,
 						"model %q: capability %q (genai_category %q) collapses onto route %q, which already "+
 							"serves genai_category %q; a single ai-proxy-advanced cannot serve multiple genai "+
@@ -865,7 +854,7 @@ func (c *Converter) convertVideoLifecycle(
 	}
 	pg := &proxyGroup{
 		routeName:         routeName,
-		llmFormat:         llmFormat(candidate.model, ""),
+		llmFormat:         videoLifecycleFormat,
 		genaiCategory:     candidate.spec.GenaiCategory,
 		balancer:          c.balancerConfig(candidate.model.Config.Balancer),
 		vectordb:          lifecycleVectorDB,
@@ -947,7 +936,7 @@ func (c *Converter) videoLifecycleCandidates(skipped map[int][]ConversionIssue) 
 		}
 		// A passthrough model's base-path route already forwards the lifecycle
 		// requests; it declares no video endpoint of its own.
-		if isPassthrough(m) || !slices.Contains(c.expandCapabilities(m), "video") {
+		if !servesOpenAIVideo(m) {
 			continue
 		}
 		src := issueSource(kindModel, m.Name)
@@ -957,10 +946,7 @@ func (c *Converter) videoLifecycleCandidates(skipped map[int][]ConversionIssue) 
 			continue
 		}
 
-		section := aimap.SectionFor(llmFormat(m, ""), "")
-		if section != "openai" {
-			continue
-		}
+		section := videoLifecycleFormat
 		spec, ok := aimap.LookupEndpoint(section, "video")
 		if !ok {
 			continue
@@ -1081,9 +1067,9 @@ func (c *Converter) checkTarget(m *aigw.Model, j int) (*aigw.Provider, string, *
 				"databricks; the target is omitted", m.Name, tm.Name),
 		}
 	}
-	// The Mantle endpoint does not serve the Converse or InvokeModel APIs.
-	if providerType == "bedrock" && tm.Config.Options["endpoint_type"] == "mantle" &&
-		llmFormat(m, providerType) == "bedrock" {
+	// A mantle target serves no bedrock-format endpoint. modelEndpoints leaves
+	// out that format when the model has other formats.
+	if isMantleTarget(tm, providerType) && onlyBedrockFormat(m, providerType) {
 		return nil, "", &targetProblem{
 			field: fmt.Sprintf("targets[%d].config.endpoint_type", j),
 			code:  ConfigFieldInvalid,
@@ -1095,8 +1081,11 @@ func (c *Converter) checkTarget(m *aigw.Model, j int) (*aigw.Provider, string, *
 }
 
 // capabilityField returns the path of the entry of m.Capabilities that
-// expands to capability.
+// expands to capability. With aimap.Wildcard, it is the path of that entry.
 func capabilityField(m *aigw.Model, capability string) string {
+	if i := slices.Index(m.Capabilities, aimap.Wildcard); i >= 0 {
+		return fmt.Sprintf("capabilities[%d]", i)
+	}
 	for i, raw := range m.Capabilities {
 		if slices.Contains(aimap.NormalizeCapability(raw), capability) {
 			return fmt.Sprintf("capabilities[%d]", i)
@@ -1395,15 +1384,6 @@ func (c *Converter) supportedTargetOptions(opts map[string]any) map[string]any {
 	return out
 }
 
-// expandCapabilities normalizes a model's capabilities into canonical keys.
-func (c *Converter) expandCapabilities(m *aigw.Model) []string {
-	var out []string
-	for _, capability := range m.Capabilities {
-		out = append(out, aimap.NormalizeCapability(capability)...)
-	}
-	return out
-}
-
 // balancerHoisted are balancer-block fields that the plugin schema
 // expects as siblings of `balancer`, not nested inside it.
 var balancerHoisted = map[string]bool{"vectordb": true, "embeddings": true}
@@ -1642,15 +1622,8 @@ func (c *Converter) extractModelAliases(src ConversionIssueSource, m *aigw.Model
 	return unique
 }
 
-// llmFormat returns the ai-proxy-advanced llm_format for a model. providerType
-// is only consulted for the passthrough format, which renders as the provider's
-// own native wire format; pass "" where no single provider applies.
-func llmFormat(m *aigw.Model, providerType string) string {
-	if len(m.Formats) > 0 && m.Formats[0].Type != "" {
-		return aimap.ClientFormat(m.Formats[0].Type, providerType)
-	}
-	return aimap.DefaultLLMFormat
-}
+// videoLifecycleFormat is the only format with a video lifecycle route.
+const videoLifecycleFormat = "openai"
 
 // balancerAlgorithm returns the algorithm a model's balancer selects, defaulted as
 // balancerConfig defaults it.
@@ -1691,14 +1664,6 @@ func (c *Converter) warnPassthroughPolicies(src ConversionIssueSource, m *aigw.M
 				"the body reaches the provider unchanged, in the provider's own shape",
 			m.Name, ref, policy.Type)
 	}
-}
-
-// isPassthrough reports whether a model forwards request bodies unchanged. The
-// format is a whole-model property (convertModels rejects it alongside any other
-// format), so every target of the model is passthrough or none is — which is
-// also what ai-proxy-advanced requires of one plugin's targets.
-func isPassthrough(m *aigw.Model) bool {
-	return slices.ContainsFunc(m.Formats, func(f aigw.Format) bool { return f.Type == aimap.PassthroughFormat })
 }
 
 // bodySizeOrDefault returns the ai-model-selector's max_request_body_size: at
