@@ -234,7 +234,7 @@ func intPtr(i int) *int { return &i }
 func TestTokenVaultSubjectTokenTypeCredentialCache(t *testing.T) {
 	t.Parallel()
 
-	location := &aigw.TokenVaultCredentialLocation{Location: "header", Name: "Authorization", Prefix: "Bearer "}
+	location := &aigw.TokenVaultCredentialLocation{Location: "header", Name: "Authorization", Prefix: new("Bearer ")}
 	tv := &aigw.TokenVaultConfig{
 		Provider:         "github",
 		SubjectTokenType: "api_key",
@@ -331,4 +331,18 @@ func TestApplyTokenVaultDatastore(t *testing.T) {
 		_, err := ApplyTokenVaultDatastore(nil, &aigw.Datastore{Type: DatastoreTypeRedisEE})
 		require.ErrorContains(t, err, "token-vault")
 	})
+}
+
+func TestTokenVaultCredentialEmptyPrefix(t *testing.T) {
+	t.Parallel()
+
+	outbound := &aigw.TokenVaultCredentialLocation{Location: "header", Name: "x-api-key", Prefix: new("")}
+	tv := &aigw.TokenVaultConfig{
+		Provider:   "anthropic",
+		Credential: &aigw.TokenVaultCredential{Outbound: outbound},
+	}
+	block := TokenVaultToPlugin(tv)
+	require.Equal(t, map[string]any{"location": "header", "name": "x-api-key", "prefix": ""},
+		block["credential"].(map[string]any)["outbound"])
+	require.Equal(t, tv, TokenVaultFromPlugin(block))
 }

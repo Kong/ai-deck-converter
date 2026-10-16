@@ -67,7 +67,8 @@ type TokenVaultCredential struct {
 type TokenVaultCredentialLocation struct {
 	Location string `yaml:"location,omitempty"`
 	Name     string `yaml:"name,omitempty"`
-	Prefix   string `yaml:"prefix,omitempty"`
+	// An empty Prefix differs from the plugin default "Bearer ".
+	Prefix *string `yaml:"prefix,omitempty"`
 }
 
 // RedisCloudConfig mirrors the AIGatewayRedisCloudConfiguration schema: the

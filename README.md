@@ -297,6 +297,17 @@ and `formats` beyond the first.
   by a `generate` capability — see `convert/testdata/58_bedrock_generate_and_speech`.
   This never breaks round-tripping a converter-produced config, since re-
   converting the recovered model reproduces the same route/target either way.
+- **Provider Token Vault.** A Model Provider's top-level `token_vault`
+  (`provider`, optional `subject_token_type`, `credential` and `cache`) plus
+  exactly one `token-vault` datastore lowers to a `token-vault-exchange`
+  plugin. The plugin has the scope of the model's `ai-proxy-advanced` (route,
+  plus the `ai-model` FK for each alias). The datastore supplies `directory`
+  and `storage`, and adds the `/_vault` callback route. Hard errors, which
+  leave out the model: static `config.auth` on the same provider, targets of
+  one model that do not share the same token vault, `type: api` models on one
+  route with different token vaults, a WebSocket capability, and inline
+  `redis` or `encryption_secrets`. Convert-only: revert does not lift the
+  plugin yet.
 - **Credentials.** Only `api-key` (`keyauth_credentials`) is generated; other
   credential types are warned about and skipped.
 - **MCP upstream.** Passthrough MCP servers without an `upstream_url` get a

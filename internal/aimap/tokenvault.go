@@ -443,7 +443,9 @@ func tokenVaultLocationToPlugin(l *aigw.TokenVaultCredentialLocation) map[string
 	out := map[string]any{}
 	setStr(out, "location", l.Location)
 	setStr(out, "name", l.Name)
-	setStr(out, "prefix", l.Prefix)
+	if l.Prefix != nil {
+		out["prefix"] = *l.Prefix
+	}
 	if len(out) == 0 {
 		return nil
 	}
@@ -457,6 +459,14 @@ func tokenVaultLocationFromPlugin(block map[string]any) *aigw.TokenVaultCredenti
 	return &aigw.TokenVaultCredentialLocation{
 		Location: getAnyStr(block, "location"),
 		Name:     getAnyStr(block, "name"),
-		Prefix:   getAnyStr(block, "prefix"),
+		Prefix:   getAnyStrPtr(block, "prefix"),
 	}
+}
+
+func getAnyStrPtr(m map[string]any, key string) *string {
+	s, ok := m[key].(string)
+	if !ok {
+		return nil
+	}
+	return &s
 }

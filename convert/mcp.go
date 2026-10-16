@@ -268,8 +268,13 @@ func (c *Converter) pruneUnexposedSources(conversionOnlyServices []int, exposed 
 }
 
 // pruneUnusedTokenVaultCallbackRoute removes the Token Vault callback route
-// when no remaining service uses a Token Vault.
+// when no remaining service or model provider uses a Token Vault.
 func (c *Converter) pruneUnusedTokenVaultCallbackRoute() {
+	for _, plugin := range c.out.Plugins {
+		if plugin.Name == tokenVaultExchangePlugin {
+			return
+		}
+	}
 	for _, service := range c.out.Services {
 		for _, route := range service.Routes {
 			for _, plugin := range route.Plugins {
@@ -359,7 +364,10 @@ func (c *Converter) mcpPlugin(src ConversionIssueSource, m *aigw.MCPServer) (kon
 			}
 		}
 		if tvDatastore != nil {
-			if err := c.ensureTokenVaultCallbackRoute(src, m, tvDatastore); err != nil {
+			owner := fmt.Sprintf("MCP server %q", m.Name)
+			routeSource := source(kindMCPServer, m.Name, "datastores")
+			at := src.at("datastores[0].name")
+			if err := c.ensureTokenVaultCallbackRoute(at, owner, tvDatastore, routeSource); err != nil {
 				return kong.Plugin{}, err
 			}
 		}
@@ -522,23 +530,23 @@ func (c *Converter) resolveMCPDatastore(src ConversionIssueSource, m *aigw.MCPSe
 }
 
 // ensureTokenVaultCallbackRoute adds the Token Vault callback route once. A
-// later server with a different connection fails, because one route cannot
+// later entity with a different connection fails, because one route cannot
 // serve two connections.
 func (c *Converter) ensureTokenVaultCallbackRoute(
-	src ConversionIssueSource, m *aigw.MCPServer, ds *aigw.Datastore,
+	at ConversionIssueSource, owner string, ds *aigw.Datastore, routeSource *kong.Source,
 ) error {
 	config, err := aimap.ApplyTokenVaultDatastore(nil, ds)
 	if err != nil {
-		return c.fail(src.at("datastores"), ConfigFieldInvalid, "MCP server %q: %v", m.Name, err)
+		return c.fail(at, ConfigFieldInvalid, "%s: %v", owner, err)
 	}
 	for _, route := range c.out.Routes {
 		if route.Name != aimap.TokenVaultCallbackName {
 			continue
 		}
 		if !reflect.DeepEqual(route.Plugins[0].Config, config) {
-			return c.fail(src.at("datastores[0].name"), ConfigFieldInvalid,
-				"MCP server %q references datastore %q, but another MCP server already "+
-					"uses a different token-vault datastore", m.Name, ds.Name)
+			return c.fail(at, ConfigFieldInvalid,
+				"%s references datastore %q, but another entity already "+
+					"uses a different token-vault datastore", owner, ds.Name)
 		}
 		return nil
 	}
@@ -549,9 +557,9 @@ func (c *Converter) ensureTokenVaultCallbackRoute(
 		Plugins: []kong.Plugin{{
 			Name:   aimap.TokenVaultCallbackName,
 			Config: config,
-			Source: source("mcp_server", m.Name, "datastores"),
+			Source: routeSource,
 		}},
-		Source: source("mcp_server", m.Name, "datastores"),
+		Source: routeSource,
 	})
 	return nil
 }
