@@ -1,0 +1,80 @@
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: openai-chat
+        paths:
+          - /ai/chat/completions
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+consumers:
+  - username: anonymous
+    custom_id: anonymous
+    plugins:
+      - name: request-termination
+        enabled: true
+        config:
+          message: Unauthorized
+          status_code: 401
+plugins:
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    ordering:
+      before:
+        access:
+          - pre-function
+      after:
+        access:
+          - openid-connect
+          - key-auth
+          - request-termination
+    route: openai-chat
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://env/openai-key}'
+          description: gpt-4o
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: '@kong/gpt-4o'
+            name: gpt-4o
+            provider: openai
+          route_type: llm/v1/chat
+    route: openai-chat
+    model: '@kong/gpt-4o'
+  - name: pre-function
+    config:
+      access:
+        - |
+          local model = ngx.ctx.ai_model
+          return kong.response.exit(200, { selected_model = model and model.name or ngx.null })
+    route: openai-chat
+    model: '@kong/gpt-4o'
+  - name: openid-connect
+    config:
+      anonymous: anonymous
+      issuer: https://dev-123456.okta.com/oauth2/default
+    route: openai-chat
+  - name: key-auth
+    config:
+      anonymous: anonymous
+      key_names:
+        - x-api-key
+    route: openai-chat
+ai_models:
+  - name: '@kong/gpt-4o'

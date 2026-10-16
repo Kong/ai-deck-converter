@@ -85,15 +85,6 @@ services:
       - name: hosts-any-route
         paths:
           - /agents/hosts
-consumers:
-  - username: anonymous
-    custom_id: anonymous
-    plugins:
-      - name: request-termination
-        enabled: true
-        config:
-          message: Unauthorized
-          status_code: 401
 plugins:
   - name: ai-model-selector
     config:
@@ -235,7 +226,6 @@ plugins:
     model: split-secured-b
   - name: key-auth
     config:
-      anonymous: anonymous
       key_names:
         - x-api-key
     route: openai-chat-4

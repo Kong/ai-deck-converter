@@ -42,9 +42,6 @@ consumers:
     username: premium-user
   - id: 8fd38b4c-59a8-54ce-a6fd-1b919bc1fffa
     username: basic-user
-  - id: 1e8d7140-b92a-52b9-9aa1-07931156b4bc
-    username: anonymous
-    custom_id: anonymous
 consumer_groups:
   - id: ccdc7a46-6d73-5cfd-96db-0dc5b6ccf7d6
     name: premium-users
@@ -52,14 +49,6 @@ consumer_group_consumers:
   - consumer: 9dc33ddb-303b-5036-a127-b36d11911b18
     consumer_group: ccdc7a46-6d73-5cfd-96db-0dc5b6ccf7d6
 plugins:
-  - id: d39c1a27-9765-525d-a8f2-96c4a2435124
-    name: request-termination
-    enabled: true
-    config:
-      message: Unauthorized
-      status_code: 401
-    consumer:
-      id: 1e8d7140-b92a-52b9-9aa1-07931156b4bc
   - id: 17fa8192-4b9f-5b5a-8379-20ad8bc836a7
     name: ai-model-selector
     config:
@@ -151,8 +140,6 @@ plugins:
       id: b2ed74bc-70de-5c05-98a5-1ff4f804ad51
   - id: 6afbae24-bec6-532d-97ee-ca0ddb350e2f
     name: key-auth
-    config:
-      anonymous: anonymous
     route:
       id: 8ae36805-da7a-55b9-b056-72bde6bb937d
   - id: 14b95fe8-855a-59e8-ac9d-18e05903fca5

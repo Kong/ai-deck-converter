@@ -1,0 +1,97 @@
+# Three models share one route behind one key-auth strategy. The pre-function
+# policy outranks ai-model-selector, so the selector gets an ordering. One auth
+# strategy needs no anonymous fallback, so request-termination stays out of
+# that ordering, and the model-scoped request-termination policy runs.
+models:
+  - display_name: Probed model
+    name: probed-model
+    type: model
+    capabilities: [ generate ]
+    formats:
+      - type: openai
+    config:
+      route:
+        paths: [ /ai-termination-probe ]
+        model:
+          values: [ probed-alias ]
+    targets:
+      - name: gpt-4o
+        provider: openai-prod
+        config:
+          type: openai
+    policies: [ ordering-probe ]
+    access:
+      auth_strategies: [ key-auth-default ]
+  - display_name: Blocked model
+    name: blocked-model
+    type: model
+    capabilities: [ generate ]
+    formats:
+      - type: openai
+    config:
+      route:
+        paths: [ /ai-termination-probe ]
+        model:
+          values: [ blocked-alias ]
+    targets:
+      - name: gpt-4o
+        provider: openai-prod
+        config:
+          type: openai
+    policies: [ block-model ]
+    access:
+      auth_strategies: [ key-auth-default ]
+  - display_name: Open model
+    name: open-model
+    type: model
+    capabilities: [ generate ]
+    formats:
+      - type: openai
+    config:
+      route:
+        paths: [ /ai-termination-probe ]
+        model:
+          values: [ open-alias ]
+    targets:
+      - name: gpt-4o
+        provider: openai-prod
+        config:
+          type: openai
+    access:
+      auth_strategies: [ key-auth-default ]
+model_providers:
+  - name: openai-prod
+    type: openai
+    display_name: OpenAI Prod
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://ai/openai-token}"
+policies:
+  - type: pre-function
+    name: ordering-probe
+    config:
+      access:
+        - |
+          local model = ngx.ctx.ai_model
+          return kong.response.exit(200, { selected_model = model and model.name or ngx.null })
+  - type: request-termination
+    name: block-model
+    config:
+      status_code: 403
+      message: model blocked
+auth_strategies:
+  - name: key-auth-default
+    type: key-auth
+    display_name: Default Key Auth
+    config:
+      key_names: [ x-api-key ]
+consumers:
+  - name: termination-probe-user
+    type: api-key
+    credentials:
+      - name: termination-probe-key
+        type: api-key
+        api_key: termination-probe-secret

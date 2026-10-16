@@ -673,6 +673,176 @@ policies:
 	require.Contains(t, err.Error(), "auth_strategies")
 }
 
+func TestConvertRejectsAuthStrategyTypeOtherThanKeyAuthOrOIDC(t *testing.T) {
+	tests := []struct {
+		name   string
+		entity string
+		kind   string
+		field  string
+	}{
+		{
+			name: "model",
+			entity: `
+models:
+  - type: model
+    name: guarded
+    capabilities: [generate]
+    formats: [{type: openai}]
+    targets:
+      - name: gpt-4o
+        provider: p1
+        config: {type: openai}
+    access:
+      auth_strategies: [bad-type]
+    config:
+      route: {paths: [/ai]}
+model_providers:
+  - name: p1
+    type: openai
+`,
+			kind:  kindModel,
+			field: "access.auth_strategies[0]",
+		},
+		{
+			name: "agent",
+			entity: `
+agents:
+  - type: http
+    name: guarded
+    access:
+      auth_strategies: [bad-type]
+    config:
+      url: https://agent.internal/api
+      route: {paths: [/agents/guarded]}
+`,
+			kind:  kindAgent,
+			field: "access.auth_strategies[0]",
+		},
+		{
+			name: "mcp server",
+			entity: `
+mcp_servers:
+  - type: listener
+    name: guarded
+    config:
+      route: {paths: [/mcp/guarded]}
+    access:
+      auth_strategies: [bad-type]
+    tools:
+      - name: ping
+        description: Ping
+        method: GET
+        path: /ping
+        scheme: https
+        host: guarded.internal
+`,
+			kind:  kindMCPServer,
+			field: "access.auth_strategies[0]",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			src := tt.entity + `
+auth_strategies:
+  - name: bad-type
+    type: jwt
+    config: {}
+`
+			result, err := Convert([]byte(src), testOptions)
+			require.NoError(t, err)
+			issue := requireIssue(t, result.Issues, Error, ConfigFieldInvalid, tt.kind, "guarded", tt.field)
+			require.Contains(t, issue.Reason, "must be key-auth or openid-connect")
+			require.Empty(t, result.Output.Services, "the entity is left out")
+		})
+	}
+}
+
+// requestTerminationModel is a model with a policy that outranks the
+// selector and a model-scoped request-termination policy. Its route has the
+// auth strategies in strategies.
+func requestTerminationModel(strategies string) []byte {
+	return []byte(`
+models:
+  - type: model
+    name: guarded
+    capabilities: [generate]
+    formats: [{type: openai}]
+    targets:
+      - name: gpt-4o
+        provider: p1
+        config: {type: openai}
+    policies: [probe, block-model]
+    access:
+      auth_strategies: ` + strategies + `
+    config:
+      route:
+        paths: [/ai]
+        model:
+          values: ["@kong/a", "@kong/b"]
+model_providers:
+  - name: p1
+    type: openai
+policies:
+  - type: pre-function
+    name: probe
+    config: {access: ["return"]}
+  - type: request-termination
+    name: block-model
+    config: {status_code: 403}
+auth_strategies:
+  - name: key-auth-default
+    type: key-auth
+    config: {key_names: [x-api-key]}
+  - name: okta-oidc
+    type: openid-connect
+    config: {issuer: https://idp.example.com}
+`)
+}
+
+// One auth plugin rejects the request itself. request-termination then stays
+// out of the selector ordering, so the model-scoped policy runs.
+func TestConvertSingleAuthStrategyKeepsModelScopedRequestTermination(t *testing.T) {
+	result, err := Convert(requestTerminationModel("[key-auth-default]"), testOptions)
+	require.NoError(t, err)
+	require.Empty(t, result.Issues)
+	require.Empty(t, result.Output.Consumers, "one auth strategy needs no anonymous consumer")
+
+	var sawKeyAuth, sawSelector bool
+	var terminations int
+	for _, p := range result.Output.Plugins {
+		switch p.Name {
+		case "key-auth":
+			sawKeyAuth = true
+			require.NotContains(t, p.Config, "anonymous")
+		case "ai-model-selector":
+			sawSelector = true
+			require.NotNil(t, p.Ordering)
+			require.Equal(t, []string{"key-auth"}, p.Ordering.After.Access)
+		case "request-termination":
+			require.NotNil(t, p.Model, "the policy stays model-scoped")
+			terminations++
+		}
+	}
+	require.True(t, sawKeyAuth, "key-auth plugin not found")
+	require.True(t, sawSelector, "ai-model-selector plugin not found")
+	require.Equal(t, 2, terminations, "one copy per alias")
+}
+
+func TestConvertWarnsModelScopedRequestTerminationWithAnonymousFallback(t *testing.T) {
+	result, err := Convert(requestTerminationModel("[key-auth-default, okta-oidc]"), testOptions)
+	require.NoError(t, err)
+	issue := requireIssue(t, result.Issues, Warning, BehaviorMayDiffer, kindModel, "guarded", "policies[1]")
+	require.Contains(t, issue.Reason, "model-scoped request-termination policy on this route never runs")
+	var sawSelector bool
+	for _, p := range result.Output.Plugins {
+		if p.Name == "ai-model-selector" {
+			sawSelector = true
+			require.Contains(t, p.Ordering.After.Access, "request-termination")
+		}
+	}
+	require.True(t, sawSelector, "ai-model-selector plugin not found")
+}
+
 func TestConvertScopesAuthStrategiesWithoutLeakingAcrossSharedRoutes(t *testing.T) {
 	src := []byte(`
 models:

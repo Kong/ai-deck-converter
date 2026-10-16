@@ -1,0 +1,8 @@
+- code: BEHAVIOR_MAY_DIFFER
+  reason: 'model "guarded": custom policy "early-streamer" sets PRIORITY 1000, which outranks ai-model-selector (957). The converter cannot reorder a custom plugin, so this model-scoped instance on route "openai-chat" never runs. Give the policy a lower PRIORITY for it to run for this model.'
+  source:
+    kind: model
+    name: guarded
+    fields:
+      - policies[0]
+  severity: WARNING

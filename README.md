@@ -168,7 +168,7 @@ See `convert/testdata/*/input.yaml` for worked examples.
 | MCP Server / Agent `config.certificates`, `config.ca_certificates` | Set the generated Service's `client_certificate` and `ca_certificates` to the IDs of the named Certificate and CA Certificates. A Service presents one client certificate, so only the first entry of `certificates` is used. A referenced entity without an `id` gets the `id` that `db-less` mode derives for it. The fields are ignored with a warning if the Service URL is not `https`, because Kong rejects them there. An unknown name warns and is dropped; `-strict` makes it an error. |
 | Policy | Kong plugin (`name` = policy `type`, config passed through). `global: true` -> one top-level plugin; otherwise instantiated per referencing entity. |
 | Datastore | Not a standalone entity. Referenced by name from a Policy's `datastores` field, or from a Model's `datastores` field (only when that model's balancer is `semantic`); its `config` is merged into that policy's plugin config at a path fixed by the plugin's type (`config.redis` for most; `config.storage_config.redis` for `acme`; `config.resources.cache.redis` for `datakit`; `config.vectordb.<redis\|pgvector>` for the VectorDB family, sub-block and `strategy` chosen by the Datastore's `type`). On a Model it replaces the connection sub-block of ai-proxy-advanced `config.vectordb` — the model keeps its own `dimensions`/`distance_metric`/`threshold`, and only `redis-ee` or `vectordb` types are accepted. Rejected if the plugin type doesn't support a Datastore, or if the Datastore's `type` isn't one that plugin accepts. An unknown reference gives an `UNDEFINED_REFERENCE` error, and the Policy or Model converts without the connection. |
-| Auth Strategy | Kong authentication plugin (`name` = strategy `type`: `key-auth` or `openid-connect`, config passed through) on the route of each entity whose `access.auth_strategies` references it, with `config.anonymous` pointing at a synthesized `anonymous` consumer that a `request-termination` plugin rejects with a 401. Models with different auth-strategy sets never share a route. |
+| Auth Strategy | Kong authentication plugin (`name` = strategy `type`: `key-auth` or `openid-connect`, config passed through) on the route of each entity whose `access.auth_strategies` references it, with `config.anonymous` pointing at a synthesized `anonymous` consumer that a `request-termination` plugin rejects with a 401. A model route with one auth strategy has no `anonymous` fallback: the auth plugin rejects the request itself. Models with different auth-strategy sets never share a route. |
 | Consumer | Consumer (`username` = name, `custom_id`), `groups` membership, nested `keyauth_credentials`, scoped policy plugins. |
 | Consumer Group | `consumer_groups` entry + scoped policy plugins. |
 | Credential | `keyauth_credentials` nested under the consumer (`key` from `api_key`, `ttl`). |
@@ -177,7 +177,7 @@ See `convert/testdata/*/input.yaml` for worked examples.
 | Certificate | `certificates` entry (`cert`/`key` and the optional `cert_alt`/`key_alt` pair passed through). Kong certificates have no `name`, so the source name is not represented in the output; in `db-less` mode it still seeds the generated `id`. |
 | SNI | Nested under its referenced Certificate's `snis` list (`hostname` → `name`, `labels` → `tags`); decK's file format has no standalone SNI entity. The SNI's own `name`/`display_name` have no Kong counterpart and are dropped. In `db-less` mode SNIs become a top-level `snis` entry referencing the certificate's generated `id`. |
 | Model with `formats: [{type: passthrough}]` | Requires AI Gateway 2.2+. **One route on the bare base path** (every method, no endpoint suffix), whatever `capabilities` it declares — `[]` is fine — with one route-scoped `ai-proxy-advanced` whose targets carry `route_type: passthrough` and no `model_alias`; `llm_format` is the provider's native format (openai for providers without their own). No `ai-model-selector`, no video lifecycle routes, and the model's policies/ACLs are route-scoped rather than `model:`-scoped, since nothing can select an `ai-models` row for a body of unknown shape (the row is still emitted). No `anthropic_version` default is applied. |
-| Model `policies`/`acls` | Top-level plugins scoped to the `ai-models` entity via a `model:` FK. |
+| Model `policies`/`acls` | Top-level plugins scoped to the `ai-models` entity via a `model:` FK. When a policy's plugin type has a static Kong priority above `ai-model-selector`'s (`aimap.OutranksModelSelector`, e.g. `pre-function`), the route's `ai-model-selector` gets `ordering.before.access` with that plugin name. See "Assumptions and limitations" below. |
 | Agent `access.acls` | Kong `acl` plugin on the agent's Route. |
 | `labels` | `tags` flattened to sorted `key:value` strings. |
 
@@ -278,9 +278,7 @@ and `formats` beyond the first.
   the realtime route with a warning; they still apply to the model's HTTP
   routes. The anonymous consumer's `request-termination` cannot run on
   WebSocket either, so a realtime auth plugin has no `anonymous` fallback, a
-  model with more than one auth strategy cannot declare `realtime`, and an
-  auth strategy whose plugin type rejects `ws`/`wss` (e.g. `jwt`) leaves out
-  the model rather than silently leaving the route unprotected. A global
+  model with more than one auth strategy cannot declare `realtime`. A global
   authentication policy cannot protect a WebSocket route either, so it leaves
   out every model with the `realtime` capability. The global policy stays.
 - **Mostly one endpoint per capability.** Each (section, capability) maps to an
@@ -299,6 +297,45 @@ and `formats` beyond the first.
   converting the recovered model reproduces the same route/target either way.
 - **Credentials.** Only `api-key` (`keyauth_credentials`) is generated; other
   credential types are warned about and skipped.
+- **High-priority model policies reorder `ai-model-selector`.** A model
+  policy can outrank `ai-model-selector`, for example `pre-function`. Without
+  reordering, it runs before Kong sets `ngx.ctx.ai_model`, so Kong skips it.
+  An `ordering` block on the model-scoped policy has no effect. Kong reads
+  `ordering` before the model is known, and a model-scoped config is not
+  visible then. The converter adds the policy's plugin name to the route's
+  `ai-model-selector` `ordering.before.access` instead. Side effects:
+  - `ordering` matches plugin names, not instances. On that route, every
+    instance of the named plugin runs after `ai-model-selector`. This
+    includes instances that are not model-scoped.
+  - Plugins on that route that the rule does not name can then run after
+    `ai-model-selector`. Authentication is not one of them. When the route
+    has auth strategies, the converter also adds the auth plugins to
+    `ordering.after.access`. So an unauthenticated request gets its 401
+    before `ai-model-selector` reads the body and before the policy runs.
+    Kong orders by plugin name. An auth strategy must have type `key-auth`
+    or `openid-connect`, and a model policy cannot have either type, so no
+    plugin name is in both lists.
+  - A model route with one auth strategy has no `anonymous` fallback. The
+    auth plugin rejects the request itself, so `request-termination` stays
+    out of the ordering. A model-scoped `request-termination` policy (for
+    example, one that blocks a model) keeps its low priority and runs after
+    `ai-model-selector`.
+  - A route with more than one auth strategy needs the fallback: a request
+    passes when any strategy accepts it. Only the `anonymous` consumer's
+    `request-termination` then rejects it, so the converter also adds
+    `request-termination` to `ordering.after.access`. A model-scoped
+    `request-termination` policy on that route is then skipped: Kong checks
+    it before the model is known. The converter warns about it. Scope it to
+    the route or globally instead.
+  - Any `ordering` in a workspace turns on dynamic plugin ordering for the
+    whole workspace. Dynamic ordering needs an Enterprise license.
+  - A user `ordering` that puts a plugin before `ai-model-selector` makes a
+    cycle. Kong then logs an error and uses the static priorities.
+
+  `e2e/testdata/pre_function_model_ordering`,
+  `e2e/testdata/pre_function_model_ordering_auth`, and
+  `e2e/testdata/model_scoped_request_termination_auth` prove this against a
+  real gateway.
 - **MCP upstream.** Passthrough MCP servers without an `upstream_url` get a
   placeholder host and a warning.
 - **Upstream auth.** Agents and MCP Servers carry `config.upstream.auth` (AWS

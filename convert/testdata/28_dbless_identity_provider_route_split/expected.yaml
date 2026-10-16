@@ -34,19 +34,7 @@ routes:
       - http
       - https
     strip_path: false
-consumers:
-  - id: 1e8d7140-b92a-52b9-9aa1-07931156b4bc
-    username: anonymous
-    custom_id: anonymous
 plugins:
-  - id: d39c1a27-9765-525d-a8f2-96c4a2435124
-    name: request-termination
-    enabled: true
-    config:
-      message: Unauthorized
-      status_code: 401
-    consumer:
-      id: 1e8d7140-b92a-52b9-9aa1-07931156b4bc
   - id: 17fa8192-4b9f-5b5a-8379-20ad8bc836a7
     name: ai-model-selector
     config:
@@ -116,7 +104,6 @@ plugins:
   - id: bb79eabd-8d6e-57e1-9428-fd9dc2b9cbad
     name: openid-connect
     config:
-      anonymous: anonymous
       auth_methods:
         - bearer
       bearer_token_param_type:
