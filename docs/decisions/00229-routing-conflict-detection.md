@@ -62,19 +62,19 @@ This RFC makes the converter report each of these conflicts.
 # Guide-level explanation
 [guide-level-explanation]: #guide-level-explanation
 
-New concepts:
+The converter will "lint" the generated document and surface issues
+to the caller via the mechanism defined in [00207-conversion-issue-reporting](00207-conversion-issue-reporting.md).
+The reported issues will have type `ROUTING_CONFLICT`, where the issue source
+is the later entity in the document and the reason names the other entity.
 
+Furthermore, it is up to the caller to decide how to handle `ROUTING_CONFLICT` issues. 
+For example, an API may choose to handle these issues by responding with a BAD REQUEST response 
+whereas another tool may choose to ignore them.
+
+New concepts:
 - **Routing conflict**: two entities can receive the same request, and the
   data plane selects one of them without a rule that the user controls.
 - **Overlap**: two values of one matcher can match one request.
-
-The converter reports each conflict as a `ROUTING_CONFLICT` issue. The issue
-source is the later entity in the document. The reason names the other entity.
-
-- A route conflict and a model selector conflict have the `WARNING` severity.
-- A model name conflict has the `ERROR` severity. The data plane requires
-  unique `ai_models` names and aliases. The converter leaves out the later
-  model.
 
 ### Example 1: two MCP servers on one path
 
