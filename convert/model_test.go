@@ -126,6 +126,20 @@ func TestPassthroughRejects(t *testing.T) {
 	}
 }
 
+// Two passthrough models on one route path leave out the later model.
+func TestPassthroughSharedPathIsRoutingConflict(t *testing.T) {
+	result, err := Convert([]byte(`models:
+  - name: first
+    formats: [{type: passthrough}]
+    targets: [{name: a, provider: p, config: {type: openai}}]
+  - name: second
+    formats: [{type: passthrough}]
+    targets: [{name: b, provider: p, config: {type: openai}}]`+passthroughProviders), testOptions)
+	require.NoError(t, err)
+	require.Len(t, result.Issues, 1, "the route check reports no second issue")
+	requireIssue(t, result.Issues, Error, RoutingConflict, kindModel, "second", "config.route.paths")
+}
+
 // TestPassthroughIgnoresCapabilities pins that a passthrough model serves one route on its bare
 // base path, on every method, whatever capabilities it declares -- none, or ones (video) that
 // would otherwise add routes of their own.
@@ -432,7 +446,8 @@ func TestRealtimeRoutesAreNotSharedBetweenModels(t *testing.T) {
     capabilities: [realtime]
     targets: [{name: t, provider: openai-prod, config: {type: openai}}]
 `+overrideProvider)
-	require.Empty(t, warnings)
+	require.Len(t, warnings, 1)
+	require.Contains(t, warnings[0], `route "openai-realtime-2" of model "b" can match the same requests`)
 	require.Len(t, doc.Services, 1, "no HTTP Service without HTTP routes")
 	require.Equal(t, aimap.GatewayWebSocketServiceName, doc.Services[0].Name)
 	require.Len(t, doc.Services[0].Routes, 2)

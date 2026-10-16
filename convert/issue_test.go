@@ -95,10 +95,10 @@ models:
 agents:
   - name: crashing-agent
     type: http
-    config: {url: https://agent.internal}
+    config: {url: https://agent.internal, route: {paths: [/crashing-agent]}}
   - name: healthy-agent
     type: http
-    config: {url: https://agent.internal}
+    config: {url: https://agent.internal, route: {paths: [/healthy-agent]}}
 `)
 	doc, err := publicaigw.Parse(src)
 	require.NoError(t, err)

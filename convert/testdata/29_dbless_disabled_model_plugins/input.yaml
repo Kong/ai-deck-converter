@@ -20,3 +20,19 @@ models:
       route:
         paths:
           - /disabled-chat
+  # The disabled model above makes no output. This model uses its alias and
+  # its route without a conflict.
+  - type: model
+    name: enabled-chat
+    capabilities:
+      - generate
+    targets:
+      - name: gpt-5
+        provider: openai
+    config:
+      route:
+        paths:
+          - /disabled-chat
+        model:
+          values:
+            - disabled-chat
