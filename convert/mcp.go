@@ -264,6 +264,25 @@ func (c *Converter) pruneUnexposedSources(conversionOnlyServices []int, exposed 
 		kept = append(kept, c.out.Services[i])
 	}
 	c.out.Services = kept
+	c.pruneUnusedTokenVaultCallbackRoute()
+}
+
+// pruneUnusedTokenVaultCallbackRoute removes the Token Vault callback route
+// when no remaining service uses a Token Vault.
+func (c *Converter) pruneUnusedTokenVaultCallbackRoute() {
+	for _, service := range c.out.Services {
+		for _, route := range service.Routes {
+			for _, plugin := range route.Plugins {
+				auth, _ := plugin.Config["auth"].(map[string]any)
+				if plugin.Name == "ai-mcp-proxy" && auth["provider"] == aimap.UpstreamAuthProviderTokenVault {
+					return
+				}
+			}
+		}
+	}
+	c.out.Routes = slices.DeleteFunc(c.out.Routes, func(r kong.Route) bool {
+		return r.Name == aimap.TokenVaultCallbackName
+	})
 }
 
 // addTag appends tag to tags if absent, keeping the result sorted so conversion
@@ -476,10 +495,13 @@ func setIfNotEmptyMap(m map[string]any, key string, val map[string]any) {
 }
 
 // resolveMCPDatastore returns the Datastore the server references, or nil when
-// it has none or the name is unknown. An unknown name is an error, and the
-// server converts without the connection.
+// it has none. A token_vault without a known datastore fails the server.
 func (c *Converter) resolveMCPDatastore(src ConversionIssueSource, m *aigw.MCPServer) (*aigw.Datastore, error) {
 	if len(m.Datastores) == 0 {
+		if m.TokenVault != nil {
+			return nil, c.fail(src.at("datastores"), MissingRequiredConfigField,
+				"MCP server %q: token_vault requires a %q datastore", m.Name, aimap.DatastoreTypeTokenVault)
+		}
 		return nil, nil
 	}
 	if len(m.Datastores) > 1 {
@@ -493,9 +515,8 @@ func (c *Converter) resolveMCPDatastore(src ConversionIssueSource, m *aigw.MCPSe
 	}
 	ds := c.datastores[m.Datastores[0].Name]
 	if ds == nil {
-		c.reportError(src.at("datastores[0].name"), UndefinedReference,
+		return nil, c.fail(src.at("datastores[0].name"), UndefinedReference,
 			"MCP server %q references unknown datastore %q", m.Name, m.Datastores[0].Name)
-		return nil, nil
 	}
 	return ds, nil
 }
@@ -525,8 +546,12 @@ func (c *Converter) ensureTokenVaultCallbackRoute(
 		Name:      aimap.TokenVaultCallbackName,
 		Paths:     []string{aimap.TokenVaultCallbackPath},
 		Protocols: []string{"http", "https"},
-		Plugins:   []kong.Plugin{{Name: aimap.TokenVaultCallbackName, Config: config}},
-		Source:    source("mcp_server", m.Name, "datastores"),
+		Plugins: []kong.Plugin{{
+			Name:   aimap.TokenVaultCallbackName,
+			Config: config,
+			Source: source("mcp_server", m.Name, "datastores"),
+		}},
+		Source: source("mcp_server", m.Name, "datastores"),
 	})
 	return nil
 }

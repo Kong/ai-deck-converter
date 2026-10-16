@@ -382,12 +382,16 @@ func TestPruneRemovesOnlyTheMCPServersOwnService(t *testing.T) {
 
 func TestTokenVaultLowersIntoAuthRecord(t *testing.T) {
 	out, _ := convertMCP(t, `
+datastores:
+  - name: tv
+    type: token-vault
+    config: {directory: my-directory}
 mcp_servers:
   - type: passthrough-listener
     name: vaulted
     upstream_url: https://mcp.internal
+    datastores: [{name: tv}]
     token_vault:
-      directory: my-directory
       provider: my-upstream-provider
       encryption_secrets: ["{vault://env/enc}"]
       redis: {host: redis.internal, port: 6379, database: 0}
@@ -401,6 +405,7 @@ mcp_servers:
 		"token_vault": map[string]any{
 			"directory":          "my-directory",
 			"provider":           "my-upstream-provider",
+			"storage":            map[string]any{"backend": "konnect"},
 			"encryption_secrets": []string{"{vault://env/enc}"},
 			"redis": map[string]any{
 				"host":     "redis.internal",
@@ -456,14 +461,19 @@ func TestTokenVaultRequiresProvider(t *testing.T) {
 		block string
 	}{
 		{name: "empty block", block: "    token_vault: {}"},
-		{name: "missing provider", block: "    token_vault:\n      directory: my-directory"},
+		{name: "missing provider", block: "    token_vault:\n      subject_token_type: api_key"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			_, _, err := convertDoc([]byte(`
+datastores:
+  - name: tv
+    type: token-vault
+    config: {directory: my-directory}
 mcp_servers:
   - type: passthrough-listener
     name: hollow
     upstream_url: https://mcp.internal
+    datastores: [{name: tv}]
 `+tt.block+`
     tools:
       - {name: report, description: Get a report}
@@ -628,4 +638,138 @@ mcp_servers:`+server("a")+server("b")+"\n"), false)
 	require.Len(t, out.Routes, 1)
 	require.Equal(t, aimap.TokenVaultCallbackName, out.Routes[0].Name)
 	require.Equal(t, "d", out.Routes[0].Plugins[0].Config["directory"])
+
+	dbless := out.ToDBLess()
+	require.Len(t, dbless.Routes, 3)
+	require.Len(t, dbless.Plugins, 3)
+	callbackRoute := dbless.Routes[2]
+	require.Equal(t, aimap.TokenVaultCallbackName, callbackRoute.Name)
+	require.Equal(t, []string{aimap.TokenVaultCallbackPath}, callbackRoute.Paths)
+	require.Equal(t, []string{"http", "https"}, callbackRoute.Protocols)
+	require.NotEmpty(t, callbackRoute.ID)
+	require.Nil(t, callbackRoute.Service, "the callback route has no service")
+	for _, route := range dbless.Routes[:2] {
+		require.NotNil(t, route.Service)
+		require.NotEqual(t, callbackRoute.ID, route.ID)
+	}
+	callbackPlugin := dbless.Plugins[2]
+	require.Equal(t, aimap.TokenVaultCallbackName, callbackPlugin.Name)
+	require.Equal(t, map[string]string{"id": callbackRoute.ID}, callbackPlugin.Route)
+	require.Nil(t, callbackPlugin.Service)
+	require.Equal(t, out.Routes[0].Plugins[0].Config, callbackPlugin.Config)
+
+	deckMeta := out.Metadata()
+	var deckRoute *kong.GeneratedEntitySource
+	for i, r := range deckMeta.Routes {
+		if r.Location == "routes[0]" {
+			deckRoute = &deckMeta.Routes[i]
+		}
+	}
+	require.NotNil(t, deckRoute, "decK metadata records the top-level callback route")
+	require.Equal(t, "a", deckRoute.EntityName)
+	var deckPlugin bool
+	for _, p := range deckMeta.Plugins {
+		deckPlugin = deckPlugin || p.Location == "routes[0].plugins[0]"
+	}
+	require.True(t, deckPlugin, "decK metadata records the callback plugin")
+
+	var dbRoute, dbPlugin bool
+	dbMeta := dbless.Metadata()
+	for _, r := range dbMeta.Routes {
+		dbRoute = dbRoute || r.Location == "routes[2]"
+	}
+	for _, p := range dbMeta.Plugins {
+		dbPlugin = dbPlugin || p.Location == "plugins[2]"
+	}
+	require.True(t, dbRoute, "db-less metadata records the callback route")
+	require.True(t, dbPlugin, "db-less metadata records the callback plugin")
+}
+
+func TestTokenVaultRequiresTokenVaultDatastore(t *testing.T) {
+	for _, tt := range []struct {
+		name    string
+		refs    string
+		wantErr string
+	}{
+		{name: "no reference", refs: "", wantErr: `token_vault requires a "token-vault" datastore`},
+		{name: "unknown name", refs: "    datastores: [{name: nope}]\n", wantErr: `unknown datastore "nope"`},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			_, _, err := convertDoc([]byte(`
+datastores:
+  - name: tv
+    type: token-vault
+    config: {directory: d}
+mcp_servers:
+  - type: passthrough-listener
+    name: vaulted
+    upstream_url: https://mcp.internal
+`+tt.refs+`    token_vault: {provider: github}
+    tools:
+      - {name: report, description: Get a report}
+`), false)
+			require.Error(t, err)
+			require.Contains(t, err.Error(), tt.wantErr)
+		})
+	}
+}
+
+func TestTokenVaultCallbackRoutePrunedWithUnexposedServer(t *testing.T) {
+	const datastore = `
+datastores:
+  - name: tv
+    type: token-vault
+    config: {directory: d}
+mcp_servers:
+  - type: conversion-only
+    name: hidden
+    config:
+      route: {name: hidden-route, paths: [/mcp/hidden]}
+    datastores: [{name: tv}]
+    token_vault: {provider: github}
+    tools:
+      - {name: report, description: Get a report, method: GET, path: /report}
+`
+	t.Run("no listener names the server", func(t *testing.T) {
+		out, _, err := convertDoc([]byte(datastore), false)
+		require.NoError(t, err)
+		require.Empty(t, out.Services)
+		require.Empty(t, out.Routes)
+	})
+	t.Run("another server keeps the route", func(t *testing.T) {
+		out, _, err := convertDoc([]byte(datastore+`  - type: passthrough-listener
+    name: shown
+    upstream_url: https://mcp.internal
+    datastores: [{name: tv}]
+    token_vault: {provider: github}
+    tools:
+      - {name: report, description: Get a report}
+`), false)
+		require.NoError(t, err)
+		require.Len(t, out.Services, 1)
+		require.Len(t, out.Routes, 1)
+	})
+}
+
+func TestTokenVaultDatastoreWithoutDirectory(t *testing.T) {
+	out, _, err := convertDoc([]byte(`
+datastores:
+  - name: tv
+    type: token-vault
+    config: {current_version: v1}
+mcp_servers:
+  - type: passthrough-listener
+    name: vaulted
+    upstream_url: https://mcp.internal
+    datastores: [{name: tv}]
+    token_vault: {provider: github}
+    tools:
+      - {name: report, description: Get a report}
+`), false)
+	require.NoError(t, err)
+	auth := routePlugins(t, out, "vaulted")[0].Config["auth"].(map[string]any)
+	block := auth["token_vault"].(map[string]any)
+	require.NotContains(t, block, "directory")
+	require.Equal(t, "github", block["provider"])
+	require.Equal(t, map[string]any{"backend": "konnect", "current_version": "v1"}, block["storage"])
 }

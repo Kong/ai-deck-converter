@@ -14,9 +14,7 @@ import (
 // roundTripSkip lists forward golden cases whose reverse direction is not (yet)
 // implemented, so the round-trip gate skips them instead of failing. The
 // forward golden itself is still asserted by convert's TestGolden.
-var roundTripSkip = map[string]string{
-	"91_mcp_token_vault_datastore": "revert does not lift token_vault storage or the callback route",
-}
+var roundTripSkip = map[string]string{}
 
 // TestRoundTrip verifies that reverting the forward converter's output and
 // converting it again reproduces the original decK config byte-for-byte, for

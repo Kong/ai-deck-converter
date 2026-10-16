@@ -31,6 +31,16 @@ func (d *Document) Metadata() *ConversionMetadata {
 	for index, plugin := range d.Plugins {
 		metadata.appendPlugin(index, fmt.Sprintf("plugins[%d]", index), plugin.Source, plugin.TargetSources)
 	}
+	for routeIndex, route := range d.Routes {
+		routeLocation := fmt.Sprintf("routes[%d]", routeIndex)
+		if route.Source != nil {
+			metadata.Routes = append(metadata.Routes, generatedEntitySource(routeIndex, routeLocation, route.Source))
+		}
+		for pluginIndex, plugin := range route.Plugins {
+			location := fmt.Sprintf("%s.plugins[%d]", routeLocation, pluginIndex)
+			metadata.appendPlugin(pluginIndex, location, plugin.Source, plugin.TargetSources)
+		}
+	}
 	for serviceIndex, service := range d.Services {
 		serviceLocation := fmt.Sprintf("services[%d]", serviceIndex)
 		if service.Source != nil {
