@@ -14,22 +14,7 @@ mcp_servers:
     upstream_url: https://mcp.internal.kongair.com
     token_vault:
       provider: my-upstream-provider
-      redis:
-        host: redis.internal
-        port: 6379
-        database: 0
-        connect_timeout: 2000
-        keepalive:
-          pool_size: 256
-        sentinel:
-          master: mymaster
-          role: any
-          nodes:
-            - host: sentinel-1.internal
-              port: 6379
-      encryption_secrets:
-        - '{vault://env/TOKEN_VAULT_ENC_SECRET}'
-        - '{vault://env/TOKEN_VAULT_ENC_SECRET_OLD}'
+      subject_token_type: access_token
   - type: passthrough-listener
     name: bare-vaulted-vendor-mcp
     config:
