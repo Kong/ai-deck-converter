@@ -36,6 +36,10 @@ type routeGroup struct {
 	selectorUnlimited bool
 	proxies           []*proxyGroup
 	proxyByOwner      map[string]*proxyGroup
+	// models holds the names of the models on the route, in join order.
+	models []string
+	// selectorShapes holds the selector shape keys of each model on the route.
+	selectorShapes map[string][]string
 }
 
 // addSelector folds one model's desired ai-model-selector shape into the
@@ -118,7 +122,6 @@ type proxyGroup struct {
 	// Its targets carry no model_alias. No selector presents an alias on a
 	// WebSocket route, so an aliased target is in a pool nothing selects.
 	realtimeModel     string
-	enabled           *bool
 	llmFormat         string
 	genaiCategory     string
 	balancer          map[string]any
@@ -176,6 +179,10 @@ type modelPass struct {
 	// requestTerminations holds, per route, the model-scoped request-termination
 	// policies that the selector ordering stops from running.
 	requestTerminations map[string][]modelPolicyRef
+	// aliasOwners maps each ai_models name to the model that uses it.
+	aliasOwners map[string]string
+	// selectorConflicts holds the model pairs with a reported selector conflict.
+	selectorConflicts map[string]bool
 	// skipped holds the issues of each model index that a pass left out.
 	skipped map[int][]ConversionIssue
 }
@@ -215,8 +222,11 @@ func (c *Converter) convertModelsPass(skipped map[int][]ConversionIssue) bool {
 		selectorBefore:      map[string][]string{},
 		selectorAfter:       map[string][]string{},
 		requestTerminations: map[string][]modelPolicyRef{},
+		aliasOwners:         map[string]string{},
+		selectorConflicts:   map[string]bool{},
 		skipped:             skipped,
 	}
+	c.modelRouteModels = map[string][]string{}
 	lifecycleCandidates := c.videoLifecycleCandidates(skipped)
 
 	for i := range c.src.Models {
@@ -235,6 +245,7 @@ func (c *Converter) convertModelsPass(skipped map[int][]ConversionIssue) bool {
 	websocketService := kong.Service{Name: aimap.GatewayWebSocketServiceName, URL: aimap.GatewayWebSocketServiceURL}
 	for _, key := range st.order {
 		g := st.groups[key]
+		c.modelRouteModels[g.route.Name] = g.models
 		if g.websocket {
 			websocketService.Routes = append(websocketService.Routes, g.route)
 		} else {
@@ -265,7 +276,6 @@ func (c *Converter) convertModelsPass(skipped map[int][]ConversionIssue) bool {
 				}
 				c.out.Plugins = append(c.out.Plugins, kong.Plugin{
 					Name:          "ai-proxy-advanced",
-					Enabled:       pg.enabled,
 					Protocols:     protocols,
 					Route:         kong.NewStringRef(pg.routeName),
 					Config:        pg.proxyConfig(),
@@ -284,7 +294,6 @@ func (c *Converter) convertModelsPass(skipped map[int][]ConversionIssue) bool {
 				cfg["targets"] = withModelAlias(pg.targets, alias)
 				c.out.Plugins = append(c.out.Plugins, kong.Plugin{
 					Name:          "ai-proxy-advanced",
-					Enabled:       pg.enabled,
 					Route:         kong.NewStringRef(pg.routeName),
 					Config:        cfg,
 					Model:         kong.NewStringRef(alias),
@@ -329,6 +338,11 @@ func (c *Converter) convertModelOnce(st *modelPass, i int, fn func() error) bool
 // convertModel adds the routes, targets, and plugins of m to the pass.
 func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 	src := issueSource(kindModel, m.Name)
+	// A disabled model makes no output. Its aliases and routes would
+	// otherwise conflict with enabled models.
+	if isDisabled(m) {
+		return nil
+	}
 	bases := basePaths(m)
 	caps := c.expandCapabilities(m)
 
@@ -341,6 +355,9 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 	// ai-model-selector can only match a request to one ai-models row at a
 	// time.
 	aliases := c.extractModelAliases(src, m)
+	if err := c.claimModelAliases(st, src, m, aliases); err != nil {
+		return err
+	}
 
 	// ownerKey groups targets into ai-proxy-advanced plugins: per source model
 	// for type "model" (each carries its own ai-model FK), shared for type
@@ -388,24 +405,13 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 				return err
 			}
 			if other, ok := st.passthroughMatchers[key]; ok && other != m.Name {
-				return c.fail(src.at("config.route.paths"), ConfigFieldInvalid,
+				return c.fail(src.at("config.route.paths"), RoutingConflict,
 					"model %q: a passthrough model cannot share route path %q with passthrough model %q",
 					m.Name, b, other)
 			}
 			st.passthroughMatchers[key] = m.Name
 		}
 	}
-	// API models share route-only ai-proxy-advanced plugins, so disabling one
-	// plugin could disable other models on the same route. Exclude explicitly
-	// disabled API models until they can be represented with independent scopes.
-	// A passthrough model never shares its plugin, so it is exempt.
-	if !modelScoped && !passthrough && m.Enabled != nil && !*m.Enabled {
-		return nil
-	}
-	// A disabled type:api model above never reaches here, so its formats and
-	// capabilities are never gated: the model emits nothing either way, and a
-	// gate failure on it would report an issue for output that was never
-	// going to exist.
 	if err := c.checkModelFeatures(src, m); err != nil {
 		return err
 	}
@@ -563,6 +569,10 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 				for _, selector := range selectorCfgs {
 					g.addSelector(selector)
 				}
+				if !slices.Contains(g.models, m.Name) {
+					g.models = append(g.models, m.Name)
+					c.checkSelectorConflict(st, src, g, m.Name, selectorCfgs)
+				}
 				if !routeSeen[g.route.Name] {
 					routeSeen[g.route.Name] = true
 					routeNames = append(routeNames, g.route.Name)
@@ -630,7 +640,6 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 						routeName:         g.route.Name,
 						aliases:           pluginAliases,
 						realtimeModel:     realtimeModel,
-						enabled:           disabledModelPluginEnabled(m.Enabled),
 						llmFormat:         llmFormat(m, providerType),
 						genaiCategory:     spec.GenaiCategory,
 						balancer:          c.balancerConfig(m.Config.Balancer),
@@ -925,7 +934,6 @@ func (c *Converter) convertVideoLifecycle(
 	}
 	pg := &proxyGroup{
 		routeName:         routeName,
-		enabled:           disabledModelPluginEnabled(candidate.model.Enabled),
 		llmFormat:         llmFormat(candidate.model, ""),
 		genaiCategory:     candidate.spec.GenaiCategory,
 		balancer:          c.balancerConfig(candidate.model.Config.Balancer),
@@ -945,7 +953,6 @@ func (c *Converter) convertVideoLifecycle(
 	}
 	c.out.Plugins = append(c.out.Plugins, kong.Plugin{
 		Name:          "ai-proxy-advanced",
-		Enabled:       pg.enabled,
 		Route:         kong.NewStringRef(routeName),
 		Config:        pg.proxyConfig(),
 		TargetSources: pg.targetSources,
@@ -1017,7 +1024,7 @@ func (c *Converter) videoLifecycleCandidates(skipped map[int][]ConversionIssue) 
 
 	for i := range c.src.Models {
 		m := &c.src.Models[i]
-		if _, ok := skipped[i]; ok {
+		if _, ok := skipped[i]; ok || isDisabled(m) {
 			continue
 		}
 		// A passthrough model's base-path route already forwards the lifecycle
@@ -1087,7 +1094,7 @@ func (c *Converter) videoLifecycleCandidates(skipped map[int][]ConversionIssue) 
 			names[k] = c.src.Models[i].Name
 		}
 		for _, i := range indexes {
-			c.warn(issueSource(kindModel, c.src.Models[i].Name).at("config.route"), BehaviorMayDiffer,
+			c.warn(issueSource(kindModel, c.src.Models[i].Name).at("config.route"), RoutingConflict,
 				"video lifecycle routes for models %s: route is shared by multiple "+
 					"video models; emitting overlapping lifecycle routes", strings.Join(names, ", "))
 		}
@@ -1590,20 +1597,89 @@ func supportsModelNameHeader(spec aimap.EndpointSpec) bool {
 		spec.RouteType != "llm/v1/skills"
 }
 
+// isDisabled reports whether m sets enabled to false.
+func isDisabled(m *aigw.Model) bool { return m.Enabled != nil && !*m.Enabled }
+
+// claimModelAliases records aliases as the ai_models names of m. It fails m
+// when another model already uses one of them.
+func (c *Converter) claimModelAliases(
+	st *modelPass, src ConversionIssueSource, m *aigw.Model, aliases []string,
+) error {
+	field := "name"
+	if len(m.Config.Route.Model.Values) > 0 {
+		field = "config.route.model.values"
+	}
+	for _, alias := range aliases {
+		if other, ok := st.aliasOwners[alias]; ok {
+			return c.fail(src.at(field), RoutingConflict,
+				"model %q uses the alias %q, but model %q already uses it. "+
+					"The data plane requires a unique name for each ai_models entry.",
+				m.Name, alias, other)
+		}
+	}
+	for _, alias := range aliases {
+		st.aliasOwners[alias] = m.Name
+	}
+	return nil
+}
+
+// checkSelectorConflict warns when the model named model reads the model
+// name from other selector sources than a model already on g.
+// A request can name a model in each source, so the source order decides.
+func (c *Converter) checkSelectorConflict(
+	st *modelPass, src ConversionIssueSource, g *routeGroup, model string, selectors []map[string]any,
+) {
+	shapes := selectorShapes(selectors)
+	if len(shapes) == 0 {
+		return
+	}
+	if g.selectorShapes == nil {
+		g.selectorShapes = map[string][]string{}
+	}
+	g.selectorShapes[model] = shapes
+	for _, other := range g.models {
+		otherShapes := g.selectorShapes[other]
+		if other == model || len(otherShapes) == 0 || slices.Equal(otherShapes, shapes) {
+			continue
+		}
+		pair := other + "\x00" + model
+		if st.selectorConflicts[pair] {
+			continue
+		}
+		st.selectorConflicts[pair] = true
+		c.warn(src.at("config.route.model"), RoutingConflict,
+			"model %q and model %q share the route %q, but read the model name from different "+
+				"sources. The order of the ai-model-selector sources decides the model for a "+
+				"request that names a model in more than one source.",
+			model, other, g.route.Name)
+	}
+}
+
+// selectorShapes returns the sorted, unique keys of selectors without the
+// max_request_body_size and pcre_pattern fields.
+func selectorShapes(selectors []map[string]any) []string {
+	var shapes []string
+	for _, selector := range selectors {
+		if selector == nil {
+			continue
+		}
+		shape := maps.Clone(selector)
+		delete(shape, "max_request_body_size")
+		delete(shape, "pcre_pattern")
+		key, err := json.Marshal(shape)
+		if err != nil {
+			continue
+		}
+		shapes = append(shapes, string(key))
+	}
+	slices.Sort(shapes)
+	return slices.Compact(shapes)
+}
+
 // isModelType reports whether a model is a synchronous "model" entity (as
 // opposed to an "api" entity for files/batches). An empty type defaults to
 // "model", the discriminator default and the common synchronous case.
 func isModelType(m *aigw.Model) bool { return m.Type != "api" }
-
-// disabledModelPluginEnabled returns false only when the source model is
-// explicitly disabled. Omitting enabled for active models preserves Kong's
-// default behavior and keeps generated configuration minimal.
-func disabledModelPluginEnabled(enabled *bool) *bool {
-	if enabled != nil && !*enabled {
-		return enabled
-	}
-	return nil
-}
 
 // extractModelAliases returns the source model's authored aliases, or its name
 // when none is authored. Values do not override the selector source. Always

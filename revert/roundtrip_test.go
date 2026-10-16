@@ -64,7 +64,9 @@ func TestRoundTrip(t *testing.T) {
 // unexpectedIssues returns the issues of a re-conversion that are not already
 // in the forward golden's issues.yaml. A WARNING whose entities all stay in
 // the output (nothing is omitted because of it) recurs identically when the
-// round-tripped document is reconverted, so it is not a regression.
+// round-tripped document is reconverted, so it is not a regression. This
+// covers both a routing conflict (both entities stay) and a custom policy's
+// priority warning (the policy stays model-scoped either way).
 func unexpectedIssues(t *testing.T, dir string, issues []convert.ConversionIssue) []convert.ConversionIssue {
 	t.Helper()
 	var forward []convert.ConversionIssue

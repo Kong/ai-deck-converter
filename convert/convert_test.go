@@ -3,6 +3,7 @@ package convert
 import (
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 
@@ -401,9 +402,27 @@ models:
         config: {type: openai}
 `)
 
-	out, warnings, err := convertYAML(src)
+	result, err := Convert(src, testOptions)
 	require.NoError(t, err, "convert")
-	require.Contains(t, strings.Join(warnings, "\n"), "shared by multiple video models")
+	var lifecycleModels []string
+	for _, issue := range result.Issues {
+		// The lifecycle check already reports the lifecycle routes, so the
+		// route check reports only the creation routes.
+		require.NotContains(t, issue.Reason, `route "openai-videos-lifecycle`)
+		if strings.Contains(issue.Reason, "shared by multiple video models") {
+			require.Equal(t, RoutingConflict, issue.Code)
+			require.Equal(t, Warning, issue.Severity)
+			require.Equal(t, []string{"config.route"}, issue.Source.Fields)
+			lifecycleModels = append(lifecycleModels, issue.Source.Name)
+		}
+	}
+	require.Equal(t, []string{"sora-a", "sora-b"}, lifecycleModels)
+	issue := requireIssue(t, slices.DeleteFunc(slices.Clone(result.Issues), func(i ConversionIssue) bool {
+		return strings.Contains(i.Reason, "shared by multiple video models")
+	}), Warning, RoutingConflict, kindModel, "sora-b", "config.route")
+	require.Contains(t, issue.Reason, `route "openai-videos-2"`)
+	out, err := result.Output.ToYAML()
+	require.NoError(t, err)
 	require.Contains(t, string(out), "openai-videos-lifecycle")
 	require.Contains(t, string(out), "openai-videos-lifecycle-2")
 }
@@ -2144,7 +2163,7 @@ mcp_servers:
 	require.Nil(t, byName["on-mcp"], "enabled MCP server should not emit the flag")
 }
 
-func TestConvertDisabledModelDisablesProxyPlugins(t *testing.T) {
+func TestConvertLeavesOutDisabledModel(t *testing.T) {
 	src := []byte(`
 model_providers:
   - name: openai
@@ -2153,43 +2172,30 @@ models:
   - type: model
     name: disabled
     enabled: false
-    capabilities: [agentic, generate, image]
+    capabilities: [agentic, generate, image, video]
     formats: [{type: openai}]
     targets: [{name: gpt-5, provider: openai, config: {type: openai}}]
     config:
       route: {paths: [/gpt-chat]}
-      model: {alias: gpt-chat}
+  - type: api
+    name: disabled-api
+    enabled: false
+    capabilities: [files]
+    targets: [{name: gpt-5, provider: openai, config: {type: openai}}]
+  - type: model
+    name: disabled-passthrough
+    enabled: false
+    formats: [{type: passthrough}]
+    targets: [{name: gpt-5, provider: openai, config: {type: openai}}]
 `)
 
-	out, _, err := encodeDBLessYAML(src, testOptions)
-	require.NoError(t, err, "convert db-less")
-
-	var got struct {
-		Plugins []struct {
-			Name    string `yaml:"name"`
-			Enabled *bool  `yaml:"enabled"`
-			Model   *struct {
-				Name string `yaml:"name"`
-			} `yaml:"model"`
-		} `yaml:"plugins"`
-		AIModels []struct {
-			Name string `yaml:"name"`
-		} `yaml:"ai_models"`
-	}
-	require.NoError(t, yaml.Unmarshal(out, &got), "unmarshal output")
-
-	require.Len(t, got.AIModels, 1)
-	require.Equal(t, "disabled", got.AIModels[0].Name)
-
-	proxyPlugins := 0
-	for _, plugin := range got.Plugins {
-		if plugin.Name == "ai-proxy-advanced" && plugin.Model != nil {
-			require.NotNil(t, plugin.Enabled)
-			require.False(t, *plugin.Enabled)
-			proxyPlugins++
-		}
-	}
-	require.Equal(t, 3, proxyPlugins, "one disabled proxy plugin per capability")
+	result, err := Convert(src, testOptions)
+	require.NoError(t, err)
+	require.Empty(t, result.Issues)
+	require.Empty(t, result.Output.Services)
+	require.Empty(t, result.Output.Routes)
+	require.Empty(t, result.Output.Plugins)
+	require.Empty(t, result.Output.AIModels)
 }
 
 func TestConvertModelsWithDifferentRoutesDoNotShareEndpointRoute(t *testing.T) {

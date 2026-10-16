@@ -12,6 +12,7 @@ mcp_servers:
     display_name: Vaulted Vendor MCP
     name: vaulted-vendor-mcp
     upstream_url: https://mcp.internal.kongair.com
+    config: {route: {paths: [/mcp/vaulted-vendor-mcp]}}
     datastores: [{name: vault-konnect-prod}]
     token_vault:
       provider: my-upstream-provider
@@ -39,6 +40,7 @@ mcp_servers:
     display_name: Bare Vaulted Vendor MCP
     name: bare-vaulted-vendor-mcp
     upstream_url: https://bare-mcp.internal.kongair.com
+    config: {route: {paths: [/mcp/bare-vaulted-vendor-mcp]}}
     datastores: [{name: vault-konnect-prod}]
     token_vault:
       provider: my-other-upstream-provider

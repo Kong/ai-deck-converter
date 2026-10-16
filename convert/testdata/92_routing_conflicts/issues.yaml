@@ -1,0 +1,48 @@
+- code: ROUTING_CONFLICT
+  reason: model "alias-second" uses the alias "gpt", but model "alias-first" already uses it. The data plane requires a unique name for each ai_models entry.
+  source:
+    kind: model
+    name: alias-second
+    fields:
+      - config.route.model.values
+  severity: ERROR
+- code: ROUTING_CONFLICT
+  reason: model "selector-header" and model "selector-body" share the route "openai-chat-2", but read the model name from different sources. The order of the ai-model-selector sources decides the model for a request that names a model in more than one source.
+  source:
+    kind: model
+    name: selector-header
+    fields:
+      - config.route.model
+  severity: WARNING
+- code: ROUTING_CONFLICT
+  reason: route "openai-chat-4" of model "split-secured-a" can match the same requests as route "openai-chat-3" of model "split-open". Kong sends each such request to only one of these routes.
+  source:
+    kind: model
+    name: split-secured-a
+    fields:
+      - config.route
+  severity: WARNING
+- code: ROUTING_CONFLICT
+  reason: route "openai-chat-4" of model "split-secured-b" can match the same requests as route "openai-chat-3" of model "split-open". Kong sends each such request to only one of these routes.
+  source:
+    kind: model
+    name: split-secured-b
+    fields:
+      - config.route
+  severity: WARNING
+- code: ROUTING_CONFLICT
+  reason: route "flights-writer-route" of agent "flights-writer" can match the same requests as route "flights-mcp-route" of mcp_server "flights-mcp". Kong sends each such request to only one of these routes.
+  source:
+    kind: agent
+    name: flights-writer
+    fields:
+      - config.route
+  severity: WARNING
+- code: ROUTING_CONFLICT
+  reason: route "hosts-any-route" of agent "hosts-any" can match the same requests as route "hosts-specific-route" of agent "hosts-specific". Kong sends each such request to only one of these routes.
+  source:
+    kind: agent
+    name: hosts-any
+    fields:
+      - config.route
+  severity: WARNING
