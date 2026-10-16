@@ -60,6 +60,116 @@ func testSingleModelMultipleAliases(t *testing.T, license string) {
 	t.Logf("PASS: all %d alias requests carried the provider credential to the mock upstream", len(hits))
 }
 
+// testPreFunctionModelPolicyRunsAfterModelSelection proves that a model
+// policy whose priority outranks ai-model-selector still runs for its model.
+// The route's ai-model-selector carries the ordering Kong reads before the
+// model is known. A model-scoped plugin's own ordering is never read.
+func testPreFunctionModelPolicyRunsAfterModelSelection(t *testing.T, license string) {
+	mock := startMockUpstream(t)
+	configPath := convertCase(t, "pre_function_model_ordering", patchMockUpstream(mock.Port, mockAuthHeaderValue))
+
+	gateway := startGateway(t, GatewayOptions{
+		Image:  gatewayImage(t, "kong/kong-ai-gateway:2.0.2"),
+		Config: configPath,
+		Env:    []string{licenseEnv(license)},
+	})
+	gateway.waitReady()
+
+	chat := func(t *testing.T, alias string) httpResponse {
+		t.Helper()
+		return httpPost(t, gateway.ProxyURL()+"/ai-ordering-probe/chat/completions",
+			map[string]string{"Content-Type": "application/json"},
+			fmt.Sprintf(`{"model": %q, "messages": [{"role": "user", "content": "hi"}]}`, alias))
+	}
+
+	for _, alias := range []string{"ordering-probe-alias-one", "ordering-probe-alias-two"} {
+		t.Run("guarded alias="+alias, func(t *testing.T) {
+			resp := chat(t, alias)
+			requireStatus(t, resp, 200, fmt.Sprintf("alias %q", alias))
+			var probe struct {
+				SelectedModel *string `json:"selected_model"`
+			}
+			if err := json.Unmarshal([]byte(resp.Body), &probe); err != nil || probe.SelectedModel == nil {
+				t.Fatalf("alias %q: expected the probe's selected_model JSON, got:\n%s", alias, resp.Body)
+			}
+			if *probe.SelectedModel != alias {
+				t.Fatalf("alias %q: probe saw ngx.ctx.ai_model %q, want %q", alias, *probe.SelectedModel, alias)
+			}
+			t.Logf("PASS: alias %q ran the model-scoped pre-function after model selection", alias)
+		})
+	}
+
+	if hits := mock.hits(); len(hits) != 0 {
+		t.Fatalf("guarded aliases must not reach the mock upstream, saw %d request(s)", len(hits))
+	}
+
+	t.Run("unguarded alias=unguarded-alias", func(t *testing.T) {
+		resp := chat(t, "unguarded-alias")
+		requireStatus(t, resp, 200, `alias "unguarded-alias"`)
+		if !strings.Contains(resp.Body, "hello from the mock upstream") {
+			t.Fatalf("unguarded alias: expected the mock upstream's response (the probe is scoped to the other model), got:\n%s",
+				resp.Body)
+		}
+		t.Logf("PASS: the model-scoped pre-function did not run for a model without the policy")
+	})
+}
+
+// testPreFunctionModelOrderingKeepsAuthFirst proves that reordering keeps
+// authentication ahead of ai-model-selector and the model policy. An
+// unauthenticated request gets the 401 and never reaches the pre-function.
+func testPreFunctionModelOrderingKeepsAuthFirst(t *testing.T, license string) {
+	mock := startMockUpstream(t)
+	configPath := convertCase(t, "pre_function_model_ordering_auth", patchMockUpstream(mock.Port, mockAuthHeaderValue))
+
+	gateway := startGateway(t, GatewayOptions{
+		Image:  gatewayImage(t, "kong/kong-ai-gateway:2.0.2"),
+		Config: configPath,
+		Env:    []string{licenseEnv(license)},
+	})
+	gateway.waitReady()
+
+	chat := func(t *testing.T, apiKey string) httpResponse {
+		t.Helper()
+		headers := map[string]string{"Content-Type": "application/json"}
+		if apiKey != "" {
+			headers["x-api-key"] = apiKey
+		}
+		return httpPost(t, gateway.ProxyURL()+"/ai-auth-ordering-probe/chat/completions", headers,
+			`{"model": "auth-ordering-probe-alias", "messages": [{"role": "user", "content": "hi"}]}`)
+	}
+
+	for name, apiKey := range map[string]string{"no key": "", "wrong key": "not-the-key"} {
+		t.Run("unauthenticated "+name, func(t *testing.T) {
+			resp := chat(t, apiKey)
+			requireStatus(t, resp, 401, name)
+			if strings.Contains(resp.Body, "selected_model") {
+				t.Fatalf("%s: the model-scoped pre-function ran before authentication rejected the request:\n%s",
+					name, resp.Body)
+			}
+			t.Logf("PASS: %s was rejected before the model-scoped pre-function ran", name)
+		})
+	}
+
+	t.Run("authenticated", func(t *testing.T) {
+		resp := chat(t, "ordering-probe-secret")
+		requireStatus(t, resp, 200, "valid key")
+		var probe struct {
+			SelectedModel *string `json:"selected_model"`
+		}
+		if err := json.Unmarshal([]byte(resp.Body), &probe); err != nil || probe.SelectedModel == nil {
+			t.Fatalf("valid key: expected the probe's selected_model JSON, got:\n%s", resp.Body)
+		}
+		if *probe.SelectedModel != "auth-ordering-probe-alias" {
+			t.Fatalf("valid key: probe saw ngx.ctx.ai_model %q, want %q", *probe.SelectedModel, "auth-ordering-probe-alias")
+		}
+		t.Logf("PASS: an authenticated request ran the model-scoped pre-function after model selection")
+	})
+
+	if hits := mock.hits(); len(hits) != 0 {
+		t.Fatalf("no request must reach the mock upstream, saw %d request(s)", len(hits))
+	}
+}
+
 // testGeminiModelAllCapabilities proves the data plane accepts a gemini model
 // declaring every capability the gemini section serves, which renders on both
 // the Gemini Standard API and the Gemini Enterprise AI paths. A DB-less gateway refuses to start on
