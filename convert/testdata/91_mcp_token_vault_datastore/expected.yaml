@@ -4,6 +4,8 @@ services:
     url: https://github-mcp.internal.kongair.com
     routes:
       - name: github-tools-route
+        paths:
+          - /mcp/github-tools
         plugins:
           - name: ai-mcp-proxy
             config:
@@ -45,6 +47,8 @@ services:
     url: https://gitlab-mcp.internal.kongair.com
     routes:
       - name: gitlab-tools-route
+        paths:
+          - /mcp/gitlab-tools
         plugins:
           - name: ai-mcp-proxy
             config:

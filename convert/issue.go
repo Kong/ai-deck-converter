@@ -24,6 +24,7 @@ const (
 	ConfigFieldIgnored         ConversionIssueCode = "CONFIG_FIELD_IGNORED"
 	ConfigFieldInvalid         ConversionIssueCode = "CONFIG_FIELD_INVALID"
 	BehaviorMayDiffer          ConversionIssueCode = "BEHAVIOR_MAY_DIFFER"
+	RoutingConflict            ConversionIssueCode = "ROUTING_CONFLICT"
 	InternalError              ConversionIssueCode = "INTERNAL_ERROR"
 
 	UnsupportedInMinRuntimeVersion ConversionIssueCode = "UNSUPPORTED_IN_MIN_RUNTIME_VERSION"

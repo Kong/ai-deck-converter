@@ -97,6 +97,9 @@ type Converter struct {
 
 	issues []ConversionIssue
 
+	// modelRouteModels holds the names of the models on each model route.
+	modelRouteModels map[string][]string
+
 	// beforeEntity is a test hook. guard calls it before each entity.
 	beforeEntity func(ConversionIssueSource)
 }
@@ -140,4 +143,5 @@ func (c *Converter) run() {
 	c.warnGlobalPoliciesForWebSocket()
 	c.convertMCPServers()
 	c.convertAgents()
+	c.lint()
 }

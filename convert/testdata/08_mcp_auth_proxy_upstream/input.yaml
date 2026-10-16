@@ -38,7 +38,7 @@ mcp_servers:
     config:
       route:
         paths:
-          - /mcp/secure-flights
+          - /mcp/secure-flights-consumer
     tools:
       - name: searchFlights
         description: Search available flights
