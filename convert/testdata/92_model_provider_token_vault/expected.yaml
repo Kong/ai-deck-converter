@@ -63,6 +63,7 @@ plugins:
     route: anthropic-messages
     model: claude
   - name: token-vault-exchange
+    enabled: true
     config:
       credential:
         inbound:

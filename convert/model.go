@@ -315,7 +315,7 @@ func (c *Converter) appendTokenVaultExchange(pg *proxyGroup, model *kong.StringR
 	}
 	c.out.Plugins = append(c.out.Plugins, kong.Plugin{
 		Name:    tokenVaultExchangePlugin,
-		Enabled: pg.enabled,
+		Enabled: new(true),
 		Route:   kong.NewStringRef(pg.routeName),
 		Model:   model,
 		Config:  pg.tokenVault,

@@ -383,6 +383,8 @@ mcp_servers:
   - type: passthrough-listener
     name: gh
     upstream_url: https://mcp.internal
+    config:
+      route: {paths: [/mcp/gh]}
     datastores: [{name: tv}]
     token_vault: {provider: github}
     tools:
