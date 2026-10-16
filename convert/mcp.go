@@ -332,14 +332,6 @@ func (c *Converter) mcpPlugin(src ConversionIssueSource, m *aigw.MCPServer) (kon
 			"MCP server %q: token_vault and config.upstream.auth are mutually exclusive "+
 				"(both lower to the ai-mcp-proxy plugin's auth record)", m.Name)
 	}
-	// Kong's Token Vault caches exchanged credentials in Redis encrypted with
-	// encryption_secrets, so a redis block without them is rejected by the
-	// plugin's own entity check. Reject here rather than emit a config decK
-	// would refuse to apply.
-	if tv := m.TokenVault; tv != nil && tv.Redis != nil && len(tv.EncryptionSecrets) == 0 {
-		return kong.Plugin{}, c.fail(src.at("token_vault.encryption_secrets"), MissingRequiredConfigField,
-			"MCP server %q: token_vault.encryption_secrets is required when token_vault.redis is configured", m.Name)
-	}
 	tvDatastore, err := c.resolveMCPDatastore(src, m)
 	if err != nil {
 		return kong.Plugin{}, err

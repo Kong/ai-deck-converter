@@ -16,7 +16,6 @@ var (
 	fixtureRedisVaultRef    = "{vault://env/redis-pass}"
 	fixtureSentinelVaultRef = "{vault://env/sentinel-pass}"
 	fixtureAWSVaultRef      = "{vault://env/aws-secret}"
-	fixtureVaultEncRef      = "{vault://env/TOKEN_VAULT_ENC_SECRET}"
 	fixtureAWSID            = "AKIA..."
 	fixtureAzureClientValue = "fake-azure-client-secret"
 )
@@ -146,22 +145,6 @@ func TestTokenVaultRedisFromPluginOmissions(t *testing.T) {
 func TestTokenVaultToFromPlugin(t *testing.T) {
 	t.Parallel()
 
-	tv := &aigw.TokenVaultConfig{
-		Directory:         "my-directory",
-		Provider:          "my-upstream-provider",
-		Redis:             tokenVaultRedisFixture(),
-		EncryptionSecrets: []string{fixtureVaultEncRef},
-	}
-	block := TokenVaultToPlugin(tv)
-	require.Equal(t, map[string]any{
-		"directory":          "my-directory",
-		"provider":           "my-upstream-provider",
-		"redis":              TokenVaultRedisToPlugin(tokenVaultRedisFixture()),
-		"encryption_secrets": []string{fixtureVaultEncRef},
-	}, block)
-	require.Equal(t, tv, TokenVaultFromPlugin(block))
-
-	// Bare block (no redis, no secrets): the PR's first sample config.
 	bare := TokenVaultToPlugin(&aigw.TokenVaultConfig{
 		Directory: "my-directory",
 		Provider:  "my-upstream-provider",

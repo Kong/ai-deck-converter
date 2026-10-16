@@ -170,19 +170,6 @@ func TestProviderTokenVaultRejects(t *testing.T) {
 			code:   MissingRequiredConfigField,
 			reason: "token_vault requires provider",
 		},
-		{
-			name: "inline redis",
-			providers: `
-  - name: vault
-    type: anthropic
-    datastores: [{name: tv}]
-    token_vault:
-      provider: anthropic
-      encryption_secrets: [s]
-      redis: {host: redis.internal}`,
-			code:   ConfigFieldInvalid,
-			reason: "token_vault does not support redis or encryption_secrets",
-		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -312,4 +299,98 @@ mcp_servers:
 	requireIssue(t, result.Issues, Warning, ConfigFieldDropped, kindMCPServer, "orphan")
 	require.Len(t, pluginsNamed(result.Output, tokenVaultExchangePlugin), 1)
 	require.Len(t, result.Output.Routes, 1)
+}
+
+// The video lifecycle route has its own ai-proxy-advanced. It needs the same
+// token-vault-exchange as the video route.
+func TestProviderTokenVaultVideoLifecycle(t *testing.T) {
+	src := providerTokenVaultDatastores + `
+models:
+  - name: sora
+    type: model
+    capabilities: [video]
+    formats: [{type: openai}]
+    config: {route: {paths: [/ai]}}
+    targets:
+      - name: sora-2
+        provider: vault
+        config: {type: openai}
+model_providers:
+  - name: vault
+    type: openai
+    datastores: [{name: tv}]
+    token_vault: {provider: openai}
+`
+	result, err := Convert([]byte(src), testOptions)
+	require.NoError(t, err)
+	proxies := pluginsNamed(result.Output, "ai-proxy-advanced")
+	exchanges := pluginsNamed(result.Output, tokenVaultExchangePlugin)
+	require.Len(t, exchanges, len(proxies))
+	for i := range proxies {
+		require.Equal(t, proxies[i].Route, exchanges[i].Route)
+		require.Equal(t, proxies[i].Model, exchanges[i].Model)
+	}
+	require.Contains(t, string(*exchanges[len(exchanges)-1].Route), "openai-videos-lifecycle")
+}
+
+func TestProviderTokenVaultRejectsEmbeddingsProvider(t *testing.T) {
+	src := providerTokenVaultDatastores + `
+models:
+  - name: semantic
+    type: model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/ai]}
+      balancer:
+        algorithm: semantic
+        embeddings:
+          provider: vault
+          model:
+            name: text-embedding-3-small
+            config: {type: openai}
+    targets:
+      - name: gpt
+        provider: plain
+        config: {type: openai}
+model_providers:
+  - name: vault
+    type: openai
+    datastores: [{name: tv}]
+    token_vault: {provider: openai}
+  - name: plain
+    type: openai
+    config:
+      auth:
+        type: basic
+        headers: [{name: Authorization, value: secret}]
+`
+	result, err := Convert([]byte(src), testOptions)
+	require.NoError(t, err)
+	issue := requireIssue(t, result.Issues, Error, ConfigFieldInvalid, kindModel, "semantic",
+		"config.balancer.embeddings.provider")
+	require.Contains(t, issue.Reason, "cannot set the credential of the embeddings request")
+	require.Empty(t, pluginsNamed(result.Output, "ai-proxy-advanced"))
+}
+
+// An MCP server and a model provider with the same datastore share one
+// callback route without an issue.
+func TestProviderTokenVaultSharesCallbackRouteWithMCP(t *testing.T) {
+	src := providerTokenVaultDatastores + "models:" +
+		providerTokenVaultModel("claude", "vault") + `
+model_providers:` + vaultProvider + `
+mcp_servers:
+  - type: passthrough-listener
+    name: gh
+    upstream_url: https://mcp.internal
+    datastores: [{name: tv}]
+    token_vault: {provider: github}
+    tools:
+      - {name: report, description: Get a report}
+`
+	result, err := Convert([]byte(src), testOptions)
+	require.NoError(t, err)
+	require.Empty(t, result.Issues)
+	require.Len(t, result.Output.Routes, 1)
+	require.Len(t, pluginsNamed(result.Output, tokenVaultExchangePlugin), 1)
 }

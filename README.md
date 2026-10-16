@@ -305,9 +305,10 @@ and `formats` beyond the first.
   and `storage`, and adds the `/_vault` callback route. Hard errors, which
   leave out the model: static `config.auth` on the same provider, targets of
   one model that do not share the same token vault, `type: api` models on one
-  route with different token vaults, a WebSocket capability, and inline
-  `redis` or `encryption_secrets`. Convert-only: revert does not lift the
-  plugin yet.
+  route with different token vaults, a WebSocket capability, and an
+  embeddings provider with `token_vault`. The video lifecycle route gets the
+  same plugin as the model's video route. Convert-only: revert does not lift
+  the plugin yet.
 - **Credentials.** Only `api-key` (`keyauth_credentials`) is generated; other
   credential types are warned about and skipped.
 - **MCP upstream.** Passthrough MCP servers without an `upstream_url` get a
@@ -321,16 +322,10 @@ and `formats` beyond the first.
   `ai-mcp-proxy` `auth` record (`provider: token_vault`, nested `token_vault`
   options). The fields are `provider` (required), `subject_token_type`,
   `credential` (`inbound` and `outbound`, each with `location`, `name` and
-  `prefix`), `cache` (copied verbatim), and optional `redis` +
-  `encryption_secrets`. The nested `redis` block (Konnect's
-  `AIGatewayRedisCloudConfiguration` shape) flattens
-  into the plugin redis config's prefixed keys (`keepalive.pool_size` →
-  `keepalive_pool_size`, `sentinel.master` → `sentinel_master`,
-  `cluster.nodes` → `cluster_nodes`, `cloud_authentication.type` →
-  `auth_provider` with provider-prefixed fields, …). `token_vault` and
+  `prefix`), and `cache` (copied verbatim). An empty `prefix` stays empty, so
+  the plugin default `Bearer ` does not apply. `token_vault` and
   `config.upstream.auth` are mutually exclusive (both lower to the same plugin
-  auth record) — declaring both is a hard error, as is `redis` without
-  `encryption_secrets` (the plugin's own entity check).
+  auth record) — declaring both is a hard error.
   A `token_vault` also needs exactly one `token-vault` datastore, referenced
   by `datastores: [{name: ...}]`. A missing or unknown reference leaves out the
   server with an error. The datastore's `config.directory` becomes
@@ -338,10 +333,10 @@ and `formats` beyond the first.
   `auth.token_vault.storage`, together with `backend: konnect`.
   The first server that uses a datastore also adds one top-level
   `token-vault-callback-handler` route (`/_vault`, `http` and `https`) with
-  the same `directory` and `storage`. Two servers with different datastores
-  conflict, because one route cannot serve both. The route is removed again
-  when a conversion-only server is dropped and no other server uses a Token
-  Vault. Revert lifts `directory` and `storage` (without `backend`) back into
+  the same `directory` and `storage`. Model providers share the same route.
+  Two entities with different datastores conflict, because one route cannot
+  serve both. The route is removed again when a conversion-only server is
+  dropped and no other server or model provider uses a Token Vault. Revert lifts `directory` and `storage` (without `backend`) back into
   a `token-vault` datastore, shared by servers with the same connection, and
   does not read the callback route. The whole feature round-trips through
   `revert/roundtrip_test.go`.

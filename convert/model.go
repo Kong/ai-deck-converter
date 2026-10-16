@@ -165,6 +165,8 @@ type modelPass struct {
 	websocketRoutes map[string][]string
 	// skipped holds the issues of each model index that a pass left out.
 	skipped map[int][]ConversionIssue
+	// tokenVaults holds the token-vault-exchange config of each model.
+	tokenVaults map[*aigw.Model]map[string]any
 }
 
 // convertModels groups all (model, target, capability) tuples into routes under
@@ -200,6 +202,7 @@ func (c *Converter) convertModelsPass(skipped map[int][]ConversionIssue) bool {
 		identityPluginSeen:  map[string]bool{},
 		websocketRoutes:     map[string][]string{},
 		skipped:             skipped,
+		tokenVaults:         map[*aigw.Model]map[string]any{},
 	}
 	lifecycleCandidates := c.videoLifecycleCandidates(skipped)
 
@@ -419,6 +422,9 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 	}
 	ds, err := c.resolveModelDatastore(src, m)
 	if err != nil {
+		return err
+	}
+	if err := c.checkEmbeddingsTokenVault(src, m); err != nil {
 		return err
 	}
 	if m.Config.Route.Name != "" {
@@ -733,6 +739,8 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 		}
 	}
 
+	st.tokenVaults[m] = tokenVault
+
 	// ai-models entries (one per alias, so ai-model-selector can match a
 	// request against any of them). note: name is set to alias and alias is
 	// intentionally unset to be compatible with the AI Gateway 2.0.0
@@ -905,6 +913,7 @@ func (c *Converter) convertVideoLifecycle(
 		genaiCategory:     candidate.spec.GenaiCategory,
 		balancer:          c.balancerConfig(candidate.model.Config.Balancer),
 		vectordb:          lifecycleVectorDB,
+		tokenVault:        st.tokenVaults[candidate.model],
 		responseStreaming: candidate.model.Config.ResponseStreaming,
 		modelNameHeader:   boolPtr(false),
 		maxBodySize:       candidate.model.Config.MaxRequestBodySize,
@@ -926,6 +935,7 @@ func (c *Converter) convertVideoLifecycle(
 		TargetSources: pg.targetSources,
 		Source:        pg.source,
 	})
+	c.appendTokenVaultExchange(pg, nil)
 
 	plugins, err := c.scopedPlugins(src, candidate.model.Policies, candidate.model.Access.ACLs)
 	if err != nil {

@@ -416,11 +416,6 @@ func (c *Converter) providerTokenVault(
 	if tv.Provider == "" {
 		return nil, c.fail(at, MissingRequiredConfigField, "%s: token_vault requires provider", owner)
 	}
-	if tv.Redis != nil || len(tv.EncryptionSecrets) > 0 {
-		return nil, c.fail(at, ConfigFieldInvalid,
-			"%s: token_vault does not support redis or encryption_secrets; use a %q datastore",
-			owner, aimap.DatastoreTypeTokenVault)
-	}
 	if len(p.Datastores) != 1 {
 		return nil, c.fail(at, MissingRequiredConfigField,
 			"%s: token_vault requires exactly one %q datastore", owner, aimap.DatastoreTypeTokenVault)
@@ -444,4 +439,18 @@ func (c *Converter) providerTokenVault(
 		return nil, err
 	}
 	return cfg, nil
+}
+
+// checkEmbeddingsTokenVault fails the model when its embeddings provider has
+// token_vault. ai-proxy-advanced sends the embeddings request itself.
+// token-vault-exchange cannot set the credential of that request.
+func (c *Converter) checkEmbeddingsTokenVault(src ConversionIssueSource, m *aigw.Model) error {
+	emb, _ := balancerExtra(m.Config.Balancer, "embeddings").(map[string]any)
+	name, _ := emb["provider"].(string)
+	if p := c.providers[name]; p != nil && p.TokenVault != nil {
+		return c.fail(src.at("config.balancer.embeddings.provider"), ConfigFieldInvalid,
+			"model %q: embeddings provider %q has token_vault, but %s cannot set "+
+				"the credential of the embeddings request", m.Name, name, tokenVaultExchangePlugin)
+	}
+	return nil
 }

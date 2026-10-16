@@ -393,8 +393,6 @@ mcp_servers:
     datastores: [{name: tv}]
     token_vault:
       provider: my-upstream-provider
-      encryption_secrets: ["{vault://env/enc}"]
-      redis: {host: redis.internal, port: 6379, database: 0}
     tools:
       - {name: report, description: Get a report}
 `)
@@ -403,15 +401,9 @@ mcp_servers:
 	require.Equal(t, map[string]any{
 		"provider": "token_vault",
 		"token_vault": map[string]any{
-			"directory":          "my-directory",
-			"provider":           "my-upstream-provider",
-			"storage":            map[string]any{"backend": "konnect"},
-			"encryption_secrets": []string{"{vault://env/enc}"},
-			"redis": map[string]any{
-				"host":     "redis.internal",
-				"port":     6379,
-				"database": 0,
-			},
+			"directory": "my-directory",
+			"provider":  "my-upstream-provider",
+			"storage":   map[string]any{"backend": "konnect"},
 		},
 	}, plugins[0].Config["auth"])
 }
@@ -433,23 +425,6 @@ mcp_servers:
 `), false)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "mutually exclusive")
-}
-
-func TestTokenVaultRedisRequiresEncryptionSecrets(t *testing.T) {
-	_, _, err := convertDoc([]byte(`
-mcp_servers:
-  - type: passthrough-listener
-    name: no-secrets
-    upstream_url: https://mcp.internal
-    token_vault:
-      directory: my-directory
-      provider: my-upstream-provider
-      redis: {host: redis.internal, port: 6379}
-    tools:
-      - {name: report, description: Get a report}
-`), false)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "encryption_secrets is required")
 }
 
 // A present but empty token_vault block (or one missing its required

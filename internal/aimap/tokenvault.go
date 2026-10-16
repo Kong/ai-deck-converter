@@ -69,12 +69,6 @@ func TokenVaultToPlugin(tv *aigw.TokenVaultConfig) map[string]any {
 	if cred := tokenVaultCredentialToPlugin(tv.Credential); cred != nil {
 		block["credential"] = cred
 	}
-	if redis := TokenVaultRedisToPlugin(tv.Redis); redis != nil {
-		block["redis"] = redis
-	}
-	if len(tv.EncryptionSecrets) > 0 {
-		block["encryption_secrets"] = append([]string(nil), tv.EncryptionSecrets...)
-	}
 	return block
 }
 
@@ -99,14 +93,6 @@ func TokenVaultFromPlugin(block map[string]any) *aigw.TokenVaultConfig {
 		tv.Credential = &aigw.TokenVaultCredential{
 			Inbound:  tokenVaultLocationFromPlugin(getAnyMap(cred, "inbound")),
 			Outbound: tokenVaultLocationFromPlugin(getAnyMap(cred, "outbound")),
-		}
-	}
-	if redis := getAnyMap(block, "redis"); redis != nil {
-		tv.Redis = TokenVaultRedisFromPlugin(redis)
-	}
-	for _, s := range getAnySlice(block, "encryption_secrets") {
-		if str, ok := s.(string); ok {
-			tv.EncryptionSecrets = append(tv.EncryptionSecrets, str)
 		}
 	}
 	return tv
