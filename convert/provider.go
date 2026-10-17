@@ -321,6 +321,10 @@ func mapOptions(
 			out["anthropic_version"] == nil && !passthrough {
 			out["anthropic_version"] = "bedrock-2023-05-31"
 		}
+		if providerType == "bedrock" && opts["endpoint_type"] == "mantle" &&
+			nested["bedrock"]["mantle_openai_path_prefix"] == nil {
+			addNested("bedrock", "mantle_openai_path_prefix", aimap.MantlePathPrefix(modelName))
+		}
 		if providerType == "azure" && provider.Config.Instance != "" {
 			out["azure_instance"] = provider.Config.Instance
 		}
