@@ -1,0 +1,39 @@
+models:
+  - type: model
+    name: openai-gpt-5-4
+    capabilities:
+      - generate
+    formats:
+      - type: openai
+    targets:
+      - name: gpt-5.4
+        provider: openai-ai
+        config:
+          type: openai
+    access:
+      auth_strategies:
+        - openid-connect-1
+    config:
+      route:
+        paths:
+          - /ai
+        model:
+          values:
+            - '@openai/gpt-5.4'
+      logging:
+        payloads: false
+        statistics: true
+model_providers:
+  - type: openai
+    name: openai-ai
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: '{vault://ai/openai-token}'
+auth_strategies:
+  - type: openid-connect
+    name: openid-connect-1
+    config:
+      issuer: https://dev-123456.okta.com/oauth2/default
