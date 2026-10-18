@@ -30,34 +30,20 @@ func (r *Reverter) revertServices() error {
 		}
 
 		var plainRoutes []plainRoute
-		hasModelRoute, hasMCPRoute := false, false
 		for j := range svc.Routes {
 			rt := &svc.Routes[j]
 			plugins := inheritPlugins(r.routePlugins(rt), svcAIPlugins)
 			switch {
 			case hasPlugin(plugins, "ai-proxy-advanced"):
-				if err := r.accumulateModelRoute(acc, rt, plugins); err != nil {
+				if err := r.accumulateModelRoute(acc, rt, inheritPlugins(plugins, svcPlugins)); err != nil {
 					return err
 				}
-				hasModelRoute = true
 			case hasPlugin(plugins, "ai-mcp-proxy"):
 				if err := r.revertMCPServer(svc, rt, plugins, svcPlugins); err != nil {
 					return err
 				}
-				hasMCPRoute = true
 			default:
 				plainRoutes = append(plainRoutes, plainRoute{rt, plugins})
-			}
-		}
-
-		// Service-level plugins on a pure model service have no AI Gateway home
-		// (model policies scope via the ai-models FK, not the service); MCP
-		// servers and agents absorb them as policies instead.
-		if hasModelRoute && !hasMCPRoute && len(plainRoutes) == 0 && len(svcPlugins) > 0 {
-			if err := r.warn(
-				"service %q: service-level plugins on a model service have no AI Gateway representation; dropped",
-				svc.Name); err != nil {
-				return err
 			}
 		}
 
