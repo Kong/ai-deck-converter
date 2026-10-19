@@ -304,6 +304,18 @@ and `formats` beyond the first.
   out with a `BEHAVIOR_MAY_DIFFER` warning. The model fails when no target
   serves a capability. The `bedrock` format has no `responses` endpoint. The
   data plane rejects `llm/v1/responses` for it.
+- **Provider Token Vault.** A Model Provider's top-level `token_vault`
+  (`provider`, optional `subject_token_type`, `credential` and `cache`) plus
+  exactly one `token-vault` datastore lowers to a `token-vault-exchange`
+  plugin. The plugin has the scope of the model's `ai-proxy-advanced` (route,
+  plus the `ai-model` FK for each alias). The datastore supplies `directory`
+  and `storage`, and adds the `/_vault` callback route. Hard errors, which
+  leave out the model: static `config.auth` on the same provider, targets of
+  one model that do not share the same token vault, `type: api` models on one
+  route with different token vaults, a WebSocket capability, and an
+  embeddings provider with `token_vault`. The video lifecycle route gets the
+  same plugin as the model's video route. Convert-only: revert does not lift
+  the plugin yet.
 - **Credentials.** Only `api-key` (`keyauth_credentials`) is generated; other
   credential types are warned about and skipped.
 - **High-priority model policies reorder `ai-model-selector`.** A model
@@ -352,18 +364,29 @@ and `formats` beyond the first.
   record (`provider: aws_iam`, nested `aws_iam` options). An unsupported auth
   type leaves out the agent or MCP server with an error. The plugin's `aws_iam.bearer_token` has no AI
   Gateway representation, so the reverse direction warns and drops it.
-- **Token Vault.** An MCP Server's top-level `token_vault` (`directory`,
-  `provider`, optional `redis` + `encryption_secrets`) lowers to the
+- **Token Vault.** An MCP Server's top-level `token_vault` lowers to the
   `ai-mcp-proxy` `auth` record (`provider: token_vault`, nested `token_vault`
-  options) and round-trips in both directions. The nested
-  `redis` block (Konnect's `AIGatewayRedisCloudConfiguration` shape) flattens
-  into the plugin redis config's prefixed keys (`keepalive.pool_size` →
-  `keepalive_pool_size`, `sentinel.master` → `sentinel_master`,
-  `cluster.nodes` → `cluster_nodes`, `cloud_authentication.type` →
-  `auth_provider` with provider-prefixed fields, …). `token_vault` and
+  options). The fields are `provider` (required), `subject_token_type`,
+  `credential` (`inbound` and `outbound`, each with `location`, `name` and
+  `prefix`), and `cache` (copied verbatim). An empty `prefix` stays empty, so
+  the plugin default `Bearer ` does not apply. `token_vault` and
   `config.upstream.auth` are mutually exclusive (both lower to the same plugin
-  auth record) — declaring both is a hard error, as is `redis` without
-  `encryption_secrets` (the plugin's own entity check).
+  auth record) — declaring both is a hard error.
+  A `token_vault` takes one `token-vault` datastore, referenced by
+  `datastores: [{name: ...}]`. Without a reference, the server converts with a
+  warning and gets no callback route. An unknown reference leaves out the
+  server with an error. The datastore's `config.directory` becomes
+  `auth.token_vault.directory`. The other `config` keys go under
+  `auth.token_vault.storage`, together with `backend: konnect`.
+  The first server that uses a datastore also adds one top-level
+  `token-vault-callback-handler` route (`/_vault`, `http` and `https`) with
+  the same `directory` and `storage`. Model providers share the same route.
+  Two entities with different datastores conflict, because one route cannot
+  serve both. The route is removed again when a conversion-only server is
+  dropped and no other server or model provider uses a Token Vault. Revert lifts `directory` and `storage` (without `backend`) back into
+  a `token-vault` datastore, shared by servers with the same connection, and
+  does not read the callback route. The whole feature round-trips through
+  `revert/roundtrip_test.go`.
 - **MCP rate limiting.** An MCP Server's top-level `rate_limiting` (`limits[]`
   with `method` or `tool`, `limit`, `window_size`) is copied 1:1 to the
   `ai-mcp-proxy` `config.rate_limiting` and round-trips in both directions. It
