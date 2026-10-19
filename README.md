@@ -306,13 +306,11 @@ and `formats` beyond the first.
   record (`provider: aws_iam`, nested `aws_iam` options). An unsupported auth
   type leaves out the agent or MCP server with an error. The plugin's `aws_iam.bearer_token` has no AI
   Gateway representation, so the reverse direction warns and drops it.
-- **Token Vault.** An MCP Server's top-level `token_vault` lowers to the
+- **Token Vault.** An MCP Server's top-level `token_vault` (`directory`,
+  `provider`, optional `redis` + `encryption_secrets`) lowers to the
   `ai-mcp-proxy` `auth` record (`provider: token_vault`, nested `token_vault`
-  options). The fields are `provider` (required), `subject_token_type`,
-  `credential` (`inbound` and `outbound`, each with `location`, `name` and
-  `prefix`), `cache` (copied verbatim), and optional `redis` +
-  `encryption_secrets`. The nested `redis` block (Konnect's
-  `AIGatewayRedisCloudConfiguration` shape) flattens
+  options) and round-trips in both directions. The nested
+  `redis` block (Konnect's `AIGatewayRedisCloudConfiguration` shape) flattens
   into the plugin redis config's prefixed keys (`keepalive.pool_size` →
   `keepalive_pool_size`, `sentinel.master` → `sentinel_master`,
   `cluster.nodes` → `cluster_nodes`, `cloud_authentication.type` →
@@ -320,20 +318,6 @@ and `formats` beyond the first.
   `config.upstream.auth` are mutually exclusive (both lower to the same plugin
   auth record) — declaring both is a hard error, as is `redis` without
   `encryption_secrets` (the plugin's own entity check).
-  A `token_vault` also needs exactly one `token-vault` datastore, referenced
-  by `datastores: [{name: ...}]`. A missing or unknown reference leaves out the
-  server with an error. The datastore's `config.directory` becomes
-  `auth.token_vault.directory`. The other `config` keys go under
-  `auth.token_vault.storage`, together with `backend: konnect`.
-  The first server that uses a datastore also adds one top-level
-  `token-vault-callback-handler` route (`/_vault`, `http` and `https`) with
-  the same `directory` and `storage`. Two servers with different datastores
-  conflict, because one route cannot serve both. The route is removed again
-  when a conversion-only server is dropped and no other server uses a Token
-  Vault. Revert lifts `directory` and `storage` (without `backend`) back into
-  a `token-vault` datastore, shared by servers with the same connection, and
-  does not read the callback route. The whole feature round-trips through
-  `revert/roundtrip_test.go`.
 - **MCP rate limiting.** An MCP Server's top-level `rate_limiting` (`limits[]`
   with `method` or `tool`, `limit`, `window_size`) is copied 1:1 to the
   `ai-mcp-proxy` `config.rate_limiting` and round-trips in both directions. It

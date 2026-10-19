@@ -77,7 +77,7 @@ const (
 	FeatureSkillsCapability           Feature = "skills-capability"
 	FeatureFailoverHTTPCodes          Feature = "failover-http-codes"
 	FeatureBedrockVPCEndpoint         Feature = "bedrock-vpc-endpoint"
-	FeatureMCPTokenVault              Feature = "mcp-token-vault"      //nolint:gosec // a feature name, not a credential
+	FeatureMCPTokenVault              Feature = "mcp-token-vault" //nolint:gosec // a feature name, not a credential
 	FeatureMCPRateLimiting            Feature = "mcp-rate-limiting"
 )
 

@@ -28,8 +28,6 @@ services:
                       - host: sentinel-1.internal
                         port: 6379
                     sentinel_role: any
-                  storage:
-                    backend: konnect
               include_consumer_groups: true
               logging:
                 log_audits: false
@@ -53,8 +51,6 @@ services:
                 token_vault:
                   directory: my-directory
                   provider: my-other-upstream-provider
-                  storage:
-                    backend: konnect
               include_consumer_groups: true
               logging:
                 log_audits: false
@@ -64,16 +60,3 @@ services:
               tools:
                 - description: A bare vendor tool
                   name: bareVendorTool
-routes:
-  - name: token-vault-callback-handler
-    paths:
-      - /_vault
-    protocols:
-      - http
-      - https
-    plugins:
-      - name: token-vault-callback-handler
-        config:
-          directory: my-directory
-          storage:
-            backend: konnect

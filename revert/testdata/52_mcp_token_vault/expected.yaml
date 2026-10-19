@@ -9,10 +9,9 @@ mcp_servers:
     tools:
       - name: vendorTool
         description: A vendor tool
-    datastores:
-      - name: token-vault
     upstream_url: https://mcp.internal.kongair.com
     token_vault:
+      directory: my-directory
       provider: my-upstream-provider
       redis:
         host: redis.internal
@@ -40,13 +39,7 @@ mcp_servers:
     tools:
       - name: bareVendorTool
         description: A bare vendor tool
-    datastores:
-      - name: token-vault
     upstream_url: https://bare-mcp.internal.kongair.com
     token_vault:
-      provider: my-other-upstream-provider
-datastores:
-  - type: token-vault
-    name: token-vault
-    config:
       directory: my-directory
+      provider: my-other-upstream-provider
