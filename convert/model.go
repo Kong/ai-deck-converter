@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
+	"reflect"
 	"regexp"
 	"slices"
 	"sort"
@@ -127,6 +128,7 @@ type proxyGroup struct {
 	balancer          map[string]any
 	vectordb          any
 	datastoreName     string // datastore whose connection was injected into vectordb; empty when authored inline
+	tokenVault        map[string]any
 	embeddings        any
 	responseStreaming string
 	modelNameHeader   *bool
@@ -185,6 +187,8 @@ type modelPass struct {
 	selectorConflicts map[string]bool
 	// skipped holds the issues of each model index that a pass left out.
 	skipped map[int][]ConversionIssue
+	// tokenVaults holds the token-vault-exchange config of each model.
+	tokenVaults map[*aigw.Model]map[string]any
 }
 
 // convertModels groups all (model, target, capability) tuples into routes under
@@ -225,6 +229,7 @@ func (c *Converter) convertModelsPass(skipped map[int][]ConversionIssue) bool {
 		aliasOwners:         map[string]string{},
 		selectorConflicts:   map[string]bool{},
 		skipped:             skipped,
+		tokenVaults:         map[*aigw.Model]map[string]any{},
 	}
 	c.modelRouteModels = map[string][]string{}
 	lifecycleCandidates := c.videoLifecycleCandidates(skipped)
@@ -283,6 +288,7 @@ func (c *Converter) convertModelsPass(skipped map[int][]ConversionIssue) bool {
 					TargetSources: pg.targetSources,
 					Source:        pg.source,
 				})
+				c.appendTokenVaultExchange(pg, nil)
 				continue
 			}
 			// One plugin per alias: ai-model-selector activates a model-scoped
@@ -300,6 +306,7 @@ func (c *Converter) convertModelsPass(skipped map[int][]ConversionIssue) bool {
 					TargetSources: pg.targetSources,
 					Source:        pg.source,
 				})
+				c.appendTokenVaultExchange(pg, kong.NewStringRef(alias))
 			}
 		}
 	}
@@ -317,6 +324,22 @@ func (c *Converter) convertModelsPass(skipped map[int][]ConversionIssue) bool {
 	}
 	c.out.Plugins = append(c.out.Plugins, st.guardPlugins...)
 	return true
+}
+
+// appendTokenVaultExchange adds the token-vault-exchange plugin of pg with
+// the scope of its ai-proxy-advanced plugin.
+func (c *Converter) appendTokenVaultExchange(pg *proxyGroup, model *kong.StringRef) {
+	if pg.tokenVault == nil {
+		return
+	}
+	c.out.Plugins = append(c.out.Plugins, kong.Plugin{
+		Name:    tokenVaultExchangePlugin,
+		Enabled: new(true),
+		Route:   kong.NewStringRef(pg.routeName),
+		Model:   model,
+		Config:  pg.tokenVault,
+		Source:  source(kindModel, pg.source.EntityName, "targets"),
+	})
 }
 
 // convertModelOnce runs fn for the model at index i. A skipped model only
@@ -424,6 +447,9 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 	if err != nil {
 		return err
 	}
+	if err := c.checkEmbeddingsTokenVault(src, m); err != nil {
+		return err
+	}
 	if m.Config.Route.Name != "" {
 		c.warn(src.at("config.route.name"), ConfigFieldOverridden,
 			"model %q sets config.route.name to %q. "+
@@ -440,6 +466,7 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 
 	var convertedTargets []int
 	servedBy := map[string][]int{}
+	var tokenVault map[string]any
 	for j := range m.TargetModels {
 		tm := &m.TargetModels[j]
 		provider, providerType, problem := c.checkTarget(m, j)
@@ -450,6 +477,18 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 		if _, ok := tm.Config.Options["vpc_endpoint"]; ok && !c.supports(aimap.FeatureBedrockVPCEndpoint) {
 			field := fmt.Sprintf("targets[%d].config.vpc_endpoint", j)
 			return c.failUnsupported(src.at(field), aimap.FeatureBedrockVPCEndpoint, field)
+		}
+		tv, err := c.providerTokenVault(src, m, j, provider)
+		if err != nil {
+			return err
+		}
+		// token-vault-exchange has model scope. It cannot tell targets apart.
+		if len(convertedTargets) == 0 {
+			tokenVault = tv
+		} else if !reflect.DeepEqual(tv, tokenVault) {
+			return c.fail(src.at(fmt.Sprintf("targets[%d].provider", j)), ConfigFieldInvalid,
+				"model %q target %q: every target must use the same provider token_vault",
+				m.Name, tm.Name)
 		}
 		c.warnUnsupportedCostLists(src, tm, j)
 		convertedTargets = append(convertedTargets, j)
@@ -507,6 +546,11 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 					servedBy[capability] = append(servedBy[capability], j)
 				}
 				websocket := aimap.IsWebSocketEndpoint(spec)
+				if websocket && tokenVault != nil {
+					return c.fail(src.at(capabilityField(m, capability)), ConfigFieldInvalid,
+						"model %q: capability %q needs a WebSocket route, but %s does not support "+
+							"the ws and wss protocols", m.Name, capability, tokenVaultExchangePlugin)
+				}
 				// A global plugin keeps Kong's http/https default protocols. A
 				// global authentication policy therefore cannot protect a ws or
 				// wss route, so the model fails closed.
@@ -611,6 +655,11 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 								"route-scoped ai-proxy-advanced would mix %s and %s",
 							m.Name, g.route.Name, existing, current)
 					}
+					if !reflect.DeepEqual(pg.tokenVault, tokenVault) {
+						return c.fail(src.at("targets"), ConfigFieldInvalid,
+							"model %q cannot share route %q with another api model that uses "+
+								"a different provider token_vault", m.Name, g.route.Name)
+					}
 				}
 				if pg == nil {
 					embeddings, err := c.resolveEmbeddings(src, balancerExtra(m.Config.Balancer, "embeddings"))
@@ -653,6 +702,7 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 						balancer:          c.balancerConfig(m.Config.Balancer),
 						vectordb:          vectordb,
 						datastoreName:     datastoreName,
+						tokenVault:        tokenVault,
 						embeddings:        embeddings,
 						responseStreaming: m.Config.ResponseStreaming,
 						modelNameHeader:   modelNameHeader,
@@ -724,6 +774,8 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 			}
 		}
 	}
+
+	st.tokenVaults[m] = tokenVault
 
 	// ai-models entries (one per alias, so ai-model-selector can match a
 	// request against any of them). note: name is set to alias and alias is
@@ -951,6 +1003,7 @@ func (c *Converter) convertVideoLifecycle(
 		genaiCategory:     candidate.spec.GenaiCategory,
 		balancer:          c.balancerConfig(candidate.model.Config.Balancer),
 		vectordb:          lifecycleVectorDB,
+		tokenVault:        st.tokenVaults[candidate.model],
 		responseStreaming: candidate.model.Config.ResponseStreaming,
 		modelNameHeader:   boolPtr(false),
 		maxBodySize:       candidate.model.Config.MaxRequestBodySize,
@@ -971,6 +1024,7 @@ func (c *Converter) convertVideoLifecycle(
 		TargetSources: pg.targetSources,
 		Source:        pg.source,
 	})
+	c.appendTokenVaultExchange(pg, nil)
 
 	plugins, err := c.scopedPlugins(src, candidate.model.Policies, candidate.model.Access.ACLs)
 	if err != nil {

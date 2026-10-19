@@ -13,21 +13,10 @@ services:
                 provider: token_vault
                 token_vault:
                   directory: my-directory
-                  encryption_secrets:
-                    - '{vault://env/TOKEN_VAULT_ENC_SECRET}'
-                    - '{vault://env/TOKEN_VAULT_ENC_SECRET_OLD}'
                   provider: my-upstream-provider
-                  redis:
-                    connect_timeout: 2000
-                    database: 0
-                    host: redis.internal
-                    keepalive_pool_size: 256
-                    port: 6379
-                    sentinel_master: mymaster
-                    sentinel_nodes:
-                      - host: sentinel-1.internal
-                        port: 6379
-                    sentinel_role: any
+                  storage:
+                    backend: konnect
+                  subject_token_type: access_token
               include_consumer_groups: true
               logging:
                 log_audits: false
@@ -51,6 +40,8 @@ services:
                 token_vault:
                   directory: my-directory
                   provider: my-other-upstream-provider
+                  storage:
+                    backend: konnect
               include_consumer_groups: true
               logging:
                 log_audits: false
@@ -60,3 +51,16 @@ services:
               tools:
                 - description: A bare vendor tool
                   name: bareVendorTool
+routes:
+  - name: token-vault-callback-handler
+    paths:
+      - /_vault
+    protocols:
+      - http
+      - https
+    plugins:
+      - name: token-vault-callback-handler
+        config:
+          directory: my-directory
+          storage:
+            backend: konnect
