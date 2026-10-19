@@ -257,6 +257,15 @@ overlap:
 Two lists of plain values that share no value do not overlap, and the check
 reports no conflict. This misses one case. See [Drawbacks](#drawbacks).
 
+### Refined routes
+
+Kong gives a route with `hosts` or with more headers a higher priority. A
+route refines another route when it matches only requests that the other
+route also matches. It must also add `hosts` or header names. The check
+reports no conflict for a refined pair, because Kong sends each shared
+request to the refining route. Header based routing on one path, for example
+`X-Tenant: [blue]`, is such a pair.
+
 ### Issue source
 
 A route carries a `Source` with the entity type and name. The issue uses
@@ -378,11 +387,10 @@ deterministic for one input.
 # Drawbacks
 [drawbacks]: #drawbacks
 
-- **Warnings for intended configurations.** A user can add a more specific
-  route, e.g., with `hosts` or `headers`, on top of a route without them. Kong
-  prefers the more specific route, so the result can be what the user wants.
-  The converter still reports a conflict because the less specific route
-  loses those requests.
+- **Warnings for intended configurations.** The check skips a route that
+  refines another route with `hosts` or headers. See
+  [Refined routes](#refined-routes). Other refinements still get a warning,
+  for example a route that adds only `methods`.
 - **Missed conflicts.** Regex paths and regex header values are compared only
   by equality. `~/v1/.*` and `/v1/chat` can match one request, and the
   converter does not report it. Two different regex values can also match one

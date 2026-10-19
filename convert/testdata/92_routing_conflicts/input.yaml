@@ -57,7 +57,8 @@ agents:
     config:
       url: https://booking.internal/api
       route: {paths: [/agents/booking], methods: [PUT]}
-  # The later route sets no hosts, so it also matches api.example.com.
+  # The earlier route adds hosts to the later route. Kong sends each request
+  # for api.example.com to the earlier route, so they do not conflict.
   - type: http
     name: hosts-specific
     config:

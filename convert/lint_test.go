@@ -94,6 +94,92 @@ func TestRoutesOverlap(t *testing.T) {
 	}
 }
 
+func TestRoutesRefine(t *testing.T) {
+	tenant := map[string][]string{"X-Tenant": {"blue"}}
+	base := kong.Route{Paths: []string{"/v1/messages"}, Methods: []string{"POST"}}
+	withHeaders := func(r kong.Route, headers map[string][]string) kong.Route {
+		r.Headers = headers
+		return r
+	}
+	for name, tc := range map[string]struct {
+		a, b kong.Route
+		want bool
+	}{
+		"header added": {base, withHeaders(base, tenant), true},
+		"header first": {withHeaders(base, tenant), base, true},
+		"equal routes": {base, base, false},
+		"different header": {
+			withHeaders(base, map[string][]string{"x-a": {"1"}}),
+			withHeaders(base, map[string][]string{"x-b": {"2"}}),
+			false,
+		},
+		"header and wider method": {
+			base,
+			kong.Route{Paths: base.Paths, Methods: []string{"POST", "GET"}, Headers: tenant},
+			false,
+		},
+		"header and other path": {base, kong.Route{Paths: []string{"/other"}, Methods: base.Methods, Headers: tenant}, false},
+		"header added to header": {
+			withHeaders(base, tenant),
+			withHeaders(base, map[string][]string{"x-tenant": {"BLUE"}, "x-team": {"a"}}),
+			true,
+		},
+		"header with wider values": {
+			withHeaders(base, tenant),
+			withHeaders(base, map[string][]string{"X-Tenant": {"blue", "red"}, "x-team": {"a"}}),
+			false,
+		},
+		"hosts added": {
+			base,
+			kong.Route{Paths: base.Paths, Methods: base.Methods, Hosts: []string{"a.test"}},
+			true,
+		},
+		"hosts on both routes": {
+			kong.Route{Hosts: []string{"a.test"}},
+			kong.Route{Hosts: []string{"a.test", "b.test"}},
+			false,
+		},
+		"methods only": {kong.Route{Paths: base.Paths}, base, false},
+		"protocol not in other": {
+			base,
+			kong.Route{Paths: base.Paths, Methods: base.Methods, Protocols: []string{"grpc"}, Headers: tenant},
+			false,
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			require.Equal(t, tc.want, routesRefine(tc.a, tc.b))
+		})
+	}
+}
+
+// Header based routing on one path is not a conflict.
+func TestRoutingConflictSkipsRefinedRoute(t *testing.T) {
+	result, err := Convert([]byte(`
+model_providers: [{name: openai, type: openai}]
+models:
+  - name: any
+    capabilities: [generate]
+    targets: [{name: gpt-5, provider: openai}]
+    config: {route: {paths: [/tenant]}}
+  - name: blue
+    capabilities: [generate]
+    targets: [{name: gpt-5, provider: openai}]
+    config: {route: {paths: [/tenant], headers: {X-Tenant: [blue]}}}
+  - name: header-a
+    capabilities: [generate]
+    targets: [{name: gpt-5, provider: openai}]
+    config: {route: {paths: [/headers], headers: {x-a: ["1"]}}}
+  - name: header-b
+    capabilities: [generate]
+    targets: [{name: gpt-5, provider: openai}]
+    config: {route: {paths: [/headers], headers: {x-b: ["2"]}}}
+`), testOptions)
+	require.NoError(t, err)
+	require.Len(t, result.Issues, 1)
+	issue := requireIssue(t, result.Issues, Warning, RoutingConflict, kindModel, "header-b", "config.route")
+	require.Contains(t, issue.Reason, `of model "header-a"`)
+}
+
 func TestHostsOverlap(t *testing.T) {
 	for _, tc := range []struct {
 		a, b string
