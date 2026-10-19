@@ -147,6 +147,16 @@ func (r *Reverter) revertMCPServer(svc *kong.Service, rt *kong.Route, plugins, s
 		m.Config.Upstream = upstream
 	}
 	m.Config.ToolsCacheTTLSeconds = getInt(cfg, "tools_cache_ttl_seconds")
+	// The plugin accepts rate_limiting on more modes than the API does.
+	// Convert rejects rate_limiting on those other modes.
+	if rl := aimap.MCPRateLimitingFromPlugin(getMap(cfg, "rate_limiting")); rl != nil {
+		if aimap.MCPRateLimitingAllowed(m.Type) {
+			m.RateLimiting = rl
+		} else if err := r.warn("MCP server %q: rate_limiting is not valid on type %q; dropped",
+			svc.Name, m.Type); err != nil {
+			return err
+		}
+	}
 
 	// Access: the ACL attribute config and default_acl live in the plugin
 	// config; lift them back into the server-level access block.

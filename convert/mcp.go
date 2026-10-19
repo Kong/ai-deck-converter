@@ -76,6 +76,7 @@ func (c *Converter) convertMCPServer(
 		kong.FieldMapping{GeneratedPrefix: "config.proxy_config", SourcePrefix: "config.proxy"},
 		kong.FieldMapping{GeneratedPrefix: "config.auth", SourcePrefix: "config.upstream.auth"},
 		kong.FieldMapping{GeneratedPrefix: "config.auth.token_vault", SourcePrefix: "token_vault"},
+		kong.FieldMapping{GeneratedPrefix: "config.rate_limiting", SourcePrefix: "rate_limiting"},
 		kong.FieldMapping{GeneratedPrefix: "config.default_acl", SourcePrefix: "access"},
 		kong.FieldMapping{GeneratedPrefix: "config.acl_attribute_type", SourcePrefix: "access.acl_attribute_type"},
 		kong.FieldMapping{
@@ -376,6 +377,17 @@ func (c *Converter) mcpPlugin(src ConversionIssueSource, m *aigw.MCPServer) (kon
 	}
 	if auth != nil {
 		cfg["auth"] = auth
+	}
+	if m.RateLimiting != nil {
+		if !c.supports(aimap.FeatureMCPRateLimiting) {
+			return kong.Plugin{}, c.failUnsupported(src.at("rate_limiting"), aimap.FeatureMCPRateLimiting, "rate_limiting")
+		}
+		if !aimap.MCPRateLimitingAllowed(m.Type) {
+			return kong.Plugin{}, c.fail(src.at("rate_limiting"), ConfigFieldInvalid,
+				"MCP server %q: rate_limiting is only valid on conversion-listener and passthrough-listener, not %q",
+				m.Name, m.Type)
+		}
+		cfg["rate_limiting"] = aimap.MCPRateLimitingToPlugin(m.RateLimiting)
 	}
 	// tools_cache_ttl_seconds is required by the plugin in upstream-server mode.
 	if m.Config.ToolsCacheTTLSeconds != nil {

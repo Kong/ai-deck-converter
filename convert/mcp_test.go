@@ -460,6 +460,27 @@ mcp_servers:
 	}
 }
 
+// The AI Gateway API accepts rate_limiting only on conversion-listener and
+// passthrough-listener.
+func TestMCPRateLimitingRejectedOnOtherTypes(t *testing.T) {
+	for _, mode := range []string{"listener", "conversion-only", "upstream-server"} {
+		t.Run(mode, func(t *testing.T) {
+			result, err := Convert([]byte(`
+mcp_servers:
+  - type: `+mode+`
+    name: limited
+    upstream_url: https://mcp.internal
+    rate_limiting:
+      limits:
+        - {method: tools/call, limit: 100, window_size: 60}
+`), testOptions)
+			require.NoError(t, err)
+			requireIssue(t, result.Issues, Error, ConfigFieldInvalid, kindMCPServer, "limited", "rate_limiting")
+			require.Empty(t, result.Output.Services, "the MCP server is left out")
+		})
+	}
+}
+
 // mcpWhenACLInput templates an MCP server whose ACL block is supplied by the
 // caller, so one fixture covers the server-wide and per-tool placements.
 //

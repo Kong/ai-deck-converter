@@ -1,0 +1,39 @@
+mcp_servers:
+  # passthrough MCP server limiting one MCP method and one tool.
+  - type: passthrough-listener
+    display_name: Limited Vendor MCP
+    name: limited-vendor-mcp
+    upstream_url: https://mcp.internal.kongair.com
+    config:
+      route: {paths: [/mcp/vendor]}
+    rate_limiting:
+      limits:
+        - method: tools/call
+          limit: 100
+          window_size: 60
+        - tool: search_flights
+          limit: 10
+          window_size: 1
+  # conversion-listener MCP server limiting its own tool per day and per hour.
+  - type: conversion-listener
+    display_name: Limited Flights MCP
+    name: limited-flights-mcp
+    upstream_url: https://flights.internal.kongair.com
+    config:
+      route: {paths: [/mcp/flights]}
+    rate_limiting:
+      limits:
+        - tool: search_flights
+          limit: 1000
+          window_size: 86400
+        - tool: search_flights
+          limit: 100
+          window_size: 3600
+        - method: tools/list
+          limit: 50
+          window_size: 60
+    tools:
+      - name: search_flights
+        description: Search flights
+        method: GET
+        path: /flights

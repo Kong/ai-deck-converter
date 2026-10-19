@@ -1,0 +1,16 @@
+# rate_limiting needs 2.3. At 2.2 the MCP server is absent with an error. The
+# other MCP server still converts.
+mcp_servers:
+  - type: passthrough-listener
+    name: limited-vendor-mcp
+    upstream_url: https://mcp.internal.kongair.com
+    config:
+      route: {paths: [/mcp/limited]}
+    rate_limiting:
+      limits:
+        - {method: tools/call, limit: 100, window_size: 60}
+  - type: passthrough-listener
+    name: plain-vendor-mcp
+    upstream_url: https://plain-mcp.internal.kongair.com
+    config:
+      route: {paths: [/mcp/plain]}

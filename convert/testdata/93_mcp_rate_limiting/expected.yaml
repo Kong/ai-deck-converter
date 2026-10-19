@@ -1,0 +1,57 @@
+_format_version: "3.0"
+services:
+  - name: limited-vendor-mcp
+    url: https://mcp.internal.kongair.com
+    routes:
+      - name: limited-vendor-mcp-route
+        paths:
+          - /mcp/vendor
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              include_consumer_groups: true
+              logging:
+                log_audits: false
+                log_payloads: false
+                log_statistics: true
+              mode: passthrough-listener
+              rate_limiting:
+                limits:
+                  - limit: 100
+                    method: tools/call
+                    window_size: 60
+                  - limit: 10
+                    tool: search_flights
+                    window_size: 1
+              tools: []
+  - name: limited-flights-mcp
+    url: https://flights.internal.kongair.com
+    routes:
+      - name: limited-flights-mcp-route
+        paths:
+          - /mcp/flights
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              include_consumer_groups: true
+              logging:
+                log_audits: false
+                log_payloads: false
+                log_statistics: true
+              mode: conversion-listener
+              rate_limiting:
+                limits:
+                  - limit: 1000
+                    tool: search_flights
+                    window_size: 86400
+                  - limit: 100
+                    tool: search_flights
+                    window_size: 3600
+                  - limit: 50
+                    method: tools/list
+                    window_size: 60
+              tools:
+                - description: Search flights
+                  method: GET
+                  name: search_flights
+                  path: /flights

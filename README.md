@@ -341,6 +341,13 @@ and `formats` beyond the first.
   a `token-vault` datastore, shared by servers with the same connection, and
   does not read the callback route. The whole feature round-trips through
   `revert/roundtrip_test.go`.
+- **MCP rate limiting.** An MCP Server's top-level `rate_limiting` (`limits[]`
+  with `method` or `tool`, `limit`, `window_size`) is copied 1:1 to the
+  `ai-mcp-proxy` `config.rate_limiting` and round-trips in both directions. It
+  requires runtime 2.3 and is valid only on `conversion-listener` and
+  `passthrough-listener`. On any other type, convert leaves out the MCP server
+  with an error, and revert drops the field with a warning. The plugin
+  validates the values.
 - **MCP OAuth2.** MCP `access.auth_strategies` / `access.metadata` round-trips
   in both directions. An openid-connect auth strategy lowers its client credentials
   plus the identically-typed / unambiguous fields onto the `ai-mcp-oauth2`

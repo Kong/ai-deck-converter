@@ -28,6 +28,22 @@ type MCPServer struct {
 	// plugin's auth record (auth.provider: token_vault), so it is mutually
 	// exclusive with config.upstream.auth.
 	TokenVault *TokenVaultConfig `yaml:"token_vault,omitempty"`
+	// The converter copies RateLimiting to the ai-mcp-proxy rate_limiting record.
+	RateLimiting *MCPRateLimiting `yaml:"rate_limiting,omitempty"`
+}
+
+// MCPRateLimiting mirrors the AIGatewayMCPServerRateLimiting schema.
+type MCPRateLimiting struct {
+	Limits []MCPRateLimit `yaml:"limits,omitempty"`
+}
+
+// MCPRateLimit is one limit on an MCP method or a tool. The plugin requires
+// exactly one of Method and Tool.
+type MCPRateLimit struct {
+	Method     *string `yaml:"method,omitempty"`
+	Tool       *string `yaml:"tool,omitempty"`
+	Limit      int     `yaml:"limit,omitempty"`
+	WindowSize int     `yaml:"window_size,omitempty"`
 }
 
 // TokenVaultConfig mirrors the AIGatewayTokenVault schema. It resolves an
