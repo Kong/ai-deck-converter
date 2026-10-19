@@ -34,7 +34,7 @@ A conflict on either layer makes routing ambiguous. Examples:
 - Two models on one base path with different auth strategies. The converter
   splits them into two routes with equal paths. Kong selects one route, and
   the models on the other route are not reachable.
-- Two models with the same alias. The data plane rejects the configuration.
+- Two models with the same alias. The models share one `ai_models` entry.
 
 This RFC makes the converter report each of these conflicts.
 
@@ -136,11 +136,11 @@ models:
 
 ```yaml
 - code: ROUTING_CONFLICT
-  severity: ERROR
+  severity: WARNING
   source: {kind: model, name: b, fields: [config.route.model.values]}
 ```
 
-The converter leaves out `b`. A model without `values` uses its name as the
+The converter keeps `b`. A model without `values` uses its name as the
 alias. The field is then `name`.
 
 ### Example 5: different selector sources on one route
@@ -270,12 +270,12 @@ issue that is equal to a recorded issue.
 
 The data plane requires a unique `name` and `alias` for each `ai_models`
 entry. The converter writes each model alias into `name` and leaves `alias`
-unset, so one alias check covers both fields.
+unset, so one alias check covers both fields. `ToDBLess` gives equal names one
+ID, so the data plane loads them as one entry.
 
 The model pass maps each alias to the first model that uses it. A later model
-with the same alias gets an `ERROR`, and the converter leaves it out with
-`c.fail`. A model with more than one alias is left out when any alias
-conflicts. The check covers only enabled models, because the converter leaves
+with the same alias gets a `WARNING` and stays in the output. Each model scoped
+plugin also has a route scope. A model on another route does not get it. The check covers only enabled models, because the converter leaves
 out disabled models. See [Disabled models](#disabled-models).
 
 ## Disabled models

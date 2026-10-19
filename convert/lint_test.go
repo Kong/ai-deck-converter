@@ -169,7 +169,7 @@ agents:
 	require.Empty(t, result.Issues)
 }
 
-func TestRoutingConflictLeavesOutModelWithUsedAlias(t *testing.T) {
+func TestRoutingConflictKeepsModelWithUsedAlias(t *testing.T) {
 	result, err := Convert([]byte(`
 model_providers: [{name: openai, type: openai}]
 models:
@@ -188,14 +188,19 @@ models:
 `), testOptions)
 	require.NoError(t, err)
 	require.Len(t, result.Issues, 2)
-	requireIssue(t, result.Issues, Error, RoutingConflict, kindModel, "b", "config.route.model.values")
+	requireIssue(t, result.Issues, Warning, RoutingConflict, kindModel, "b", "config.route.model.values")
 	var fields [][]string
 	for _, issue := range result.Issues {
 		fields = append(fields, issue.Source.Fields)
 	}
 	require.Contains(t, fields, []string{"name"})
-	require.Len(t, result.Output.AIModels, 1)
-	require.Equal(t, "a", result.Output.AIModels[0].Name)
+	require.Len(t, result.Output.AIModels, 3)
+	dbless := result.Output.ToDBLess()
+	require.Len(t, dbless.AIModels, 3)
+	for _, model := range dbless.AIModels {
+		require.Equal(t, "a", model.Name)
+		require.Equal(t, dbless.AIModels[0].ID, model.ID, "the data plane loads equal IDs as one entry")
+	}
 }
 
 // A disabled model makes no output, so it cannot conflict.
