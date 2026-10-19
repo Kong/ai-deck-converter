@@ -495,12 +495,16 @@ func setIfNotEmptyMap(m map[string]any, key string, val map[string]any) {
 }
 
 // resolveMCPDatastore returns the Datastore the server references, or nil when
-// it has none. A token_vault without a known datastore fails the server.
+// it has none. A token_vault without a datastore gives a warning.
 func (c *Converter) resolveMCPDatastore(src ConversionIssueSource, m *aigw.MCPServer) (*aigw.Datastore, error) {
 	if len(m.Datastores) == 0 {
+		// Servers made before Token Vault datastores existed have none.
+		// They keep working without the callback route.
 		if m.TokenVault != nil {
-			return nil, c.fail(src.at("datastores"), MissingRequiredConfigField,
-				"MCP server %q: token_vault requires a %q datastore", m.Name, aimap.DatastoreTypeTokenVault)
+			c.warn(src.at("datastores"), MissingRequiredConfigField,
+				"MCP server %q: token_vault has no %q datastore. "+
+					"The output has no Token Vault callback route for this server.",
+				m.Name, aimap.DatastoreTypeTokenVault)
 		}
 		return nil, nil
 	}
