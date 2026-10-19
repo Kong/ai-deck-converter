@@ -68,6 +68,9 @@ func (c *Converter) routeEntries() []routeEntry {
 			add(&service.Routes[j])
 		}
 	}
+	for i := range c.out.Routes {
+		add(&c.out.Routes[i])
+	}
 	return entries
 }
 

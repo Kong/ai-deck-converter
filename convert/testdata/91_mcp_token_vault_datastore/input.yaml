@@ -1,0 +1,47 @@
+datastores:
+  - name: vault-konnect-prod
+    type: token-vault
+    config:
+      directory: my-directory
+      current_version: v1
+      keys:
+        - version: v1
+          key: "{vault://hcv/vault-enc-key}"
+
+mcp_servers:
+  # The datastore supplies directory and storage. The callback route is added
+  # once even though two servers reference the datastore.
+  - type: passthrough-listener
+    name: github-tools
+    upstream_url: https://github-mcp.internal.kongair.com
+    config: {route: {paths: [/mcp/github-tools]}}
+    datastores: [{name: vault-konnect-prod}]
+    token_vault:
+      provider: github
+      subject_token_type: api_key
+      credential:
+        inbound:
+          location: header
+          name: Authorization
+          prefix: "Bearer "
+        outbound:
+          location: header
+          name: Authorization
+          prefix: "Bearer "
+      cache:
+        redis:
+          host: redis.internal
+          port: 6379
+    tools:
+      - name: githubTool
+        description: A GitHub tool
+  - type: passthrough-listener
+    name: gitlab-tools
+    upstream_url: https://gitlab-mcp.internal.kongair.com
+    config: {route: {paths: [/mcp/gitlab-tools]}}
+    datastores: [{name: vault-konnect-prod}]
+    token_vault:
+      provider: gitlab
+    tools:
+      - name: gitlabTool
+        description: A GitLab tool
