@@ -30,11 +30,3 @@
     fields:
       - config.route
   severity: WARNING
-- code: ROUTING_CONFLICT
-  reason: route "hosts-any-route" of agent "hosts-any" can match the same requests as route "hosts-specific-route" of agent "hosts-specific". Kong sends each such request to only one of these routes.
-  source:
-    kind: agent
-    name: hosts-any
-    fields:
-      - config.route
-  severity: WARNING
