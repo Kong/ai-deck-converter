@@ -1,0 +1,65 @@
+_format_version: "3.0"
+_transform: false
+services:
+  - id: 947a4e23-b483-5a65-8165-da9aed24565b
+    name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    host: ai-gateway.upstream.local
+    port: 80
+    protocol: http
+routes:
+  - id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+    name: openai-chat
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - //chat/completions
+    methods:
+      - POST
+    protocols:
+      - http
+      - https
+    strip_path: true
+    preserve_host: false
+    https_redirect_status_code: 426
+    regex_priority: 0
+    path_handling: v0
+    request_buffering: true
+    response_buffering: true
+plugins:
+  - id: 17fa8192-4b9f-5b5a-8379-20ad8bc836a7
+    name: ai-model-selector
+    config:
+      body_path: model
+      max_request_body_size: 8388608
+      source: body
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+  - id: f3adc007-171c-5519-8763-3a0eef79bde3
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      max_request_body_size: 8388608
+      model_name_header: true
+      response_streaming: allow
+      targets:
+        - auth:
+            allow_override: false
+            header_name: Authorization
+            header_value: Bearer x
+          description: gpt-4o
+          model:
+            model_alias: my-gpt-4o
+            name: gpt-4o
+            provider: openai
+          route_type: llm/v1/chat
+          weight: 100
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+ai_models:
+  - id: b928a636-5f89-4c48-aa7a-2847cef4c42b
+    name: my-gpt-4o
+    alias: my-gpt-4o

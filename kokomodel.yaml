@@ -1,0 +1,53 @@
+_format_version: "2.1"
+_transform: false
+ai_models:
+  - alias: my-model-alias
+    id: e857b7cc-9aa7-5e56-ad1e-de70fd50b611
+    name: my-balancer-ch-model-openai-generate
+  - alias: my-model-alias
+    id: 40a88177-862d-5156-bf2f-13db5d528b9c
+    name: my-balancer-ch-model-openai-embeddings
+ca_certificates: []
+certificates: []
+consumer_group_consumers: []
+consumer_groups: []
+consumers: []
+degraphql_routes: []
+graphql_ratelimiting_advanced_cost_decoration: []
+licenses:
+  - id: e02f273a-d458-11ec-9d64-0242ac120002
+    payload: '{     "license":{       "payload":{         "admin_seats":"1",         "customer":"EXPIRED",         "dataplanes":"1",         "license_creation_date":"2014-11-14",         "license_expiration_date":"2014-11-14",         "license_key":"EXPIREDEXPIREDEXPIRED_a1VEXPIRED",         "product_subscription":"Kong Only",         "support_plan":"None"      },      "signature":"403c322e015c6a5e62aff6ca56156db1198a00cb12ffac4feedf9d173c34a775f3d898a10d32c904fceb352f81158a19140264fc6a8db620497f4564a327e964",      "version":"1"     } }'
+parameters:
+  - key: cluster_id
+    value: e74e1971-b291-43ea-89af-5bc898da48a3
+plugins: []
+routes:
+  - id: e1af9155-67b4-597a-bdd6-b92d75a9941c
+    methods:
+      - POST
+    name: openai-generate
+    paths:
+      - /v1/chat/completions
+      - /chat/completions
+      - /v1/completions
+      - /completions
+    strip_path: false
+  - id: 04dc7356-1301-5b91-ae33-af9f5837c531
+    methods:
+      - POST
+    name: openai-embeddings
+    paths:
+      - /v1/embeddings
+      - /embeddings
+    strip_path: false
+services:
+  - host: localhost
+    id: ec21b949-4052-519e-86b9-397ffb54080f
+    name: ai-gateway
+    port: 8000
+    protocol: http
+    url: http://ai-gateway.upstream.local
+snis: []
+targets: []
+upstreams: []
+vaults: []

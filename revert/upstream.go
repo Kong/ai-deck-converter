@@ -62,7 +62,7 @@ func (r *Reverter) upstreamFromConfig(auth map[string]any, entity string) (*aigw
 // tokenVaultFromConfig lifts the ai-mcp-proxy plugin's auth.token_vault record
 // back into the MCP Server's top-level token_vault field (its position in the
 // AI Gateway schema; the reverse of convert's emit in mcpPlugin). The
-// directory/provider/subject_token_type/credential/cache fields are recovered via the
+// directory/provider/redis/encryption_secrets fields are recovered via the
 // shared aimap table. Returns nil when the block is missing (the plugin's own
 // schema forbids provider token_vault without it); warns, since there is
 // nothing to lift. Mirrors convert's upstreamAuthBlock/tokenVault lowering.

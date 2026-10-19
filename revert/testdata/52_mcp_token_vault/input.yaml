@@ -11,8 +11,21 @@ services:
                 provider: token_vault
                 token_vault:
                   directory: my-directory
+                  encryption_secrets:
+                    - '{vault://env/TOKEN_VAULT_ENC_SECRET}'
+                    - '{vault://env/TOKEN_VAULT_ENC_SECRET_OLD}'
                   provider: my-upstream-provider
-                  subject_token_type: access_token
+                  redis:
+                    connect_timeout: 2000
+                    database: 0
+                    host: redis.internal
+                    keepalive_pool_size: 256
+                    port: 6379
+                    sentinel_master: mymaster
+                    sentinel_nodes:
+                      - host: sentinel-1.internal
+                        port: 6379
+                    sentinel_role: any
               include_consumer_groups: true
               logging:
                 log_audits: false

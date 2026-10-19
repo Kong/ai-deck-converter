@@ -48,7 +48,8 @@ type MCPRateLimit struct {
 
 // TokenVaultConfig mirrors the AIGatewayTokenVault schema. It resolves an
 // upstream credential per request via Kong's Token Vault: exchanged
-// credentials are cached per node. Lowered into the ai-mcp-proxy plugin's
+// credentials are cached per node and, when Redis is configured, shared
+// across the cluster (encrypted). Lowered into the ai-mcp-proxy plugin's
 // auth.token_vault record.
 type TokenVaultConfig struct {
 	// Directory is the directory name segment of the vault token endpoint.
@@ -64,6 +65,12 @@ type TokenVaultConfig struct {
 	Credential *TokenVaultCredential `yaml:"credential,omitempty"`
 	// Cache is copied verbatim into the plugin's auth.token_vault.cache.
 	Cache map[string]any `yaml:"cache,omitempty"`
+	// Redis shares exchanged credentials across the cluster.
+	Redis *RedisCloudConfig `yaml:"redis,omitempty"`
+	// EncryptionSecrets encrypt exchanged credentials before they are cached
+	// in Redis. Required when Redis is configured. Referenceable
+	// ({vault://...} references pass through verbatim).
+	EncryptionSecrets []string `yaml:"encryption_secrets,omitempty"`
 }
 
 // TokenVaultCredential holds the inbound and outbound credential placement.
@@ -76,8 +83,7 @@ type TokenVaultCredential struct {
 type TokenVaultCredentialLocation struct {
 	Location string `yaml:"location,omitempty"`
 	Name     string `yaml:"name,omitempty"`
-	// An empty Prefix differs from the plugin default "Bearer ".
-	Prefix *string `yaml:"prefix,omitempty"`
+	Prefix   string `yaml:"prefix,omitempty"`
 }
 
 // RedisCloudConfig mirrors the AIGatewayRedisCloudConfiguration schema: the
