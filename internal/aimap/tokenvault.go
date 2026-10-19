@@ -60,14 +60,11 @@ func TokenVaultToPlugin(tv *aigw.TokenVaultConfig) map[string]any {
 	if tv.Provider != "" {
 		block["provider"] = tv.Provider
 	}
-	if tv.SubjectTokenType != "" {
-		block["subject_token_type"] = tv.SubjectTokenType
+	if redis := TokenVaultRedisToPlugin(tv.Redis); redis != nil {
+		block["redis"] = redis
 	}
-	if len(tv.Cache) > 0 {
-		block["cache"] = tv.Cache
-	}
-	if cred := tokenVaultCredentialToPlugin(tv.Credential); cred != nil {
-		block["credential"] = cred
+	if len(tv.EncryptionSecrets) > 0 {
+		block["encryption_secrets"] = append([]string(nil), tv.EncryptionSecrets...)
 	}
 	return block
 }
@@ -83,16 +80,13 @@ func TokenVaultFromPlugin(block map[string]any) *aigw.TokenVaultConfig {
 	tv := &aigw.TokenVaultConfig{
 		Directory: getAnyStr(block, "directory"),
 		Provider:  getAnyStr(block, "provider"),
-
-		SubjectTokenType: getAnyStr(block, "subject_token_type"),
 	}
-	if cache := getAnyMap(block, "cache"); cache != nil {
-		tv.Cache = cache
+	if redis := getAnyMap(block, "redis"); redis != nil {
+		tv.Redis = TokenVaultRedisFromPlugin(redis)
 	}
-	if cred := getAnyMap(block, "credential"); cred != nil {
-		tv.Credential = &aigw.TokenVaultCredential{
-			Inbound:  tokenVaultLocationFromPlugin(getAnyMap(cred, "inbound")),
-			Outbound: tokenVaultLocationFromPlugin(getAnyMap(cred, "outbound")),
+	for _, s := range getAnySlice(block, "encryption_secrets") {
+		if str, ok := s.(string); ok {
+			tv.EncryptionSecrets = append(tv.EncryptionSecrets, str)
 		}
 	}
 	return tv
@@ -403,56 +397,4 @@ func getAnyBoolPtr(m map[string]any, key string) *bool {
 		return &v
 	}
 	return nil
-}
-
-func tokenVaultCredentialToPlugin(c *aigw.TokenVaultCredential) map[string]any {
-	if c == nil {
-		return nil
-	}
-	out := map[string]any{}
-	if in := tokenVaultLocationToPlugin(c.Inbound); in != nil {
-		out["inbound"] = in
-	}
-	if o := tokenVaultLocationToPlugin(c.Outbound); o != nil {
-		out["outbound"] = o
-	}
-	if len(out) == 0 {
-		return nil
-	}
-	return out
-}
-
-func tokenVaultLocationToPlugin(l *aigw.TokenVaultCredentialLocation) map[string]any {
-	if l == nil {
-		return nil
-	}
-	out := map[string]any{}
-	setStr(out, "location", l.Location)
-	setStr(out, "name", l.Name)
-	if l.Prefix != nil {
-		out["prefix"] = *l.Prefix
-	}
-	if len(out) == 0 {
-		return nil
-	}
-	return out
-}
-
-func tokenVaultLocationFromPlugin(block map[string]any) *aigw.TokenVaultCredentialLocation {
-	if len(block) == 0 {
-		return nil
-	}
-	return &aigw.TokenVaultCredentialLocation{
-		Location: getAnyStr(block, "location"),
-		Name:     getAnyStr(block, "name"),
-		Prefix:   getAnyStrPtr(block, "prefix"),
-	}
-}
-
-func getAnyStrPtr(m map[string]any, key string) *string {
-	s, ok := m[key].(string)
-	if !ok {
-		return nil
-	}
-	return &s
 }

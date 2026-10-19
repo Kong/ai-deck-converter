@@ -77,8 +77,7 @@ const (
 	FeatureSkillsCapability           Feature = "skills-capability"
 	FeatureFailoverHTTPCodes          Feature = "failover-http-codes"
 	FeatureBedrockVPCEndpoint         Feature = "bedrock-vpc-endpoint"
-	FeatureMCPTokenVault              Feature = "mcp-token-vault"      //nolint:gosec // a feature name, not a credential
-	FeatureProviderTokenVault         Feature = "provider-token-vault" //nolint:gosec // a feature name, not a credential
+	FeatureMCPTokenVault              Feature = "mcp-token-vault" //nolint:gosec // a feature name, not a credential
 	FeatureMCPRateLimiting            Feature = "mcp-rate-limiting"
 )
 
@@ -96,7 +95,6 @@ var featureSince = map[Feature]Version{
 	FeatureFailoverHTTPCodes:          mustVersion("2.3"),
 	FeatureBedrockVPCEndpoint:         mustVersion("2.3"),
 	FeatureMCPTokenVault:              mustVersion("2.3"),
-	FeatureProviderTokenVault:         mustVersion("2.3"),
 	FeatureMCPRateLimiting:            mustVersion("2.3"),
 }
 

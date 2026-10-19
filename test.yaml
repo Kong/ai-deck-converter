@@ -1,0 +1,53 @@
+consumer_groups: []
+consumers: []
+models:
+    - config:
+        logging:
+            payloads: false
+            statistics: true
+        max_request_body_size: 8.388608e+06
+        model:
+            name_header: true
+        response_streaming: allow
+        route:
+            https_redirect_status_code: 426
+            path_handling: v0
+            paths:
+                - /
+            preserve_host: false
+            protocols:
+                - http
+                - https
+            regex_priority: 0
+            request_buffering: true
+            response_buffering: true
+            strip_path: true
+      created_at: 1.781654719e+09
+      display_name: my-gpt-4o
+      enabled: true
+      formats:
+        - type: openai
+      id: b928a636-5f89-4c48-aa7a-2847cef4c42b
+      name: my-gpt-4o
+      target_models:
+        - allow_auth_override: false
+          config:
+            type: openai
+          name: gpt-4o
+          provider: generic-openai
+          weight: 100
+      type: model
+      capabilities: [generate]
+policies: []
+providers:
+    - config:
+        auth:
+            headers:
+                - name: Authorization
+                  value: Bearer x
+            type: basic
+      created_at: 1.781654705e+09
+      display_name: generic-openai
+      id: 7bdb41c8-39f9-4bf4-8c73-3d3e39381748
+      name: generic-openai
+      type: openai

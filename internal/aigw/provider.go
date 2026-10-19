@@ -11,10 +11,6 @@ type Provider struct {
 	Name        string         `yaml:"name,omitempty"`
 	Labels      Labels         `yaml:"labels,omitempty"`
 	Config      ProviderConfig `yaml:"config,omitempty"`
-	Datastores  []DatastoreRef `yaml:"datastores,omitempty"`
-	// TokenVault lowers into a token-vault-exchange plugin on each model that
-	// targets this provider.
-	TokenVault *TokenVaultConfig `yaml:"token_vault,omitempty"`
 }
 
 // ProviderConfig holds the provider auth plus provider-specific top-level fields.

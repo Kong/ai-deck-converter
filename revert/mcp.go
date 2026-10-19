@@ -136,9 +136,6 @@ func (r *Reverter) revertMCPServer(svc *kong.Service, rt *kong.Route, plugins, s
 			return err
 		}
 		m.TokenVault = tokenVault
-		if tokenVault != nil {
-			m.Datastores = r.tokenVaultDatastoreRef(getMap(authBlock, "token_vault"), tokenVault)
-		}
 	} else {
 		upstream, err := r.upstreamFromConfig(authBlock, fmt.Sprintf("MCP server %q", svc.Name))
 		if err != nil {
