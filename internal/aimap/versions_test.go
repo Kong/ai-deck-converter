@@ -51,6 +51,7 @@ var allFeatures = []Feature{
 	FeatureBedrockVPCEndpoint,
 	FeatureMCPTokenVault,
 	FeatureProviderTokenVault,
+	FeatureMCPRateLimiting,
 }
 
 func TestFeatureTable(t *testing.T) {

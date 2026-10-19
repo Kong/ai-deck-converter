@@ -79,6 +79,7 @@ const (
 	FeatureBedrockVPCEndpoint         Feature = "bedrock-vpc-endpoint"
 	FeatureMCPTokenVault              Feature = "mcp-token-vault"      //nolint:gosec // a feature name, not a credential
 	FeatureProviderTokenVault         Feature = "provider-token-vault" //nolint:gosec // a feature name, not a credential
+	FeatureMCPRateLimiting            Feature = "mcp-rate-limiting"
 )
 
 // featureSince maps each feature to its first AI Gateway release. The source
@@ -96,6 +97,7 @@ var featureSince = map[Feature]Version{
 	FeatureBedrockVPCEndpoint:         mustVersion("2.3"),
 	FeatureMCPTokenVault:              mustVersion("2.3"),
 	FeatureProviderTokenVault:         mustVersion("2.3"),
+	FeatureMCPRateLimiting:            mustVersion("2.3"),
 }
 
 // Since returns the first AI Gateway release that has f. It panics for an

@@ -440,6 +440,32 @@ services:
 		"want a defaulting-to-generate warning")
 }
 
+// The AI Gateway API does not accept rate_limiting on a listener.
+// Revert drops it to keep the output valid for convert.
+func TestMCPRateLimitingDroppedOnListener(t *testing.T) {
+	in := []byte(`
+_format_version: "3.0"
+services:
+  - name: limited-listener
+    host: localhost
+    routes:
+      - name: limited-listener-route
+        paths: [/mcp/listener]
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              mode: listener
+              rate_limiting:
+                limits:
+                  - {method: tools/call, limit: 100, window_size: 60}
+`)
+	doc, warnings, err := revertYAML(t, in, Options{})
+	require.NoError(t, err, "revert")
+	require.Len(t, doc.MCPServers, 1)
+	require.Nil(t, doc.MCPServers[0].RateLimiting)
+	require.Contains(t, strings.Join(warnings, "\n"), `rate_limiting is not valid on type "listener"`)
+}
+
 // revertYAML is a test helper that runs Revert and re-parses the output into
 // an aigw document for structural assertions.
 func revertYAML(t *testing.T, in []byte, opts Options) (*aigw.Document, []string, error) {

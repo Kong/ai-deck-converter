@@ -1,0 +1,18 @@
+_format_version: "3.0"
+services:
+  - name: plain-vendor-mcp
+    url: https://plain-mcp.internal.kongair.com
+    routes:
+      - name: plain-vendor-mcp-route
+        paths:
+          - /mcp/plain
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              include_consumer_groups: true
+              logging:
+                log_audits: false
+                log_payloads: false
+                log_statistics: true
+              mode: passthrough-listener
+              tools: []
