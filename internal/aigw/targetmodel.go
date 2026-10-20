@@ -20,6 +20,11 @@ type TargetModel struct {
 type TargetModelConfig struct {
 	Type    string
 	Options map[string]any
+
+	// BedrockEndpointType is "runtime" or "mantle" when a bedrock target sets
+	// endpoint_type to one of them. No code reads it yet. Future endpoint
+	// rules can use it.
+	BedrockEndpointType string
 }
 
 // UnmarshalYAML extracts the provider type discriminator and keeps the rest of
@@ -32,6 +37,12 @@ func (c *TargetModelConfig) UnmarshalYAML(node *yaml.Node) error {
 	if t, ok := m["type"].(string); ok {
 		c.Type = t
 		delete(m, "type")
+	}
+	if c.Type == "bedrock" {
+		switch v, _ := m["endpoint_type"].(string); v {
+		case "runtime", "mantle":
+			c.BedrockEndpointType = v
+		}
 	}
 	c.Options = m
 	return nil
