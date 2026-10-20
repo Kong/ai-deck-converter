@@ -1,0 +1,50 @@
+datastores:
+  - name: vault-konnect-prod
+    type: token-vault
+    config:
+      directory: my-directory
+      current_version: v1
+      keys:
+        - version: v1
+          key: "{vault://hcv/vault-enc-key}"
+
+auth_strategies:
+  - name: okta-ai-se
+    datastores: [ {name: vault-konnect-prod} ]
+    display_name: Okta AI SE
+    type: openid-connect
+    config:
+      issuer: https://dev-123456.okta.com
+      client_id: [ "0oa1b2c3d4e5f6g7h8i9" ]
+      client_secret: [ "{vault://hcv/okta/client-secret}" ]
+      cache_tokens_salt: 4f1c9a7e2b
+      auth_methods: [ bearer, client_credentials, authorization_code, session ]
+      principals:
+        enabled: true
+        directory: my-directory
+    token_vault:
+      enabled: true
+      # storage block omitted - datastore populates it
+
+mcp_servers:
+  - type: conversion-listener
+    display_name: Secure Flights MCP
+    name: secure-flights-mcp
+    config:
+      route:
+        paths: [/mcp/secure-flights]
+    access:
+      auth_strategies: [okta-ai-se]
+      metadata:
+        endpoint: /mcp/secure-flights/.well-known/oauth-protected-resource
+        resource: https://api.example.com/mcp/secure-flights
+        authorization_servers:
+          - https://dev-123456.okta.com/oauth2/default
+        scopes_supported: [openid, flights:read]
+    tools:
+      - name: searchFlights
+        description: Search available flights
+        method: GET
+        path: /flights
+        scheme: https
+        host: flights.internal

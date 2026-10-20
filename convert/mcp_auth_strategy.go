@@ -61,6 +61,12 @@ func (c *Converter) mcpAuthStrategyPlugins(
 		return nil, err
 	}
 
+	if idp != nil {
+		probe := kong.Plugin{Config: map[string]any{}}
+		if err := c.applyAuthStrategyTokenVault(idp, &probe); err != nil {
+			return nil, err
+		}
+	}
 	// key-auth cannot serve OAuth 2.0 Protected Resource Metadata; reject the
 	// combination unconditionally.
 	if meta != nil && idp != nil && idp.Type == "key-auth" {
@@ -108,6 +114,9 @@ func (c *Converter) mcpAuthStrategyPlugins(
 		cfg["hide_credentials"] = false
 	}
 	plugin := kong.Plugin{Name: idp.Type, Config: cfg, Source: source("identity_provider", idp.Name, "config")}
+	if err := c.applyAuthStrategyTokenVault(idp, &plugin); err != nil {
+		return nil, err
+	}
 	return []kong.Plugin{plugin}, nil
 }
 

@@ -1,0 +1,98 @@
+_format_version: "3.0"
+services:
+  - name: tools-a
+    url: https://a.internal.kongair.com
+    routes:
+      - name: tools-a-route
+        paths:
+          - /mcp/tools-a
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              include_consumer_groups: true
+              logging:
+                log_audits: false
+                log_payloads: false
+                log_statistics: true
+              mode: passthrough-listener
+              tools:
+                - description: Get a report
+                  name: report
+          - name: openid-connect
+            config:
+              client_id:
+                - 0oa1b2c3d4e5f6g7h8i9
+              issuer: https://dev-123456.okta.com
+              redirect_uri:
+                - /vuc/okta-ai-se/oidc/callback
+              session_secret: 0123456789abcdef0123456789abcdef
+              token_vault:
+                directory: my-directory
+                enabled: true
+                storage:
+                  backend: konnect
+              upstream_access_token_header: authorization:bearer
+  - name: tools-b
+    url: https://b.internal.kongair.com
+    routes:
+      - name: tools-b-route
+        paths:
+          - /mcp/tools-b
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              include_consumer_groups: true
+              logging:
+                log_audits: false
+                log_payloads: false
+                log_statistics: true
+              mode: passthrough-listener
+              tools:
+                - description: Get a report
+                  name: report
+          - name: openid-connect
+            config:
+              client_id:
+                - 0oa1b2c3d4e5f6g7h8i9
+              issuer: https://dev-123456.okta.com
+              redirect_uri:
+                - /vuc/okta-ai-se/oidc/callback
+              session_secret: 0123456789abcdef0123456789abcdef
+              token_vault:
+                directory: my-directory
+                enabled: true
+                storage:
+                  backend: konnect
+              upstream_access_token_header: authorization:bearer
+routes:
+  - name: token-vault-callback-handler
+    paths:
+      - /_vault
+    protocols:
+      - http
+      - https
+    plugins:
+      - name: token-vault-callback-handler
+        config:
+          directory: my-directory
+          storage:
+            backend: konnect
+  - name: token-vault-credential-manager-okta-ai-se
+    paths:
+      - /vuc/okta-ai-se
+    protocols:
+      - http
+      - https
+    plugins:
+      - name: openid-connect
+        config:
+          client_id:
+            - 0oa1b2c3d4e5f6g7h8i9
+          issuer: https://dev-123456.okta.com
+          redirect_uri:
+            - /vuc/okta-ai-se/oidc/callback
+          session_secret: 0123456789abcdef0123456789abcdef
+          upstream_access_token_header: authorization:bearer
+      - name: token-vault-credential-manager
+        config:
+          directory: my-directory

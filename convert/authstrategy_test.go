@@ -1,10 +1,13 @@
 package convert
 
 import (
+	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
 	"github.com/Kong/ai-deck-converter/internal/aigw"
+	"github.com/Kong/ai-deck-converter/internal/aimap"
 	"github.com/Kong/ai-deck-converter/internal/kong"
 	"github.com/stretchr/testify/require"
 )
@@ -263,4 +266,194 @@ models:
 				"the anonymous consumer keeps the plugins the user wrote")
 		})
 	}
+}
+
+func TestAuthStrategyTokenVault(t *testing.T) {
+	const doc = `
+datastores:
+  - name: tv
+    type: token-vault
+    config: {directory: d}
+auth_strategies:
+  - name: sso
+    type: %s
+    datastores: %s
+    config: {issuer: https://idp.example.com}
+    token_vault: {enabled: true}
+mcp_servers:
+  - type: passthrough-listener
+    name: m
+    upstream_url: https://mcp.internal
+    config: {route: {paths: [/mcp/m]}}
+    access: {auth_strategies: [sso]}
+    tools:
+      - {name: report, description: Get a report}
+`
+	run := func(typ, datastores string) (*ConversionResult, error) {
+		res, err := Convert([]byte(fmt.Sprintf(doc, typ, datastores)), testOptions)
+		return res, err
+	}
+	t.Run("openid-connect adds the callback route once", func(t *testing.T) {
+		res, err := run("openid-connect", "[{name: tv}]")
+		require.NoError(t, err)
+		require.Empty(t, res.Issues)
+		require.Len(t, res.Output.Routes, 2)
+		require.Equal(t, aimap.TokenVaultCallbackName, res.Output.Routes[0].Name)
+		require.Equal(t, aimap.TokenVaultCredentialManagerName+"-sso", res.Output.Routes[1].Name)
+	})
+	t.Run("other type fails", func(t *testing.T) {
+		res, _ := run("key-auth", "[{name: tv}]")
+		requireIssue(t, res.Issues, Error, ConfigFieldInvalid, kindAuthStrategy, "sso", "token_vault")
+		require.Empty(t, res.Output.Routes)
+		require.Empty(t, res.Output.Services)
+	})
+	t.Run("missing datastore fails", func(t *testing.T) {
+		res, _ := run("openid-connect", "[]")
+		requireIssue(t, res.Issues, Error, MissingRequiredConfigField, kindAuthStrategy, "sso", "datastores")
+		require.Empty(t, res.Output.Services)
+	})
+	t.Run("unknown datastore fails", func(t *testing.T) {
+		res, _ := run("openid-connect", "[{name: nope}]")
+		requireIssue(t, res.Issues, Error, UndefinedReference, kindAuthStrategy, "sso", "datastores[0].name")
+		require.Empty(t, res.Output.Services)
+	})
+}
+
+func TestAuthStrategyTokenVaultUnusedStrategyStillFails(t *testing.T) {
+	res, _ := Convert([]byte(`
+datastores:
+  - name: tv
+    type: token-vault
+    config: {directory: d}
+auth_strategies:
+  - name: ka
+    type: key-auth
+    datastores: [{name: tv}]
+    token_vault: {enabled: true}
+  - name: oidc
+    type: openid-connect
+    datastores: [{name: tv}]
+    token_vault: {enabled: true}
+`), testOptions)
+	requireIssue(t, res.Issues, Error, ConfigFieldInvalid, kindAuthStrategy, "ka", "token_vault")
+	require.Len(t, res.Issues, 1)
+	require.Empty(t, res.Output.Routes, "an unused strategy adds no callback route")
+}
+
+//nolint:gosec
+const tokenVaultStrategyDoc = `
+datastores:
+  - name: tv
+    type: token-vault
+    config: {directory: d}
+auth_strategies:
+  - name: sso
+    type: openid-connect
+    datastores: [{name: tv}]
+    config:
+      issuer: https://idp.example.com
+%s
+    token_vault: {enabled: %t}
+mcp_servers:
+  - type: passthrough-listener
+    name: a
+    upstream_url: https://a.internal
+    config: {route: {paths: [/mcp/a]}}
+    access: {auth_strategies: [sso]}
+    tools:
+      - {name: report, description: Get a report}
+  - type: passthrough-listener
+    name: b
+    upstream_url: https://b.internal
+    config: {route: {paths: [/mcp/b]}}
+    access: {auth_strategies: [sso]}
+    tools:
+      - {name: report, description: Get a report}
+`
+
+func tokenVaultOIDCConfigs(t *testing.T, extra string, enabled bool) []map[string]any {
+	t.Helper()
+	res, err := Convert([]byte(fmt.Sprintf(tokenVaultStrategyDoc, extra, enabled)), testOptions)
+	require.NoError(t, err)
+	require.Empty(t, res.Issues)
+	var configs []map[string]any
+	for _, svc := range res.Output.Services {
+		for _, route := range svc.Routes {
+			for _, p := range route.Plugins {
+				if p.Name == "openid-connect" {
+					configs = append(configs, p.Config)
+				}
+			}
+		}
+	}
+	for _, route := range res.Output.Routes {
+		for _, p := range route.Plugins {
+			if p.Name == "openid-connect" {
+				configs = append(configs, p.Config)
+			}
+		}
+	}
+	return configs
+}
+
+func TestAuthStrategyTokenVaultDefaults(t *testing.T) {
+	t.Cleanup(func(prev func() (string, error)) func() { return func() { newSessionSecret = prev } }(newSessionSecret))
+	calls := 0
+	newSessionSecret = func() (string, error) {
+		calls++
+		return "generated", nil
+	}
+
+	configs := tokenVaultOIDCConfigs(t, "", true)
+
+	require.Len(t, configs, 3, "two entity plugins and the credential manager plugin")
+	for _, cfg := range configs {
+		require.Equal(t, "authorization:bearer", cfg["upstream_access_token_header"])
+		require.Equal(t, []any{"/vuc/sso/oidc/callback"}, cfg["redirect_uri"])
+		require.Equal(t, "generated", cfg["session_secret"])
+	}
+	require.Equal(t, 1, calls, "the secret is generated once per strategy")
+}
+
+func TestAuthStrategyTokenVaultKeepsConfiguredValues(t *testing.T) {
+	configs := tokenVaultOIDCConfigs(t, `      upstream_access_token_header: x-token
+      redirect_uri: [/custom]
+      session_secret: mine`, true)
+
+	require.Len(t, configs, 3)
+	for _, cfg := range configs {
+		require.Equal(t, "x-token", cfg["upstream_access_token_header"])
+		require.Equal(t, []any{"/custom"}, cfg["redirect_uri"])
+		require.Equal(t, "mine", cfg["session_secret"])
+	}
+}
+
+func TestAuthStrategyTokenVaultDisabledAddsNoRouteOrDefaults(t *testing.T) {
+	configs := tokenVaultOIDCConfigs(t, "", false)
+
+	require.Len(t, configs, 2, "no credential manager route")
+	for _, cfg := range configs {
+		require.NotContains(t, cfg, "session_secret")
+		require.NotContains(t, cfg, "redirect_uri")
+		require.NotContains(t, cfg, "upstream_access_token_header")
+	}
+}
+
+func TestAuthStrategyTokenVaultSessionSecretFailure(t *testing.T) {
+	t.Cleanup(func(prev func() (string, error)) func() { return func() { newSessionSecret = prev } }(newSessionSecret))
+	newSessionSecret = func() (string, error) { return "", errors.New("no entropy") }
+
+	res, _ := Convert([]byte(fmt.Sprintf(tokenVaultStrategyDoc, "", true)), testOptions)
+
+	requireIssue(t, res.Issues, Error, InternalError, kindAuthStrategy, "sso", "config.session_secret")
+	require.Empty(t, res.Output.Services)
+}
+
+func TestGenerateSessionSecret(t *testing.T) {
+	a, err := generateSessionSecret()
+	require.NoError(t, err)
+	b, err := generateSessionSecret()
+	require.NoError(t, err)
+	require.Regexp(t, `^[0-9a-f]{32}$`, a)
+	require.NotEqual(t, a, b)
 }

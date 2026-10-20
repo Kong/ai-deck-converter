@@ -395,5 +395,13 @@ func ApplyTokenVaultDatastore(block map[string]any, ds *aigw.Datastore) (map[str
 // handle the Token Vault callback.
 const TokenVaultCallbackName = "token-vault-callback-handler"
 
+// TokenVaultCredentialManagerName is the name of the plugin that manages the
+// Token Vault credentials of an auth strategy. The route name starts with it.
+const TokenVaultCredentialManagerName = "token-vault-credential-manager"
+
+// TokenVaultCredentialManagerPath is the path prefix of the credential
+// manager route. The auth strategy name follows it.
+const TokenVaultCredentialManagerPath = "/vuc"
+
 // TokenVaultCallbackPath is the path of the Token Vault callback route.
 const TokenVaultCallbackPath = "/_vault"
