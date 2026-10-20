@@ -80,7 +80,7 @@ const (
 	FeatureMCPTokenVault              Feature = "mcp-token-vault"      //nolint:gosec // a feature name, not a credential
 	FeatureProviderTokenVault         Feature = "provider-token-vault" //nolint:gosec // a feature name, not a credential
 	FeatureMCPRateLimiting            Feature = "mcp-rate-limiting"
-	FeatureAuthStrategyTokenVault     Feature = "auth-strategy-token-vault" //nolint:gosec // a feature name, not a credential
+	FeatureAuthStrategyTokenVault     Feature = "auth-strategy-token-vault"
 )
 
 // featureSince maps each feature to its first AI Gateway release. The source
