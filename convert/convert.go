@@ -137,6 +137,7 @@ func (c *Converter) run() {
 	c.convertCACertificates()
 	c.convertCertificates()
 	c.convertSNIs()
+	c.validateModelProviderTokenVaults()
 	c.convertConsumerGroups()
 	c.convertConsumers()
 	c.convertModels()

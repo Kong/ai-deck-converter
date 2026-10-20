@@ -105,6 +105,7 @@ func (r *ConversionResult) HasErrors() bool {
 // Source.Kind values. The values are public API.
 const (
 	kindModel            = "model"
+	kindModelProvider    = "model_provider"
 	kindMCPServer        = "mcp_server"
 	kindAgent            = "agent"
 	kindPolicy           = "policy"
