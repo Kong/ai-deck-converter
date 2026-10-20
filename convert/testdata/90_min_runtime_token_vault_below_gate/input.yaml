@@ -1,9 +1,3 @@
-datastores:
-  - name: vault-konnect-prod
-    type: token-vault
-    config:
-      directory: my-directory
-
 # token_vault needs 2.3. At 2.2 the MCP server is absent with an error. Without
 # the vault, the upstream gets no credential. The other MCP server still
 # converts.
@@ -13,8 +7,8 @@ mcp_servers:
     upstream_url: https://mcp.internal.kongair.com
     config:
       route: {paths: [/mcp/vaulted]}
-    datastores: [{name: vault-konnect-prod}]
     token_vault:
+      directory: my-directory
       provider: my-upstream-provider
   - type: passthrough-listener
     name: plain-vendor-mcp

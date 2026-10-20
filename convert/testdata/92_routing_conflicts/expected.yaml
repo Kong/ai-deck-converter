@@ -5,26 +5,19 @@ services:
     routes:
       - name: openai-chat
         paths:
-          - /alias-first/chat/completions
+          - /selector/chat/completions
         methods:
           - POST
           - OPTIONS
         strip_path: false
       - name: openai-chat-2
         paths:
-          - /selector/chat/completions
-        methods:
-          - POST
-          - OPTIONS
-        strip_path: false
-      - name: openai-chat-3
-        paths:
           - /split/chat/completions
         methods:
           - POST
           - OPTIONS
         strip_path: false
-      - name: openai-chat-4
+      - name: openai-chat-3
         paths:
           - /split/chat/completions
         methods:
@@ -92,34 +85,9 @@ plugins:
       sources:
         - body_path: model
           source: body
-    route: openai-chat
-  - name: ai-proxy-advanced
-    config:
-      balancer:
-        algorithm: round-robin
-      genai_category: text/generation
-      llm_format: openai
-      targets:
-        - description: gpt-5
-          logging:
-            log_payloads: false
-            log_statistics: true
-          model:
-            model_alias: gpt
-            name: gpt-5
-            provider: openai
-          route_type: llm/v1/chat
-    route: openai-chat
-    model: gpt
-  - name: ai-model-selector
-    config:
-      max_request_body_size: 8388608
-      sources:
-        - body_path: model
-          source: body
         - header_name: x-model
           source: header
-    route: openai-chat-2
+    route: openai-chat
   - name: ai-proxy-advanced
     config:
       balancer:
@@ -136,7 +104,7 @@ plugins:
             name: gpt-5
             provider: openai
           route_type: llm/v1/chat
-    route: openai-chat-2
+    route: openai-chat
     model: selector-body
   - name: ai-proxy-advanced
     config:
@@ -154,7 +122,7 @@ plugins:
             name: gpt-5
             provider: openai
           route_type: llm/v1/chat
-    route: openai-chat-2
+    route: openai-chat
     model: selector-header
   - name: ai-model-selector
     config:
@@ -162,7 +130,7 @@ plugins:
       sources:
         - body_path: model
           source: body
-    route: openai-chat-3
+    route: openai-chat-2
   - name: ai-proxy-advanced
     config:
       balancer:
@@ -179,7 +147,7 @@ plugins:
             name: gpt-5
             provider: openai
           route_type: llm/v1/chat
-    route: openai-chat-3
+    route: openai-chat-2
     model: split-open
   - name: ai-model-selector
     config:
@@ -187,7 +155,7 @@ plugins:
       sources:
         - body_path: model
           source: body
-    route: openai-chat-4
+    route: openai-chat-3
   - name: ai-proxy-advanced
     config:
       balancer:
@@ -204,7 +172,7 @@ plugins:
             name: gpt-5
             provider: openai
           route_type: llm/v1/chat
-    route: openai-chat-4
+    route: openai-chat-3
     model: split-secured-a
   - name: ai-proxy-advanced
     config:
@@ -222,15 +190,14 @@ plugins:
             name: gpt-5
             provider: openai
           route_type: llm/v1/chat
-    route: openai-chat-4
+    route: openai-chat-3
     model: split-secured-b
   - name: key-auth
     config:
       key_names:
         - x-api-key
-    route: openai-chat-4
+    route: openai-chat-3
 ai_models:
-  - name: gpt
   - name: selector-body
   - name: selector-header
   - name: split-open

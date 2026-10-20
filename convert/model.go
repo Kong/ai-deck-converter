@@ -355,9 +355,7 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 	// ai-model-selector can only match a request to one ai-models row at a
 	// time.
 	aliases := c.extractModelAliases(src, m)
-	if err := c.claimModelAliases(st, src, m, aliases); err != nil {
-		return err
-	}
+	c.claimModelAliases(st, src, m, aliases)
 
 	// ownerKey groups targets into ai-proxy-advanced plugins: per source model
 	// for type "model" (each carries its own ai-model FK), shared for type
@@ -1600,27 +1598,26 @@ func supportsModelNameHeader(spec aimap.EndpointSpec) bool {
 // isDisabled reports whether m sets enabled to false.
 func isDisabled(m *aigw.Model) bool { return m.Enabled != nil && !*m.Enabled }
 
-// claimModelAliases records aliases as the ai_models names of m. It fails m
-// when another model already uses one of them.
+// claimModelAliases records aliases as the ai_models names of m. It warns
+// when another model already uses one of them. ToDBLess gives equal names one
+// ID, so the data plane loads them as one ai_models entry.
 func (c *Converter) claimModelAliases(
 	st *modelPass, src ConversionIssueSource, m *aigw.Model, aliases []string,
-) error {
+) {
 	field := "name"
 	if len(m.Config.Route.Model.Values) > 0 {
 		field = "config.route.model.values"
 	}
 	for _, alias := range aliases {
 		if other, ok := st.aliasOwners[alias]; ok {
-			return c.fail(src.at(field), RoutingConflict,
+			c.warn(src.at(field), RoutingConflict,
 				"model %q uses the alias %q, but model %q already uses it. "+
-					"The data plane requires a unique name for each ai_models entry.",
+					"Both models share one ai_models entry.",
 				m.Name, alias, other)
+			continue
 		}
-	}
-	for _, alias := range aliases {
 		st.aliasOwners[alias] = m.Name
 	}
-	return nil
 }
 
 // checkSelectorConflict warns when the model named model reads the model

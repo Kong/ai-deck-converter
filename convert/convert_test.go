@@ -257,6 +257,7 @@ mcp_servers:
 			{GeneratedPrefix: "config.proxy_config", SourcePrefix: "config.proxy"},
 			{GeneratedPrefix: "config.auth", SourcePrefix: "config.upstream.auth"},
 			{GeneratedPrefix: "config.auth.token_vault", SourcePrefix: "token_vault"},
+			{GeneratedPrefix: "config.rate_limiting", SourcePrefix: "rate_limiting"},
 			{GeneratedPrefix: "config.default_acl", SourcePrefix: "access"},
 			{GeneratedPrefix: "config.acl_attribute_type", SourcePrefix: "access.acl_attribute_type"},
 			{GeneratedPrefix: "config.access_token_claim_field", SourcePrefix: "access.access_token_claim_field"},
@@ -2193,7 +2194,6 @@ models:
 	require.NoError(t, err)
 	require.Empty(t, result.Issues)
 	require.Empty(t, result.Output.Services)
-	require.Empty(t, result.Output.Routes)
 	require.Empty(t, result.Output.Plugins)
 	require.Empty(t, result.Output.AIModels)
 }

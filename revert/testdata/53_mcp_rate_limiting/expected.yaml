@@ -1,0 +1,47 @@
+mcp_servers:
+  - type: passthrough-listener
+    name: limited-vendor-mcp
+    config:
+      route:
+        paths:
+          - /mcp/vendor
+      logging:
+        payloads: false
+        statistics: true
+        audits: false
+    upstream_url: https://mcp.internal.kongair.com
+    rate_limiting:
+      limits:
+        - method: tools/call
+          limit: 100
+          window_size: 60
+        - tool: search_flights
+          limit: 10
+          window_size: 1
+  - type: conversion-listener
+    name: limited-flights-mcp
+    config:
+      route:
+        paths:
+          - /mcp/flights
+      logging:
+        payloads: false
+        statistics: true
+        audits: false
+    tools:
+      - name: search_flights
+        description: Search flights
+        method: GET
+        path: /flights
+    upstream_url: https://flights.internal.kongair.com
+    rate_limiting:
+      limits:
+        - tool: search_flights
+          limit: 1000
+          window_size: 86400
+        - tool: search_flights
+          limit: 100
+          window_size: 3600
+        - method: tools/list
+          limit: 50
+          window_size: 60

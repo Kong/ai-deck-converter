@@ -64,7 +64,6 @@ func TestDatastoreSupported(t *testing.T) {
 	require.True(t, DatastoreSupported("ai-rag-injector", "redis-ee"))
 	require.True(t, DatastoreSupported("ai-rag-injector", "vectordb"))
 
-	require.False(t, DatastoreSupported("rate-limiting", "token-vault"))
 	require.False(t, DatastoreSupported("rate-limiting", "redis-ee"))
 	require.False(t, DatastoreSupported("ai-rag-injector", "redis-ce"))
 	require.False(t, DatastoreSupported("acl", "redis-ce"))
@@ -153,10 +152,6 @@ func TestDatastoreStrategyForDatastoreType(t *testing.T) {
 			datastoreType: "vectordb",
 			wantStrategy:  "pgvector",
 			wantOk:        true,
-		},
-		{
-			name:          "token-vault has no strategy",
-			datastoreType: "token-vault",
 		},
 		{
 			name:          "unknown type",

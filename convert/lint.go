@@ -32,7 +32,8 @@ func (c *Converter) warnRoutingConflicts() {
 	for i := range entries {
 		later := entries[i]
 		for _, earlier := range entries[:i] {
-			if !routesOverlap(*earlier.route, *later.route) || sharedLifecycleRoutes(*earlier.route, *later.route) {
+			if !routesOverlap(*earlier.route, *later.route) || sharedLifecycleRoutes(*earlier.route, *later.route) ||
+				routesRefine(*earlier.route, *later.route) {
 				continue
 			}
 			for _, owner := range later.owners {
@@ -66,9 +67,6 @@ func (c *Converter) routeEntries() []routeEntry {
 		for j := range service.Routes {
 			add(&service.Routes[j])
 		}
-	}
-	for i := range c.out.Routes {
-		add(&c.out.Routes[i])
 	}
 	return entries
 }
@@ -115,6 +113,69 @@ func sharedLifecycleRoutes(a, b kong.Route) bool {
 	a.Plugins, b.Plugins = nil, nil
 	a.Source, b.Source = nil, nil
 	return reflect.DeepEqual(a, b)
+}
+
+// routesRefine reports whether one of a and b refines the other. Kong sends
+// a request that matches both routes to the refining route.
+func routesRefine(a, b kong.Route) bool {
+	return refines(a, b) || refines(b, a)
+}
+
+// refines reports whether each request that matches specific also matches
+// general, and specific adds hosts or header names. Kong gives a route with
+// hosts or with more headers a higher priority.
+func refines(specific, general kong.Route) bool {
+	addsMatcher := len(general.Hosts) == 0 && len(specific.Hosts) > 0 ||
+		len(specific.Headers) > len(general.Headers)
+	return addsMatcher &&
+		listWithin(protocolsOrDefault(specific.Protocols), protocolsOrDefault(general.Protocols), strings.EqualFold) &&
+		listWithin(specific.Methods, general.Methods, strings.EqualFold) &&
+		listWithin(specific.Paths, general.Paths, func(x, y string) bool { return x == y }) &&
+		listWithin(specific.Hosts, general.Hosts, strings.EqualFold) &&
+		listWithin(specific.SNIs, general.SNIs, strings.EqualFold) &&
+		listWithin(specific.Sources, general.Sources, sameCIDRPort) &&
+		listWithin(specific.Destinations, general.Destinations, sameCIDRPort) &&
+		headersWithin(specific.Headers, general.Headers)
+}
+
+// listWithin reports whether each value of a is in b. An empty b matches
+// every value. An empty a matches every value, so it is not within a
+// non-empty b.
+func listWithin[T any](a, b []T, equal func(x, y T) bool) bool {
+	if len(b) == 0 {
+		return true
+	}
+	if len(a) == 0 {
+		return false
+	}
+	for _, x := range a {
+		if !slices.ContainsFunc(b, func(y T) bool { return equal(x, y) }) {
+			return false
+		}
+	}
+	return true
+}
+
+// headersWithin reports whether a sets each header of b with values that b
+// accepts.
+func headersWithin(a, b map[string][]string) bool {
+	for nameB, valuesB := range b {
+		found := false
+		for nameA, valuesA := range a {
+			if strings.EqualFold(nameA, nameB) {
+				found = listWithin(valuesA, valuesB, headerValuesOverlap)
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
+}
+
+func sameCIDRPort(a, b kong.CIDRPort) bool {
+	return a.IP == b.IP && reflect.DeepEqual(a.Port, b.Port)
 }
 
 // routesOverlap reports whether one request can match both a and b.

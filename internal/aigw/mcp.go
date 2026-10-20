@@ -15,7 +15,6 @@ type MCPServer struct {
 	Config      MCPServerConfig `yaml:"config,omitempty"`
 	Tools       []MCPTool       `yaml:"tools,omitempty"`
 	Policies    []string        `yaml:"policies,omitempty"`
-	Datastores  []DatastoreRef  `yaml:"datastores,omitempty"`
 	Access      MCPAccess       `yaml:"access,omitempty"`
 	Labels      Labels          `yaml:"labels,omitempty"`
 
@@ -28,6 +27,22 @@ type MCPServer struct {
 	// plugin's auth record (auth.provider: token_vault), so it is mutually
 	// exclusive with config.upstream.auth.
 	TokenVault *TokenVaultConfig `yaml:"token_vault,omitempty"`
+	// The converter copies RateLimiting to the ai-mcp-proxy rate_limiting record.
+	RateLimiting *MCPRateLimiting `yaml:"rate_limiting,omitempty"`
+}
+
+// MCPRateLimiting mirrors the AIGatewayMCPServerRateLimiting schema.
+type MCPRateLimiting struct {
+	Limits []MCPRateLimit `yaml:"limits,omitempty"`
+}
+
+// MCPRateLimit is one limit on an MCP method or a tool. The plugin requires
+// exactly one of Method and Tool.
+type MCPRateLimit struct {
+	Method     *string `yaml:"method,omitempty"`
+	Tool       *string `yaml:"tool,omitempty"`
+	Limit      int     `yaml:"limit,omitempty"`
+	WindowSize int     `yaml:"window_size,omitempty"`
 }
 
 // TokenVaultConfig mirrors the AIGatewayTokenVault schema. It resolves an
@@ -41,33 +56,12 @@ type TokenVaultConfig struct {
 	// Provider is the upstream credential provider registered in the Token
 	// Vault directory.
 	Provider string `yaml:"provider,omitempty"`
-	// SubjectTokenType is the type of the subject token sent in the token
-	// exchange.
-	SubjectTokenType string `yaml:"subject_token_type,omitempty"`
-	// Credential says where the inbound credential arrives and where the
-	// exchanged credential goes upstream.
-	Credential *TokenVaultCredential `yaml:"credential,omitempty"`
-	// Cache is copied verbatim into the plugin's auth.token_vault.cache.
-	Cache map[string]any `yaml:"cache,omitempty"`
 	// Redis shares exchanged credentials across the cluster.
 	Redis *RedisCloudConfig `yaml:"redis,omitempty"`
 	// EncryptionSecrets encrypt exchanged credentials before they are cached
 	// in Redis. Required when Redis is configured. Referenceable
 	// ({vault://...} references pass through verbatim).
 	EncryptionSecrets []string `yaml:"encryption_secrets,omitempty"`
-}
-
-// TokenVaultCredential holds the inbound and outbound credential placement.
-type TokenVaultCredential struct {
-	Inbound  *TokenVaultCredentialLocation `yaml:"inbound,omitempty"`
-	Outbound *TokenVaultCredentialLocation `yaml:"outbound,omitempty"`
-}
-
-// TokenVaultCredentialLocation places a credential in a request.
-type TokenVaultCredentialLocation struct {
-	Location string `yaml:"location,omitempty"`
-	Name     string `yaml:"name,omitempty"`
-	Prefix   string `yaml:"prefix,omitempty"`
 }
 
 // RedisCloudConfig mirrors the AIGatewayRedisCloudConfiguration schema: the

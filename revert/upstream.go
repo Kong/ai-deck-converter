@@ -1,9 +1,6 @@
 package revert
 
 import (
-	"fmt"
-	"reflect"
-
 	"github.com/Kong/ai-deck-converter/internal/aigw"
 	"github.com/Kong/ai-deck-converter/internal/aimap"
 )
@@ -75,33 +72,4 @@ func (r *Reverter) tokenVaultFromConfig(auth map[string]any, entity string) (*ai
 			entity, aimap.UpstreamAuthProviderTokenVault)
 	}
 	return tv, nil
-}
-
-// tokenVaultDatastoreRef moves the directory and storage of an auth.token_vault
-// block into a token-vault Datastore. It clears the directory on tv and
-// returns a reference to the Datastore. Equal connections share one Datastore.
-func (r *Reverter) tokenVaultDatastoreRef(block map[string]any, tv *aigw.TokenVaultConfig) []aigw.DatastoreRef {
-	config := map[string]any{}
-	if tv.Directory != "" {
-		config["directory"] = tv.Directory
-		tv.Directory = ""
-	}
-	for k, v := range getMap(block, "storage") {
-		if k != "backend" {
-			config[k] = v
-		}
-	}
-	for _, ds := range r.out.Datastores {
-		if ds.Type == aimap.DatastoreTypeTokenVault && reflect.DeepEqual(ds.Config, config) {
-			return []aigw.DatastoreRef{{Name: ds.Name}}
-		}
-	}
-	name := "token-vault"
-	if n := len(r.out.Datastores); n > 0 {
-		name = fmt.Sprintf("token-vault-%d", n+1)
-	}
-	r.out.Datastores = append(r.out.Datastores, aigw.Datastore{
-		Name: name, Type: aimap.DatastoreTypeTokenVault, Config: config,
-	})
-	return []aigw.DatastoreRef{{Name: name}}
 }

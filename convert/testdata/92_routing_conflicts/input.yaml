@@ -7,15 +7,6 @@ auth_strategies:
     config:
       key_names: [x-api-key]
 models:
-  # The later model with the alias gpt is left out.
-  - name: alias-first
-    capabilities: [generate]
-    targets: [{name: gpt-5, provider: openai}]
-    config: {route: {paths: [/alias-first], model: {values: [gpt]}}}
-  - name: alias-second
-    capabilities: [generate]
-    targets: [{name: gpt-5, provider: openai}]
-    config: {route: {paths: [/alias-second], model: {values: [gpt]}}}
   # Both models share one route. They read the model name from different
   # sources.
   - name: selector-body
@@ -66,7 +57,8 @@ agents:
     config:
       url: https://booking.internal/api
       route: {paths: [/agents/booking], methods: [PUT]}
-  # The later route sets no hosts, so it also matches api.example.com.
+  # The earlier route adds hosts to the later route. Kong sends each request
+  # for api.example.com to the earlier route, so they do not conflict.
   - type: http
     name: hosts-specific
     config:

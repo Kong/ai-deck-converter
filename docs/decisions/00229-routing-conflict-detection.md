@@ -34,7 +34,7 @@ A conflict on either layer makes routing ambiguous. Examples:
 - Two models on one base path with different auth strategies. The converter
   splits them into two routes with equal paths. Kong selects one route, and
   the models on the other route are not reachable.
-- Two models with the same alias. The data plane rejects the configuration.
+- Two models with the same alias. The models share one `ai_models` entry.
 
 This RFC makes the converter report each of these conflicts.
 
@@ -136,11 +136,11 @@ models:
 
 ```yaml
 - code: ROUTING_CONFLICT
-  severity: ERROR
+  severity: WARNING
   source: {kind: model, name: b, fields: [config.route.model.values]}
 ```
 
-The converter leaves out `b`. A model without `values` uses its name as the
+The converter keeps `b`. A model without `values` uses its name as the
 alias. The field is then `name`.
 
 ### Example 5: different selector sources on one route
@@ -257,6 +257,15 @@ overlap:
 Two lists of plain values that share no value do not overlap, and the check
 reports no conflict. This misses one case. See [Drawbacks](#drawbacks).
 
+### Refined routes
+
+Kong gives a route with `hosts` or with more headers a higher priority. A
+route refines another route when it matches only requests that the other
+route also matches. It must also add `hosts` or header names. The check
+reports no conflict for a refined pair, because Kong sends each shared
+request to the refining route. Header based routing on one path, for example
+`X-Tenant: [blue]`, is such a pair.
+
 ### Issue source
 
 A route carries a `Source` with the entity type and name. The issue uses
@@ -270,12 +279,12 @@ issue that is equal to a recorded issue.
 
 The data plane requires a unique `name` and `alias` for each `ai_models`
 entry. The converter writes each model alias into `name` and leaves `alias`
-unset, so one alias check covers both fields.
+unset, so one alias check covers both fields. `ToDBLess` gives equal names one
+ID, so the data plane loads them as one entry.
 
 The model pass maps each alias to the first model that uses it. A later model
-with the same alias gets an `ERROR`, and the converter leaves it out with
-`c.fail`. A model with more than one alias is left out when any alias
-conflicts. The check covers only enabled models, because the converter leaves
+with the same alias gets a `WARNING` and stays in the output. Each model scoped
+plugin also has a route scope. A model on another route does not get it. The check covers only enabled models, because the converter leaves
 out disabled models. See [Disabled models](#disabled-models).
 
 ## Disabled models
@@ -378,11 +387,10 @@ deterministic for one input.
 # Drawbacks
 [drawbacks]: #drawbacks
 
-- **Warnings for intended configurations.** A user can add a more specific
-  route, e.g., with `hosts` or `headers`, on top of a route without them. Kong
-  prefers the more specific route, so the result can be what the user wants.
-  The converter still reports a conflict because the less specific route
-  loses those requests.
+- **Warnings for intended configurations.** The check skips a route that
+  refines another route with `hosts` or headers. See
+  [Refined routes](#refined-routes). Other refinements still get a warning,
+  for example a route that adds only `methods`.
 - **Missed conflicts.** Regex paths and regex header values are compared only
   by equality. `~/v1/.*` and `/v1/chat` can match one request, and the
   converter does not report it. Two different regex values can also match one
