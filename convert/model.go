@@ -424,11 +424,7 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 		tm := &m.TargetModels[j]
 		provider, providerType, problem := c.checkTarget(m, j)
 		if problem != nil {
-			if problem.severity == Error {
-				c.reportError(src.at(problem.field), problem.code, "%s", problem.reason)
-			} else {
-				c.warn(src.at(problem.field), problem.code, "%s", problem.reason)
-			}
+			c.warn(src.at(problem.field), problem.code, "%s", problem.reason)
 			continue
 		}
 		if _, ok := tm.Config.Options["vpc_endpoint"]; ok && !c.supports(aimap.FeatureBedrockVPCEndpoint) {
@@ -1024,10 +1020,9 @@ func (c *Converter) videoLifecycleCandidates(skipped map[int][]ConversionIssue) 
 
 // targetProblem tells why checkTarget leaves out a target.
 type targetProblem struct {
-	field    string
-	code     ConversionIssueCode
-	reason   string
-	severity ConversionIssueSeverity
+	field  string
+	code   ConversionIssueCode
+	reason string
 }
 
 // checkTarget resolves the provider of target j of m. It returns a problem when
@@ -1078,9 +1073,8 @@ func (c *Converter) checkTarget(m *aigw.Model, j int) (*aigw.Provider, string, *
 	// passthrough never does, so the upstream must be spelled out.
 	if isPassthrough(m) && providerType == "databricks" && tm.Config.Options["upstream_url"] == nil {
 		return nil, "", &targetProblem{
-			severity: Error,
-			field:    fmt.Sprintf("targets[%d].config.upstream_url", j),
-			code:     MissingRequiredConfigField,
+			field: fmt.Sprintf("targets[%d].config.upstream_url", j),
+			code:  MissingRequiredConfigField,
 			reason: fmt.Sprintf("model %q target %q: the passthrough format requires upstream_url for "+
 				"databricks; the target is omitted", m.Name, tm.Name),
 		}
