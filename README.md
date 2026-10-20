@@ -303,10 +303,10 @@ and `formats` beyond the first.
   plugin. The plugin has the scope of the model's `ai-proxy-advanced` (route,
   plus the `ai-model` FK for each alias). The datastore supplies `directory`
   and `storage`, and adds the `/_vault` callback route. Hard errors, which
-  leave out the model: static `config.auth` on the same provider, targets of
-  one model that do not share the same token vault, `type: api` models on one
-  route with different token vaults, a WebSocket capability, and an
-  embeddings provider with `token_vault`. The video lifecycle route gets the
+  leave out the model: credentials in `config.auth` on the same provider,
+  targets of one model that do not share the same token vault, `type: api`
+  models on one route with different token vaults, a WebSocket capability, and
+  an embeddings provider with `token_vault`. The video lifecycle route gets the
   same plugin as the model's video route. Convert-only: revert does not lift
   the plugin yet.
 - **Credentials.** Only `api-key` (`keyauth_credentials`) is generated; other
