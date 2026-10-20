@@ -1,0 +1,153 @@
+_format_version: "3.0"
+_transform: false
+services:
+  - id: 947a4e23-b483-5a65-8165-da9aed24565b
+    name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    host: ai-gateway.upstream.local
+    port: 80
+    protocol: http
+routes:
+  - id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+    name: openai-chat
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /ai-termination-probe/chat/completions
+    methods:
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+consumers:
+  - id: 0cb5b51c-f907-5336-bb12-78a336ce9f38
+    username: termination-probe-user
+plugins:
+  - id: 17fa8192-4b9f-5b5a-8379-20ad8bc836a7
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    ordering:
+      before:
+        access:
+          - pre-function
+      after:
+        access:
+          - key-auth
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+  - id: f3adc007-171c-5519-8763-3a0eef79bde3
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-4o
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: probed-alias
+            name: gpt-4o
+            provider: openai
+          route_type: llm/v1/chat
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+    model:
+      id: 8197186c-03a6-5c46-9c3f-00a77a68efbb
+  - id: fe4129f3-2075-5492-8b59-90def2cf73ab
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-4o
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: blocked-alias
+            name: gpt-4o
+            provider: openai
+          route_type: llm/v1/chat
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+    model:
+      id: 892265eb-8b09-5604-829d-7a40a7f1b845
+  - id: 75ff22ed-6245-594b-895f-6a9fa36f4581
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-4o
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: open-alias
+            name: gpt-4o
+            provider: openai
+          route_type: llm/v1/chat
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+    model:
+      id: ed6a49a3-c140-5ad2-b906-2cc9adbe5bac
+  - id: 3bf0455b-d140-5afe-b82a-4939a79d1dd4
+    name: pre-function
+    config:
+      access:
+        - |
+          local model = ngx.ctx.ai_model
+          return kong.response.exit(200, { selected_model = model and model.name or ngx.null })
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+    model:
+      id: 8197186c-03a6-5c46-9c3f-00a77a68efbb
+  - id: e3755ad8-2dec-569d-9f27-e233721c6b8e
+    name: key-auth
+    config:
+      key_names:
+        - x-api-key
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+  - id: d13e8b7a-84fe-54c0-b198-de4e7c9687a0
+    name: request-termination
+    config:
+      message: model blocked
+      status_code: 403
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+    model:
+      id: 892265eb-8b09-5604-829d-7a40a7f1b845
+ai_models:
+  - id: 8197186c-03a6-5c46-9c3f-00a77a68efbb
+    name: probed-alias
+  - id: 892265eb-8b09-5604-829d-7a40a7f1b845
+    name: blocked-alias
+  - id: ed6a49a3-c140-5ad2-b906-2cc9adbe5bac
+    name: open-alias
+keyauth_credentials:
+  - id: e4402f73-03ba-51eb-a512-2e12991b6d3a
+    key: termination-probe-secret
+    consumer: 0cb5b51c-f907-5336-bb12-78a336ce9f38

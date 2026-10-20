@@ -486,25 +486,6 @@ auth_strategies:
 	require.ErrorContains(t, err, "supports only one auth strategy")
 }
 
-// TestRealtimeRouteRejectsNonWebSocketAuthStrategy pins that a realtime model
-// cannot use an auth strategy plugin that rejects the ws/wss protocols (jwt,
-// confirmed against Kong AI Gateway 2.0.2, 2.1, and 2.2.0): emitting it there
-// would either leave the WebSocket route unprotected (the plugin would never
-// run, since its default protocols exclude ws/wss) or make the data plane
-// refuse the whole config, so the conversion fails instead.
-func TestRealtimeRouteRejectsNonWebSocketAuthStrategy(t *testing.T) {
-	_, _, err := convertDoc([]byte(`models:
-  - name: m
-    capabilities: [realtime]
-    access: {auth_strategies: [legacy]}
-    targets: [{name: t, provider: openai-prod, config: {type: openai}}]
-`+overrideProvider+`
-auth_strategies:
-  - {name: legacy, type: jwt, config: {}}
-`), false)
-	require.ErrorContains(t, err, `auth strategy plugin "jwt" does not support the ws and wss protocols`)
-}
-
 func TestRealtimeRouteSkipsPluginsWithoutWebSocketSupport(t *testing.T) {
 	src := `models:
   - name: m

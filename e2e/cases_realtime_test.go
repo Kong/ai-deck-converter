@@ -53,9 +53,9 @@ func testRealtimeModelWebSocketTransport(t *testing.T, license string) {
 		if !strings.Contains(resp.Body, "hello from the mock upstream") {
 			t.Fatalf("chat response did not come from the mock upstream:\n%s", resp.Body)
 		}
-		// key-auth falls back to the anonymous consumer on HTTP. acl runs before
-		// request-termination and rejects that consumer with 403.
-		requireStatus(t, chat("", "Say hello."), 403, "chat completion without a key")
+		// The route has one auth strategy, so key-auth has no anonymous
+		// fallback and rejects a missing key itself.
+		requireStatus(t, chat("", "Say hello."), 401, "chat completion without a key")
 		requireStatus(t, chat(realtimeBasicKey, "Say hello."), 403, "chat completion outside the ACL group")
 		requireStatus(t, chat(realtimePremiumKey, "Say something forbidden."), 400, "chat completion the prompt guard denies")
 	})

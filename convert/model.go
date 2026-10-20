@@ -153,6 +153,12 @@ type videoLifecycleCandidate struct {
 	spec    aimap.EndpointSpec
 }
 
+// modelPolicyRef names a policy reference of a model by its field path.
+type modelPolicyRef struct {
+	model string
+	field string
+}
+
 // modelPass holds the state that the models of one conversion pass share.
 type modelPass struct {
 	groups              map[string]*routeGroup
@@ -164,6 +170,15 @@ type modelPass struct {
 	// websocketRoutes holds the protocols of each WebSocket route by name.
 	// Plugins on these routes must declare the same protocols to run.
 	websocketRoutes map[string][]string
+	// selectorBefore holds, per route, the model policy plugin names that
+	// must run after that route's ai-model-selector.
+	selectorBefore map[string][]string
+	// selectorAfter holds, per route, the plugins that reject unauthenticated
+	// requests. A selector that carries selectorBefore still runs after them.
+	selectorAfter map[string][]string
+	// requestTerminations holds, per route, the model-scoped request-termination
+	// policies that the selector ordering stops from running.
+	requestTerminations map[string][]modelPolicyRef
 	// aliasOwners maps each ai_models name to the model that uses it.
 	aliasOwners map[string]string
 	// selectorConflicts holds the model pairs with a reported selector conflict.
@@ -204,6 +219,9 @@ func (c *Converter) convertModelsPass(skipped map[int][]ConversionIssue) bool {
 		passthroughMatchers: map[string]string{},
 		identityPluginSeen:  map[string]bool{},
 		websocketRoutes:     map[string][]string{},
+		selectorBefore:      map[string][]string{},
+		selectorAfter:       map[string][]string{},
+		requestTerminations: map[string][]modelPolicyRef{},
 		aliasOwners:         map[string]string{},
 		selectorConflicts:   map[string]bool{},
 		skipped:             skipped,
@@ -240,10 +258,11 @@ func (c *Converter) convertModelsPass(skipped map[int][]ConversionIssue) bool {
 				{GeneratedPrefix: "config.sources", SourcePrefix: "config.route.model"},
 			}
 			c.out.Plugins = append(c.out.Plugins, kong.Plugin{
-				Name:   "ai-model-selector",
-				Route:  kong.NewStringRef(g.route.Name),
-				Config: selectorCfg,
-				Source: source("model", g.route.Source.EntityName, "config.route.model", mappings...),
+				Name:     "ai-model-selector",
+				Route:    kong.NewStringRef(g.route.Name),
+				Config:   selectorCfg,
+				Ordering: c.selectorOrdering(st, g.route.Name),
+				Source:   source("model", g.route.Source.EntityName, "config.route.model", mappings...),
 			})
 		}
 		for _, pg := range g.proxies {
@@ -761,6 +780,30 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 				st.guardPlugins = append(st.guardPlugins, p)
 				continue
 			}
+			// Kong cannot read the ordering of a model-scoped plugin before
+			// ai-model-selector sets the model. The route's selector carries
+			// the ordering instead. See "Assumptions and limitations" in README.md.
+			if aimap.OutranksModelSelector(p.Name) {
+				if !slices.Contains(st.selectorBefore[routeName], p.Name) {
+					st.selectorBefore[routeName] = append(st.selectorBefore[routeName], p.Name)
+				}
+			} else if priority, ok := c.customPolicyPriority(p.Name); ok && priority > aimap.AIModelSelectorPriority {
+				// aimap.PluginPriority has no entry for a custom plugin, so the
+				// converter cannot add it to the route's ai-model-selector
+				// ordering the way it does for a known high-priority plugin.
+				c.warn(src.at(scopedPluginField(m.Policies, p)), BehaviorMayDiffer,
+					"model %q: custom policy %q sets PRIORITY %d, which outranks ai-model-selector (%d). "+
+						"The converter cannot reorder a custom plugin, so this model-scoped instance "+
+						"on route %q never runs. Give the policy a lower PRIORITY for it to run for this "+
+						"model.",
+					m.Name, p.Name, priority, aimap.AIModelSelectorPriority, routeName)
+			}
+			if p.Name == "request-termination" {
+				ref := modelPolicyRef{model: m.Name, field: scopedPluginField(m.Policies, p)}
+				if !slices.Contains(st.requestTerminations[routeName], ref) {
+					st.requestTerminations[routeName] = append(st.requestTerminations[routeName], ref)
+				}
+			}
 			// Same ai-model identities as the ai-proxy-advanced FKs: one copy
 			// of this policy/ACL plugin per alias, so a request is protected
 			// regardless of which alias it names.
@@ -791,36 +834,62 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 					"request-termination cannot reject the anonymous consumer on ws and wss routes",
 				m.Name, routeName)
 		}
-		if websocket {
-			// An auth plugin that can't run on ws/wss would otherwise leave the
-			// route unprotected (a plugin's protocols default to http/https, so
-			// it would simply never execute on a ws/wss-only route) or make the
-			// whole declarative config fail to load (an invalid protocols value
-			// on any one plugin rejects the entire file). Fail the model
-			// instead of choosing between those silently.
-			for _, p := range idpPlugins {
-				if !aimap.SupportsWebSocket(p.Name) {
-					return c.fail(src.at(authStrategyField(m.Access.AuthStrategies, p)), ConfigFieldInvalid,
-						"model %q: auth strategy plugin %q does not support the ws and wss "+
-							"protocols, so it cannot protect the WebSocket route %q",
-						m.Name, p.Name, routeName)
-				}
-			}
-		}
-		if !websocket {
+		fallback := needsAnonymousFallback(idpPlugins)
+		if fallback {
 			c.ensureAnonymousConsumer()
 		}
 		for k := range idpPlugins {
 			p := idpPlugins[k]
 			p.Route = kong.NewStringRef(routeName)
-			if websocket {
+			if !fallback {
 				p = withoutAnonymousFallback(p)
+			}
+			if websocket {
 				p.Protocols = protocols
+			} else if !slices.Contains(st.selectorAfter[routeName], p.Name) {
+				st.selectorAfter[routeName] = append(st.selectorAfter[routeName], p.Name)
 			}
 			st.guardPlugins = append(st.guardPlugins, p)
 		}
+		if fallback && !slices.Contains(st.selectorAfter[routeName], "request-termination") {
+			// Auth plugins fall back to the anonymous consumer. Its
+			// request-termination rejects the request.
+			st.selectorAfter[routeName] = append(st.selectorAfter[routeName], "request-termination")
+		}
 	}
 	return nil
+}
+
+// selectorOrdering returns the ordering of the ai-model-selector on
+// routeName. It is nil unless a model policy outranks the selector.
+func (c *Converter) selectorOrdering(st *modelPass, routeName string) *kong.Ordering {
+	before := st.selectorBefore[routeName]
+	if len(before) == 0 {
+		return nil
+	}
+	ordering := &kong.Ordering{Before: &kong.OrderingPhases{Access: before}}
+	// Reordering must not move authentication after the selector or the
+	// policies. Kong rejects unauthenticated requests before the selector
+	// reads the body.
+	if after := st.selectorAfter[routeName]; len(after) > 0 {
+		ordering.After = &kong.OrderingPhases{Access: after}
+		if slices.Contains(after, "request-termination") {
+			c.warnModelScopedRequestTermination(routeName, st.requestTerminations[routeName])
+		}
+	}
+	return ordering
+}
+
+// warnModelScopedRequestTermination warns once per policy reference in refs.
+// The selector's ordering.after runs every request-termination before the
+// model is known, so these policies never match.
+func (c *Converter) warnModelScopedRequestTermination(routeName string, refs []modelPolicyRef) {
+	for _, ref := range refs {
+		c.warn(issueSource(kindModel, ref.model).at(ref.field), BehaviorMayDiffer,
+			"route %q: ordering moves request-termination before ai-model-selector. "+
+				"A model-scoped request-termination policy on this route never runs. "+
+				"Scope the policy to the route or globally instead.", routeName)
+	}
 }
 
 // convertVideoLifecycle adds the video lifecycle route of candidate to service.
@@ -901,14 +970,27 @@ func (c *Converter) convertVideoLifecycle(
 	if err != nil {
 		return err
 	}
-	if len(idpPlugins) > 0 {
+	fallback := needsAnonymousFallback(idpPlugins)
+	if fallback {
 		c.ensureAnonymousConsumer()
 	}
 	for i := range idpPlugins {
+		if !fallback {
+			idpPlugins[i] = withoutAnonymousFallback(idpPlugins[i])
+		}
 		idpPlugins[i].Route = kong.NewStringRef(routeName)
 		c.out.Plugins = append(c.out.Plugins, idpPlugins[i])
 	}
 	return nil
+}
+
+// needsAnonymousFallback reports whether the auth plugins of a model route
+// need the anonymous consumer. Only more than one plugin needs it, so that a
+// request passes when any one of them accepts it. One plugin rejects the
+// request itself. Then request-termination stays out of the selector
+// ordering, and a model-scoped request-termination policy can run.
+func needsAnonymousFallback(idpPlugins []kong.Plugin) bool {
+	return len(idpPlugins) > 1
 }
 
 // authStrategyKey canonicalizes auth-strategy references for route
@@ -1112,17 +1194,6 @@ func scopedPluginField(refs []string, p kong.Plugin) string {
 		}
 	}
 	return "access.acls"
-}
-
-// authStrategyField returns the path of the reference in refs that produced
-// the auth strategy plugin p.
-func authStrategyField(refs []string, p kong.Plugin) string {
-	if p.Source != nil {
-		if i := slices.Index(refs, p.Source.EntityName); i >= 0 {
-			return fmt.Sprintf("access.auth_strategies[%d]", i)
-		}
-	}
-	return "access.auth_strategies"
 }
 
 func buildVideoLifecycleRoute(rc aigw.ModelRouteConfig, routeName string, bases []string) kong.Route {

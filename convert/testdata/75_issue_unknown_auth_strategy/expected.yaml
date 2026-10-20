@@ -10,15 +10,6 @@ services:
           - POST
           - OPTIONS
         strip_path: false
-consumers:
-  - username: anonymous
-    custom_id: anonymous
-    plugins:
-      - name: request-termination
-        enabled: true
-        config:
-          message: Unauthorized
-          status_code: 401
 plugins:
   - name: ai-model-selector
     config:
@@ -47,7 +38,6 @@ plugins:
     model: protected
   - name: key-auth
     config:
-      anonymous: anonymous
       key_names:
         - apikey
     route: openai-chat

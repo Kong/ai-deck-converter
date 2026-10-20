@@ -37,10 +37,22 @@ func (c *Converter) scopedAuthStrategyPlugins(src ConversionIssueSource, refs []
 			return nil, c.fail(src.at(fmt.Sprintf("access.auth_strategies[%d]", i)), UndefinedReference,
 				"unknown auth strategy reference %q", ref)
 		}
+		if err := c.checkAuthStrategyType(src, fmt.Sprintf("access.auth_strategies[%d]", i), idp); err != nil {
+			return nil, err
+		}
 		c.warnAuthStrategyOverrides(idp)
 		plugins = append(plugins, authStrategyPlugin(idp))
 	}
 	return plugins, nil
+}
+
+func (c *Converter) checkAuthStrategyType(src ConversionIssueSource, field string, idp *aigw.AuthStrategy) error {
+	if authPolicyTypes[idp.Type] {
+		return nil
+	}
+	return c.fail(src.at(field), ConfigFieldInvalid,
+		"auth strategy %q has type %q, but the type must be key-auth or openid-connect",
+		idp.Name, idp.Type)
 }
 
 // warnAuthStrategyOverrides reports the auth strategy config values that
@@ -49,9 +61,11 @@ func (c *Converter) warnAuthStrategyOverrides(idp *aigw.AuthStrategy) {
 	src := issueSource(kindAuthStrategy, idp.Name)
 	if v := idp.Config["anonymous"]; !isEmptyConfigValue(v) && v != "" && v != anonymousConsumerName {
 		c.warn(src.at("config.anonymous"), ConfigFieldOverridden,
-			"auth strategy %q sets config.anonymous to %v. "+
-				"This will be ignored, and anonymous will be overridden to %q "+
-				"to reject unauthenticated requests with a request-termination plugin.",
+			"auth strategy %q sets config.anonymous to %v. This will be ignored. "+
+				"Where an entity has more than one auth strategy, or on an agent or MCP server, "+
+				"anonymous will be overridden to %q, which a request-termination plugin rejects. "+
+				"On a model route with one auth strategy, anonymous will be removed, "+
+				"so the auth plugin rejects unauthenticated requests itself.",
 			idp.Name, v, anonymousConsumerName)
 	}
 	if idp.Type == "key-auth" && keyAuthPrincipalsEnabled(idp.Config) {

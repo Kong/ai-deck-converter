@@ -10,15 +10,6 @@ services:
           - POST
           - OPTIONS
         strip_path: false
-consumers:
-  - username: anonymous
-    custom_id: anonymous
-    plugins:
-      - name: request-termination
-        enabled: true
-        config:
-          message: Unauthorized
-          status_code: 401
 plugins:
   - name: ai-model-selector
     config:
@@ -50,7 +41,6 @@ plugins:
     model: openai-gpt-5-4
   - name: openid-connect
     config:
-      anonymous: anonymous
       issuer: https://dev-123456.okta.com/oauth2/default
     route: openai-chat
 ai_models:

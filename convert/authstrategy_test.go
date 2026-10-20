@@ -188,17 +188,20 @@ func TestAuthStrategyWarnsOverrides(t *testing.T) {
 	cases := map[string]struct {
 		config string
 		field  string
-		want   string
+		want   []string
 	}{
 		"anonymous": {
 			`{key_names: [k], anonymous: someone}`,
 			"config.anonymous",
-			`anonymous will be overridden to "anonymous"`,
+			[]string{
+				`anonymous will be overridden to "anonymous"`,
+				"On a model route with one auth strategy, anonymous will be removed",
+			},
 		},
 		"identity_realms": {
 			`{principals: {enabled: true}, identity_realms: [{scope: cp}]}`,
 			"config.identity_realms",
-			"identity_realms will be overridden to []",
+			[]string{"identity_realms will be overridden to []"},
 		},
 	}
 	for name, tc := range cases {
@@ -207,7 +210,9 @@ func TestAuthStrategyWarnsOverrides(t *testing.T) {
 			require.NoError(t, err)
 			require.Len(t, result.Issues, 1, "two referencing models give one issue")
 			issue := requireIssue(t, result.Issues, Warning, ConfigFieldOverridden, kindAuthStrategy, "ka", tc.field)
-			require.Contains(t, issue.Reason, tc.want)
+			for _, want := range tc.want {
+				require.Contains(t, issue.Reason, want)
+			}
 		})
 	}
 }

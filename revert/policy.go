@@ -59,15 +59,25 @@ func (r *Reverter) policyRefs(plugins []kong.Plugin) ([]string, aigw.ACLs) {
 // references
 // before delegating the remaining plugins to policyRefs.
 func (r *Reverter) authStrategyPolicyRefs(plugins []kong.Plugin) ([]string, aigw.ACLs, []string) {
-	var rest []kong.Plugin
-	var idpRefs []string
-	for _, p := range plugins {
+	return r.splitAuthStrategies(plugins, func(p kong.Plugin) bool {
 		// The anonymous fallback is the forward converter's marker that an
 		// auth plugin originated from an auth strategy. A bare key-auth/OIDC
 		// plugin with http/https protocols remains a regular policy; one
 		// carrying ws/wss is recovered as an auth strategy, like the forward
 		// converter's own WebSocket auth plugins.
-		if authPluginNames[p.Name] && (p.Config["anonymous"] == anonymousConsumerName || isWebSocketAuthPlugin(p)) {
+		return p.Config["anonymous"] == anonymousConsumerName || isWebSocketAuthPlugin(p)
+	})
+}
+
+// splitAuthStrategies recovers each auth plugin for which isStrategy is true
+// as an auth strategy reference. It changes the other plugins into policies.
+func (r *Reverter) splitAuthStrategies(
+	plugins []kong.Plugin, isStrategy func(kong.Plugin) bool,
+) ([]string, aigw.ACLs, []string) {
+	var rest []kong.Plugin
+	var idpRefs []string
+	for _, p := range plugins {
+		if authPluginNames[p.Name] && isStrategy(p) {
 			idpRefs = append(idpRefs, r.registerAuthStrategy(p).Name)
 			continue
 		}
@@ -89,8 +99,11 @@ func hasWebSocketProtocol(protocols []string) bool {
 	return slices.ContainsFunc(protocols, func(p string) bool { return p == "ws" || p == "wss" })
 }
 
+// modelPolicyRefs recovers every auth plugin of a model as an auth strategy.
+// A model policy cannot be an auth plugin. A model route with one auth
+// strategy has no anonymous fallback.
 func (r *Reverter) modelPolicyRefs(plugins []kong.Plugin) ([]string, aigw.ACLs, []string) {
-	return r.authStrategyPolicyRefs(plugins)
+	return r.splitAuthStrategies(plugins, func(kong.Plugin) bool { return true })
 }
 
 // registerPolicy dedupes a plugin into the policy registry: a plugin with the
