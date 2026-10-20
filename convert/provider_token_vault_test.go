@@ -120,7 +120,7 @@ func TestProviderTokenVaultRejects(t *testing.T) {
         type: basic
         headers: [{name: x-api-key, value: secret}]`,
 			code:   ConfigFieldInvalid,
-			reason: "token_vault and config.auth are mutually exclusive",
+			reason: "token_vault and credentials in config.auth are mutually exclusive",
 		},
 		{
 			name: "no datastore",
@@ -190,6 +190,132 @@ func TestProviderTokenVaultRejects(t *testing.T) {
 			require.Empty(t, result.Output.Routes)
 		})
 	}
+}
+
+// The validation pass checks every provider, also one that no model targets.
+func TestProviderTokenVaultUnusedProvider(t *testing.T) {
+	const models = `
+models:
+  - name: claude
+    type: model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    config: {route: {paths: [/ai]}}
+    targets:
+      - name: gpt-5.2
+        provider: plain
+        config: {type: openai}
+`
+	t.Run("static auth and token_vault fails", func(t *testing.T) {
+		src := providerTokenVaultDatastores + models + `
+model_providers:
+  - name: plain
+    type: openai
+  - name: unused-vault
+    type: openai
+    datastores: [{name: tv}]
+    token_vault: {provider: openai}
+    config:
+      auth:
+        type: basic
+        headers: [{name: Authorization, value: secret}]
+`
+		result, err := Convert([]byte(src), testOptions)
+		require.NoError(t, err)
+		issue := requireIssue(t, result.Issues, Error, ConfigFieldInvalid,
+			kindModelProvider, "unused-vault", "token_vault")
+		require.Contains(t, issue.Reason, "token_vault and credentials in config.auth are mutually exclusive")
+		require.Empty(t, result.Output.Routes, "an unused provider adds no callback route")
+		require.Empty(t, pluginsNamed(result.Output, tokenVaultExchangePlugin))
+	})
+
+	t.Run("auth field that resolveAuth ignores is accepted", func(t *testing.T) {
+		src := providerTokenVaultDatastores + models + `
+model_providers:
+  - name: plain
+    type: openai
+  - name: unused-vault
+    type: bedrock
+    datastores: [{name: tv}]
+    token_vault: {provider: bedrock}
+    config:
+      auth:
+        assume_role_arn: arn:aws:iam::000000000000:role/r
+        role_session_name: session
+`
+		result, err := Convert([]byte(src), testOptions)
+		require.NoError(t, err)
+		require.Empty(t, result.Issues)
+		require.Empty(t, result.Output.Routes)
+	})
+
+	t.Run("provider field names the failed check", func(t *testing.T) {
+		cases := []struct {
+			name      string
+			providers string
+			field     string
+			code      ConversionIssueCode
+			reason    string
+		}{
+			{
+				name: "no provider",
+				providers: `
+  - name: unused-vault
+    type: openai
+    datastores: [{name: tv}]
+    token_vault: {subject_token_type: api_key}`,
+				field:  "token_vault",
+				code:   MissingRequiredConfigField,
+				reason: "token_vault requires provider",
+			},
+			{
+				name: "no datastore",
+				providers: `
+  - name: unused-vault
+    type: openai
+    token_vault: {provider: openai}`,
+				field:  "datastores",
+				code:   MissingRequiredConfigField,
+				reason: `token_vault requires exactly one "token-vault" datastore`,
+			},
+			{
+				name: "unknown datastore",
+				providers: `
+  - name: unused-vault
+    type: openai
+    datastores: [{name: nope}]
+    token_vault: {provider: openai}`,
+				field:  "datastores[0].name",
+				code:   UndefinedReference,
+				reason: `references unknown datastore "nope"`,
+			},
+			{
+				name: "wrong datastore type",
+				providers: `
+  - name: unused-vault
+    type: openai
+    datastores: [{name: cache}]
+    token_vault: {provider: openai}`,
+				field:  "datastores[0].name",
+				code:   ConfigFieldInvalid,
+				reason: `token_vault does not support a "redis-ee" datastore`,
+			},
+		}
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				src := providerTokenVaultDatastores + models +
+					"model_providers:\n  - name: plain\n    type: openai" +
+					tc.providers + "\n"
+				result, err := Convert([]byte(src), testOptions)
+				require.NoError(t, err)
+				issue := requireIssue(t, result.Issues, Error, tc.code,
+					kindModelProvider, "unused-vault", tc.field)
+				require.Contains(t, issue.Reason, tc.reason)
+				require.Empty(t, result.Output.Routes)
+				require.Empty(t, pluginsNamed(result.Output, tokenVaultExchangePlugin))
+			})
+		}
+	})
 }
 
 func TestProviderTokenVaultRejectsWebSocket(t *testing.T) {
