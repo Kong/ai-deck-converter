@@ -52,6 +52,7 @@ var allFeatures = []Feature{
 	FeatureMCPTokenVault,
 	FeatureProviderTokenVault,
 	FeatureMCPRateLimiting,
+	FeatureAuthStrategyTokenVault,
 }
 
 func TestFeatureTable(t *testing.T) {

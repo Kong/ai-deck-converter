@@ -76,6 +76,9 @@ func (c *Converter) applyAuthStrategyTokenVault(idp *aigw.AuthStrategy, plugin *
 	if idp.TokenVault == nil {
 		return nil
 	}
+	if !c.supports(aimap.FeatureAuthStrategyTokenVault) {
+		return c.failUnsupported(src.at("token_vault"), aimap.FeatureAuthStrategyTokenVault, "token_vault")
+	}
 	if idp.Type != authStrategyTypeOpenIDConnect {
 		return c.fail(src.at("token_vault"), ConfigFieldInvalid,
 			"auth strategy %q: token_vault requires type %q, not %q",
