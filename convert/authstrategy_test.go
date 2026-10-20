@@ -279,7 +279,7 @@ auth_strategies:
     type: %s
     datastores: %s
     config: {issuer: https://idp.example.com}
-    token_vault: {enabled: true}
+    token_vault: {enable_credential_manager: true}
 mcp_servers:
   - type: passthrough-listener
     name: m
@@ -329,11 +329,11 @@ auth_strategies:
   - name: ka
     type: key-auth
     datastores: [{name: tv}]
-    token_vault: {enabled: true}
+    token_vault: {enable_credential_manager: true}
   - name: oidc
     type: openid-connect
     datastores: [{name: tv}]
-    token_vault: {enabled: true}
+    token_vault: {enable_credential_manager: true}
 `), testOptions)
 	requireIssue(t, res.Issues, Error, ConfigFieldInvalid, kindAuthStrategy, "ka", "token_vault")
 	require.Len(t, res.Issues, 1)
@@ -353,7 +353,7 @@ auth_strategies:
     config:
       issuer: https://idp.example.com
 %s
-    token_vault: {enabled: %t}
+    token_vault: {enable_credential_manager: %t}
 mcp_servers:
   - type: passthrough-listener
     name: a

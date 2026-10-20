@@ -23,7 +23,7 @@ auth_strategies:
         enabled: true
         directory: my-directory
     token_vault:
-      enabled: true
+      enable_credential_manager: true
       # storage block omitted - datastore populates it
 
 mcp_servers:

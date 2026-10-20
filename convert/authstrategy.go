@@ -15,6 +15,10 @@ import (
 
 const authStrategyTypeOpenIDConnect = "openid-connect"
 
+// enableCredentialManagerKey is the token_vault key of an auth strategy that
+// turns on all Token Vault output.
+const enableCredentialManagerKey = "enable_credential_manager" //nolint:gosec
+
 // defaultUpstreamAccessTokenHeader is the openid-connect default of an enabled
 // Token Vault strategy that sets no upstream_access_token_header.
 const defaultUpstreamAccessTokenHeader = "authorization:bearer"
@@ -76,13 +80,16 @@ func (c *Converter) applyAuthStrategyTokenVault(idp *aigw.AuthStrategy, plugin *
 	if idp.TokenVault == nil {
 		return nil
 	}
-	if !c.supports(aimap.FeatureAuthStrategyTokenVault) {
-		return c.failUnsupported(src.at("token_vault"), aimap.FeatureAuthStrategyTokenVault, "token_vault")
-	}
 	if idp.Type != authStrategyTypeOpenIDConnect {
 		return c.fail(src.at("token_vault"), ConfigFieldInvalid,
 			"auth strategy %q: token_vault requires type %q, not %q",
 			idp.Name, authStrategyTypeOpenIDConnect, idp.Type)
+	}
+	if enabled, _ := idp.TokenVault[enableCredentialManagerKey].(bool); !enabled {
+		return nil
+	}
+	if !c.supports(aimap.FeatureAuthStrategyTokenVault) {
+		return c.failUnsupported(src.at("token_vault"), aimap.FeatureAuthStrategyTokenVault, "token_vault")
 	}
 	if len(idp.Datastores) != 1 {
 		return c.fail(src.at("datastores"), MissingRequiredConfigField,
@@ -99,7 +106,9 @@ func (c *Converter) applyAuthStrategyTokenVault(idp *aigw.AuthStrategy, plugin *
 			"auth strategy %q: token_vault does not support a %q datastore; use %q instead",
 			idp.Name, ds.Type, aimap.DatastoreTypeTokenVault)
 	}
-	block, err := aimap.ApplyTokenVaultDatastore(idp.TokenVault, ds)
+	settings := maps.Clone(idp.TokenVault)
+	delete(settings, enableCredentialManagerKey)
+	block, err := aimap.ApplyTokenVaultDatastore(settings, ds)
 	if err != nil {
 		return c.fail(src.at("datastores"), ConfigFieldInvalid, "auth strategy %q: %v", idp.Name, err)
 	}
@@ -108,14 +117,13 @@ func (c *Converter) applyAuthStrategyTokenVault(idp *aigw.AuthStrategy, plugin *
 	if err := c.ensureTokenVaultCallbackRoute(src.at("datastores[0].name"), owner, ds, routeSource); err != nil {
 		return err
 	}
-	if enabled, _ := idp.TokenVault["enabled"].(bool); enabled {
-		if err := c.credentialManagerRoute(src, idp, ds); err != nil {
-			return err
-		}
-		if err := c.applyTokenVaultOIDCDefaults(src, idp, plugin.Config); err != nil {
-			return err
-		}
+	if err := c.credentialManagerRoute(src, idp, ds); err != nil {
+		return err
 	}
+	if err := c.applyTokenVaultOIDCDefaults(src, idp, plugin.Config); err != nil {
+		return err
+	}
+	block["enabled"] = true
 	plugin.Config["token_vault"] = block
 	return nil
 }
