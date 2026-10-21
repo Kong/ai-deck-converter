@@ -1138,7 +1138,7 @@ func (c *Converter) checkTarget(m *aigw.Model, j int) (*aigw.Provider, string, *
 			reason: fmt.Sprintf("model %q target %q has no resolvable provider type; the target is omitted", m.Name, tm.Name),
 		}
 	}
-	if providerType == aimap.TypesafeProviderType && !c.supports(aimap.FeatureTypesafe) {
+	if f, gated := aimap.ProviderFeature(providerType); gated && !c.supports(f) {
 		field := fmt.Sprintf("targets[%d].config.type", j)
 		if tm.Config.Type == "" {
 			field = fmt.Sprintf("targets[%d].provider", j)
@@ -1146,7 +1146,7 @@ func (c *Converter) checkTarget(m *aigw.Model, j int) (*aigw.Provider, string, *
 		return nil, "", &targetProblem{
 			field: field,
 			code:  UnsupportedInMinRuntimeVersion,
-			reason: unsupportedReason(aimap.FeatureTypesafe, "provider type typesafe", c.minRuntimeVersion) +
+			reason: unsupportedReason(f, "provider type "+providerType, c.minRuntimeVersion) +
 				"; the target is omitted",
 		}
 	}
