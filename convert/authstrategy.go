@@ -91,6 +91,11 @@ func (c *Converter) applyAuthStrategyTokenVault(idp *aigw.AuthStrategy, plugin *
 	if !c.supports(aimap.FeatureAuthStrategyTokenVault) {
 		return c.failUnsupported(src.at("token_vault"), aimap.FeatureAuthStrategyTokenVault, "token_vault")
 	}
+	if hide, _ := idp.Config["hide_credentials"].(bool); hide {
+		return c.fail(src.at("config.hide_credentials"), ConfigFieldInvalid,
+			"auth strategy %q: config.hide_credentials must not be true with token_vault",
+			idp.Name)
+	}
 	if len(idp.Datastores) != 1 {
 		return c.fail(src.at("datastores"), MissingRequiredConfigField,
 			"auth strategy %q: token_vault requires exactly one %q datastore",

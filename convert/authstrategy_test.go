@@ -457,3 +457,13 @@ func TestGenerateSessionSecret(t *testing.T) {
 	require.Regexp(t, `^[0-9a-f]{32}$`, a)
 	require.NotEqual(t, a, b)
 }
+
+func TestAuthStrategyTokenVaultRejectsHideCredentials(t *testing.T) {
+	doc := fmt.Sprintf(tokenVaultStrategyDoc, "      hide_credentials: true", true)
+
+	res, _ := Convert([]byte(doc), testOptions)
+
+	requireIssue(t, res.Issues, Error, ConfigFieldInvalid, kindAuthStrategy, "sso", "config.hide_credentials")
+	require.Empty(t, res.Output.Services)
+	require.Empty(t, res.Output.Routes)
+}
