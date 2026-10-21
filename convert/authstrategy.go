@@ -137,6 +137,9 @@ func (c *Converter) applyTokenVaultOIDCDefaults(
 	if isEmptyConfigValue(cfg["upstream_access_token_header"]) {
 		cfg["upstream_access_token_header"] = defaultUpstreamAccessTokenHeader
 	}
+	if _, ok := cfg["hide_credentials"]; !ok {
+		cfg["hide_credentials"] = false
+	}
 	if isEmptyConfigValue(cfg["redirect_uri"]) {
 		cfg["redirect_uri"] = []any{
 			aimap.TokenVaultCredentialManagerPath + "/" + idp.Name + "/oidc/callback",
