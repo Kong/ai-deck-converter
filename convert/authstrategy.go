@@ -170,7 +170,6 @@ func (c *Converter) applyTokenVaultOIDCDefaults(
 var newSessionSecret = generateSessionSecret
 
 func generateSessionSecret() (string, error) {
-	// 16 bytes of randomness equals 32 hex characters.
 	bytes := make([]byte, 16) //nolint:mnd
 	if _, err := rand.Read(bytes); err != nil {
 		return "", err
