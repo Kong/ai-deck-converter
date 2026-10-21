@@ -1,0 +1,43 @@
+# baseten needs 2.3. At 2.2:
+# - a baseten target on another model is absent with a warning;
+# - a model whose only target is baseten is absent with an error.
+model_providers:
+  - name: baseten-prod
+    type: baseten
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "Bearer {vault://ai/baseten-token}"
+  - name: openai-prod
+    type: openai
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://ai/openai-token}"
+models:
+  - name: mixed-gpt
+    type: model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/mixed]}
+    targets:
+      - name: gpt-4o
+        provider: openai-prod
+        config: {type: openai}
+      - name: openai/gpt-oss-120b
+        provider: baseten-prod
+        config: {type: baseten}
+  - name: only-baseten
+    type: model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/only]}
+    targets:
+      - name: openai/gpt-oss-120b
+        provider: baseten-prod

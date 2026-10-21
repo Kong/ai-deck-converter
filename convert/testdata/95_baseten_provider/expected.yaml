@@ -1,0 +1,57 @@
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: openai-chat
+        paths:
+          - /baseten/chat/completions
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+plugins:
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-chat
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: Bearer {vault://ai/baseten-token}
+          description: deepseek-ai/DeepSeek-V4-Pro-0813
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: baseten-chat
+            name: deepseek-ai/DeepSeek-V4-Pro-0813
+            provider: baseten
+          route_type: llm/v1/chat
+        - auth:
+            header_name: Authorization
+            header_value: Bearer {vault://ai/baseten-token}
+          description: my-served-model
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: baseten-chat
+            name: my-served-model
+            options:
+              upstream_url: https://model-abc123.api.baseten.co/environments/production/sync/v1/chat/completions
+            provider: baseten
+          route_type: llm/v1/chat
+    route: openai-chat
+    model: baseten-chat
+ai_models:
+  - name: baseten-chat
