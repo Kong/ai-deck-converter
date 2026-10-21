@@ -113,10 +113,10 @@ func resolveAuth(p *aigw.Provider, allowOverride *bool) map[string]any {
 // entity is referenced.
 //
 // It works on a copy. A model pass can run more than once over the source.
-func (c *Converter) resolveEmbeddings(src ConversionIssueSource, raw any) any {
+func (c *Converter) resolveEmbeddings(src ConversionIssueSource, raw any) (any, error) {
 	emb, ok := deepCopy(raw).(map[string]any)
 	if !ok {
-		return raw
+		return raw, nil
 	}
 
 	var provider *aigw.Provider
@@ -129,26 +129,34 @@ func (c *Converter) resolveEmbeddings(src ConversionIssueSource, raw any) any {
 		}
 	}
 
-	lowerEmbeddingsModel(emb, provider)
+	providerType, explicit := lowerEmbeddingsModel(emb, provider)
+	if f, gated := aimap.ProviderFeature(providerType); gated && !c.supports(f) {
+		field := "config.balancer.embeddings.model.config.type"
+		if !explicit {
+			field = "config.balancer.embeddings.provider"
+		}
+		// A semantic balancer needs its embeddings, so the model cannot convert.
+		return nil, c.failUnsupported(src.at(field), f, "provider type "+providerType)
+	}
 
 	if provider == nil {
-		return emb
+		return emb, nil
 	}
 	resolved := resolveAuth(provider, nil)
 	if resolved == nil {
-		return emb
+		return emb, nil
 	}
 	existing, _ := emb["auth"].(map[string]any)
 	if existing == nil {
 		emb["auth"] = resolved
-		return emb
+		return emb, nil
 	}
 	for k, v := range resolved {
 		if _, set := existing[k]; !set {
 			existing[k] = v
 		}
 	}
-	return emb
+	return emb, nil
 }
 
 // deepCopy copies the maps and slices of a YAML value.
@@ -179,19 +187,23 @@ func deepCopy(v any) any {
 // under model.options.azure rather than using flat azure_* keys. A model with no
 // `config` block is already lowered (e.g. produced by the reverse converter), so
 // it is left untouched — keeping the forward conversion idempotent.
-func lowerEmbeddingsModel(emb map[string]any, provider *aigw.Provider) {
+//
+// It returns the provider type it lowers. explicit is true when the type comes
+// from the config block and not from the provider entity.
+func lowerEmbeddingsModel(emb map[string]any, provider *aigw.Provider) (providerType string, explicit bool) {
 	model, ok := emb["model"].(map[string]any)
 	if !ok {
-		return
+		return "", false
 	}
 	config, ok := model["config"].(map[string]any)
 	if !ok {
-		return
+		return "", false
 	}
 	delete(model, "config")
 
-	providerType, _ := config["type"].(string)
-	if providerType == "" && provider != nil {
+	providerType, _ = config["type"].(string)
+	explicit = providerType != ""
+	if !explicit && provider != nil {
 		providerType = provider.Type
 	}
 	// Emit the ai-proxy-advanced provider enum (e.g. vertex -> gemini), matching
@@ -212,6 +224,7 @@ func lowerEmbeddingsModel(emb map[string]any, provider *aigw.Provider) {
 	if len(options) > 0 {
 		model["options"] = options
 	}
+	return providerType, explicit
 }
 
 // nestAzureEmbeddingsOptions rewrites the flat azure_* keys mapOptions emits for

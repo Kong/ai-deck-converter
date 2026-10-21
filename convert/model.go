@@ -606,7 +606,10 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 					}
 				}
 				if pg == nil {
-					embeddings := c.resolveEmbeddings(src, balancerExtra(m.Config.Balancer, "embeddings"))
+					embeddings, err := c.resolveEmbeddings(src, balancerExtra(m.Config.Balancer, "embeddings"))
+					if err != nil {
+						return err
+					}
 					vectordb, err := c.modelVectorDB(src, m, ds)
 					if err != nil {
 						return err
