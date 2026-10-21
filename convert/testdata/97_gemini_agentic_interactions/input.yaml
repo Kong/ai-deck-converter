@@ -1,0 +1,25 @@
+# Gemini serves the Interactions API beside its native generateContent, so
+# "agentic" emits a route for each: the Gemini-style path and its Gemini
+# Enterprise counterpart. This is gated at 2.3 or later
+# (FeatureGeminiAgenticCapability); this case has no options.yaml, so the
+# default LatestVersion applies.
+model_providers:
+  - name: gemini-prod
+    type: gemini
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://ai/gemini-token}"
+models:
+  - name: gemini-agentic
+    type: model
+    capabilities: [agentic]
+    formats: [{type: gemini}]
+    config:
+      route: {paths: [/ai]}
+    targets:
+      - name: gemini-2.5-pro
+        provider: gemini-prod
+        config: {type: gemini}

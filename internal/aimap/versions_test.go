@@ -51,6 +51,7 @@ var allFeatures = []Feature{
 	FeatureBedrockVPCEndpoint,
 	FeatureMCPTokenVault,
 	FeatureMCPRateLimiting,
+	FeatureGeminiAgenticCapability,
 }
 
 func TestFeatureTable(t *testing.T) {
@@ -78,9 +79,18 @@ func TestFeatureLookups(t *testing.T) {
 	_, ok = FormatFeature("vertex")
 	require.False(t, ok)
 
-	f, ok = CapabilityFeature("skills")
+	f, ok = CapabilityFeature("openai", "skills")
 	require.True(t, ok)
 	require.Equal(t, FeatureSkillsCapability, f)
-	_, ok = CapabilityFeature("generate")
+	f, ok = CapabilityFeature("gemini", "agentic")
+	require.True(t, ok)
+	require.Equal(t, FeatureGeminiAgenticCapability, f)
+	// Bedrock and OpenAI also serve "agentic", but shipped it before this
+	// gate existed, so it stays ungated outside the gemini section.
+	_, ok = CapabilityFeature("bedrock", "agentic")
+	require.False(t, ok)
+	_, ok = CapabilityFeature("openai", "agentic")
+	require.False(t, ok)
+	_, ok = CapabilityFeature("openai", "generate")
 	require.False(t, ok)
 }

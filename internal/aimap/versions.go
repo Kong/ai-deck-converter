@@ -79,6 +79,7 @@ const (
 	FeatureBedrockVPCEndpoint         Feature = "bedrock-vpc-endpoint"
 	FeatureMCPTokenVault              Feature = "mcp-token-vault" //nolint:gosec // a feature name, not a credential
 	FeatureMCPRateLimiting            Feature = "mcp-rate-limiting"
+	FeatureGeminiAgenticCapability    Feature = "gemini-agentic-capability"
 )
 
 // featureSince maps each feature to its first AI Gateway release. The source
@@ -96,6 +97,7 @@ var featureSince = map[Feature]Version{
 	FeatureBedrockVPCEndpoint:         mustVersion("2.3"),
 	FeatureMCPTokenVault:              mustVersion("2.3"),
 	FeatureMCPRateLimiting:            mustVersion("2.3"),
+	FeatureGeminiAgenticCapability:    mustVersion("2.3"),
 }
 
 // Since returns the first AI Gateway release that has f. It panics for an
@@ -139,13 +141,27 @@ func FormatFeature(format string) (Feature, bool) {
 	return f, ok
 }
 
+// capabilityFeatures gates a capability in every section.
 var capabilityFeatures = map[string]Feature{
 	"decisions": FeatureDecisionsCapability,
 	"skills":    FeatureSkillsCapability,
 }
 
-// CapabilityFeature returns the feature that gates the canonical capability.
-func CapabilityFeature(capability string) (Feature, bool) {
+// geminiCapabilityFeatures gates a capability only in the gemini section.
+// Bedrock and OpenAI also serve "agentic", but neither needs the gate: both
+// shipped it before this feature existed.
+var geminiCapabilityFeatures = map[string]Feature{
+	"agentic": FeatureGeminiAgenticCapability,
+}
+
+// CapabilityFeature returns the feature that gates the canonical capability
+// in the given endpoint section (aimap.SectionFor).
+func CapabilityFeature(section, capability string) (Feature, bool) {
+	if section == "gemini" {
+		if f, ok := geminiCapabilityFeatures[capability]; ok {
+			return f, true
+		}
+	}
 	f, ok := capabilityFeatures[capability]
 	return f, ok
 }

@@ -320,8 +320,9 @@ var bedrockInvokeChatSpec = EndpointSpec{
 
 // Gemini Enterprise URL templates the gemini section's Gemini Enterprise endpoints build on.
 const (
-	geminiEnterpriseLocPath   = "v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)"
-	geminiEnterpriseModelPath = geminiEnterpriseLocPath + "/publishers/(?<publisher>[^/]+)/models/(?<model_name>[^:/]+)"
+	geminiEnterpriseLocPath     = "v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)"
+	geminiBetaEnterpriseLocPath = "v1beta1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)"
+	geminiEnterpriseModelPath   = geminiEnterpriseLocPath + "/publishers/(?<publisher>[^/]+)/models/(?<model_name>[^:/]+)"
 )
 
 // EndpointTable maps section -> capability -> EndpointEntry, derived from
@@ -495,6 +496,26 @@ var EndpointTable = map[string]map[string]EndpointEntry{
 	// Secondary spec where both do. Gemini Enterprise specs carry their own route labels
 	// so the two path shapes never collapse into one route.
 	"gemini": {
+		"agentic": {
+			Primary: EndpointSpec{
+				"responses", "/v1/interactions",
+				false, mGetPost, "llm/v1/responses", catTextGen, &defaultBodyModelSelectorConfig, true,
+			},
+			Secondary: []EndpointSpec{
+				{
+					"beta-responses", "/v1beta/interactions",
+					false, mGetPost, "llm/v1/responses", catTextGen, &defaultBodyModelSelectorConfig, true,
+				},
+				{
+					"enterprise-responses", geminiEnterpriseLocPath + "/interactions",
+					true, mGetPost, "llm/v1/responses", catTextGen, &defaultBodyModelSelectorConfig, true,
+				},
+				{
+					"enterprise-beta-responses", geminiBetaEnterpriseLocPath + "/interactions",
+					true, mGetPost, "llm/v1/responses", catTextGen, &defaultBodyModelSelectorConfig, true,
+				},
+			},
+		},
 		"generate": {
 			Primary: EndpointSpec{
 				"generate", "v1beta/models/(?<model_name>[^:/]+):(?:generateContent|streamGenerateContent)",

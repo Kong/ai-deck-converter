@@ -42,7 +42,7 @@ func TestCapabilitiesFor(t *testing.T) {
 	// The gemini section covers Gemini and Gemini Enterprise endpoints alike, whichever provider serves it.
 	for _, providerType := range []string{"gemini", "vertex"} {
 		require.Equal(t,
-			[]string{"generate", "batches", "embeddings", "files", "image", "realtime", "rerank", "video"},
+			[]string{"generate", "agentic", "batches", "embeddings", "files", "image", "realtime", "rerank", "video"},
 			CapabilitiesFor("gemini", providerType), providerType)
 	}
 	// A format whose section is provider-independent.
@@ -73,36 +73,83 @@ func TestSectionDerivation(t *testing.T) {
 }
 
 func TestGeminiEnterpriseEndpoints(t *testing.T) {
-	// Every gemini capability's full set of paths, primary first.
+	// Every gemini capability's full set of specs, primary first. Asserting
+	// the whole EndpointSpec (not just PathSuffix) catches a wrong route
+	// name, method list, route_type, genai_category, regex flag, or
+	// selector default, not only a wrong path.
 	const loc = "v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)"
+	const betaLoc = "v1beta1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)"
 	const model = loc + "/publishers/(?<publisher>[^/]+)/models/(?<model_name>[^:/]+)"
-	want := map[string][]string{
+	want := map[string][]EndpointSpec{
 		"generate": {
-			"v1beta/models/(?<model_name>[^:/]+):(?:generateContent|streamGenerateContent)",
-			model + ":(?:generateContent|streamGenerateContent)",
+			{
+				"generate", "v1beta/models/(?<model_name>[^:/]+):(?:generateContent|streamGenerateContent)",
+				true, mGetPost, "llm/v1/chat", catTextGen, &geminiPathModelSelectorConfig, true,
+			},
+			{
+				"enterprise-generate", model + ":(?:generateContent|streamGenerateContent)",
+				true, mGetPost, "llm/v1/chat", catTextGen, &geminiPathModelSelectorConfig, true,
+			},
+		},
+		"agentic": {
+			{
+				"responses", "/v1/interactions",
+				false, mGetPost, "llm/v1/responses", catTextGen, &defaultBodyModelSelectorConfig, true,
+			},
+			{
+				"beta-responses", "/v1beta/interactions",
+				false, mGetPost, "llm/v1/responses", catTextGen, &defaultBodyModelSelectorConfig, true,
+			},
+			{
+				"enterprise-responses", loc + "/interactions",
+				true, mGetPost, "llm/v1/responses", catTextGen, &defaultBodyModelSelectorConfig, true,
+			},
+			{
+				"enterprise-beta-responses", betaLoc + "/interactions",
+				true, mGetPost, "llm/v1/responses", catTextGen, &defaultBodyModelSelectorConfig, true,
+			},
 		},
 		"embeddings": {
-			"v1beta/models/(?<model_name>[^:/]+):(?:embedContent|batchEmbedContents)",
-			model + ":embedContent",
+			{
+				"embeddings", "v1beta/models/(?<model_name>[^:/]+):(?:embedContent|batchEmbedContents)",
+				true, mGetPost, "llm/v1/embeddings", catEmbeddings, &geminiPathModelSelectorConfig, true,
+			},
+			{
+				"enterprise-embeddings", model + ":embedContent",
+				true, mGetPost, "llm/v1/embeddings", catEmbeddings, &geminiPathModelSelectorConfig, true,
+			},
 		},
-		"image":   {model + ":predict"},
-		"video":   {model + ":predictLongRunning"},
-		"rerank":  {loc + "/rankingConfigs/(?<config_name>[^:/]+):rank"},
-		"batches": {"/v1beta/batches", loc + "/batchPredictionJobs"},
-		"files":   {"(?:upload/)?v1beta/files"},
+		"image": {{
+			"predict", model + ":predict",
+			true, mGetPost, "image/v1/images/generations", catImage, &geminiPathModelSelectorConfig, true,
+		}},
+		"video": {{
+			"predict-long-running", model + ":predictLongRunning",
+			true, mGetPost, "video/v1/videos/generations", catVideo, &geminiPathModelSelectorConfig, true,
+		}},
+		"rerank": {{
+			"ranking", loc + "/rankingConfigs/(?<config_name>[^:/]+):rank",
+			true, mGetPost, "llm/v1/chat", catTextGen, nil, true,
+		}},
+		"batches": {
+			{"batches", "/v1beta/batches", false, mGetPost, "llm/v1/batches", catTextGen, nil, true},
+			{
+				"enterprise-batches", loc + "/batchPredictionJobs",
+				true, mGetPost, "llm/v1/batches", catTextGen, nil, true,
+			},
+		},
+		"files": {
+			{"files", "(?:upload/)?v1beta/files", true, mGetPost, "llm/v1/chat", catTextGen, nil, true},
+		},
 		// Gemini Live is one WebSocket endpoint, so it has no Gemini
 		// Enterprise secondary to pair with.
-		"realtime": {"/realtime"},
+		"realtime": {{"realtime", "/realtime", false, nil, RealtimeRouteType, catRealtime, nil, true}},
 	}
 	require.Len(t, EndpointTable["gemini"], len(want), "gemini capabilities")
-	for capability, paths := range want {
-		specs, ok := EndpointsFor("gemini", capability)
+	for capability, specs := range want {
+		got, ok := EndpointsFor("gemini", capability)
 		require.True(t, ok, capability)
-		got := make([]string, len(specs))
-		for i, spec := range specs {
-			got[i] = spec.PathSuffix
-		}
-		require.Equal(t, paths, got, capability)
+		require.Equal(t, specs, got, capability)
 	}
 	_, ok := EndpointTable["vertex"]
 	require.False(t, ok, "vertex is served by the gemini section")
