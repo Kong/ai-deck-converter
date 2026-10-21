@@ -92,6 +92,8 @@ type Converter struct {
 	providers      map[string]*aigw.Provider
 	policies       map[string]*aigw.Policy
 	authStrategies map[string]*aigw.AuthStrategy
+	// sessionSecrets holds the generated session secret of each auth strategy.
+	sessionSecrets map[string]string
 	consumerGroups map[string]*aigw.ConsumerGroup
 	datastores     map[string]*aigw.Datastore
 
@@ -114,6 +116,7 @@ func newConverter(doc *aigw.Document, opts Options) *Converter {
 		providers:         map[string]*aigw.Provider{},
 		policies:          map[string]*aigw.Policy{},
 		authStrategies:    map[string]*aigw.AuthStrategy{},
+		sessionSecrets:    map[string]string{},
 		consumerGroups:    map[string]*aigw.ConsumerGroup{},
 		datastores:        map[string]*aigw.Datastore{},
 	}
@@ -137,6 +140,7 @@ func (c *Converter) run() {
 	c.convertCACertificates()
 	c.convertCertificates()
 	c.convertSNIs()
+	c.validateAuthStrategyTokenVaults()
 	c.validateModelProviderTokenVaults()
 	c.convertConsumerGroups()
 	c.convertConsumers()

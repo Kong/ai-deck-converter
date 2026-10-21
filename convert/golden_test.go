@@ -15,6 +15,11 @@ import (
 // testOptions targets the newest known release, so no feature gate applies.
 var testOptions = Options{MinRuntimeVersion: aimap.LatestVersion.String()}
 
+//nolint:gochecknoinits
+func init() {
+	newSessionSecret = func() (string, error) { return "0123456789abcdef0123456789abcdef", nil }
+}
+
 var update = flag.Bool("update", false, "regenerate golden expected.yaml and issues.yaml files")
 
 // TestGolden runs every convert/testdata/<case>/ directory: it converts

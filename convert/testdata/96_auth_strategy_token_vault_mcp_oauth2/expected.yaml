@@ -1,0 +1,85 @@
+_format_version: "3.0"
+services:
+  - name: secure-flights-mcp
+    host: localhost
+    routes:
+      - name: secure-flights-mcp-route
+        paths:
+          - /mcp/secure-flights
+          - /mcp/secure-flights/.well-known/oauth-protected-resource
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              include_consumer_groups: true
+              logging:
+                log_audits: false
+                log_payloads: false
+                log_statistics: true
+              mode: conversion-listener
+              tools:
+                - description: Search available flights
+                  host: flights.internal
+                  method: GET
+                  name: searchFlights
+                  path: /flights
+                  scheme: https
+          - name: ai-mcp-oauth2
+            config:
+              authorization_servers:
+                - https://dev-123456.okta.com/oauth2/default
+              client_id: 0oa1b2c3d4e5f6g7h8i9
+              client_secret: '{vault://hcv/okta/client-secret}'
+              insecure_relaxed_audience_validation: true
+              metadata_endpoint: /mcp/secure-flights/.well-known/oauth-protected-resource
+              resource: https://api.example.com/mcp/secure-flights
+              scopes_supported:
+                - openid
+                - flights:read
+routes:
+  - name: token-vault-callback-handler
+    paths:
+      - /_vault
+    protocols:
+      - http
+      - https
+    plugins:
+      - name: token-vault-callback-handler
+        config:
+          directory: my-directory
+          storage:
+            backend: konnect
+            current_version: v1
+            keys:
+              - key: '{vault://hcv/vault-enc-key}'
+                version: v1
+  - name: token-vault-credential-manager-okta-ai-se
+    paths:
+      - /vuc/okta-ai-se
+    protocols:
+      - http
+      - https
+    plugins:
+      - name: openid-connect
+        config:
+          auth_methods:
+            - bearer
+            - client_credentials
+            - authorization_code
+            - session
+          cache_tokens_salt: 4f1c9a7e2b
+          client_id:
+            - 0oa1b2c3d4e5f6g7h8i9
+          client_secret:
+            - '{vault://hcv/okta/client-secret}'
+          hide_credentials: false
+          issuer: https://dev-123456.okta.com
+          principals:
+            directory: my-directory
+            enabled: true
+          redirect_uri:
+            - /vuc/okta-ai-se/oidc/callback
+          session_secret: 0123456789abcdef0123456789abcdef
+          upstream_access_token_header: authorization:bearer
+      - name: token-vault-credential-manager
+        config:
+          directory: my-directory

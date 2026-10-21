@@ -55,6 +55,7 @@ var allFeatures = []Feature{
 	FeatureBaseten,
 	FeatureGeminiAgenticCapability,
 	FeatureSagemaker,
+	FeatureAuthStrategyTokenVault,
 }
 
 func TestFeatureTable(t *testing.T) {
