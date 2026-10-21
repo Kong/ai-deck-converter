@@ -283,6 +283,9 @@ func (c *Converter) pruneUnusedTokenVaultCallbackRoute() {
 				if plugin.Name == "ai-mcp-proxy" && auth["provider"] == aimap.UpstreamAuthProviderTokenVault {
 					return
 				}
+				if plugin.Name == authStrategyTypeOpenIDConnect && plugin.Config["token_vault"] != nil {
+					return
+				}
 			}
 		}
 	}

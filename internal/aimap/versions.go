@@ -82,6 +82,7 @@ const (
 	FeatureMCPRateLimiting            Feature = "mcp-rate-limiting"
 	FeatureGeminiAgenticCapability    Feature = "gemini-agentic-capability"
 	FeatureBaseten                    Feature = "baseten"
+	FeatureAuthStrategyTokenVault     Feature = "auth-strategy-token-vault"
 )
 
 // featureSince maps each feature to its first AI Gateway release. The source
@@ -102,6 +103,7 @@ var featureSince = map[Feature]Version{
 	FeatureMCPRateLimiting:            mustVersion("2.3"),
 	FeatureGeminiAgenticCapability:    mustVersion("2.3"),
 	FeatureBaseten:                    mustVersion("2.3"),
+	FeatureAuthStrategyTokenVault:     mustVersion("2.3"),
 }
 
 // Since returns the first AI Gateway release that has f. It panics for an
