@@ -1,7 +1,5 @@
-# Bedrock serves the OpenAI Responses API beside its native
-# RetrieveAndGenerate, so "agentic" emits a route for each (KOKO-4642).
-# The generate capability's own OpenAI/Anthropic-compatible routes already
-# appear in every other bedrock case, so this one declares agentic alone.
+# The data plane rejects llm/v1/responses in the bedrock format.
+# A bedrock model with "agentic" therefore gets only the retrieve route.
 model_providers:
   - name: bedrock-prod
     type: bedrock

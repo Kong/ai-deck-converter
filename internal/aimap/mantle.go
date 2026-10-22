@@ -32,3 +32,22 @@ func MantlePathPrefix(modelName string) string {
 	}
 	return MantlePathPrefixAuto
 }
+
+// BedrockEndpointTypeMantle is the endpoint_type value of a bedrock target
+// that uses the bedrock-mantle endpoint.
+const BedrockEndpointTypeMantle = "mantle"
+
+// mantleRouteTypes replaces the bedrock row of the data plane route type
+// table for a mantle target.
+var mantleRouteTypes = map[string]bool{
+	"llm/v1/chat":        true,
+	"llm/v1/responses":   true,
+	"llm/v1/files":       true,
+	PassthroughRouteType: true,
+}
+
+// MantleSupports reports whether the data plane accepts a mantle target on
+// spec in format.
+func MantleSupports(format string, spec EndpointSpec) bool {
+	return (format == "openai" || format == "anthropic") && mantleRouteTypes[spec.RouteType]
+}

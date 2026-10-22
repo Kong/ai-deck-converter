@@ -1,0 +1,180 @@
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: openai-chat
+        paths:
+          - /mantle-openai/chat/completions
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-responses
+        paths:
+          - /mantle-openai/responses
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-embeddings
+        paths:
+          - /mantle-openai/embeddings
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: anthropic-messages
+        paths:
+          - /mantle-anthropic/v1/messages
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+plugins:
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-chat
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - description: gpt-5.2
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: mantle-openai
+            name: gpt-5.2
+            provider: openai
+          route_type: llm/v1/chat
+        - auth:
+            aws_access_key_id: '{vault://ai/aws-access-key-id}'
+            aws_secret_access_key: '{vault://ai/aws-secret-access-key}'
+          description: openai.gpt-oss-120b
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: mantle-openai
+            name: openai.gpt-oss-120b
+            options:
+              bedrock:
+                aws_region: us-east-1
+                endpoint_type: mantle
+                mantle_openai_path_prefix: /v1
+            provider: bedrock
+          route_type: llm/v1/chat
+    route: openai-chat
+    model: mantle-openai
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-responses
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - description: gpt-5.2
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: mantle-openai
+            name: gpt-5.2
+            provider: openai
+          route_type: llm/v1/responses
+        - auth:
+            aws_access_key_id: '{vault://ai/aws-access-key-id}'
+            aws_secret_access_key: '{vault://ai/aws-secret-access-key}'
+          description: openai.gpt-oss-120b
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: mantle-openai
+            name: openai.gpt-oss-120b
+            options:
+              bedrock:
+                aws_region: us-east-1
+                endpoint_type: mantle
+                mantle_openai_path_prefix: /v1
+            provider: bedrock
+          route_type: llm/v1/responses
+    route: openai-responses
+    model: mantle-openai
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-embeddings
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/embeddings
+      llm_format: openai
+      targets:
+        - description: gpt-5.2
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: mantle-openai
+            name: gpt-5.2
+            provider: openai
+          route_type: llm/v1/embeddings
+    route: openai-embeddings
+    model: mantle-openai
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: anthropic-messages
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      targets:
+        - auth:
+            aws_access_key_id: '{vault://ai/aws-access-key-id}'
+            aws_secret_access_key: '{vault://ai/aws-secret-access-key}'
+          description: anthropic.claude-sonnet-4-5
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: mantle-anthropic
+            name: anthropic.claude-sonnet-4-5
+            options:
+              anthropic_version: bedrock-2023-05-31
+              bedrock:
+                aws_region: us-east-1
+                endpoint_type: mantle
+                mantle_openai_path_prefix: auto_detect
+            provider: bedrock
+          route_type: llm/v1/chat
+    route: anthropic-messages
+    model: mantle-anthropic
+ai_models:
+  - name: mantle-openai
+  - name: mantle-anthropic

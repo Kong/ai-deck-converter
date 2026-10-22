@@ -438,7 +438,8 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 	// the body unchanged, so every target must speak the same client format.
 	passthroughFormat := ""
 
-	convertedTargets := 0
+	var convertedTargets []int
+	servedBy := map[string][]int{}
 	for j := range m.TargetModels {
 		tm := &m.TargetModels[j]
 		provider, providerType, problem := c.checkTarget(m, j)
@@ -451,7 +452,7 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 			return c.failUnsupported(src.at(field), aimap.FeatureBedrockVPCEndpoint, field)
 		}
 		c.warnUnsupportedCostLists(src, tm, j)
-		convertedTargets++
+		convertedTargets = append(convertedTargets, j)
 		if passthrough && !aimap.HasNativeFormat(providerType) {
 			c.warn(src.at(fmt.Sprintf("targets[%d].config.type", j)), BehaviorMayDiffer,
 				"model %q target %q: provider type %q has no native llm_format, so the passthrough "+
@@ -499,6 +500,12 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 			// carrying this target; revert's capsSeen folds the routes back
 			// into the one capability.
 			for _, spec := range specs {
+				if !passthrough && !targetSupports(llmFormat(m, providerType), tm, providerType, spec) {
+					continue
+				}
+				if !slices.Contains(servedBy[capability], j) {
+					servedBy[capability] = append(servedBy[capability], j)
+				}
 				websocket := aimap.IsWebSocketEndpoint(spec)
 				// A global plugin keeps Kong's http/https default protocols. A
 				// global authentication policy therefore cannot protect a ws or
@@ -753,9 +760,14 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 
 	// Model policy and ACL plugins scope to each route the model produces, plus
 	// the ai-model entity for type "model".
-	if len(m.TargetModels) > 0 && convertedTargets == 0 {
+	if len(m.TargetModels) > 0 && len(convertedTargets) == 0 {
 		return c.fail(src.at("targets"), MissingRequiredConfigField,
 			"model %q has no target that the converter can convert", m.Name)
+	}
+	if !passthrough {
+		if err := c.checkTargetSupport(src, m, caps, servedBy, convertedTargets); err != nil {
+			return err
+		}
 	}
 
 	plugins, err := c.scopedPlugins(src, m.Policies, m.Access.ACLs)
@@ -1051,7 +1063,7 @@ func (c *Converter) videoLifecycleCandidates(skipped map[int][]ConversionIssue) 
 		lifecycleTargets := make([]videoLifecycleTarget, 0, len(m.TargetModels))
 		for j := range m.TargetModels {
 			provider, providerType, problem := c.checkTarget(m, j)
-			if problem != nil {
+			if problem != nil || !targetSupports(section, &m.TargetModels[j], providerType, spec) {
 				continue
 			}
 			lifecycleTargets = append(lifecycleTargets, videoLifecycleTarget{
@@ -1165,16 +1177,62 @@ func (c *Converter) checkTarget(m *aigw.Model, j int) (*aigw.Provider, string, *
 		}
 	}
 	// The Mantle endpoint does not serve the Converse or InvokeModel APIs.
-	if providerType == "bedrock" && tm.Config.Options["endpoint_type"] == "mantle" &&
-		llmFormat(m, providerType) == "bedrock" {
-		return nil, "", &targetProblem{
-			field: fmt.Sprintf("targets[%d].config.endpoint_type", j),
-			code:  ConfigFieldInvalid,
-			reason: fmt.Sprintf("model %q target %q: the mantle endpoint type is not supported with the "+
-				"bedrock format; the target is omitted", m.Name, tm.Name),
+	if isMantleTarget(tm, providerType) {
+		format := llmFormat(m, providerType)
+		if format != "openai" && format != "anthropic" {
+			return nil, "", &targetProblem{
+				field: fmt.Sprintf("targets[%d].config.endpoint_type", j),
+				code:  ConfigFieldInvalid,
+				reason: fmt.Sprintf("model %q target %q: the mantle endpoint type is not supported with the "+
+					"%s format; the target is omitted", m.Name, tm.Name, format),
+			}
 		}
 	}
 	return provider, providerType, nil
+}
+
+func isMantleTarget(tm *aigw.TargetModel, providerType string) bool {
+	return providerType == "bedrock" && tm.Config.Options["endpoint_type"] == aimap.BedrockEndpointTypeMantle
+}
+
+// targetSupports reports whether the data plane accepts tm on spec in format.
+func targetSupports(format string, tm *aigw.TargetModel, providerType string, spec aimap.EndpointSpec) bool {
+	if isMantleTarget(tm, providerType) {
+		return aimap.MantleSupports(format, spec)
+	}
+	return true
+}
+
+// checkTargetSupport fails m when no target serves a capability in caps.
+// served holds the indexes of the targets that serve each capability.
+// converted holds the indexes of the targets that checkTarget accepts.
+func (c *Converter) checkTargetSupport(
+	src ConversionIssueSource, m *aigw.Model, caps []string, served map[string][]int, converted []int,
+) error {
+	if len(converted) == 0 {
+		return nil
+	}
+	for i, capability := range caps {
+		if slices.Contains(caps[:i], capability) {
+			continue
+		}
+		field := capabilityField(m, capability)
+		if len(served[capability]) == 0 {
+			return c.fail(src.at(field), ConfigFieldInvalid,
+				"model %q: no target can serve capability %q with llm_format %q",
+				m.Name, capability, llmFormat(m, ""))
+		}
+		for _, j := range converted {
+			if slices.Contains(served[capability], j) {
+				continue
+			}
+			c.warn(src.at(field, fmt.Sprintf("targets[%d]", j)), BehaviorMayDiffer,
+				"model %q target %q: the data plane does not accept this target for capability %q "+
+					"with llm_format %q. The routes of this capability will not fail over to it.",
+				m.Name, m.TargetModels[j].Name, capability, llmFormat(m, ""))
+		}
+	}
+	return nil
 }
 
 // capabilityField returns the path of the entry of m.Capabilities that
