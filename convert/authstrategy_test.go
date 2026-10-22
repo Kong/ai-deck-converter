@@ -411,7 +411,7 @@ func TestAuthStrategyTokenVaultDefaults(t *testing.T) {
 
 	configs := tokenVaultOIDCConfigs(t, "", true)
 
-	require.Len(t, configs, 3, "two entity plugins and the credential manager plugin")
+	require.Len(t, configs, 4, "two entity plugins, the callback route and the credential manager route")
 	for _, cfg := range configs {
 		require.Equal(t, "authorization:bearer", cfg["upstream_access_token_header"])
 		require.Equal(t, []any{"/vuc/sso/oidc/callback"}, cfg["redirect_uri"])
@@ -425,7 +425,7 @@ func TestAuthStrategyTokenVaultKeepsConfiguredValues(t *testing.T) {
       redirect_uri: [/custom]
       session_secret: mine`, true)
 
-	require.Len(t, configs, 3)
+	require.Len(t, configs, 4)
 	for _, cfg := range configs {
 		require.Equal(t, "x-token", cfg["upstream_access_token_header"])
 		require.Equal(t, []any{"/custom"}, cfg["redirect_uri"])

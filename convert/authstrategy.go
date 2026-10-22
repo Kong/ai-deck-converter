@@ -134,6 +134,9 @@ func (c *Converter) applyAuthStrategyTokenVault(idp *aigw.AuthStrategy, plugin *
 	if err := c.ensureTokenVaultCallbackRoute(src.at("datastores[0].name"), owner, ds, routeSource); err != nil {
 		return err
 	}
+	if err := c.secureCallbackRoute(src, idp); err != nil {
+		return err
+	}
 	if err := c.credentialManagerRoute(src, idp, ds); err != nil {
 		return err
 	}
@@ -189,6 +192,48 @@ func generateSessionSecret() (string, error) {
 	return hex.EncodeToString(bytes), nil
 }
 
+// tokenVaultOIDCConfig returns a copy of the strategy config with the
+// Token Vault defaults.
+func (c *Converter) tokenVaultOIDCConfig(src ConversionIssueSource, idp *aigw.AuthStrategy) (map[string]any, error) {
+	cfg := maps.Clone(idp.Config)
+	if cfg == nil {
+		cfg = map[string]any{}
+	}
+	if err := c.applyTokenVaultOIDCDefaults(src, idp, cfg); err != nil {
+		return nil, err
+	}
+	return cfg, nil
+}
+
+// secureCallbackRoute adds an openid-connect plugin to the Token Vault callback
+// route when the route has none. A plugin that another entity added stays.
+// The function replaces the route, because convertEntity restores only a
+// shallow copy of the output.
+func (c *Converter) secureCallbackRoute(src ConversionIssueSource, idp *aigw.AuthStrategy) error {
+	i := slices.IndexFunc(c.out.Routes, func(r kong.Route) bool { return r.Name == aimap.TokenVaultCallbackName })
+	if i < 0 {
+		return nil
+	}
+	hasOIDC := slices.ContainsFunc(c.out.Routes[i].Plugins, func(p kong.Plugin) bool {
+		return p.Name == authStrategyTypeOpenIDConnect
+	})
+	if hasOIDC {
+		return nil
+	}
+	cfg, err := c.tokenVaultOIDCConfig(src, idp)
+	if err != nil {
+		return err
+	}
+	routes := slices.Clone(c.out.Routes)
+	routes[i].Plugins = append(slices.Clone(routes[i].Plugins), kong.Plugin{
+		Name:   authStrategyTypeOpenIDConnect,
+		Config: cfg,
+		Source: source(kindAuthStrategy, idp.Name, "token_vault"),
+	})
+	c.out.Routes = routes
+	return nil
+}
+
 // credentialManagerRoute adds the route of the auth strategy that serves the
 // Token Vault credential manager. The route has its own openid-connect plugin
 // with the unchanged config of the strategy.
@@ -201,11 +246,8 @@ func (c *Converter) credentialManagerRoute(
 			return nil
 		}
 	}
-	oidcConfig := maps.Clone(idp.Config)
-	if oidcConfig == nil {
-		oidcConfig = map[string]any{}
-	}
-	if err := c.applyTokenVaultOIDCDefaults(src, idp, oidcConfig); err != nil {
+	oidcConfig, err := c.tokenVaultOIDCConfig(src, idp)
+	if err != nil {
 		return err
 	}
 	config := map[string]any{}

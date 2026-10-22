@@ -52,6 +52,27 @@ routes:
             keys:
               - key: '{vault://hcv/vault-enc-key}'
                 version: v1
+      - name: openid-connect
+        config:
+          auth_methods:
+            - bearer
+            - client_credentials
+            - authorization_code
+            - session
+          cache_tokens_salt: 4f1c9a7e2b
+          client_id:
+            - 0oa1b2c3d4e5f6g7h8i9
+          client_secret:
+            - '{vault://hcv/okta/client-secret}'
+          hide_credentials: false
+          issuer: https://dev-123456.okta.com
+          principals:
+            directory: my-directory
+            enabled: true
+          redirect_uri:
+            - /vuc/okta-ai-se/oidc/callback
+          session_secret: 0123456789abcdef0123456789abcdef
+          upstream_access_token_header: authorization:bearer
   - name: token-vault-credential-manager-okta-ai-se
     paths:
       - /vuc/okta-ai-se
