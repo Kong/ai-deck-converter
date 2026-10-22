@@ -165,10 +165,11 @@ func TestEndpointsForAndSectionEndpoints(t *testing.T) {
 		seen[ce.Capability+"/"+ce.Spec.RouteLabel] = true
 	}
 	for _, labelled := range []string{
-		"generate/invoke", "generate/chat", "generate/messages", "agentic/responses",
+		"generate/invoke", "generate/chat", "generate/messages",
 	} {
 		require.True(t, seen[labelled], "SectionEndpoints includes the %s secondary spec", labelled)
 	}
+	require.False(t, seen["agentic/responses"], "the bedrock format has no responses endpoint")
 
 	// A section with no secondaries returns exactly the primary specs.
 	require.Len(t, SectionEndpoints("openai"), len(EndpointTable["openai"]),

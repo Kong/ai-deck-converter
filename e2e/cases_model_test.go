@@ -263,6 +263,45 @@ func testGeminiModelAllCapabilities(t *testing.T, license string) {
 	})
 	gateway.waitReady()
 
+	loaded := requireRoutesLoaded(t, gateway,
+		"gemini-generate", "gemini-enterprise-generate",
+		"gemini-embeddings", "gemini-enterprise-embeddings",
+		"gemini-predict", "gemini-predict-long-running",
+		"gemini-ranking",
+		"gemini-batches", "gemini-enterprise-batches",
+		"gemini-files",
+	)
+	t.Logf("PASS: the gateway accepted all %d gemini capability routes", loaded)
+}
+
+// testBedrockModelAllEndpoints proves the data plane accepts every bedrock
+// endpoint and every bedrock mantle endpoint. A mantle target serves only the
+// openai chat, responses, and files endpoints and the anthropic messages
+// endpoint.
+func testBedrockModelAllEndpoints(t *testing.T, license string) {
+	configPath := convertCase(t, "bedrock_model_all_endpoints", "2.2", nil)
+
+	gateway := startGateway(t, GatewayOptions{
+		Image:  gatewayImage(t, "kong/kong-ai-gateway-dev:39781160847-8e8728ff5c40091224a4182628fac5a80f6b29dc"),
+		Config: configPath,
+		Env:    []string{licenseEnv(license)},
+	})
+	gateway.waitReady()
+
+	loaded := requireRoutesLoaded(t, gateway,
+		"bedrock-converse", "bedrock-invoke", "bedrock-chat", "bedrock-messages",
+		"bedrock-retrieve", "bedrock-rerank",
+		"bedrock-invoke-2", "bedrock-invoke-3", "bedrock-invoke-4",
+		"bedrock-batches",
+		"openai-chat", "openai-responses", "anthropic-messages", "openai-files",
+	)
+	t.Logf("PASS: the gateway accepted all %d bedrock and bedrock mantle routes", loaded)
+}
+
+// requireRoutesLoaded fails t unless the gateway loaded each route in names.
+// It returns the count of loaded routes.
+func requireRoutesLoaded(t *testing.T, gateway *Gateway, names ...string) int {
+	t.Helper()
 	status, _, body := httpGet(gateway.AdminURL() + "/routes")
 	if status != 200 {
 		t.Fatalf("GET /routes returned %d:\n%s", status, body)
@@ -279,17 +318,10 @@ func testGeminiModelAllCapabilities(t *testing.T, license string) {
 	for _, r := range routes.Data {
 		loaded[r.Name] = true
 	}
-	for _, name := range []string{
-		"gemini-generate", "gemini-enterprise-generate",
-		"gemini-embeddings", "gemini-enterprise-embeddings",
-		"gemini-predict", "gemini-predict-long-running",
-		"gemini-ranking",
-		"gemini-batches", "gemini-enterprise-batches",
-		"gemini-files",
-	} {
+	for _, name := range names {
 		if !loaded[name] {
 			t.Fatalf("route %q was not loaded by the gateway; loaded routes: %v", name, loaded)
 		}
 	}
-	t.Logf("PASS: the gateway accepted all %d gemini capability routes", len(routes.Data))
+	return len(routes.Data)
 }

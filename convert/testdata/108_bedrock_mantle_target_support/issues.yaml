@@ -1,0 +1,17 @@
+- code: BEHAVIOR_MAY_DIFFER
+  reason: 'model "mantle-openai" target "openai.gpt-oss-120b": the data plane does not accept this target for capability "embeddings" with llm_format "openai". The routes of this capability will not fail over to it.'
+  source:
+    kind: model
+    name: mantle-openai
+    fields:
+      - capabilities[2]
+      - targets[1]
+  severity: WARNING
+- code: CONFIG_FIELD_INVALID
+  reason: 'model "mantle-unserved": no target can serve capability "image" with llm_format "openai"'
+  source:
+    kind: model
+    name: mantle-unserved
+    fields:
+      - capabilities[1]
+  severity: ERROR

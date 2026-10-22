@@ -295,6 +295,14 @@ and `formats` beyond the first.
   by a `generate` capability — see `convert/testdata/58_bedrock_generate_and_speech`.
   This never breaks round-tripping a converter-produced config, since re-
   converting the recovered model reproduces the same route/target either way.
+- **Bedrock mantle targets.** A `bedrock` target with `endpoint_type: mantle`
+  serves only the `llm/v1/chat`, `llm/v1/responses`, and `llm/v1/files` route
+  types, in the `openai` or `anthropic` format. It therefore gets only the
+  `openai` `generate`, `agentic`, and `files` endpoints and the `anthropic`
+  `generate` endpoint. On any other endpoint of the model the target is left
+  out with a `BEHAVIOR_MAY_DIFFER` warning. The model fails when no target
+  serves a capability. The `bedrock` format has no `responses` endpoint. The
+  data plane rejects `llm/v1/responses` for it.
 - **Credentials.** Only `api-key` (`keyauth_credentials`) is generated; other
   credential types are warned about and skipped.
 - **High-priority model policies reorder `ai-model-selector`.** A model

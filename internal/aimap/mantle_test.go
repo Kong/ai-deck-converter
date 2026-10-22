@@ -26,3 +26,17 @@ func TestMantlePathPrefix(t *testing.T) {
 		require.Equal(t, MantlePathPrefixAuto, MantlePathPrefix(name), name)
 	}
 }
+
+func TestMantleSupports(t *testing.T) {
+	var served []string
+	for _, format := range []string{"openai", "anthropic", "bedrock", "gemini"} {
+		for _, ce := range SectionEndpoints(format) {
+			if MantleSupports(format, ce.Spec) {
+				served = append(served, format+"-"+ce.Spec.RouteLabel)
+			}
+		}
+	}
+	require.ElementsMatch(t, []string{
+		"openai-chat", "openai-responses", "openai-files", "anthropic-messages",
+	}, served)
+}
