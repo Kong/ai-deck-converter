@@ -1,0 +1,8 @@
+- code: UNSUPPORTED_IN_MIN_RUNTIME_VERSION
+  reason: token_vault requires minimum runtime version "2.3", but the configured minimum is "2.2"
+  source:
+    kind: auth_strategy
+    name: okta-ai-se
+    fields:
+      - token_vault
+  severity: ERROR
