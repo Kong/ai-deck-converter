@@ -7,11 +7,9 @@ import (
 	"github.com/Kong/ai-deck-converter/internal/kong"
 )
 
-// aclFields enumerates the acl-plugin config fields an AI Gateway ACL can
-// populate, in schema order. The Kong acl plugin declares all four mutually
-// exclusive. Only the two with cel false have an ai-mcp-proxy counterpart: its
-// default_acl entries and tools[].acl records define allow and deny alone, and
-// Kong rejects an unknown record key outright.
+// aclFields lists the ACL fields in schema order. The Kong acl plugin permits
+// exactly one of them. An MCP ACL sets allow and deny, or allow_when and
+// deny_when.
 var aclFields = []struct {
 	name   string
 	cel    bool
@@ -23,14 +21,11 @@ var aclFields = []struct {
 	{"deny_when", true, func(a aigw.ACLs) []string { return a.DenyWhen }},
 }
 
-// aclConfig builds a config map from the ACL fields that pass keep. Returns nil
-// when no field is populated.
-func aclConfig(acls aigw.ACLs, keep func(cel bool) bool) map[string]any {
+// aclConfig builds a config map from the ACL fields. Returns nil when no field
+// is populated.
+func aclConfig(acls aigw.ACLs) map[string]any {
 	config := map[string]any{}
 	for _, f := range aclFields {
-		if !keep(f.cel) {
-			continue
-		}
 		if values := f.values(acls); len(values) > 0 {
 			config[f.name] = values
 		}
@@ -39,23 +34,6 @@ func aclConfig(acls aigw.ACLs, keep func(cel bool) bool) map[string]any {
 		return nil
 	}
 	return config
-}
-
-// aclBlock builds the {allow, deny} config map every consumer accepts. Returns
-// nil when both lists are empty. The CEL when-expressions live on the acl
-// plugin alone, so aclPlugin builds its own config.
-func aclBlock(acls aigw.ACLs) map[string]any {
-	return aclConfig(acls, func(cel bool) bool { return !cel })
-}
-
-// hasCELExpressions reports whether an ACL carries CEL when-expressions.
-func hasCELExpressions(acls aigw.ACLs) bool {
-	for _, f := range aclFields {
-		if f.cel && len(f.values(acls)) > 0 {
-			return true
-		}
-	}
-	return false
 }
 
 // celFieldPaths returns the path of each CEL field that acls sets. Each path
@@ -83,17 +61,10 @@ func aclFieldsSet(acls aigw.ACLs) []string {
 	return set
 }
 
-// mergeACLs unions two AI Gateway ACLs' lists, base first, so a broader ACL (a
-// server-wide acls block) and a narrower one (default_tool_acls) both apply
-// instead of one shadowing the other. Duplicate subjects are kept as-authored;
-// Kong tolerates them.
+// mergeACLs joins each list of base and extra, base first. The result can set
+// both field pairs, because one ai-mcp-proxy record accepts all four fields.
+// Duplicate subjects stay.
 func mergeACLs(base, extra aigw.ACLs) aigw.ACLs {
-	if extra.IsEmpty() {
-		return base
-	}
-	if base.IsEmpty() {
-		return extra
-	}
 	return aigw.ACLs{
 		Allow:     slices.Concat(base.Allow, extra.Allow),
 		Deny:      slices.Concat(base.Deny, extra.Deny),
@@ -103,10 +74,11 @@ func mergeACLs(base, extra aigw.ACLs) aigw.ACLs {
 }
 
 // defaultACLBlock wraps an AI Gateway ACL into the ai-mcp-proxy config.default_acl
-// array shape: a list of {scope, allow, deny} entries. Returns nil when empty.
-// scope is left unset (Kong defaults it to "tools") per the omit-defaults policy.
+// array shape: a list of {scope, allow, deny, allow_when, deny_when} entries.
+// Returns nil when empty. scope is left unset (Kong defaults it to "tools") per
+// the omit-defaults policy.
 func defaultACLBlock(acls aigw.ACLs) []map[string]any {
-	block := aclBlock(acls)
+	block := aclConfig(acls)
 	if block == nil {
 		return nil
 	}
@@ -122,7 +94,7 @@ func defaultACLBlock(acls aigw.ACLs) []map[string]any {
 // allow/deny entries that name a consumer_groups group would otherwise never
 // match anything and the plugin could never allow a request.
 func aclPlugin(acls aigw.ACLs) kong.Plugin {
-	config := aclConfig(acls, func(bool) bool { return true })
+	config := aclConfig(acls)
 	if config == nil {
 		config = map[string]any{}
 	}

@@ -81,6 +81,7 @@ const (
 	FeatureMCPTokenVault              Feature = "mcp-token-vault"      //nolint:gosec // a feature name, not a credential
 	FeatureProviderTokenVault         Feature = "provider-token-vault" //nolint:gosec // a feature name, not a credential
 	FeatureMCPRateLimiting            Feature = "mcp-rate-limiting"
+	FeatureMCPACLWhen                 Feature = "mcp-acl-when"
 	FeatureGeminiAgenticCapability    Feature = "gemini-agentic-capability"
 	FeatureBaseten                    Feature = "baseten"
 	FeatureSagemaker                  Feature = "sagemaker"
@@ -104,6 +105,7 @@ var featureSince = map[Feature]Version{
 	FeatureMCPTokenVault:              mustVersion("2.3"),
 	FeatureProviderTokenVault:         mustVersion("2.3"),
 	FeatureMCPRateLimiting:            mustVersion("2.3"),
+	FeatureMCPACLWhen:                 mustVersion("2.3"),
 	FeatureGeminiAgenticCapability:    mustVersion("2.3"),
 	FeatureBaseten:                    mustVersion("2.3"),
 	FeatureSagemaker:                  mustVersion("2.1"),

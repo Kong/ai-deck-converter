@@ -1,0 +1,30 @@
+mcp_servers:
+  # access.acls and default_tool_acls merge into one default_acl entry.
+  - type: conversion-listener
+    display_name: Partner Flights MCP
+    name: partner-flights-mcp
+    upstream_url: https://flights.internal.kongair.com
+    config:
+      route: {paths: [/mcp/flights]}
+    access:
+      acls:
+        allow: [partners]
+        deny_when:
+          - "has(principal.metadata.status) && principal.metadata.status == 'suspended'"
+      default_tool_acls:
+        allow_when:
+          - "has(principal.metadata.tier) && principal.metadata.tier == 'gold'"
+    tools:
+      - name: search_flights
+        description: Search flights
+        method: GET
+        path: /flights
+      - name: book_flight
+        description: Book a flight
+        method: POST
+        path: /bookings
+        access:
+          acls:
+            deny: [interns]
+            allow_when:
+              - "has(principal.metadata.role) && principal.metadata.role == 'buyer'"

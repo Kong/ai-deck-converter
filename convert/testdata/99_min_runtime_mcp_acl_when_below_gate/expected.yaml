@@ -1,0 +1,25 @@
+_format_version: "3.0"
+services:
+  - name: booking-mcp
+    url: https://bookings.internal.kongair.com
+    routes:
+      - name: booking-mcp-route
+        paths:
+          - /mcp/bookings
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              default_acl:
+                - allow:
+                    - partners
+              include_consumer_groups: true
+              logging:
+                log_audits: false
+                log_payloads: false
+                log_statistics: true
+              mode: conversion-listener
+              tools:
+                - description: List bookings
+                  method: GET
+                  name: list_bookings
+                  path: /bookings

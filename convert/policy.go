@@ -124,8 +124,7 @@ func (c *Converter) scopedPlugins(src ConversionIssueSource, refs []string, acls
 				"acl policy sets %s, but a Kong acl plugin permits exactly one of "+
 					"allow, deny, allow_when, or deny_when", strings.Join(set, " and "))
 		}
-		if hasCELExpressions(acls) && !c.supports(aimap.FeatureACLWhen) {
-			fields := celFieldPaths("access.acls", acls)
+		if fields := celFieldPaths("access.acls", acls); len(fields) > 0 && !c.supports(aimap.FeatureACLWhen) {
 			return nil, c.failUnsupported(src.at(fields...), aimap.FeatureACLWhen, fields[0])
 		}
 		plugins = append(plugins, aclPlugin(acls))
