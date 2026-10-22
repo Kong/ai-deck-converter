@@ -70,8 +70,8 @@ models:
 
 The `skills` route has only the `primary` target. A failure on this route
 cannot fail over to `fallback`. The other routes have both targets. The
-converter gives a warning on `fallback`. An explicit `skills` capability
-gives the same warning. The other sections of this RFC use this example.
+converter gives no issue. An explicit `skills` capability gives a warning
+on `fallback`. The other sections of this RFC use this example.
 
 # Reference-level explanation
 [reference-level-explanation]: #reference-level-explanation
@@ -209,34 +209,31 @@ The warning names every video model on the route.
 
 ## Issues
 
-Three rules decide if `*` gives an issue:
+Two rules decide if `*` gives an issue:
 
 1. **No issue when `*` causes the result.** The model does not ask for the
    value.
-2. **A warning when another setting removes an endpoint that the model can
-   serve.** A warning also occurs when the provider of a target removes a
-   capability that another target serves.
-3. **An issue when the model or a target cannot serve an explicit value as
+2. **An issue when the model or a target cannot serve an explicit value as
    asked.** The user asked for the value.
 
-Mistakes in the configuration give issues outside these rules.
+Note: an unknown format gives an issue outside these rules.
 
-| Case                                                                                                                                 | Under `*`                    | Explicit list                                                                       | Code and field                                                                              | Rule |
-|--------------------------------------------------------------------------------------------------------------------------------------|------------------------------|-------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------|------|
-| `type` leaves out a capability                                                                                                       | left out, no issue           | not changed                                                                         |                                                                                             | 1    |
-| Passthrough-only pair, for example `(openai, skills)` on `anthropic`. The target serves the capability through another format        | pair left out, no issue      | pair left out, no issue                                                             |                                                                                             | 1    |
-| Pair that no endpoint serves, when another pair serves the capability, for example `(cohere, generate)` next to `(openai, generate)` | left out, no issue           | left out, no issue                                                                  |                                                                                             | 1    |
-| Capability that shares a route with another genai category, for example `(bedrock, embeddings)` on the `invoke` route                | left out, no issue           | left out, no issue when another endpoint serves the capability. Otherwise `WARNING` | `CONFIG_FIELD_DROPPED` on the capability                                                    | 1, 3 |
-| Gated format or capability                                                                                                           | left out, no issue           | model fails                                                                         | `UNSUPPORTED_IN_MIN_RUNTIME_VERSION`                                                        | 1, 3 |
-| Equal paths in two formats                                                                                                           | `openai` kept, no issue      | `openai` kept, no issue                                                             |                                                                                             | 1    |
-| Target cannot serve a capability that another target serves. See Case 3                                                              | target left out, `WARNING`   | target left out, `WARNING`                                                          | `BEHAVIOR_MAY_DIFFER` on `capabilities[i]` and `targets[j]`                                 | 2, 3 |
-| Video lifecycle route with 2+ targets                                                                                                | no issue                     | `WARNING`                                                                           | `BEHAVIOR_MAY_DIFFER` on `targets`                                                          | 1, 3 |
-| Two video models on one route                                                                                                        | no issue for the `*` model   | `WARNING`                                                                           | `ROUTING_CONFLICT` on `config.route`                                                        | 1, 3 |
-| `realtime` that the model cannot protect                                                                                             | endpoint left out, `WARNING` | model fails                                                                         | `BEHAVIOR_MAY_DIFFER` on `access.auth_strategies` or `capabilities`, `CONFIG_FIELD_INVALID` | 2, 3 |
-| No target serves a capability                                                                                                        | N/A                          | model fails                                                                         | `CONFIG_FIELD_INVALID` on the capability                                                    | 3    |
-| Only gated formats serve a capability. For future formats                                                                            | N/A                          | model fails                                                                         | `UNSUPPORTED_IN_MIN_RUNTIME_VERSION`                                                        | 3    |
-| A value next to `*`                                                                                                                  | value ignored, `WARNING`     | N/A                                                                                 | `CONFIG_FIELD_IGNORED` on the value                                                         |      |
-| Unknown format                                                                                                                       | model fails                  | model fails                                                                         | `CONFIG_FIELD_INVALID` on `formats[i].type`                                                 |      |
+| Case                                                                                                                                 | Under `*`                  | Explicit list                                                                       | Code and field                                                                              | Rule |
+|--------------------------------------------------------------------------------------------------------------------------------------|----------------------------|-------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------|------|
+| `type` leaves out a capability                                                                                                       | left out, no issue         | not changed                                                                         |                                                                                             | 1    |
+| Passthrough-only pair, for example `(openai, skills)` on `anthropic`. The target serves the capability through another format        | pair left out, no issue    | pair left out, no issue                                                             |                                                                                             | 1    |
+| Pair that no endpoint serves, when another pair serves the capability, for example `(cohere, generate)` next to `(openai, generate)` | left out, no issue         | left out, no issue                                                                  |                                                                                             | 1    |
+| Capability that shares a route with another genai category, for example `(bedrock, embeddings)` on the `invoke` route                | left out, no issue         | left out, no issue when another endpoint serves the capability. Otherwise `WARNING` | `CONFIG_FIELD_DROPPED` on the capability                                                    | 1, 2 |
+| Gated format or capability                                                                                                           | left out, no issue         | model fails                                                                         | `UNSUPPORTED_IN_MIN_RUNTIME_VERSION`                                                        | 1, 2 |
+| Equal paths in two formats                                                                                                           | `openai` kept, no issue    | `openai` kept, no issue                                                             |                                                                                             | 1    |
+| Target cannot serve a capability that another target serves. See Case 3                                                              | target left out, no issue  | target left out, `WARNING`                                                          | `BEHAVIOR_MAY_DIFFER` on `capabilities[i]` and `targets[j]`                                 | 1, 2 |
+| Video lifecycle route with 2+ targets                                                                                                | no issue                   | `WARNING`                                                                           | `BEHAVIOR_MAY_DIFFER` on `targets`                                                          | 1, 2 |
+| Two video models on one route                                                                                                        | no issue for the `*` model | `WARNING`                                                                           | `ROUTING_CONFLICT` on `config.route`                                                        | 1, 2 |
+| `realtime` that the model cannot protect                                                                                             | left out, no issue         | model fails                                                                         | `CONFIG_FIELD_INVALID`                                                                      | 1, 2 |
+| No target serves a capability                                                                                                        | N/A                        | model fails                                                                         | `CONFIG_FIELD_INVALID` on the capability                                                    | 2    |
+| Only gated formats serve a capability. For future formats                                                                            | N/A                        | model fails                                                                         | `UNSUPPORTED_IN_MIN_RUNTIME_VERSION`                                                        | 2    |
+| A value next to `*`                                                                                                                  | value ignored, no issue    | N/A                                                                                 |                                                                                             | 1    |
+| Unknown format                                                                                                                       | model fails                | model fails                                                                         | `CONFIG_FIELD_INVALID` on `formats[i].type`                                                 |      |
 
 The expansion runs for each target. The converter reports each issue one
 time for each model. The exception is the "target cannot serve" warning. The
@@ -269,14 +266,12 @@ The collected formats and capabilities give the same pairs again. The
 The round trip case that `revert/roundtrip_test.go` asserts stays 
 byte-identical.
 
-The round trip can add or change warnings. The reverter writes explicit
-lists. The second conversion then applies rule 3. `unexpectedIssues`
-accepts these `WARNING` issues, only for a model with `capabilities: ["*"]`
-in the forward input:
+The round trip can add warnings. Under `*`, rule 1 gives no issue. The
+reverter writes explicit lists. The second conversion then applies rule 2.
+`unexpectedIssues` accepts these `WARNING` issues, only for a model with
+`capabilities: ["*"]` in the forward input:
 
-- `BEHAVIOR_MAY_DIFFER` on one `capabilities[i]` and one `targets[j]`. The
-  first conversion reports it on the index of `*`. The second conversion
-  reports it on the index of the explicit capability.
+- `BEHAVIOR_MAY_DIFFER` on one `capabilities[i]` and one `targets[j]`.
 - `BEHAVIOR_MAY_DIFFER` on `targets`.
 - `ROUTING_CONFLICT` on `config.route`.
 
@@ -298,11 +293,17 @@ Only `videoLifecycleCandidates` gives the last two.
   include the video lifecycle route.
 - **More routing conflicts.** A `*` model uses every path under its base
   path. An MCP server or an agent on such a path conflicts with the model.
-- **Issues under `*`.** See [Issues](#issues).
-  - Rule 2 warnings occur on every conversion. `-strict` callers cannot use
-    these models. A common case is an `openai` and an `azure` target.
-  - Rule 1 hides video lifecycle risks and the endpoints that a later
-    runtime version adds.
+- **Results under `*` that give no issue.** See rule 1 of
+  [Issues](#issues). The user gets no signal for these results:
+  - Failover differs for each endpoint. See Case 3.
+  - A video lifecycle request can reach a wrong target.
+  - Auth settings remove the `realtime` endpoint.
+  - A later runtime version adds endpoints.
+  - A value next to `*` is ignored. For example, the user can expect
+    `[{type: "*"}, {type: passthrough}]` to be a passthrough model.
+  - A `bedrock` model serves `generate` on `invoke`, never `embeddings`,
+    `image`, or `video`. A Bedrock embedding or image model needs an
+    explicit list.
 - **Untested format and provider pairs.** `formats: [{type: "*"}]` asks one
   provider to serve every format.
 - **`type: api` models on one route stay merged after a revert.** These
@@ -322,13 +323,15 @@ Only `videoLifecycleCandidates` gives the last two.
   balances over all targets. A target with fewer capabilities then removes
   endpoints from the whole model. This RFC uses the union.
 - **Warn for each value that `*` leaves out or changes.** This covers gated
-  values and the video lifecycle warnings. The user cannot remove these
-  warnings without removing `*`. `-strict` callers then cannot use `*`. One
-  warning for each model has the same problem. This RFC follows rule 1
-  instead.
+  values, a target that cannot serve a capability, the video lifecycle
+  warnings, `realtime` that the model cannot protect, and a value next to
+  `*`. The user cannot remove these warnings without removing `*`.
+  `-strict` callers then cannot use `*`. One warning for each model has the
+  same problem. This RFC follows rule 1 instead.
 - **Never warn for a target that cannot serve a capability.** The round
   trip then needs no exception. The user gets no signal that failover
-  differs. This RFC warns, also under `*`. See rule 2 of [Issues](#issues).
+  differs. This RFC warns only for explicit lists. See rule 1 of
+  [Issues](#issues).
 
 # Unresolved questions
 [unresolved-questions]: #unresolved-questions
@@ -375,24 +378,27 @@ Forward golden cases in `convert/testdata`:
 - `96_multi_format_explicit`: explicit formats and capabilities. A pair
   that no endpoint serves. Equal `realtime` paths.
 - `97_wildcard_ignored_values`: `["*", generate]` and
-  `[{type: "*"}, {type: passthrough}]`.
-- `98_wildcard_issues`: an unknown format, a misspelled capability with `*`
-  formats, a `*` model with two auth strategies, and a `*` model with one
-  `jwt` strategy.
+  `[{type: "*"}, {type: passthrough}]`. No issue.
+- `98_wildcard_issues`: an unknown format and a misspelled capability with
+  `*` formats.
 - `99_multi_format_order_and_normalization`: the fixed pair order for
   `[gemini, openai]`, `vertex` with `*`, and `(openai, skills)` on an
   `anthropic` provider.
 - `100_wildcard_realtime_global_auth`: a `*` model and a global
-  authentication policy. Separate because a global policy applies to every
-  model.
+  authentication policy. The model loses `realtime` with no issue. Separate
+  because a global policy applies to every model.
+- `102_wildcard_realtime_auth_strategies`: a `*` model with two auth
+  strategies loses `realtime` with no issue. A `*` model with one `jwt`
+  strategy keeps `realtime`.
 - `101_wildcard_targets_and_video`: the Case 3 model with explicit lists
   and with `*`. Two `*` models and one explicit `video` model on their own
   base path. The round-trip tests the accepted warnings.
 
-`26_multimodal_collapse_guard` stays unchanged. Its model has only the
-`bedrock` format. No other endpoint serves its dropped capabilities. A new
-model in this case has `formats: [bedrock]` and `[embeddings, generate]`.
-`generate` loses `invoke` with no issue. `converse` still serves it.
+The existing model of `26_multimodal_collapse_guard` keeps its warnings. It
+has only the `bedrock` format. No other endpoint serves its dropped
+capabilities. A new model in this case has `formats: [{type: bedrock}]` and
+`[embeddings, generate]`. `generate` loses `invoke` with no issue.
+`converse` still serves it.
 
 Reverse golden case `revert/testdata/69_model_multi_format`: one model with
 routes in two sections. The expected model has both formats in route order.
