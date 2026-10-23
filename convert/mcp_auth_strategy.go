@@ -414,6 +414,13 @@ func applyOIDCFieldsToOAuth2(cfg, oidc map[string]any) {
 			}
 		}
 	}
+
+	// ai-mcp-oauth2 has only the single-path credential_claim.
+	// The first credential_claims path wins over credential_claim.
+	// Revert gives back credential_claim only.
+	if p := firstConfigPath(oidc, "credential_claims"); len(p) > 0 {
+		cfg["credential_claim"] = p
+	}
 }
 
 // firstConfigString reads config[key] as a string, taking the first element
