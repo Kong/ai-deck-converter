@@ -260,20 +260,20 @@ func (c *Converter) checkModelCapabilities(src ConversionIssueSource, m *aigw.Mo
 // checkCapabilityEndpoints fails m when no format has an endpoint for an
 // explicit capability.
 func (c *Converter) checkCapabilityEndpoints(
-	src ConversionIssueSource, m *aigw.Model, lists modelLists, formats []string, providerType string,
+	src ConversionIssueSource, m *aigw.Model, lists modelLists, formats []string,
 ) error {
 	if lists.capsWildcard {
 		return nil
 	}
 	for _, capability := range lists.capabilities {
 		served := slices.ContainsFunc(formats, func(format string) bool {
-			_, ok := aimap.EndpointsFor(aimap.SectionFor(format, providerType), capability)
+			_, ok := aimap.EndpointsFor(aimap.SectionFor(format, ""), capability)
 			return ok
 		})
 		if !served {
 			return c.fail(src.at(capabilityField(m, capability)), ConfigFieldInvalid,
-				"model %q: capability %q is not supported with llm_format %q for provider type %q",
-				m.Name, capability, strings.Join(formats, ", "), providerType)
+				"model %q: capability %q is not supported with llm_format %q",
+				m.Name, capability, strings.Join(formats, ", "))
 		}
 	}
 	return nil

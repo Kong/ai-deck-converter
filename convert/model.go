@@ -484,7 +484,7 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 		}
 	} else {
 		if len(targets) > 0 {
-			if err := c.checkCapabilityEndpoints(src, m, lists, formats, targets[0].providerType); err != nil {
+			if err := c.checkCapabilityEndpoints(src, m, lists, formats); err != nil {
 				return err
 			}
 		}

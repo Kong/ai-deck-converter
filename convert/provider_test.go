@@ -156,8 +156,7 @@ model_providers:
 	result, err := Convert(src, testOptions)
 	require.NoError(t, err, "convert")
 	issue := requireIssue(t, result.Issues, Error, ConfigFieldInvalid, kindModel, "m1", "capabilities[0]")
-	require.Contains(t, issue.Reason, `capability "rerank" is not supported `+
-		`with llm_format "openai" for provider type "bedrock"`)
+	require.Contains(t, issue.Reason, `capability "rerank" is not supported with llm_format "openai"`)
 	require.Empty(t, result.Output.AIModels, "the model is left out")
 }
 
