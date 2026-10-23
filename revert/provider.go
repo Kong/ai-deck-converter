@@ -1,7 +1,6 @@
 package revert
 
 import (
-	"encoding/json"
 	"fmt"
 	"regexp"
 	"sort"
@@ -10,71 +9,6 @@ import (
 	"github.com/Kong/ai-deck-converter/internal/aigw"
 	"github.com/Kong/ai-deck-converter/internal/aimap"
 )
-
-// detectProviderType maps an ai-proxy-advanced provider enum back to an AI
-// Gateway provider type. The only ambiguous enum is "gemini", which serves
-// both the gemini and vertex provider types; the route path is the deciding
-// signal (vertex routes carry project/location URL templates, gemini routes do
-// not). Aliases and options are no help: both provider types share them.
-//
-// The forward converter renders a gemini capability on its Gemini and its
-// Gemini Enterprise paths alike, whichever provider type serves it, so a
-// Gemini Enterprise-style path only means vertex when the same target is not
-// also served on a Gemini-style one (onGeminiPath; see indexGeminiPathTargets).
-func detectProviderType(enum, routePath string, onGeminiPath bool) string {
-	if enum != "gemini" {
-		return enum
-	}
-	if !onGeminiPath && isGeminiEnterprisePath(routePath) {
-		return "vertex"
-	}
-	return "gemini"
-}
-
-// isGeminiEnterprisePath reports whether a route path carries Gemini Enterprise's
-// project/location URL template.
-func isGeminiEnterprisePath(routePath string) bool {
-	return strings.Contains(routePath, "/projects/") && strings.Contains(routePath, "/locations/")
-}
-
-// geminiTargetKey fingerprints a raw ai-proxy-advanced target independently
-// of its route_type, so one target keys identically across every route the
-// forward converter emitted it on, whichever capability each route serves.
-func geminiTargetKey(target map[string]any) string {
-	rest := make(map[string]any, len(target))
-	for k, v := range target {
-		if k != "route_type" {
-			rest[k] = v
-		}
-	}
-	b, err := json.Marshal(rest)
-	if err != nil {
-		return fmt.Sprintf("%v", rest)
-	}
-	return string(b)
-}
-
-// indexGeminiPathTargets records the geminiTargetKey of every gemini-enum
-// target served on a route with a Gemini-style (non-Gemini Enterprise) path, for
-// detectProviderType.
-func (r *Reverter) indexGeminiPathTargets() {
-	for i := range r.src.Services {
-		for j := range r.src.Services[i].Routes {
-			rt := &r.src.Services[i].Routes[j]
-			if len(rt.Paths) == 0 || isGeminiEnterprisePath(rt.Paths[0]) {
-				continue
-			}
-			for _, proxy := range findPlugins(r.routePlugins(rt), "ai-proxy-advanced") {
-				for _, raw := range getSlice(proxy.Config, "targets") {
-					target, ok := raw.(map[string]any)
-					if ok && getStr(getMap(target, "model"), "provider") == "gemini" {
-						r.geminiPathTargets[geminiTargetKey(target)] = true
-					}
-				}
-			}
-		}
-	}
-}
 
 // defoldedTarget is the result of pulling a single ai-proxy-advanced target
 // apart into its AI Gateway pieces: the target-level fields, the remaining
@@ -86,7 +20,7 @@ type defoldedTarget struct {
 	service         string // azure (azure-openai | azure-foundry)
 	foundryResource string // azure (azure-foundry)
 	foundryDomain   string // azure (azure-foundry)
-	projectID       string // gemini / vertex
+	projectID       string // gemini
 	options         map[string]any
 }
 
@@ -189,7 +123,7 @@ func defoldOptions(options map[string]any, providerType string, d *defoldedTarge
 			out["foundry_path_prefix"] = v
 		case providerType == "anthropic" && k == "anthropic_version":
 			out["version"] = v
-		case (providerType == "gemini" || providerType == "vertex") && k == "gemini":
+		case providerType == "gemini" && k == "gemini":
 			block, _ := v.(map[string]any)
 			if len(block) > 0 {
 				env := make(map[string]any, len(block))
@@ -198,7 +132,7 @@ func defoldOptions(options map[string]any, providerType string, d *defoldedTarge
 				}
 				out["gcp_environment"] = env
 			}
-		case (providerType == "gemini" || providerType == "vertex") && k == "bedrock":
+		case providerType == "gemini" && k == "bedrock":
 			// AWS STS settings for a workload identity federation token exchange
 			// (see convert's mapOptions), not target options.
 			block, _ := v.(map[string]any)

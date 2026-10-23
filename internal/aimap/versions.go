@@ -143,7 +143,7 @@ var formatFeatures = map[string]Feature{
 
 // FormatFeature returns the feature that gates the model format.
 func FormatFeature(format string) (Feature, bool) {
-	f, ok := formatFeatures[NormalizeFormat(format)]
+	f, ok := formatFeatures[format]
 	return f, ok
 }
 

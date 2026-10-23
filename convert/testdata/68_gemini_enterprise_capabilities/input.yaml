@@ -1,13 +1,10 @@
 # Gemini Enterprise-only gemini capabilities. image renders on :predict and video on
 # :predictLongRunning — distinct routes, since one route's ai-proxy-advanced
 # carries a single genai_category. rerank renders on the rankingConfigs :rank
-# path, and generate emits both its Gemini and Gemini Enterprise routes. On revert, the
-# image/video model's target appears only on Gemini Enterprise paths and comes back as a
-# vertex provider; the mixed model's target is also on the Gemini generate
-# route, so it comes back as gemini.
+# path, and generate emits both its Gemini and Gemini Enterprise routes.
 model_providers:
-  - name: vx
-    type: vertex
+  - name: gm
+    type: gemini
     config:
       auth:
         type: gcp
@@ -18,10 +15,10 @@ models:
     capabilities: [image, video]
     formats: [{type: gemini}]
     config: {route: {paths: [/img]}}
-    targets: [{name: imagen-4, provider: vx, config: {type: vertex}}]
+    targets: [{name: imagen-4, provider: gm, config: {type: gemini}}]
   - name: mixed
     type: model
     capabilities: [generate, image, rerank]
     formats: [{type: gemini}]
     config: {route: {paths: [/mix]}}
-    targets: [{name: gemini-2.5, provider: vx, config: {type: vertex}}]
+    targets: [{name: gemini-2.5, provider: gm, config: {type: gemini}}]

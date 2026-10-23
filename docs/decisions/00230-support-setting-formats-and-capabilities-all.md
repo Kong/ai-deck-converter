@@ -85,10 +85,9 @@ When a list holds `*`, the converter ignores every other value of that list.
 list. `[{type: "*"}, {type: passthrough}]` is therefore not a passthrough
 model.
 
-Each format that the converter uses must be `*`, a value of
-`aimap.Formats()`, or a format alias such as `vertex`. Any other value fails
-the model. Today an unknown format fails only when no endpoint serves its
-capabilities.
+Each format that the converter uses must be `*` or a value of
+`aimap.Formats()`. Any other value fails the model. Today an unknown format
+fails only when no endpoint serves its capabilities.
 
 | Field          | Absent or `[]`     | `*` value             |
 |----------------|--------------------|-----------------------|
@@ -122,15 +121,13 @@ lists for each target.
 out these formats:
 
 - `passthrough`.
-- Format aliases, for example `vertex`.
 - A format with a `FormatFeature` gate that `minRuntimeVersion` does not
   support. The function returns it in `unsupported`.
 
-`WildcardCapabilities` normalizes the format, for example `vertex` to
-`gemini`. It starts from `aimap.CapabilitiesFor(format, providerType)`. That
-function already leaves out a passthrough-only capability, for example
-`skills`, when the provider does not speak the format. `WildcardCapabilities`
-then leaves out these capabilities:
+`WildcardCapabilities` starts from `aimap.CapabilitiesFor(format,
+providerType)`. That function already leaves out a passthrough-only
+capability, for example `skills`, when the provider does not speak the
+format. `WildcardCapabilities` then leaves out these capabilities:
 
 - For a `type: model` model, `batches` and `files`.
 - For a `type: api` model, every other capability.
@@ -382,8 +379,7 @@ Forward golden cases in `convert/testdata`:
 - `98_wildcard_issues`: an unknown format and a misspelled capability with
   `*` formats.
 - `99_multi_format_order_and_normalization`: the fixed pair order for
-  `[gemini, openai]`, `vertex` with `*`, and `(openai, skills)` on an
-  `anthropic` provider.
+  `[gemini, openai]` and `(openai, skills)` on an `anthropic` provider.
 - `100_wildcard_realtime_global_auth`: a `*` model and a global
   authentication policy. The model loses `realtime` with no issue. Separate
   because a global policy applies to every model.

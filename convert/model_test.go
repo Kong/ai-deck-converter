@@ -249,7 +249,6 @@ func TestPassthroughWarnsAboutProvidersWithoutNativeFormat(t *testing.T) {
 		"bedrock":     false,
 		"cohere":      false,
 		"gemini":      false,
-		"vertex":      false,
 		"huggingface": false,
 		"azure":       true,
 		"mistral":     true,
@@ -282,7 +281,7 @@ models:
 }
 
 // TestPassthroughAllowsHostDisambiguatedModels pins that two passthrough models on one base
-// path convert when their hosts tell them apart, and that gemini and vertex targets mix.
+// path convert when their hosts tell them apart.
 func TestPassthroughAllowsHostDisambiguatedModels(t *testing.T) {
 	_, _, err := convertDoc([]byte(`models:
   - name: a
@@ -294,7 +293,6 @@ func TestPassthroughAllowsHostDisambiguatedModels(t *testing.T) {
     config: {route: {paths: [/ai], hosts: [b.example]}}
     targets:
       - {name: g, provider: p, config: {type: gemini}}
-      - {name: v, provider: p, config: {type: vertex}}
 `+passthroughProviders), false)
 	require.NoError(t, err)
 }

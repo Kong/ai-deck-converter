@@ -160,8 +160,7 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 			modelMap := getMap(target, "model")
 			alias := getStr(modelMap, "model_alias")
 			routeType := getStr(target, "route_type")
-			providerType := detectProviderType(
-				getStr(modelMap, "provider"), path, r.geminiPathTargets[geminiTargetKey(target)])
+			providerType := getStr(modelMap, "provider")
 			section := aimap.SectionFor(llmFormat, providerType)
 
 			var capability string
