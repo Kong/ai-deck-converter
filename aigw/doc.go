@@ -5,6 +5,7 @@ import internal "github.com/Kong/ai-deck-converter/internal/aigw"
 type (
 	Document          = internal.Document
 	Model             = internal.Model
+	Capability        = internal.Capability
 	Format            = internal.Format
 	ModelConfig       = internal.ModelConfig
 	ModelNameConfig   = internal.ModelNameConfig
