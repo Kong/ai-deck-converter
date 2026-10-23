@@ -1,6 +1,7 @@
 package convert
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/Kong/ai-deck-converter/internal/aigw"
@@ -398,4 +399,134 @@ func mapOptions(
 
 func isBedrockAnthropicModelName(name string) bool {
 	return strings.Contains(strings.ToLower(name), "anthropic.claude")
+}
+
+// tokenVaultExchangePlugin is the plugin that a provider's token_vault lowers
+// into.
+const tokenVaultExchangePlugin = "token-vault-exchange" //nolint:gosec // a plugin name, not a credential
+
+// tokenVaultProblem is a token_vault check that a provider fails.
+// Field is the path of the failing provider field.
+type tokenVaultProblem struct {
+	Field  string
+	Code   ConversionIssueCode
+	Reason string
+}
+
+// providerTokenVaultDatastore returns the token-vault Datastore of provider p.
+// It returns the first check that p fails instead. owner names the referencing
+// entity in the reason.
+func (c *Converter) providerTokenVaultDatastore(
+	owner string, p *aigw.Provider,
+) (*aigw.Datastore, *tokenVaultProblem) {
+	if resolveAuth(p, nil) != nil {
+		return nil, &tokenVaultProblem{
+			Field: "token_vault", Code: ConfigFieldInvalid,
+			Reason: fmt.Sprintf(
+				"%s: token_vault and credentials in config.auth are mutually exclusive", owner),
+		}
+	}
+	if p.TokenVault.Provider == "" {
+		return nil, &tokenVaultProblem{
+			Field: "token_vault", Code: MissingRequiredConfigField,
+			Reason: fmt.Sprintf("%s: token_vault requires provider", owner),
+		}
+	}
+	if len(p.Datastores) != 1 {
+		return nil, &tokenVaultProblem{
+			Field: "datastores", Code: MissingRequiredConfigField,
+			Reason: fmt.Sprintf("%s: token_vault requires exactly one %q datastore",
+				owner, aimap.DatastoreTypeTokenVault),
+		}
+	}
+	ds := c.datastores[p.Datastores[0].Name]
+	if ds == nil {
+		return nil, &tokenVaultProblem{
+			Field: "datastores[0].name", Code: UndefinedReference,
+			Reason: fmt.Sprintf("%s references unknown datastore %q", owner, p.Datastores[0].Name),
+		}
+	}
+	if ds.Type != aimap.DatastoreTypeTokenVault {
+		return nil, &tokenVaultProblem{
+			Field: "datastores[0].name", Code: ConfigFieldInvalid,
+			Reason: fmt.Sprintf("%s: token_vault does not support a %q datastore; use %q instead",
+				owner, ds.Type, aimap.DatastoreTypeTokenVault),
+		}
+	}
+	return ds, nil
+}
+
+// validateModelProviderTokenVaults reports the token_vault problems of every
+// model provider, also of a provider that no model targets.
+// The output keeps no callback route of an unused provider.
+func (c *Converter) validateModelProviderTokenVaults() {
+	for i := range c.src.ModelProviders {
+		p := &c.src.ModelProviders[i]
+		if p.TokenVault == nil {
+			continue
+		}
+		src := issueSource(kindModelProvider, p.Name)
+		owner := fmt.Sprintf("provider %q", p.Name)
+		snapshot := *c.out
+		ds, problem := c.providerTokenVaultDatastore(owner, p)
+		if problem != nil {
+			c.reportError(src.at(problem.Field), problem.Code, "%s", problem.Reason)
+		} else {
+			// A model that targets p adds this route during the model pass.
+			_ = c.ensureTokenVaultCallbackRoute(src.at("datastores[0].name"), owner, ds,
+				source(kindModelProvider, p.Name, "token_vault"))
+		}
+		*c.out = snapshot
+	}
+}
+
+// providerTokenVault returns the token-vault-exchange config of the provider
+// of target j, or nil if the provider has no token_vault. The plugin replaces
+// the target's credential. A provider with static auth cannot also have
+// token_vault.
+func (c *Converter) providerTokenVault(
+	src ConversionIssueSource, m *aigw.Model, j int, p *aigw.Provider,
+) (map[string]any, error) {
+	at := src.at(fmt.Sprintf("targets[%d].provider", j))
+	owner := fmt.Sprintf("model %q target %q: provider %q", m.Name, m.TargetModels[j].Name, p.Name)
+	tv := p.TokenVault
+	if tv == nil {
+		if len(p.Datastores) > 0 {
+			return nil, c.fail(at, ConfigFieldInvalid,
+				"%s references datastore %q, but datastores require token_vault",
+				owner, p.Datastores[0].Name)
+		}
+		return nil, nil
+	}
+	if !c.supports(aimap.FeatureProviderTokenVault) {
+		return nil, c.failUnsupported(at, aimap.FeatureProviderTokenVault, "provider token_vault")
+	}
+	ds, problem := c.providerTokenVaultDatastore(owner, p)
+	if problem != nil {
+		// The model target names the reference that needs the change.
+		return nil, c.fail(at, problem.Code, "%s", problem.Reason)
+	}
+	cfg, err := aimap.ApplyTokenVaultDatastore(aimap.TokenVaultToPlugin(tv), ds)
+	if err != nil {
+		return nil, c.fail(at, ConfigFieldInvalid, "%s: %v", owner, err)
+	}
+	routeSource := source(kindModel, m.Name, fmt.Sprintf("targets[%d].provider", j))
+	if err := c.ensureTokenVaultCallbackRoute(at, owner, ds, routeSource); err != nil {
+		return nil, err
+	}
+	return cfg, nil
+}
+
+// checkEmbeddingsTokenVault fails the model when its embeddings provider has
+// token_vault. ai-proxy-advanced sends the embeddings request itself.
+// token-vault-exchange cannot set the credential of that request.
+func (c *Converter) checkEmbeddingsTokenVault(src ConversionIssueSource, m *aigw.Model) error {
+	emb, _ := balancerExtra(m.Config.Balancer, "embeddings").(map[string]any)
+	name, _ := emb["provider"].(string)
+	if p := c.providers[name]; p != nil && p.TokenVault != nil {
+		return c.fail(src.at("config.balancer.embeddings.provider"), ConfigFieldInvalid,
+			"model %q: embeddings provider %q has token_vault, but %s cannot set "+
+				"the credential of the embeddings request", m.Name, name, tokenVaultExchangePlugin)
+	}
+	return nil
 }

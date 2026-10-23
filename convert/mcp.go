@@ -2,7 +2,9 @@ package convert
 
 import (
 	"fmt"
+	"reflect"
 	"slices"
+	"strings"
 
 	"github.com/Kong/ai-deck-converter/internal/aigw"
 	"github.com/Kong/ai-deck-converter/internal/aimap"
@@ -264,6 +266,36 @@ func (c *Converter) pruneUnexposedSources(conversionOnlyServices []int, exposed 
 		kept = append(kept, c.out.Services[i])
 	}
 	c.out.Services = kept
+	c.pruneUnusedTokenVaultCallbackRoute()
+}
+
+// pruneUnusedTokenVaultCallbackRoute removes the Token Vault callback route
+// when no remaining service, model provider or credential manager uses a
+// Token Vault.
+func (c *Converter) pruneUnusedTokenVaultCallbackRoute() {
+	for _, plugin := range c.out.Plugins {
+		if plugin.Name == tokenVaultExchangePlugin {
+			return
+		}
+	}
+	for _, route := range c.out.Routes {
+		if strings.HasPrefix(route.Name, aimap.TokenVaultCredentialManagerName+"-") {
+			return
+		}
+	}
+	for _, service := range c.out.Services {
+		for _, route := range service.Routes {
+			for _, plugin := range route.Plugins {
+				auth, _ := plugin.Config["auth"].(map[string]any)
+				if plugin.Name == "ai-mcp-proxy" && auth["provider"] == aimap.UpstreamAuthProviderTokenVault {
+					return
+				}
+			}
+		}
+	}
+	c.out.Routes = slices.DeleteFunc(c.out.Routes, func(r kong.Route) bool {
+		return r.Name == aimap.TokenVaultCallbackName
+	})
 }
 
 // addTag appends tag to tags if absent, keeping the result sorted so conversion
@@ -308,28 +340,40 @@ func (c *Converter) mcpPlugin(src ConversionIssueSource, m *aigw.MCPServer) (kon
 			"MCP server %q: token_vault and config.upstream.auth are mutually exclusive "+
 				"(both lower to the ai-mcp-proxy plugin's auth record)", m.Name)
 	}
-	// Kong's Token Vault caches exchanged credentials in Redis encrypted with
-	// encryption_secrets, so a redis block without them is rejected by the
-	// plugin's own entity check. Reject here rather than emit a config decK
-	// would refuse to apply.
-	if tv := m.TokenVault; tv != nil && tv.Redis != nil && len(tv.EncryptionSecrets) == 0 {
-		return kong.Plugin{}, c.fail(src.at("token_vault.encryption_secrets"), MissingRequiredConfigField,
-			"MCP server %q: token_vault.encryption_secrets is required when token_vault.redis is configured", m.Name)
+	tvDatastore, err := c.resolveMCPDatastore(src, m)
+	if err != nil {
+		return kong.Plugin{}, err
 	}
 	// A present but empty token_vault block would otherwise lower to
-	// auth.token_vault: {} — the plugin schema requires directory and provider
-	// when provider is token_vault, so reject it the same way. (After this the
-	// lowered block can never be empty.)
-	if tv := m.TokenVault; tv != nil && (tv.Directory == "" || tv.Provider == "") {
-		return kong.Plugin{}, c.fail(src.at("token_vault.directory", "token_vault.provider"), MissingRequiredConfigField,
-			"MCP server %q: token_vault requires directory and provider", m.Name)
+	// auth.token_vault: {} — the plugin schema requires provider when the auth
+	// provider is token_vault, so reject it the same way. The directory is
+	// optional.
+	if tv := m.TokenVault; tv != nil && tv.Provider == "" {
+		return kong.Plugin{}, c.fail(src.at("token_vault.provider"), MissingRequiredConfigField,
+			"MCP server %q: token_vault requires provider", m.Name)
 	}
 	// Token Vault credential resolution (auth.provider: token_vault); only
 	// emitted when set.
 	if tv := m.TokenVault; tv != nil {
+		block := aimap.TokenVaultToPlugin(tv)
+		if tvDatastore != nil {
+			block, err = aimap.ApplyTokenVaultDatastore(block, tvDatastore)
+			if err != nil {
+				return kong.Plugin{}, c.fail(src.at("datastores"), ConfigFieldInvalid,
+					"MCP server %q: %v", m.Name, err)
+			}
+		}
+		if tvDatastore != nil {
+			owner := fmt.Sprintf("MCP server %q", m.Name)
+			routeSource := source(kindMCPServer, m.Name, "datastores")
+			at := src.at("datastores[0].name")
+			if err := c.ensureTokenVaultCallbackRoute(at, owner, tvDatastore, routeSource); err != nil {
+				return kong.Plugin{}, err
+			}
+		}
 		cfg["auth"] = map[string]any{
 			"provider":    aimap.UpstreamAuthProviderTokenVault,
-			"token_vault": aimap.TokenVaultToPlugin(tv),
+			"token_vault": block,
 		}
 	}
 	// Upstream authentication (e.g. AWS SigV4) lowers to the plugin's auth
@@ -467,4 +511,70 @@ func setIfNotEmptyMap(m map[string]any, key string, val map[string]any) {
 	if len(val) > 0 {
 		m[key] = val
 	}
+}
+
+// resolveMCPDatastore returns the Datastore the server references, or nil when
+// it has none. A token_vault without a datastore gives a warning.
+func (c *Converter) resolveMCPDatastore(src ConversionIssueSource, m *aigw.MCPServer) (*aigw.Datastore, error) {
+	if len(m.Datastores) == 0 {
+		// Servers made before Token Vault datastores existed have none.
+		// They keep working without the callback route.
+		if m.TokenVault != nil {
+			c.warn(src.at("datastores"), MissingRequiredConfigField,
+				"MCP server %q: token_vault has no %q datastore. "+
+					"The output has no Token Vault callback route for this server.",
+				m.Name, aimap.DatastoreTypeTokenVault)
+		}
+		return nil, nil
+	}
+	if len(m.Datastores) > 1 {
+		return nil, c.fail(src.at("datastores"), ConfigFieldInvalid,
+			"MCP server %q has %d datastores, but only one is allowed", m.Name, len(m.Datastores))
+	}
+	if m.TokenVault == nil {
+		return nil, c.fail(src.at("datastores", "token_vault"), ConfigFieldInvalid,
+			"MCP server %q references datastore %q, but datastores require token_vault",
+			m.Name, m.Datastores[0].Name)
+	}
+	ds := c.datastores[m.Datastores[0].Name]
+	if ds == nil {
+		return nil, c.fail(src.at("datastores[0].name"), UndefinedReference,
+			"MCP server %q references unknown datastore %q", m.Name, m.Datastores[0].Name)
+	}
+	return ds, nil
+}
+
+// ensureTokenVaultCallbackRoute adds the Token Vault callback route once. A
+// later entity with a different connection fails, because one route cannot
+// serve two connections.
+func (c *Converter) ensureTokenVaultCallbackRoute(
+	at ConversionIssueSource, owner string, ds *aigw.Datastore, routeSource *kong.Source,
+) error {
+	config, err := aimap.ApplyTokenVaultDatastore(nil, ds)
+	if err != nil {
+		return c.fail(at, ConfigFieldInvalid, "%s: %v", owner, err)
+	}
+	for _, route := range c.out.Routes {
+		if route.Name != aimap.TokenVaultCallbackName {
+			continue
+		}
+		if !reflect.DeepEqual(route.Plugins[0].Config, config) {
+			return c.fail(at, ConfigFieldInvalid,
+				"%s references datastore %q, but another entity already "+
+					"uses a different token-vault datastore", owner, ds.Name)
+		}
+		return nil
+	}
+	c.out.Routes = append(c.out.Routes, kong.Route{
+		Name:      aimap.TokenVaultCallbackName,
+		Paths:     []string{aimap.TokenVaultCallbackPath},
+		Protocols: []string{"http", "https"},
+		Plugins: []kong.Plugin{{
+			Name:   aimap.TokenVaultCallbackName,
+			Config: config,
+			Source: routeSource,
+		}},
+		Source: routeSource,
+	})
+	return nil
 }

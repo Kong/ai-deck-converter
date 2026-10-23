@@ -1,42 +1,32 @@
+datastores:
+  - name: vault-konnect-prod
+    type: token-vault
+    config:
+      directory: my-directory
+
 mcp_servers:
   # passthrough MCP server resolving its upstream credential per request via
-  # Kong's Token Vault, with Redis-backed cross-node caching of the exchanged
-  # (encrypted) credentials.
+  # Kong's Token Vault, with an explicit subject token type.
   - type: passthrough-listener
     display_name: Vaulted Vendor MCP
     name: vaulted-vendor-mcp
     upstream_url: https://mcp.internal.kongair.com
     config: {route: {paths: [/mcp/vaulted-vendor-mcp]}}
+    datastores: [{name: vault-konnect-prod}]
     token_vault:
-      directory: my-directory
       provider: my-upstream-provider
-      encryption_secrets:
-        - "{vault://env/TOKEN_VAULT_ENC_SECRET}"
-        - "{vault://env/TOKEN_VAULT_ENC_SECRET_OLD}"
-      redis:
-        host: redis.internal
-        port: 6379
-        database: 0
-        connect_timeout: 2000
-        keepalive:
-          pool_size: 256
-        sentinel:
-          master: mymaster
-          role: any
-          nodes:
-            - {host: sentinel-1.internal, port: 6379}
+      subject_token_type: access_token
     tools:
       - name: vendorTool
         description: A vendor tool
-  # bare token_vault (no redis, no secrets): exchanged credentials are cached
-  # per node only.
+  # bare token_vault: only the required provider.
   - type: passthrough-listener
     display_name: Bare Vaulted Vendor MCP
     name: bare-vaulted-vendor-mcp
     upstream_url: https://bare-mcp.internal.kongair.com
     config: {route: {paths: [/mcp/bare-vaulted-vendor-mcp]}}
+    datastores: [{name: vault-konnect-prod}]
     token_vault:
-      directory: my-directory
       provider: my-other-upstream-provider
     tools:
       - name: bareVendorTool

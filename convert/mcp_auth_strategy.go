@@ -61,6 +61,11 @@ func (c *Converter) mcpAuthStrategyPlugins(
 		return nil, err
 	}
 
+	if idp != nil {
+		if err := c.applyAuthStrategyTokenVault(idp); err != nil {
+			return nil, err
+		}
+	}
 	// key-auth cannot serve OAuth 2.0 Protected Resource Metadata; reject the
 	// combination unconditionally.
 	if meta != nil && idp != nil && idp.Type == "key-auth" {

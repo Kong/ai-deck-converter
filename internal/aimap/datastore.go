@@ -13,9 +13,10 @@ import (
 // where they're actually validated and interpreted, so nothing compares
 // against a bare string literal.
 const (
-	DatastoreTypeRedisCE  = "redis-ce"
-	DatastoreTypeRedisEE  = "redis-ee"
-	DatastoreTypeVectorDB = "vectordb" // despite the name, always pgvector; see datastoreTypeVectorDBMap.
+	DatastoreTypeRedisCE    = "redis-ce"
+	DatastoreTypeRedisEE    = "redis-ee"
+	DatastoreTypeTokenVault = "token-vault"
+	DatastoreTypeVectorDB   = "vectordb" // despite the name, always pgvector; see datastoreTypeVectorDBMap.
 )
 
 const (
@@ -360,3 +361,47 @@ func ApplyModelDatastore(vectordb any, datastoreType string, dsConfig map[string
 	block, _ := vectordb.(map[string]any)
 	return mergeVectorDBDatastore(block, strategy, dsConfig), nil
 }
+
+// TokenVaultStorageBackendKonnect is the storage backend of a Datastore-backed
+// Token Vault.
+const TokenVaultStorageBackendKonnect = "konnect"
+
+// ApplyTokenVaultDatastore puts a token-vault Datastore's connection into the
+// plugin's auth.token_vault block. The directory key stays at the top of the
+// block. Every other config key goes under storage.
+// The storage block always has backend set to konnect. The Datastore wins over
+// any directory the block already has. The function does not change its inputs.
+func ApplyTokenVaultDatastore(block map[string]any, ds *aigw.Datastore) (map[string]any, error) {
+	if ds.Type != DatastoreTypeTokenVault {
+		return nil, fmt.Errorf("an MCP server does not support a %q datastore; use %q instead",
+			ds.Type, DatastoreTypeTokenVault)
+	}
+	out := make(map[string]any, len(block)+2) //nolint:mnd
+	maps.Copy(out, block)
+	storage := make(map[string]any, len(ds.Config))
+	for k, v := range ds.Config {
+		if k == "directory" {
+			out[k] = v
+			continue
+		}
+		storage[k] = v
+	}
+	storage["backend"] = TokenVaultStorageBackendKonnect
+	out["storage"] = storage
+	return out, nil
+}
+
+// TokenVaultCallbackName is the name of the route and of the plugin that
+// handle the Token Vault callback.
+const TokenVaultCallbackName = "token-vault-callback-handler"
+
+// TokenVaultCredentialManagerName is the name of the plugin that manages the
+// Token Vault credentials of an auth strategy. The route name starts with it.
+const TokenVaultCredentialManagerName = "token-vault-credential-manager"
+
+// TokenVaultCredentialManagerPath is the path prefix of the credential
+// manager route. The auth strategy name follows it.
+const TokenVaultCredentialManagerPath = "/vuc"
+
+// TokenVaultCallbackPath is the path of the Token Vault callback route.
+const TokenVaultCallbackPath = "/_vault"

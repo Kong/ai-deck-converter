@@ -2194,6 +2194,7 @@ models:
 	require.NoError(t, err)
 	require.Empty(t, result.Issues)
 	require.Empty(t, result.Output.Services)
+	require.Empty(t, result.Output.Routes)
 	require.Empty(t, result.Output.Plugins)
 	require.Empty(t, result.Output.AIModels)
 }

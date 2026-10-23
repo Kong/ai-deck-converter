@@ -1,0 +1,75 @@
+_format_version: "3.0"
+services:
+  - name: github-tools
+    url: https://github-mcp.internal.kongair.com
+    routes:
+      - name: github-tools-route
+        paths:
+          - /mcp/github-tools
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              auth:
+                provider: token_vault
+                token_vault:
+                  directory: my-directory
+                  provider: github
+                  storage:
+                    backend: konnect
+                    current_version: v1
+                    keys:
+                      - key: '{vault://hcv/vault-enc-key}'
+                        version: v1
+              include_consumer_groups: true
+              logging:
+                log_audits: false
+                log_payloads: false
+                log_statistics: true
+              mode: passthrough-listener
+              tools:
+                - description: A GitHub tool
+                  name: githubTool
+          - name: openid-connect
+            config:
+              auth_methods:
+                - bearer
+              client_id:
+                - 0oa1b2c3d4e5f6g7h8i9
+              hide_credentials: false
+              issuer: https://dev-123456.okta.com
+              login_action: redirect
+              redirect_uri:
+                - https://app.example.com/callback
+              session_cookie_same_site: Strict
+              upstream_access_token_header: x-token
+routes:
+  - name: token-vault-callback-handler
+    paths:
+      - /_vault
+    protocols:
+      - http
+      - https
+    plugins:
+      - name: token-vault-callback-handler
+        config:
+          directory: my-directory
+          storage:
+            backend: konnect
+            current_version: v1
+            keys:
+              - key: '{vault://hcv/vault-enc-key}'
+                version: v1
+      - name: openid-connect
+        config:
+          auth_methods:
+            - bearer
+            - session
+            - authorization_code
+          authorization_cookie_path: /_vault
+          client_id:
+            - 0oa1b2c3d4e5f6g7h8i9
+          hide_credentials: false
+          issuer: https://dev-123456.okta.com
+          preserve_query_args: true
+          session_secret: 0123456789abcdef0123456789abcdef
+          upstream_access_token_header: authorization:bearer

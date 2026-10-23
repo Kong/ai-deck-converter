@@ -50,9 +50,11 @@ var allFeatures = []Feature{
 	FeatureFailoverHTTPCodes,
 	FeatureBedrockVPCEndpoint,
 	FeatureMCPTokenVault,
+	FeatureProviderTokenVault,
 	FeatureMCPRateLimiting,
 	FeatureBaseten,
 	FeatureGeminiAgenticCapability,
+	FeatureAuthStrategyTokenVault,
 }
 
 func TestFeatureTable(t *testing.T) {
