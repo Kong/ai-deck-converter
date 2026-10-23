@@ -148,5 +148,7 @@ func (c *Converter) run() {
 	c.warnGlobalPoliciesForWebSocket()
 	c.convertMCPServers()
 	c.convertAgents()
+	c.secureTokenVaultCallbackRoute()
+	c.revealTokenVaultCredentials()
 	c.lint()
 }

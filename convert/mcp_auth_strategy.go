@@ -62,8 +62,7 @@ func (c *Converter) mcpAuthStrategyPlugins(
 	}
 
 	if idp != nil {
-		probe := kong.Plugin{Config: map[string]any{}}
-		if err := c.applyAuthStrategyTokenVault(idp, &probe); err != nil {
+		if err := c.applyAuthStrategyTokenVault(idp); err != nil {
 			return nil, err
 		}
 	}
@@ -114,9 +113,6 @@ func (c *Converter) mcpAuthStrategyPlugins(
 		cfg["hide_credentials"] = false
 	}
 	plugin := kong.Plugin{Name: idp.Type, Config: cfg, Source: source("identity_provider", idp.Name, "config")}
-	if err := c.applyAuthStrategyTokenVault(idp, &plugin); err != nil {
-		return nil, err
-	}
 	return []kong.Plugin{plugin}, nil
 }
 

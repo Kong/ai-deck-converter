@@ -22,6 +22,11 @@ type Document struct {
 	Certificates   []Certificate   `yaml:"certificates,omitempty"`
 	AIModels       []AIModel       `yaml:"ai_models,omitempty"`
 	CACertificates []CACertificate `yaml:"ca_certificates,omitempty"`
+
+	// TokenVaultAuthStrategies holds the names of the used openid-connect auth
+	// strategies that have a token-vault Datastore. It is not output.
+	// A rollback of the document also rolls back this list.
+	TokenVaultAuthStrategies []string `yaml:"-"`
 }
 
 // Metadata returns the AI Gateway source of each generated entity.
