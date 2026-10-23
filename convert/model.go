@@ -1489,8 +1489,9 @@ func (c *Converter) checkModelFeatures(src ConversionIssueSource, m *aigw.Model)
 // model's caps must already be its post-override value ([""]), since its
 // declared capabilities never reach the data plane and so must never gate it.
 func (c *Converter) checkModelCapabilities(src ConversionIssueSource, m *aigw.Model, caps []string) error {
+	section := aimap.SectionFor(llmFormat(m, ""), "")
 	for _, capability := range caps {
-		if f, gated := aimap.CapabilityFeature(capability); gated && !c.supports(f) {
+		if f, gated := aimap.CapabilityFeature(section, capability); gated && !c.supports(f) {
 			field := capabilityField(m, capability)
 			return c.failUnsupported(src.at(field), f, fmt.Sprintf("%s: %s", field, capability))
 		}
