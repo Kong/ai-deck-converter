@@ -1,0 +1,70 @@
+# baseten needs 2.3. At 2.2 a semantic model with baseten embeddings is absent
+# with an error. The type can come from the embeddings config or the provider.
+model_providers:
+  - name: openai-prod
+    type: openai
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://ai/openai-token}"
+  - name: baseten-embed
+    type: baseten
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "Bearer {vault://ai/baseten-token}"
+models:
+  - name: explicit-type
+    type: model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    targets:
+      - name: gpt-4o
+        provider: openai-prod
+        config: {type: openai}
+    config:
+      route: {paths: [/explicit]}
+      balancer:
+        algorithm: semantic
+        embeddings:
+          model:
+            name: baseten-embed-model
+            config: {type: baseten}
+  - name: provider-type
+    type: model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    targets:
+      - name: gpt-4o
+        provider: openai-prod
+        config: {type: openai}
+    config:
+      route: {paths: [/provider]}
+      balancer:
+        algorithm: semantic
+        embeddings:
+          provider: baseten-embed
+          model:
+            name: baseten-embed-model
+            config: {}
+  - name: openai-embeddings
+    type: model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    targets:
+      - name: gpt-4o
+        provider: openai-prod
+        config: {type: openai}
+    config:
+      route: {paths: [/openai]}
+      balancer:
+        algorithm: semantic
+        embeddings:
+          provider: openai-prod
+          model:
+            name: text-embedding-3-small
+            config: {type: openai}

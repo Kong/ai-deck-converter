@@ -1,0 +1,16 @@
+- code: UNSUPPORTED_IN_MIN_RUNTIME_VERSION
+  reason: provider type baseten requires minimum runtime version "2.3", but the configured minimum is "2.2"
+  source:
+    kind: model
+    name: explicit-type
+    fields:
+      - config.balancer.embeddings.model.config.type
+  severity: ERROR
+- code: UNSUPPORTED_IN_MIN_RUNTIME_VERSION
+  reason: provider type baseten requires minimum runtime version "2.3", but the configured minimum is "2.2"
+  source:
+    kind: model
+    name: provider-type
+    fields:
+      - config.balancer.embeddings.provider
+  severity: ERROR

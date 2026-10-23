@@ -1,0 +1,721 @@
+_format_version: "3.0"
+_transform: false
+services:
+  - id: 947a4e23-b483-5a65-8165-da9aed24565b
+    name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    host: ai-gateway.upstream.local
+    port: 80
+    protocol: http
+routes:
+  - id: 934cbaf7-d722-5a54-ae50-48c0b63343dd
+    name: bedrock-converse
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - ~/bedrock/model/(?<model_name>[^/]+)/converse(?:-stream)?
+    methods:
+      - GET
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: df12ed34-44b5-5c3d-9c3d-908ece02fb32
+    name: bedrock-invoke
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - ~/bedrock/model/(?<model_name>[^/]+)/invoke(?:-with-response-stream)?
+    methods:
+      - GET
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: 3e5bbe5f-d382-52f7-837e-2701814528e5
+    name: bedrock-chat
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /bedrock/openai/v1/chat/completions
+    methods:
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: f389aa8d-e597-5c0f-8678-04572278e83e
+    name: bedrock-messages
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /bedrock/anthropic/v1/messages
+    methods:
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: 78397398-a48f-503c-ba71-7ac2ea7b5883
+    name: bedrock-retrieve
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - ~/bedrock/model/(?<model_name>[^/]+)/retrieveAndGenerate(?:Stream)?
+    methods:
+      - GET
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: 57dbc083-73ad-583e-b144-a4006f6e1721
+    name: bedrock-rerank
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - ~/bedrock/model/(?<model_name>[^/]+)/rerank
+    methods:
+      - GET
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: b6ef3b88-21e0-5e31-87a9-83d5d69a7599
+    name: bedrock-invoke-2
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - ~/bedrock-embeddings/model/(?<model_name>[^/]+)/invoke(?:-with-response-stream)?
+    methods:
+      - GET
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: 42ad48c4-fa26-5e28-9b81-47e4b976b972
+    name: bedrock-invoke-3
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - ~/bedrock-image/model/(?<model_name>[^/]+)/invoke(?:-with-response-stream)?
+    methods:
+      - GET
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: fd893c85-2a3a-522b-9c79-f97f8980442d
+    name: bedrock-invoke-4
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - ~/bedrock-video/model/(?<model_name>[^/]+)/invoke(?:-with-response-stream)?
+    methods:
+      - GET
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: a65a9e4b-10b4-5de0-93ae-0173e5ae0346
+    name: bedrock-batches
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - ~/bedrock-batches/model-invocation-jobs?(?:/[^/]+(?:/stop)?)?
+    methods:
+      - GET
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+    name: openai-chat
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /mantle-openai/chat/completions
+    methods:
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: 1a3f650c-2709-5e79-a792-7ffd18243fbf
+    name: openai-responses
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /mantle-openai/responses
+    methods:
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: bb559a54-dc17-5c0f-b946-b0d9c5cebd7a
+    name: anthropic-messages
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /mantle-anthropic/v1/messages
+    methods:
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: b433d478-0f40-5518-b6bb-815583936241
+    name: openai-files
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /mantle-files/files
+    methods:
+      - GET
+      - POST
+      - DELETE
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+plugins:
+  - id: 17fa8192-4b9f-5b5a-8379-20ad8bc836a7
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - path_pattern: model/([^/]+)/
+          source: path
+    route:
+      id: 934cbaf7-d722-5a54-ae50-48c0b63343dd
+  - id: f3adc007-171c-5519-8763-3a0eef79bde3
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: bedrock
+      targets:
+        - auth:
+            aws_access_key_id: e2e-fake-access-key-id
+            aws_secret_access_key: e2e-fake-secret-access-key
+          description: anthropic.claude-sonnet-4-5
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: bedrock-chat
+            name: anthropic.claude-sonnet-4-5
+            options:
+              anthropic_version: bedrock-2023-05-31
+              bedrock:
+                aws_region: us-east-1
+            provider: bedrock
+          route_type: llm/v1/chat
+    route:
+      id: 934cbaf7-d722-5a54-ae50-48c0b63343dd
+    model:
+      id: 45407819-61a7-5d51-a737-b63bcbab37ff
+  - id: dcebfb31-cc0f-5469-b6d7-9d8807a4e8d2
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - path_pattern: model/([^/]+)/
+          source: path
+    route:
+      id: df12ed34-44b5-5c3d-9c3d-908ece02fb32
+  - id: 75ff22ed-6245-594b-895f-6a9fa36f4581
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: bedrock
+      targets:
+        - auth:
+            aws_access_key_id: e2e-fake-access-key-id
+            aws_secret_access_key: e2e-fake-secret-access-key
+          description: anthropic.claude-sonnet-4-5
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: bedrock-chat
+            name: anthropic.claude-sonnet-4-5
+            options:
+              anthropic_version: bedrock-2023-05-31
+              bedrock:
+                aws_region: us-east-1
+            provider: bedrock
+          route_type: llm/v1/chat
+    route:
+      id: df12ed34-44b5-5c3d-9c3d-908ece02fb32
+    model:
+      id: 45407819-61a7-5d51-a737-b63bcbab37ff
+  - id: 5477cac7-3c38-581b-899b-f9d520e9d5e4
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route:
+      id: 3e5bbe5f-d382-52f7-837e-2701814528e5
+  - id: 628550fd-b362-5247-b3ba-f2f6fa95de13
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: bedrock
+      targets:
+        - auth:
+            aws_access_key_id: e2e-fake-access-key-id
+            aws_secret_access_key: e2e-fake-secret-access-key
+          description: anthropic.claude-sonnet-4-5
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: bedrock-chat
+            name: anthropic.claude-sonnet-4-5
+            options:
+              anthropic_version: bedrock-2023-05-31
+              bedrock:
+                aws_region: us-east-1
+            provider: bedrock
+          route_type: llm/v1/chat
+    route:
+      id: 3e5bbe5f-d382-52f7-837e-2701814528e5
+    model:
+      id: 45407819-61a7-5d51-a737-b63bcbab37ff
+  - id: 3912bf60-1edb-5602-89ae-a8a2e41177f4
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route:
+      id: f389aa8d-e597-5c0f-8678-04572278e83e
+  - id: ccc68bd9-2622-5864-b026-137e5c06c755
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: bedrock
+      targets:
+        - auth:
+            aws_access_key_id: e2e-fake-access-key-id
+            aws_secret_access_key: e2e-fake-secret-access-key
+          description: anthropic.claude-sonnet-4-5
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: bedrock-chat
+            name: anthropic.claude-sonnet-4-5
+            options:
+              anthropic_version: bedrock-2023-05-31
+              bedrock:
+                aws_region: us-east-1
+            provider: bedrock
+          route_type: llm/v1/chat
+    route:
+      id: f389aa8d-e597-5c0f-8678-04572278e83e
+    model:
+      id: 45407819-61a7-5d51-a737-b63bcbab37ff
+  - id: cd4aa418-5dc5-57fe-860c-f5ddb6889d88
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - path_pattern: model/([^/]+)/
+          source: path
+    route:
+      id: 78397398-a48f-503c-ba71-7ac2ea7b5883
+  - id: d7038ac4-55db-505a-824e-d2a548ec7424
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: bedrock
+      targets:
+        - auth:
+            aws_access_key_id: e2e-fake-access-key-id
+            aws_secret_access_key: e2e-fake-secret-access-key
+          description: anthropic.claude-sonnet-4-5
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: bedrock-chat
+            name: anthropic.claude-sonnet-4-5
+            options:
+              anthropic_version: bedrock-2023-05-31
+              bedrock:
+                aws_region: us-east-1
+            provider: bedrock
+          route_type: llm/v1/chat
+    route:
+      id: 78397398-a48f-503c-ba71-7ac2ea7b5883
+    model:
+      id: 45407819-61a7-5d51-a737-b63bcbab37ff
+  - id: b5fb23d3-496f-532c-9b75-245ccfee68d3
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - path_pattern: model/([^/]+)/
+          source: path
+    route:
+      id: 57dbc083-73ad-583e-b144-a4006f6e1721
+  - id: e4b46606-e4f5-57c3-9298-949d4e990f2d
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: bedrock
+      targets:
+        - auth:
+            aws_access_key_id: e2e-fake-access-key-id
+            aws_secret_access_key: e2e-fake-secret-access-key
+          description: anthropic.claude-sonnet-4-5
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: bedrock-chat
+            name: anthropic.claude-sonnet-4-5
+            options:
+              anthropic_version: bedrock-2023-05-31
+              bedrock:
+                aws_region: us-east-1
+            provider: bedrock
+          route_type: llm/v1/chat
+    route:
+      id: 57dbc083-73ad-583e-b144-a4006f6e1721
+    model:
+      id: 45407819-61a7-5d51-a737-b63bcbab37ff
+  - id: 47b56eb4-93bb-5ba2-a7a7-1b24635b434e
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - path_pattern: model/([^/]+)/
+          source: path
+    route:
+      id: b6ef3b88-21e0-5e31-87a9-83d5d69a7599
+  - id: 1fc0cc9b-eb94-5eb9-8c69-d8361c990007
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/embeddings
+      llm_format: bedrock
+      targets:
+        - auth:
+            aws_access_key_id: e2e-fake-access-key-id
+            aws_secret_access_key: e2e-fake-secret-access-key
+          description: amazon.titan-embed-text-v2:0
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: bedrock-embeddings
+            name: amazon.titan-embed-text-v2:0
+            options:
+              bedrock:
+                aws_region: us-east-1
+            provider: bedrock
+          route_type: llm/v1/embeddings
+    route:
+      id: b6ef3b88-21e0-5e31-87a9-83d5d69a7599
+    model:
+      id: 8341f2ba-6b26-53ae-9c7a-7c90f348a415
+  - id: b21a1b0e-3d70-5c23-84a5-d25fee046ce9
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - path_pattern: model/([^/]+)/
+          source: path
+    route:
+      id: 42ad48c4-fa26-5e28-9b81-47e4b976b972
+  - id: cf7316be-1398-5d7d-bed6-bacd43b095b8
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: image/generation
+      llm_format: bedrock
+      targets:
+        - auth:
+            aws_access_key_id: e2e-fake-access-key-id
+            aws_secret_access_key: e2e-fake-secret-access-key
+          description: amazon.nova-canvas-v1:0
+          logging:
+            log_payloads: false
+            log_statistics: false
+          model:
+            model_alias: bedrock-image
+            name: amazon.nova-canvas-v1:0
+            options:
+              bedrock:
+                aws_region: us-east-1
+            provider: bedrock
+          route_type: image/v1/images/generations
+    route:
+      id: 42ad48c4-fa26-5e28-9b81-47e4b976b972
+    model:
+      id: 803c8bc7-8690-5271-b1a8-b52a08e5748f
+  - id: ea5f9246-1910-58d8-9d91-68ca8f388d7d
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - path_pattern: model/([^/]+)/
+          source: path
+    route:
+      id: fd893c85-2a3a-522b-9c79-f97f8980442d
+  - id: 5f4b0e19-29d1-5ce6-b34f-3e1394bf878e
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: video/generation
+      llm_format: bedrock
+      targets:
+        - auth:
+            aws_access_key_id: e2e-fake-access-key-id
+            aws_secret_access_key: e2e-fake-secret-access-key
+          description: amazon.nova-reel-v1:1
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: bedrock-video
+            name: amazon.nova-reel-v1:1
+            options:
+              bedrock:
+                aws_region: us-east-1
+                video_output_s3_uri: s3://e2e-bucket/videos
+            provider: bedrock
+          route_type: video/v1/videos/generations
+    route:
+      id: fd893c85-2a3a-522b-9c79-f97f8980442d
+    model:
+      id: 0835e469-295d-5fcc-9115-467aed1342ab
+  - id: e5d9f5b0-2145-5715-8c71-796608710480
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: bedrock
+      model_name_header: false
+      targets:
+        - auth:
+            aws_access_key_id: e2e-fake-access-key-id
+            aws_secret_access_key: e2e-fake-secret-access-key
+          description: anthropic.claude-sonnet-4-5
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: anthropic.claude-sonnet-4-5
+            options:
+              anthropic_version: bedrock-2023-05-31
+              bedrock:
+                aws_region: us-east-1
+                batch_bucket_prefix: s3://e2e-bucket/batches/
+                batch_role_arn: arn:aws:iam::123456789012:role/e2e-batch
+            provider: bedrock
+          route_type: llm/v1/batches
+    route:
+      id: a65a9e4b-10b4-5de0-93ae-0173e5ae0346
+  - id: c059681f-5745-5af7-9bfa-b22fa2f982d1
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+  - id: cccc78d9-7846-57bc-af68-12f85e625fcd
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            aws_access_key_id: e2e-fake-access-key-id
+            aws_secret_access_key: e2e-fake-secret-access-key
+          description: openai.gpt-oss-120b
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: mantle-openai
+            name: openai.gpt-oss-120b
+            options:
+              bedrock:
+                aws_region: us-east-1
+                endpoint_type: mantle
+                mantle_openai_path_prefix: /v1
+            provider: bedrock
+          route_type: llm/v1/chat
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+    model:
+      id: 337a0f42-f075-5ed7-85a7-069f5ba0d5a9
+  - id: 17eaf231-63cd-5a56-a5e2-23ac294f4c9b
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route:
+      id: 1a3f650c-2709-5e79-a792-7ffd18243fbf
+  - id: dd276604-c64f-5c9f-85c3-f358cc3115c0
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            aws_access_key_id: e2e-fake-access-key-id
+            aws_secret_access_key: e2e-fake-secret-access-key
+          description: openai.gpt-oss-120b
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: mantle-openai
+            name: openai.gpt-oss-120b
+            options:
+              bedrock:
+                aws_region: us-east-1
+                endpoint_type: mantle
+                mantle_openai_path_prefix: /v1
+            provider: bedrock
+          route_type: llm/v1/responses
+    route:
+      id: 1a3f650c-2709-5e79-a792-7ffd18243fbf
+    model:
+      id: 337a0f42-f075-5ed7-85a7-069f5ba0d5a9
+  - id: ad35bedc-5ff8-5182-8be6-fa58212663b8
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route:
+      id: bb559a54-dc17-5c0f-b946-b0d9c5cebd7a
+  - id: fc67fd65-983a-5b80-9bda-de44a1de9b6a
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      targets:
+        - auth:
+            aws_access_key_id: e2e-fake-access-key-id
+            aws_secret_access_key: e2e-fake-secret-access-key
+          description: anthropic.claude-sonnet-4-5
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: mantle-anthropic
+            name: anthropic.claude-sonnet-4-5
+            options:
+              anthropic_version: bedrock-2023-05-31
+              bedrock:
+                aws_region: us-east-1
+                endpoint_type: mantle
+                mantle_openai_path_prefix: auto_detect
+            provider: bedrock
+          route_type: llm/v1/chat
+    route:
+      id: bb559a54-dc17-5c0f-b946-b0d9c5cebd7a
+    model:
+      id: 670ee2da-e67b-59f4-811d-48aec0ff00d0
+  - id: f767a5a0-2605-5ec7-a54b-54b5ba91d32e
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      model_name_header: false
+      targets:
+        - auth:
+            aws_access_key_id: e2e-fake-access-key-id
+            aws_secret_access_key: e2e-fake-secret-access-key
+          description: openai.gpt-oss-120b
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: openai.gpt-oss-120b
+            options:
+              bedrock:
+                aws_region: us-east-1
+                endpoint_type: mantle
+                mantle_openai_path_prefix: /v1
+            provider: bedrock
+          route_type: llm/v1/files
+    route:
+      id: b433d478-0f40-5518-b6bb-815583936241
+ai_models:
+  - id: 45407819-61a7-5d51-a737-b63bcbab37ff
+    name: bedrock-chat
+  - id: 8341f2ba-6b26-53ae-9c7a-7c90f348a415
+    name: bedrock-embeddings
+  - id: 803c8bc7-8690-5271-b1a8-b52a08e5748f
+    name: bedrock-image
+  - id: 0835e469-295d-5fcc-9115-467aed1342ab
+    name: bedrock-video
+  - id: ccd72abd-a653-5f00-9e96-7367fc418604
+    name: bedrock-batches
+  - id: 337a0f42-f075-5ed7-85a7-069f5ba0d5a9
+    name: mantle-openai
+  - id: 670ee2da-e67b-59f4-811d-48aec0ff00d0
+    name: mantle-anthropic
+  - id: dd90a1f2-89af-5fdc-acc4-7e2935d5498b
+    name: mantle-files

@@ -41,6 +41,7 @@ func TestE2E(t *testing.T) {
 		{"pre_function_model_ordering_auth", func(t *testing.T) { testPreFunctionModelOrderingKeepsAuthFirst(t, license) }},
 		{"model_scoped_request_termination_auth", func(t *testing.T) { testModelScopedRequestTermination(t, license) }},
 		{"gemini_model_all_capabilities", func(t *testing.T) { testGeminiModelAllCapabilities(t, license) }},
+		{"bedrock_model_all_endpoints", func(t *testing.T) { testBedrockModelAllEndpoints(t, license) }},
 		{"reusable_toolsets_are_internal_only", func(t *testing.T) { testReusableToolsetsAreInternalOnly(t, license) }},
 		{"token_vault_gates_tools_and_enrolls", func(t *testing.T) { testTokenVaultGatesToolsAndEnrolls(t, license) }},
 		{"realtime_model_websocket_transport", func(t *testing.T) { testRealtimeModelWebSocketTransport(t, license) }},

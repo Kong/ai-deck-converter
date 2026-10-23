@@ -443,16 +443,12 @@ var EndpointTable = map[string]map[string]EndpointEntry{
 				},
 			},
 		},
+		// The data plane rejects llm/v1/responses in the bedrock format. A
+		// mantle target serves the Responses API in the openai format.
 		"agentic": {
 			Primary: EndpointSpec{
 				"retrieve", "model/(?<model_name>[^/]+)/retrieveAndGenerate(?:Stream)?",
 				true, mGetPost, "llm/v1/chat", catTextGen, &bedrockPathModelSelectorConfig, true,
-			},
-			Secondary: []EndpointSpec{
-				{
-					"responses", "/openai/v1/responses", false, mPost, "llm/v1/responses", catTextGen,
-					&defaultBodyModelSelectorConfig, true,
-				},
 			},
 		},
 		"embeddings": {

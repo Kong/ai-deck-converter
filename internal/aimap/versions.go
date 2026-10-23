@@ -80,6 +80,7 @@ const (
 	FeatureMCPTokenVault              Feature = "mcp-token-vault" //nolint:gosec // a feature name, not a credential
 	FeatureMCPRateLimiting            Feature = "mcp-rate-limiting"
 	FeatureGeminiAgenticCapability    Feature = "gemini-agentic-capability"
+	FeatureBaseten                    Feature = "baseten"
 )
 
 // featureSince maps each feature to its first AI Gateway release. The source
@@ -98,6 +99,7 @@ var featureSince = map[Feature]Version{
 	FeatureMCPTokenVault:              mustVersion("2.3"),
 	FeatureMCPRateLimiting:            mustVersion("2.3"),
 	FeatureGeminiAgenticCapability:    mustVersion("2.3"),
+	FeatureBaseten:                    mustVersion("2.3"),
 }
 
 // Since returns the first AI Gateway release that has f. It panics for an
@@ -127,8 +129,12 @@ var FailoverHTTPCodes = map[string]bool{
 	"http_422": true, "http_522": true, "http_529": true, "http_5xx": true,
 }
 
-// TypesafeProviderType is the provider type that FeatureTypesafe gates.
-const TypesafeProviderType = "typesafe"
+const (
+	// TypesafeProviderType is the provider type that FeatureTypesafe gates.
+	TypesafeProviderType = "typesafe"
+	// BasetenProviderType is the provider type that FeatureBaseten gates.
+	BasetenProviderType = "baseten"
+)
 
 var formatFeatures = map[string]Feature{
 	PassthroughFormat:    FeaturePassthroughFormat,
@@ -138,6 +144,17 @@ var formatFeatures = map[string]Feature{
 // FormatFeature returns the feature that gates the model format.
 func FormatFeature(format string) (Feature, bool) {
 	f, ok := formatFeatures[NormalizeFormat(format)]
+	return f, ok
+}
+
+var providerFeatures = map[string]Feature{
+	TypesafeProviderType: FeatureTypesafe,
+	BasetenProviderType:  FeatureBaseten,
+}
+
+// ProviderFeature returns the feature that gates the provider type.
+func ProviderFeature(providerType string) (Feature, bool) {
+	f, ok := providerFeatures[providerType]
 	return f, ok
 }
 

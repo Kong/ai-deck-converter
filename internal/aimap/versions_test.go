@@ -51,6 +51,7 @@ var allFeatures = []Feature{
 	FeatureBedrockVPCEndpoint,
 	FeatureMCPTokenVault,
 	FeatureMCPRateLimiting,
+	FeatureBaseten,
 	FeatureGeminiAgenticCapability,
 }
 
@@ -77,6 +78,15 @@ func TestFeatureLookups(t *testing.T) {
 	_, ok = FormatFeature("openai")
 	require.False(t, ok)
 	_, ok = FormatFeature("vertex")
+	require.False(t, ok)
+
+	f, ok = ProviderFeature("typesafe")
+	require.True(t, ok)
+	require.Equal(t, FeatureTypesafe, f)
+	f, ok = ProviderFeature("baseten")
+	require.True(t, ok)
+	require.Equal(t, FeatureBaseten, f)
+	_, ok = ProviderFeature("cerebras")
 	require.False(t, ok)
 
 	f, ok = CapabilityFeature("openai", "skills")

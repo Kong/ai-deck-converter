@@ -1,0 +1,96 @@
+# Every bedrock endpoint and every bedrock mantle endpoint.
+# Each invoke capability has a different genai category. Each therefore has its own model.
+model_providers:
+  - name: bedrock-prod
+    type: bedrock
+    display_name: Bedrock Prod
+    config:
+      auth:
+        type: aws
+        access_key_id: e2e-fake-access-key-id
+        secret_access_key: e2e-fake-secret-access-key
+models:
+  - name: bedrock-chat
+    type: model
+    capabilities: [ generate, agentic, rerank, audio/speech ]
+    formats: [ { type: bedrock } ]
+    config:
+      route: { paths: [ /bedrock ] }
+    targets:
+      - name: anthropic.claude-sonnet-4-5
+        provider: bedrock-prod
+        config: { type: bedrock, region: us-east-1 }
+  - name: bedrock-embeddings
+    type: model
+    capabilities: [ embeddings ]
+    formats: [ { type: bedrock } ]
+    config:
+      route: { paths: [ /bedrock-embeddings ] }
+    targets:
+      - name: amazon.titan-embed-text-v2:0
+        provider: bedrock-prod
+        config: { type: bedrock, region: us-east-1 }
+  - name: bedrock-image
+    type: model
+    capabilities: [ image ]
+    formats: [ { type: bedrock } ]
+    config:
+      route: { paths: [ /bedrock-image ] }
+    targets:
+      - name: amazon.nova-canvas-v1:0
+        provider: bedrock-prod
+        config: { type: bedrock, region: us-east-1 }
+  - name: bedrock-video
+    type: model
+    capabilities: [ video ]
+    formats: [ { type: bedrock } ]
+    config:
+      route: { paths: [ /bedrock-video ] }
+    targets:
+      - name: amazon.nova-reel-v1:1
+        provider: bedrock-prod
+        config: { type: bedrock, region: us-east-1, video_output_s3_uri: "s3://e2e-bucket/videos" }
+  - name: bedrock-batches
+    type: api
+    capabilities: [ batches ]
+    formats: [ { type: bedrock } ]
+    config:
+      route: { paths: [ /bedrock-batches ] }
+    targets:
+      - name: anthropic.claude-sonnet-4-5
+        provider: bedrock-prod
+        config:
+          type: bedrock
+          region: us-east-1
+          batch_bucket_prefix: "s3://e2e-bucket/batches/"
+          batch_role_arn: "arn:aws:iam::123456789012:role/e2e-batch"
+  - name: mantle-openai
+    type: model
+    capabilities: [ generate, agentic ]
+    formats: [ { type: openai } ]
+    config:
+      route: { paths: [ /mantle-openai ] }
+    targets:
+      - name: openai.gpt-oss-120b
+        provider: bedrock-prod
+        config: { type: bedrock, region: us-east-1, endpoint_type: mantle }
+  - name: mantle-anthropic
+    type: model
+    capabilities: [ generate ]
+    formats: [ { type: anthropic } ]
+    config:
+      route: { paths: [ /mantle-anthropic ] }
+    targets:
+      - name: anthropic.claude-sonnet-4-5
+        provider: bedrock-prod
+        config: { type: bedrock, region: us-east-1, endpoint_type: mantle }
+  - name: mantle-files
+    type: api
+    capabilities: [ files ]
+    formats: [ { type: openai } ]
+    config:
+      route: { paths: [ /mantle-files ] }
+    targets:
+      - name: openai.gpt-oss-120b
+        provider: bedrock-prod
+        config: { type: bedrock, region: us-east-1, endpoint_type: mantle }

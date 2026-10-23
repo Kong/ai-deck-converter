@@ -3,7 +3,6 @@ models:
     name: claude-bedrock
     capabilities:
       - generate
-      - agentic
     formats:
       - type: bedrock
     targets:

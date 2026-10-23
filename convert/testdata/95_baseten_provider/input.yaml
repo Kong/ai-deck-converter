@@ -1,0 +1,27 @@
+# baseten speaks the OpenAI format. A target without upstream_url uses the
+# Model APIs default. A dedicated deployment sets upstream_url.
+model_providers:
+  - name: baseten-prod
+    type: baseten
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "Bearer {vault://ai/baseten-token}"
+models:
+  - name: baseten-chat
+    type: model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/baseten]}
+    targets:
+      - name: deepseek-ai/DeepSeek-V4-Pro-0813
+        provider: baseten-prod
+        config: {type: baseten}
+      - name: my-served-model
+        provider: baseten-prod
+        config:
+          type: baseten
+          upstream_url: https://model-abc123.api.baseten.co/environments/production/sync/v1/chat/completions
