@@ -1,0 +1,43 @@
+# sagemaker needs 2.1. At 2.0:
+# - a sagemaker target on another model is absent with a warning;
+# - a model whose only target is sagemaker is absent with an error.
+model_providers:
+  - name: sagemaker-prod
+    type: sagemaker
+    config:
+      auth:
+        type: sagemaker
+        access_key_id: "{vault://env/aws-key-id}"
+        secret_access_key: "{vault://env/aws-secret}"
+        session_token: "{vault://env/aws-session-token}"
+  - name: openai-prod
+    type: openai
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://ai/openai-token}"
+models:
+  - name: mixed-gpt
+    type: model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/mixed]}
+    targets:
+      - name: gpt-4o
+        provider: openai-prod
+        config: {type: openai}
+      - name: anthropic.claude-3-5-sonnet
+        provider: sagemaker-prod
+        config: {type: sagemaker}
+  - name: only-sagemaker
+    type: model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/only]}
+    targets:
+      - name: anthropic.claude-3-5-sonnet
+        provider: sagemaker-prod
