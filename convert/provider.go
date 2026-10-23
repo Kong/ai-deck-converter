@@ -206,8 +206,8 @@ func lowerEmbeddingsModel(emb map[string]any, provider *aigw.Provider) (provider
 	if !explicit && provider != nil {
 		providerType = provider.Type
 	}
-	// Emit the ai-proxy-advanced provider enum (e.g. vertex -> gemini), matching
-	// the target path (convert/model.go), rather than the raw AI Gateway type.
+	// Emit the ai-proxy-advanced provider enum, matching the target path
+	// (convert/model.go), rather than the raw AI Gateway type.
 	model["provider"] = aimap.PluginProvider(providerType)
 
 	opts := map[string]any{}
@@ -284,7 +284,7 @@ func mapOptions(
 			out["azure_foundry_path_prefix"] = v
 		case providerType == "anthropic" && k == "version":
 			out["anthropic_version"] = v
-		case (providerType == "gemini" || providerType == "vertex") && k == "gcp_environment":
+		case providerType == "gemini" && k == "gcp_environment":
 			if env, ok := v.(map[string]any); ok {
 				for ek, ev := range env {
 					if aimap.GeminiOptionKeys[ek] {
@@ -351,10 +351,10 @@ func mapOptions(
 				out["azure_foundry_domain"] = provider.Config.Foundry.Domain
 			}
 		}
-		// A gemini/vertex provider federating from an AWS IAM identity signs the
+		// A gemini provider federating from an AWS IAM identity signs the
 		// token exchange with AWS, so its region and assume-role settings ride in
 		// the same model.options.bedrock block the bedrock provider uses.
-		if providerType == "gemini" || providerType == "vertex" {
+		if providerType == "gemini" {
 			if wif := provider.Config.Auth.WorkloadIdentityFederation; wif != nil {
 				if wif.AWSRegion != "" {
 					addNested("bedrock", "aws_region", wif.AWSRegion)

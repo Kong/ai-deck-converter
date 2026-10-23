@@ -12,7 +12,6 @@ func TestFormats(t *testing.T) {
 	// without a section of its own.
 	want := []string{"anthropic", "bedrock", "cohere", "gemini", "huggingface", "openai", "passthrough", "typesafe"}
 	require.Equal(t, want, got)
-	require.NotContains(t, got, "vertex", "vertex is an alias of gemini, not a client format")
 }
 
 func TestClientFormatPassthroughBorrowsTheProviderSection(t *testing.T) {
@@ -20,9 +19,6 @@ func TestClientFormatPassthroughBorrowsTheProviderSection(t *testing.T) {
 	require.Equal(t, "openai", ClientFormat("passthrough", "openai"))
 	require.Equal(t, "anthropic", ClientFormat("passthrough", "anthropic"))
 	require.Equal(t, "bedrock", ClientFormat("passthrough", "bedrock"))
-	// A format alias resolves through its base format and section.
-	require.Equal(t, "gemini", ClientFormat("passthrough", "vertex"))
-	require.Equal(t, "gemini", SectionFor("passthrough", "vertex"))
 	// Providers with no section of their own expose OpenAI-shaped APIs.
 	for _, providerType := range []string{"azure", "mistral", "databricks", "deepseek", ""} {
 		require.Equal(t, "openai", ClientFormat("passthrough", providerType), providerType)
@@ -39,18 +35,14 @@ func TestRoutePathPassthroughIsTheBasePath(t *testing.T) {
 }
 
 func TestCapabilitiesFor(t *testing.T) {
-	// The gemini section covers Gemini and Gemini Enterprise endpoints alike, whichever provider serves it.
-	for _, providerType := range []string{"gemini", "vertex"} {
-		require.Equal(t,
-			[]string{"generate", "agentic", "batches", "embeddings", "files", "image", "realtime", "rerank", "video"},
-			CapabilitiesFor("gemini", providerType), providerType)
-	}
+	// The gemini section covers Gemini and Gemini Enterprise endpoints alike.
+	require.Equal(t,
+		[]string{"generate", "agentic", "batches", "embeddings", "files", "image", "realtime", "rerank", "video"},
+		CapabilitiesFor("gemini", "gemini"))
 	// A format whose section is provider-independent.
 	require.Equal(t, []string{"rerank"}, CapabilitiesFor("cohere", "cohere"))
-	// An unknown format yields nil, as does a format alias (parity with Formats, which excludes
-	// "vertex").
+	// An unknown format yields nil.
 	require.Nil(t, CapabilitiesFor("nope", ""))
-	require.Nil(t, CapabilitiesFor("vertex", "vertex"))
 }
 
 func TestSectionDerivation(t *testing.T) {
@@ -63,8 +55,7 @@ func TestSectionDerivation(t *testing.T) {
 		{"anthropic", "anthropic", "anthropic"},
 		{"bedrock", "bedrock", "bedrock"},
 		{"gemini", "gemini", "gemini"},
-		{"gemini", "vertex", "gemini"}, // gemini format served by Vertex
-		{"", "openai", "openai"},       // default format
+		{"", "openai", "openai"}, // default format
 	}
 	for _, tc := range cases {
 		got := SectionFor(tc.format, tc.providerType)
@@ -151,8 +142,6 @@ func TestGeminiEnterpriseEndpoints(t *testing.T) {
 		require.True(t, ok, capability)
 		require.Equal(t, specs, got, capability)
 	}
-	_, ok := EndpointTable["vertex"]
-	require.False(t, ok, "vertex is served by the gemini section")
 }
 
 func TestEndpointLookupAndNormalization(t *testing.T) {

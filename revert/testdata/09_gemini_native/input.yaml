@@ -36,12 +36,12 @@ plugins:
             gcp_service_account_json: '{vault://ai/gcp-service-account-json}'
             gcp_use_service_account: true
           model:
-            model_alias: '@vertex/gemini-2.5-pro'
+            model_alias: '@gemini/gemini-2.5-pro'
             name: gemini-2.5-pro
             options:
               gemini:
                 location_id: us-central1
-                project_id: kong-vertex-project
+                project_id: kong-gemini-project
               max_tokens: 4096
               temperature: 1
             provider: gemini
@@ -66,18 +66,18 @@ plugins:
             gcp_service_account_json: '{vault://ai/gcp-service-account-json}'
             gcp_use_service_account: true
           model:
-            model_alias: '@vertex/text-embedding-005'
+            model_alias: '@gemini/text-embedding-005'
             name: text-embedding-005
             options:
               gemini:
                 location_id: us-central1
-                project_id: kong-vertex-project
+                project_id: kong-gemini-project
             provider: gemini
           route_type: llm/v1/embeddings
     route:
       name: gemini-embeddings
 ai_models:
-  - name: vertex-gemini-2-5-pro
-    alias: '@vertex/gemini-2.5-pro'
-  - name: vertex-text-embedding-005
-    alias: '@vertex/text-embedding-005'
+  - name: gemini-2-5-pro
+    alias: '@gemini/gemini-2.5-pro'
+  - name: text-embedding-005
+    alias: '@gemini/text-embedding-005'

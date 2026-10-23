@@ -113,11 +113,8 @@ wire format), *not* the provider type — `aimap.SectionFor` (`internal/aimap/en
 
 ```go
 sec := aimap.SectionFor(llmFormat(m), providerType)
-// format == "" → "openai"; format=="gemini" && providerType=="vertex" → "vertex"
+// format == "" → "openai"
 ```
-
-The one exception baked into `SectionFor` is gemini-format traffic served by
-Vertex, which uses Vertex's project/location URL templates.
 
 ---
 
@@ -210,7 +207,7 @@ target, delegating auth and option translation to `convert/provider.go`:
 
 ```go
 model := map[string]any{
-    "provider": aimap.PluginProvider(providerType),  // vertex → "gemini"
+    "provider": aimap.PluginProvider(providerType),
     "name":     tm.Name,
 }
 if alias != "" { model["model_alias"] = alias }
@@ -233,7 +230,7 @@ provider-specific keys:
 
 - `azure`: `deployment_id` → `azure_deployment_id`, `api_version` → `azure_api_version`, provider `instance` → `azure_instance`
 - `anthropic`: `version` → `anthropic_version`
-- `gemini`/`vertex`: keys in `aimap.GeminiOptionKeys` nest under `options.gemini`; provider `project_id` too
+- `gemini`: keys in `aimap.GeminiOptionKeys` nest under `options.gemini`; provider `project_id` too
 - `bedrock`: keys in `aimap.BedrockOptionKeys` (and assume-role auth) nest under `options.bedrock`
 - everything else passes through flat
 

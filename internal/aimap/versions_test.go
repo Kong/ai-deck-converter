@@ -77,8 +77,6 @@ func TestFeatureLookups(t *testing.T) {
 	require.Equal(t, FeatureTypesafe, f)
 	_, ok = FormatFeature("openai")
 	require.False(t, ok)
-	_, ok = FormatFeature("vertex")
-	require.False(t, ok)
 
 	f, ok = ProviderFeature("typesafe")
 	require.True(t, ok)

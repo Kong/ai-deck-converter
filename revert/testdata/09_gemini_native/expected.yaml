@@ -1,6 +1,6 @@
 models:
   - type: model
-    name: vertex-gemini-2-5-pro
+    name: gemini-2-5-pro
     capabilities:
       - generate
     formats:
@@ -11,7 +11,7 @@ models:
         config:
           gcp_environment:
             location_id: us-central1
-            project_id: kong-vertex-project
+            project_id: kong-gemini-project
           max_tokens: 4096
           temperature: 1
           type: gemini
@@ -21,12 +21,12 @@ models:
           - /ai
         model:
           values:
-            - '@vertex/gemini-2.5-pro'
+            - '@gemini/gemini-2.5-pro'
       logging:
         payloads: false
         statistics: true
   - type: model
-    name: vertex-text-embedding-005
+    name: text-embedding-005
     capabilities:
       - embeddings
     formats:
@@ -37,7 +37,7 @@ models:
         config:
           gcp_environment:
             location_id: us-central1
-            project_id: kong-vertex-project
+            project_id: kong-gemini-project
           type: gemini
     config:
       route:
@@ -45,7 +45,7 @@ models:
           - /ai
         model:
           values:
-            - '@vertex/text-embedding-005'
+            - '@gemini/text-embedding-005'
       logging:
         payloads: false
         statistics: true

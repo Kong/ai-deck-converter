@@ -74,7 +74,7 @@ func TestMapOptionsAzureRenames(t *testing.T) {
 }
 
 func TestMapOptionsGeminiNesting(t *testing.T) {
-	p := &aigw.Provider{Type: "vertex", Config: aigw.ProviderConfig{}}
+	p := &aigw.Provider{Type: "gemini", Config: aigw.ProviderConfig{}}
 	got := mapOptions(map[string]any{
 		"max_tokens": 4096,
 		"gcp_environment": map[string]any{
@@ -82,7 +82,7 @@ func TestMapOptionsGeminiNesting(t *testing.T) {
 			"location_id":  "us-central1",
 			"api_endpoint": "https://us-central1-aiplatform.googleapis.com",
 		},
-	}, "vertex", "gemini-2.5-pro", p, false)
+	}, "gemini", "gemini-2.5-pro", p, false)
 	want := map[string]any{
 		"max_tokens": 4096,
 		"gemini": map[string]any{

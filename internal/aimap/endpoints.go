@@ -98,9 +98,8 @@ func IsWebSocketEndpoint(spec EndpointSpec) bool {
 // SectionFor selects the endpoint section from the model's llm_format (the
 // client-facing wire format that determines the request paths). The provider
 // type only matters for passthrough, which has no client format of its own
-// (see ClientFormat). Gemini-format traffic served by a vertex provider uses
-// the gemini section, which carries Gemini Enterprise's project/location URL
-// templates as well.
+// (see ClientFormat). The gemini section carries Gemini Enterprise's
+// project/location URL templates as well as the Gemini API's own paths.
 func SectionFor(format, providerType string) string {
 	return ClientFormat(format, providerType)
 }
@@ -114,9 +113,8 @@ func SectionFor(format, providerType string) string {
 // the paths, methods and llm_format all come from the provider's own section,
 // and only the target's route_type says passthrough.
 func ClientFormat(format, providerType string) string {
-	format = NormalizeFormat(format)
 	if format == PassthroughFormat {
-		format = NormalizeFormat(providerType)
+		format = providerType
 		if !HasNativeFormat(providerType) {
 			// Providers that speak no section of their own (azure, mistral,
 			// databricks, ...) all expose OpenAI-shaped APIs.
@@ -134,27 +132,8 @@ func ClientFormat(format, providerType string) string {
 // matching llm_format. Passthrough extracts usage with that format's adapter; any other provider
 // falls back to OpenAI-shaped extraction, which may find nothing.
 func HasNativeFormat(providerType string) bool {
-	_, served := EndpointTable[NormalizeFormat(providerType)]
+	_, served := EndpointTable[providerType]
 	return served
-}
-
-// NormalizeFormat maps a provider name used directly as a model's format
-// (e.g. "vertex") to its base client-facing wire format ("gemini"). Vertex
-// serves the same Gemini request/response shape, so a model that names its
-// format "vertex" is equivalent to one that names "gemini"; keeping both
-// spellings working here means llm_format/routing never fork on which one
-// was used.
-func NormalizeFormat(format string) string {
-	if base, ok := formatAliases[format]; ok {
-		return base
-	}
-	return format
-}
-
-// formatAliases are provider names accepted as a model's format that are not formats in their
-// own right. Each maps to its base format. They are excluded from Formats.
-var formatAliases = map[string]string{
-	"vertex": "gemini",
 }
 
 // PromptReadingPolicies are the AI policies that parse the request or response into the
@@ -214,7 +193,7 @@ var PassthroughEndpoint = EndpointSpec{
 
 // Formats returns the client-facing wire formats a model may declare (the valid Format.Type
 // values), sorted: every EndpointTable section, plus PassthroughFormat, a valid format that is
-// not a section. Format aliases such as "vertex" are not listed.
+// not a section.
 func Formats() []string {
 	out := make([]string, 0, len(EndpointTable)+1)
 	for section := range EndpointTable {
@@ -240,12 +219,9 @@ func RequiresNativeFormat(capability string) bool { return nativeFormatCapabilit
 // CapabilitiesFor returns the capabilities a model of the given client format may declare when
 // served by the given provider type, resolved through the same section routing the converter uses
 // (SectionFor). A passthrough-only capability is left out unless the provider renders the model's
-// own format. "generate" is listed first when present, the rest sorted. An unknown format, or a
-// format alias, yields nil — keeping parity with Formats, which excludes those aliases.
+// own format. "generate" is listed first when present, the rest sorted. An unknown format yields
+// nil.
 func CapabilitiesFor(format, providerType string) []string {
-	if _, alias := formatAliases[format]; alias {
-		return nil
-	}
 	section := SectionFor(format, providerType)
 	caps, ok := EndpointTable[section]
 	if !ok {
@@ -717,16 +693,13 @@ func trimRegexEndAnchor(s string) string {
 }
 
 // PluginProvider maps an AI Gateway provider type to the ai-proxy-advanced
-// provider enum. Vertex is served through the gemini provider.
+// provider enum.
 func PluginProvider(providerType string) string {
-	if providerType == "vertex" {
-		return "gemini"
-	}
 	return providerType
 }
 
 // GeminiOptionKeys are target-config keys that nest under model.options.gemini
-// for the gemini and vertex provider types.
+// for the gemini provider type.
 var GeminiOptionKeys = map[string]bool{
 	"location_id": true, "api_endpoint": true, "endpoint_id": true, "project_id": true,
 }

@@ -19,7 +19,7 @@ type ProviderConfig struct {
 	Instance  string        `yaml:"instance,omitempty"`   // azure (azure-openai)
 	Service   string        `yaml:"service,omitempty"`    // azure (azure-openai | azure-foundry)
 	Foundry   *AzureFoundry `yaml:"foundry,omitempty"`    // azure (azure-foundry)
-	ProjectID string        `yaml:"project_id,omitempty"` // gemini / vertex
+	ProjectID string        `yaml:"project_id,omitempty"` // gemini
 }
 
 // AzureFoundry is the endpoint configuration for Azure AI Foundry hosted models

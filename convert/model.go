@@ -459,7 +459,6 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 					"format may not extract usage or cost", m.Name, tm.Name, providerType)
 		}
 		if passthrough {
-			// Compare client formats, not sections, so gemini and vertex stay compatible.
 			format := aimap.ClientFormat(aimap.PassthroughFormat, providerType)
 			if passthroughFormat == "" {
 				passthroughFormat = format
