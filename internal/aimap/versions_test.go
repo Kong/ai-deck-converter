@@ -53,6 +53,7 @@ var allFeatures = []Feature{
 	FeatureMCPRateLimiting,
 	FeatureBaseten,
 	FeatureGeminiAgenticCapability,
+	FeatureSagemaker,
 }
 
 func TestFeatureTable(t *testing.T) {
@@ -84,6 +85,9 @@ func TestFeatureLookups(t *testing.T) {
 	f, ok = ProviderFeature("baseten")
 	require.True(t, ok)
 	require.Equal(t, FeatureBaseten, f)
+	f, ok = ProviderFeature("sagemaker")
+	require.True(t, ok)
+	require.Equal(t, FeatureSagemaker, f)
 	_, ok = ProviderFeature("cerebras")
 	require.False(t, ok)
 

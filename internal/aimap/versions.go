@@ -81,6 +81,7 @@ const (
 	FeatureMCPRateLimiting            Feature = "mcp-rate-limiting"
 	FeatureGeminiAgenticCapability    Feature = "gemini-agentic-capability"
 	FeatureBaseten                    Feature = "baseten"
+	FeatureSagemaker                  Feature = "sagemaker"
 )
 
 // featureSince maps each feature to its first AI Gateway release. The source
@@ -100,6 +101,7 @@ var featureSince = map[Feature]Version{
 	FeatureMCPRateLimiting:            mustVersion("2.3"),
 	FeatureGeminiAgenticCapability:    mustVersion("2.3"),
 	FeatureBaseten:                    mustVersion("2.3"),
+	FeatureSagemaker:                  mustVersion("2.1"),
 }
 
 // Since returns the first AI Gateway release that has f. It panics for an
@@ -134,6 +136,8 @@ const (
 	TypesafeProviderType = "typesafe"
 	// BasetenProviderType is the provider type that FeatureBaseten gates.
 	BasetenProviderType = "baseten"
+	// SagemakerProviderType is the provider type that FeatureSagemaker gates.
+	SagemakerProviderType = "sagemaker"
 )
 
 var formatFeatures = map[string]Feature{
@@ -148,8 +152,9 @@ func FormatFeature(format string) (Feature, bool) {
 }
 
 var providerFeatures = map[string]Feature{
-	TypesafeProviderType: FeatureTypesafe,
-	BasetenProviderType:  FeatureBaseten,
+	TypesafeProviderType:  FeatureTypesafe,
+	BasetenProviderType:   FeatureBaseten,
+	SagemakerProviderType: FeatureSagemaker,
 }
 
 // ProviderFeature returns the feature that gates the provider type.
