@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"reflect"
 	"slices"
+	"strings"
 
 	"github.com/Kong/ai-deck-converter/internal/aigw"
 	"github.com/Kong/ai-deck-converter/internal/aimap"
@@ -269,10 +270,16 @@ func (c *Converter) pruneUnexposedSources(conversionOnlyServices []int, exposed 
 }
 
 // pruneUnusedTokenVaultCallbackRoute removes the Token Vault callback route
-// when no remaining service or model provider uses a Token Vault.
+// when no remaining service, model provider or credential manager uses a
+// Token Vault.
 func (c *Converter) pruneUnusedTokenVaultCallbackRoute() {
 	for _, plugin := range c.out.Plugins {
 		if plugin.Name == tokenVaultExchangePlugin {
+			return
+		}
+	}
+	for _, route := range c.out.Routes {
+		if strings.HasPrefix(route.Name, aimap.TokenVaultCredentialManagerName+"-") {
 			return
 		}
 	}
@@ -281,9 +288,6 @@ func (c *Converter) pruneUnusedTokenVaultCallbackRoute() {
 			for _, plugin := range route.Plugins {
 				auth, _ := plugin.Config["auth"].(map[string]any)
 				if plugin.Name == "ai-mcp-proxy" && auth["provider"] == aimap.UpstreamAuthProviderTokenVault {
-					return
-				}
-				if plugin.Name == authStrategyTypeOpenIDConnect && plugin.Config["token_vault"] != nil {
 					return
 				}
 			}

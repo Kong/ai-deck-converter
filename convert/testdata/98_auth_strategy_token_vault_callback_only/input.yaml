@@ -1,0 +1,41 @@
+datastores:
+  - name: vault-konnect-prod
+    type: token-vault
+    config:
+      directory: my-directory
+      current_version: v1
+      keys:
+        - version: v1
+          key: "{vault://hcv/vault-enc-key}"
+
+auth_strategies:
+  # The datastore protects the callback route without the credential manager.
+  # The callback route config replaces the login and cookie fields below.
+  # The MCP server uses a Token Vault, so its plugin gets hide_credentials: false.
+  - name: okta-ai-se
+    display_name: Okta AI SE
+    type: openid-connect
+    datastores: [{name: vault-konnect-prod}]
+    config:
+      issuer: https://dev-123456.okta.com
+      client_id: ["0oa1b2c3d4e5f6g7h8i9"]
+      auth_methods: [bearer]
+      hide_credentials: true
+      redirect_uri: [https://app.example.com/callback]
+      login_action: redirect
+      session_cookie_same_site: Strict
+      upstream_access_token_header: x-token
+
+mcp_servers:
+  - type: passthrough-listener
+    name: github-tools
+    upstream_url: https://github-mcp.internal.kongair.com
+    config: {route: {paths: [/mcp/github-tools]}}
+    datastores: [{name: vault-konnect-prod}]
+    token_vault:
+      provider: github
+    access:
+      auth_strategies: [okta-ai-se]
+    tools:
+      - name: githubTool
+        description: A GitHub tool

@@ -1,0 +1,8 @@
+- code: CONFIG_FIELD_OVERRIDDEN
+  reason: auth strategy "okta-ai-se" sets config.hide_credentials to true. On a route that uses a Token Vault, hide_credentials will be overridden to false, because the Token Vault reads the subject token of the caller from the request.
+  source:
+    kind: auth_strategy
+    name: okta-ai-se
+    fields:
+      - config.hide_credentials
+  severity: WARNING

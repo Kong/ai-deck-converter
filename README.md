@@ -387,6 +387,24 @@ and `formats` beyond the first.
   a `token-vault` datastore, shared by servers with the same connection, and
   does not read the callback route. The whole feature round-trips through
   `revert/roundtrip_test.go`.
+- **Auth strategy Token Vault.** An `openid-connect` auth strategy takes at
+  most one `token-vault` datastore. When an entity uses the strategy, an
+  `openid-connect` plugin protects the `/_vault` callback route. The callback
+  handler then binds each enrollment to the principal that starts it. The
+  route plugin has `hide_credentials: false`, `preserve_query_args: true`,
+  `authorization_cookie_path: /_vault` and
+  `upstream_access_token_header: authorization:bearer`. `auth_methods` gets
+  `session` and `authorization_code`. `redirect_uri`, `login_action`,
+  `session_cookie_same_site` and `session_cookie_path` are removed, so their
+  defaults apply. The first strategy with the datastore of the route protects
+  it. Any other strategy gets a `CONFIG_FIELD_IGNORED` warning.
+  `token_vault.enable_credential_manager: true` requires the datastore and
+  runtime 2.3. It also adds the callback route and a
+  `token-vault-credential-manager-<strategy>` route on `/vuc/<strategy>`.
+  The entity `openid-connect` plugin keeps the strategy config. On a route
+  with a Token Vault plugin, `hide_credentials` is set to `false` with a
+  `CONFIG_FIELD_OVERRIDDEN` warning. The Token Vault reads the subject token
+  of the caller from the request.
 - **MCP rate limiting.** An MCP Server's top-level `rate_limiting` (`limits[]`
   with `method` or `tool`, `limit`, `window_size`) is copied 1:1 to the
   `ai-mcp-proxy` `config.rate_limiting` and round-trips in both directions. It

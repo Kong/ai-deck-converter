@@ -54,11 +54,10 @@ func (c *Converter) scopedAuthStrategyPlugins(src ConversionIssueSource, refs []
 			return nil, err
 		}
 		c.warnAuthStrategyOverrides(idp)
-		plugin := authStrategyPlugin(idp)
-		if err := c.applyAuthStrategyTokenVault(idp, &plugin); err != nil {
+		if err := c.applyAuthStrategyTokenVault(idp); err != nil {
 			return nil, err
 		}
-		plugins = append(plugins, plugin)
+		plugins = append(plugins, authStrategyPlugin(idp))
 	}
 	return plugins, nil
 }
@@ -78,79 +77,76 @@ func (c *Converter) checkAuthStrategyType(src ConversionIssueSource, field strin
 func (c *Converter) validateAuthStrategyTokenVaults() {
 	for i := range c.src.AuthStrategies {
 		snapshot := *c.out
-		probe := kong.Plugin{Config: map[string]any{}}
-		_ = c.applyAuthStrategyTokenVault(&c.src.AuthStrategies[i], &probe)
+		_ = c.applyAuthStrategyTokenVault(&c.src.AuthStrategies[i])
 		*c.out = snapshot
 	}
 }
 
-// applyAuthStrategyTokenVault sets config.token_vault of the openid-connect
-// plugin from the auth strategy and adds the Token Vault callback route.
+// applyAuthStrategyTokenVault records an openid-connect strategy with a
+// token-vault Datastore for secureTokenVaultCallbackRoute. An enabled
+// credential manager also adds the callback and credential manager routes.
 // Any other strategy type with a token_vault fails.
-func (c *Converter) applyAuthStrategyTokenVault(idp *aigw.AuthStrategy, plugin *kong.Plugin) error {
+func (c *Converter) applyAuthStrategyTokenVault(idp *aigw.AuthStrategy) error {
 	src := issueSource(kindAuthStrategy, idp.Name)
-	if idp.TokenVault == nil {
-		return nil
-	}
-	if idp.Type != authStrategyTypeOpenIDConnect {
+	if idp.TokenVault != nil && idp.Type != authStrategyTypeOpenIDConnect {
 		return c.fail(src.at("token_vault"), ConfigFieldInvalid,
 			"auth strategy %q: token_vault requires type %q, not %q",
 			idp.Name, authStrategyTypeOpenIDConnect, idp.Type)
 	}
-	if enabled, _ := idp.TokenVault[enableCredentialManagerKey].(bool); !enabled {
+	if idp.Type != authStrategyTypeOpenIDConnect {
 		return nil
 	}
-	if !c.supports(aimap.FeatureAuthStrategyTokenVault) {
+	enabled, _ := idp.TokenVault[enableCredentialManagerKey].(bool)
+	if enabled && !c.supports(aimap.FeatureAuthStrategyTokenVault) {
 		return c.failUnsupported(src.at("token_vault"), aimap.FeatureAuthStrategyTokenVault, "token_vault")
 	}
-	if hide, _ := idp.Config["hide_credentials"].(bool); hide {
-		return c.fail(src.at("config.hide_credentials"), ConfigFieldInvalid,
-			"auth strategy %q: config.hide_credentials must not be true with token_vault",
-			idp.Name)
+	ds, err := c.authStrategyTokenVaultDatastore(src, idp, enabled)
+	if err != nil || ds == nil {
+		return err
 	}
-	if len(idp.Datastores) != 1 {
-		return c.fail(src.at("datastores"), MissingRequiredConfigField,
-			"auth strategy %q: token_vault requires exactly one %q datastore",
-			idp.Name, aimap.DatastoreTypeTokenVault)
+	if !slices.Contains(c.out.TokenVaultAuthStrategies, idp.Name) {
+		c.out.TokenVaultAuthStrategies = append(c.out.TokenVaultAuthStrategies, idp.Name)
 	}
-	ds := c.datastores[idp.Datastores[0].Name]
-	if ds == nil {
-		return c.fail(src.at("datastores[0].name"), UndefinedReference,
-			"auth strategy %q references unknown datastore %q", idp.Name, idp.Datastores[0].Name)
-	}
-	if ds.Type != aimap.DatastoreTypeTokenVault {
-		return c.fail(src.at("datastores[0].name"), ConfigFieldInvalid,
-			"auth strategy %q: token_vault does not support a %q datastore; use %q instead",
-			idp.Name, ds.Type, aimap.DatastoreTypeTokenVault)
-	}
-	settings := maps.Clone(idp.TokenVault)
-	delete(settings, enableCredentialManagerKey)
-	block, err := aimap.ApplyTokenVaultDatastore(settings, ds)
-	if err != nil {
-		return c.fail(src.at("datastores"), ConfigFieldInvalid, "auth strategy %q: %v", idp.Name, err)
+	if !enabled {
+		return nil
 	}
 	owner := fmt.Sprintf("auth strategy %q", idp.Name)
 	routeSource := source(kindAuthStrategy, idp.Name, "datastores")
 	if err := c.ensureTokenVaultCallbackRoute(src.at("datastores[0].name"), owner, ds, routeSource); err != nil {
 		return err
 	}
-	if err := c.secureCallbackRoute(src, idp); err != nil {
-		return err
-	}
-	if err := c.credentialManagerRoute(src, idp, ds); err != nil {
-		return err
-	}
-	if err := c.applyTokenVaultOIDCDefaults(src, idp, plugin.Config); err != nil {
-		return err
-	}
-	block["enabled"] = true
-	plugin.Config["token_vault"] = block
-	return nil
+	return c.credentialManagerRoute(src, idp, ds)
 }
 
-// applyTokenVaultOIDCDefaults sets the openid-connect fields that an enabled
-// Token Vault strategy needs and does not set. Every plugin of the strategy
-// gets the same generated session secret.
+// authStrategyTokenVaultDatastore returns the token-vault Datastore of the
+// strategy, or nil if the strategy has none. The credential manager requires
+// one.
+func (c *Converter) authStrategyTokenVaultDatastore(
+	src ConversionIssueSource, idp *aigw.AuthStrategy, required bool,
+) (*aigw.Datastore, error) {
+	if len(idp.Datastores) == 0 && !required {
+		return nil, nil
+	}
+	if len(idp.Datastores) != 1 {
+		return nil, c.fail(src.at("datastores"), MissingRequiredConfigField,
+			"auth strategy %q: token_vault requires exactly one %q datastore",
+			idp.Name, aimap.DatastoreTypeTokenVault)
+	}
+	ds := c.datastores[idp.Datastores[0].Name]
+	if ds == nil {
+		return nil, c.fail(src.at("datastores[0].name"), UndefinedReference,
+			"auth strategy %q references unknown datastore %q", idp.Name, idp.Datastores[0].Name)
+	}
+	if ds.Type != aimap.DatastoreTypeTokenVault {
+		return nil, c.fail(src.at("datastores[0].name"), ConfigFieldInvalid,
+			"auth strategy %q does not support a %q datastore; use %q instead",
+			idp.Name, ds.Type, aimap.DatastoreTypeTokenVault)
+	}
+	return ds, nil
+}
+
+// applyTokenVaultOIDCDefaults sets the openid-connect fields that the
+// credential manager route needs and the strategy does not set.
 func (c *Converter) applyTokenVaultOIDCDefaults(
 	src ConversionIssueSource, idp *aigw.AuthStrategy, cfg map[string]any,
 ) error {
@@ -165,6 +161,13 @@ func (c *Converter) applyTokenVaultOIDCDefaults(
 			aimap.TokenVaultCredentialManagerPath + "/" + idp.Name + "/oidc/callback",
 		}
 	}
+	return c.applySessionSecret(src, idp, cfg)
+}
+
+// applySessionSecret sets a generated session_secret when cfg has none. Every
+// plugin of the strategy gets the same secret. The browser session then works
+// on the credential manager route and on the callback route.
+func (c *Converter) applySessionSecret(src ConversionIssueSource, idp *aigw.AuthStrategy, cfg map[string]any) error {
 	if !isEmptyConfigValue(cfg["session_secret"]) {
 		return nil
 	}
@@ -192,51 +195,204 @@ func generateSessionSecret() (string, error) {
 	return hex.EncodeToString(bytes), nil
 }
 
-// tokenVaultOIDCConfig returns a copy of the strategy config with the
-// Token Vault defaults.
-func (c *Converter) tokenVaultOIDCConfig(src ConversionIssueSource, idp *aigw.AuthStrategy) (map[string]any, error) {
+// callbackOIDCRemovedFields are the openid-connect fields that the callback
+// route must have at their defaults.
+var callbackOIDCRemovedFields = []string{
+	"redirect_uri",
+	"login_action",
+	"session_cookie_same_site",
+	"session_cookie_path",
+}
+
+// callbackOIDCAuthMethods are the openid-connect auth methods that the browser
+// flow on the callback route needs.
+var callbackOIDCAuthMethods = []string{"session", "authorization_code"}
+
+// callbackOIDCConfig returns the openid-connect config of the Token Vault
+// callback route. The callback handler reads the access token from the
+// Authorization header. With no redirect_uri, the login returns to the
+// requested callback URL.
+func (c *Converter) callbackOIDCConfig(src ConversionIssueSource, idp *aigw.AuthStrategy) (map[string]any, error) {
 	cfg := maps.Clone(idp.Config)
 	if cfg == nil {
 		cfg = map[string]any{}
 	}
-	if err := c.applyTokenVaultOIDCDefaults(src, idp, cfg); err != nil {
+	for _, field := range callbackOIDCRemovedFields {
+		delete(cfg, field)
+	}
+	cfg["hide_credentials"] = false
+	cfg["preserve_query_args"] = true
+	cfg["authorization_cookie_path"] = aimap.TokenVaultCallbackPath
+	cfg["upstream_access_token_header"] = defaultUpstreamAccessTokenHeader
+	if methods := configStrings(cfg, "auth_methods"); len(methods) > 0 {
+		out := make([]any, 0, len(methods)+len(callbackOIDCAuthMethods))
+		for _, m := range methods {
+			out = append(out, m)
+		}
+		for _, m := range callbackOIDCAuthMethods {
+			if !slices.Contains(methods, m) {
+				out = append(out, m)
+			}
+		}
+		cfg["auth_methods"] = out
+	}
+	if err := c.applySessionSecret(src, idp, cfg); err != nil {
 		return nil, err
 	}
 	return cfg, nil
 }
 
-// secureCallbackRoute adds an openid-connect plugin to the Token Vault callback
-// route when the route has none. A plugin that another entity added stays.
-// The function replaces the route, because convertEntity restores only a
-// shallow copy of the output.
-func (c *Converter) secureCallbackRoute(src ConversionIssueSource, idp *aigw.AuthStrategy) error {
+// secureTokenVaultCallbackRoute adds an openid-connect plugin to the Token
+// Vault callback route. The first used strategy with the Datastore of the
+// route gives the config. The callback handler then binds each enrollment to
+// the principal that starts it.
+func (c *Converter) secureTokenVaultCallbackRoute() {
 	i := slices.IndexFunc(c.out.Routes, func(r kong.Route) bool { return r.Name == aimap.TokenVaultCallbackName })
 	if i < 0 {
-		return nil
+		return
 	}
-	hasOIDC := slices.ContainsFunc(c.out.Routes[i].Plugins, func(p kong.Plugin) bool {
-		return p.Name == authStrategyTypeOpenIDConnect
-	})
-	if hasOIDC {
-		return nil
+	var chosen *aigw.AuthStrategy
+	for _, name := range c.out.TokenVaultAuthStrategies {
+		idp := c.authStrategies[name]
+		src := issueSource(kindAuthStrategy, name)
+		ds := c.datastores[idp.Datastores[0].Name]
+		dsConfig, err := aimap.ApplyTokenVaultDatastore(nil, ds)
+		if err != nil || !reflect.DeepEqual(c.out.Routes[i].Plugins[0].Config, dsConfig) {
+			c.warn(src.at("datastores[0].name"), ConfigFieldIgnored,
+				"auth strategy %q references datastore %q, but the Token Vault callback route "+
+					"uses a different token-vault datastore. The strategy does not protect the callback route.",
+				name, ds.Name)
+			continue
+		}
+		if chosen != nil {
+			c.warn(src.at("datastores"), ConfigFieldIgnored,
+				"auth strategy %q does not protect the Token Vault callback route. "+
+					"Auth strategy %q already protects it.",
+				name, chosen.Name)
+			continue
+		}
+		chosen = idp
 	}
-	cfg, err := c.tokenVaultOIDCConfig(src, idp)
+	if chosen == nil {
+		return
+	}
+	src := issueSource(kindAuthStrategy, chosen.Name)
+	cfg, err := c.callbackOIDCConfig(src, chosen)
 	if err != nil {
-		return err
+		// An unprotected route lets a victim complete an enrollment of an attacker.
+		c.out.Routes = slices.Delete(slices.Clone(c.out.Routes), i, i+1)
+		return
 	}
 	routes := slices.Clone(c.out.Routes)
 	routes[i].Plugins = append(slices.Clone(routes[i].Plugins), kong.Plugin{
 		Name:   authStrategyTypeOpenIDConnect,
 		Config: cfg,
-		Source: source(kindAuthStrategy, idp.Name, "token_vault"),
+		Source: source(kindAuthStrategy, chosen.Name, "datastores"),
 	})
 	c.out.Routes = routes
-	return nil
+}
+
+// revealTokenVaultCredentials sets hide_credentials to false on each
+// openid-connect plugin of a route that uses a Token Vault. The Token Vault
+// plugins read the subject token of the caller from the request.
+func (c *Converter) revealTokenVaultCredentials() {
+	routes := c.tokenVaultRouteNames()
+	if len(routes) == 0 {
+		return
+	}
+
+	plugins, changed := c.revealedTokenVaultPlugins(c.out.Plugins, func(p kong.Plugin) bool {
+		return p.Route != nil && routes[string(*p.Route)]
+	})
+	if changed {
+		c.out.Plugins = plugins
+	}
+
+	var services []kong.Service
+	for i, service := range c.out.Services {
+		clonedRoutes := false
+		for j, route := range service.Routes {
+			plugins, changed := c.revealedTokenVaultPlugins(route.Plugins, func(kong.Plugin) bool {
+				return routes[route.Name]
+			})
+			if !changed {
+				continue
+			}
+			if services == nil {
+				services = slices.Clone(c.out.Services)
+			}
+			if !clonedRoutes {
+				services[i].Routes = slices.Clone(service.Routes)
+				clonedRoutes = true
+			}
+			services[i].Routes[j].Plugins = plugins
+		}
+	}
+	if services != nil {
+		c.out.Services = services
+	}
+}
+
+// tokenVaultRouteNames returns the names of the routes with a Token Vault
+// plugin.
+func (c *Converter) tokenVaultRouteNames() map[string]bool {
+	routes := map[string]bool{}
+	for _, p := range c.out.Plugins {
+		if p.Name == tokenVaultExchangePlugin && p.Route != nil {
+			routes[string(*p.Route)] = true
+		}
+	}
+	for _, service := range c.out.Services {
+		for _, route := range service.Routes {
+			for _, p := range route.Plugins {
+				auth, _ := p.Config["auth"].(map[string]any)
+				if p.Name == "ai-mcp-proxy" && auth["provider"] == aimap.UpstreamAuthProviderTokenVault {
+					routes[route.Name] = true
+				}
+			}
+		}
+	}
+	return routes
+}
+
+// revealedTokenVaultPlugins returns a copy of plugins in which each selected
+// openid-connect plugin has hide_credentials set to false. It reports false
+// when no plugin changes, and then returns plugins unchanged.
+func (c *Converter) revealedTokenVaultPlugins(
+	plugins []kong.Plugin, selected func(kong.Plugin) bool,
+) ([]kong.Plugin, bool) {
+	var out []kong.Plugin
+	for i, p := range plugins {
+		if p.Name != authStrategyTypeOpenIDConnect || !selected(p) {
+			continue
+		}
+		if hide, _ := p.Config["hide_credentials"].(bool); !hide {
+			continue
+		}
+		if p.Source != nil {
+			c.warn(issueSource(kindAuthStrategy, p.Source.EntityName).at("config.hide_credentials"),
+				ConfigFieldOverridden,
+				"auth strategy %q sets config.hide_credentials to true. "+
+					"On a route that uses a Token Vault, hide_credentials will be overridden to false, "+
+					"because the Token Vault reads the subject token of the caller from the request.",
+				p.Source.EntityName)
+		}
+		if out == nil {
+			out = slices.Clone(plugins)
+		}
+		cfg := maps.Clone(p.Config)
+		cfg["hide_credentials"] = false
+		out[i].Config = cfg
+	}
+	if out == nil {
+		return plugins, false
+	}
+	return out, true
 }
 
 // credentialManagerRoute adds the route of the auth strategy that serves the
 // Token Vault credential manager. The route has its own openid-connect plugin
-// with the unchanged config of the strategy.
+// with the config of the strategy.
 func (c *Converter) credentialManagerRoute(
 	src ConversionIssueSource, idp *aigw.AuthStrategy, ds *aigw.Datastore,
 ) error {
@@ -246,13 +402,16 @@ func (c *Converter) credentialManagerRoute(
 			return nil
 		}
 	}
-	oidcConfig, err := c.tokenVaultOIDCConfig(src, idp)
-	if err != nil {
+	oidcConfig := maps.Clone(idp.Config)
+	if oidcConfig == nil {
+		oidcConfig = map[string]any{}
+	}
+	if err := c.applyTokenVaultOIDCDefaults(src, idp, oidcConfig); err != nil {
 		return err
 	}
-	config := map[string]any{}
-	if directory, ok := ds.Config["directory"]; ok {
-		config["directory"] = directory
+	config, err := aimap.ApplyTokenVaultDatastore(nil, ds)
+	if err != nil {
+		return c.fail(src.at("datastores[0].name"), ConfigFieldInvalid, "auth strategy %q: %v", idp.Name, err)
 	}
 	routeSource := source(kindAuthStrategy, idp.Name, "token_vault")
 	c.out.Routes = append(c.out.Routes, kong.Route{
