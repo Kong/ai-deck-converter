@@ -14,3 +14,11 @@
     fields:
       - capabilities[2]
   severity: WARNING
+- code: CONFIG_FIELD_DROPPED
+  reason: 'model "nova-chat": capability "embeddings" (genai_category "text/embeddings") collapses onto route "bedrock-invoke-2", which already serves genai_category "text/generation"; a single ai-proxy-advanced cannot serve multiple genai categories, skipping this capability'
+  source:
+    kind: model
+    name: nova-chat
+    fields:
+      - capabilities[0]
+  severity: WARNING

@@ -1,0 +1,60 @@
+# openai and gemini both serve realtime on /realtime. A model keeps the
+# first format in pair order that a target serves.
+# - mixed keeps the openai route. Its gemini target listed realtime, so it
+#   gets a warning.
+# - gemini-only keeps the gemini route.
+# - cohere-and-openai has no endpoint for (cohere, generate) or
+#   (openai, rerank). These pairs give no issue, because another pair
+#   serves each capability. The openai target cannot serve rerank, so it
+#   gets a warning.
+models:
+  - name: mixed
+    type: model
+    capabilities: [realtime]
+    formats: [{type: gemini}, {type: openai}]
+    config:
+      route: {paths: [/mixed]}
+    targets:
+      - name: gpt-realtime
+        provider: openai-prod
+      - name: gemini-live-2.5-flash
+        provider: gemini-prod
+  - name: gemini-only
+    type: model
+    capabilities: [realtime]
+    formats: [{type: gemini}, {type: openai}]
+    config:
+      route: {paths: [/gemini-only]}
+    targets:
+      - name: gemini-live-2.5-flash
+        provider: gemini-prod
+  - name: cohere-and-openai
+    type: model
+    capabilities: [generate, rerank]
+    formats: [{type: cohere}, {type: openai}]
+    config:
+      route: {paths: [/cohere]}
+    targets:
+      - name: rerank-v3.5
+        provider: cohere-prod
+      - name: gpt-5.4
+        provider: openai-prod
+model_providers:
+  - name: openai-prod
+    type: openai
+    config:
+      auth:
+        type: bearer
+        token: "{vault://ai/openai-key}"
+  - name: gemini-prod
+    type: gemini
+    config:
+      auth:
+        type: basic
+        headers: [{name: x-goog-api-key, value: "{vault://ai/gemini-key}"}]
+  - name: cohere-prod
+    type: cohere
+    config:
+      auth:
+        type: bearer
+        token: "{vault://ai/cohere-key}"

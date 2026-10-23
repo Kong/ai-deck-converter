@@ -16,10 +16,7 @@ models:
           - /ai
       logging:
         payloads: false
-        statistics: false
       response_streaming: deny
-      model:
-        name_header: false
   - type: api
     name: ant-skills
     capabilities:
@@ -38,10 +35,7 @@ models:
           - /claude
       logging:
         payloads: false
-        statistics: false
       response_streaming: deny
-      model:
-        name_header: false
 model_providers:
   - type: openai
     name: openai-env

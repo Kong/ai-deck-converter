@@ -1,0 +1,381 @@
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: openai-chat
+        paths:
+          - /ignored/chat/completions
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-responses
+        paths:
+          - /ignored/responses
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-audio-speech
+        paths:
+          - /ignored/audio/speech
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-audio-transcribe
+        paths:
+          - /ignored/audio/transcriptions
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-audio-translate
+        paths:
+          - /ignored/audio/translations
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-embeddings
+        paths:
+          - /ignored/embeddings
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-images
+        paths:
+          - /ignored/images/generations
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-skills
+        paths:
+          - /ignored/skills
+        methods:
+          - GET
+          - POST
+          - DELETE
+          - OPTIONS
+        strip_path: false
+      - name: openai-videos
+        paths:
+          - /ignored/videos
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: anthropic-messages
+        paths:
+          - /ignored/v1/messages
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-videos-lifecycle
+        paths:
+          - /ignored/videos
+        methods:
+          - GET
+          - DELETE
+        strip_path: false
+        tags:
+          - aigw:video-lifecycle
+  - name: ai-gateway-websocket
+    url: ws://ai-gateway.upstream.local
+    routes:
+      - name: openai-realtime
+        paths:
+          - /ignored/realtime
+        protocols:
+          - ws
+          - wss
+        strip_path: false
+plugins:
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-chat
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: ignored-next-to-wildcard
+            name: gpt-5.4
+            provider: openai
+          route_type: llm/v1/chat
+    route: openai-chat
+    model: ignored-next-to-wildcard
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-responses
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: ignored-next-to-wildcard
+            name: gpt-5.4
+            provider: openai
+          route_type: llm/v1/responses
+    route: openai-responses
+    model: ignored-next-to-wildcard
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-audio-speech
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: audio/speech
+      llm_format: openai
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: false
+          model:
+            model_alias: ignored-next-to-wildcard
+            name: gpt-5.4
+            provider: openai
+          route_type: audio/v1/audio/speech
+    route: openai-audio-speech
+    model: ignored-next-to-wildcard
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-audio-transcribe
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: audio/transcription
+      llm_format: openai
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: false
+          model:
+            model_alias: ignored-next-to-wildcard
+            name: gpt-5.4
+            provider: openai
+          route_type: audio/v1/audio/transcriptions
+    route: openai-audio-transcribe
+    model: ignored-next-to-wildcard
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-audio-translate
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: audio/transcription
+      llm_format: openai
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: false
+          model:
+            model_alias: ignored-next-to-wildcard
+            name: gpt-5.4
+            provider: openai
+          route_type: audio/v1/audio/translations
+    route: openai-audio-translate
+    model: ignored-next-to-wildcard
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-embeddings
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/embeddings
+      llm_format: openai
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: ignored-next-to-wildcard
+            name: gpt-5.4
+            provider: openai
+          route_type: llm/v1/embeddings
+    route: openai-embeddings
+    model: ignored-next-to-wildcard
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-images
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: image/generation
+      llm_format: openai
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: ignored-next-to-wildcard
+            name: gpt-5.4
+            provider: openai
+          route_type: image/v1/images/generations
+    route: openai-images
+    model: ignored-next-to-wildcard
+  - name: ai-proxy-advanced
+    protocols:
+      - ws
+      - wss
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: realtime/generation
+      llm_format: openai
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: gpt-5.4
+            provider: openai
+          route_type: realtime/v1/realtime
+    route: openai-realtime
+    tags:
+      - ai-gateway-realtime-model:ignored-next-to-wildcard
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      model_name_header: false
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: false
+          model:
+            model_alias: ignored-next-to-wildcard
+            name: gpt-5.4
+            provider: openai
+          route_type: llm/v1/skills
+    route: openai-skills
+    model: ignored-next-to-wildcard
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-videos
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: video/generation
+      llm_format: openai
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: ignored-next-to-wildcard
+            name: gpt-5.4
+            provider: openai
+          route_type: video/v1/videos/generations
+    route: openai-videos
+    model: ignored-next-to-wildcard
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: anthropic-messages
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: ignored-next-to-wildcard
+            name: gpt-5.4
+            provider: openai
+          route_type: llm/v1/chat
+    route: anthropic-messages
+    model: ignored-next-to-wildcard
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: video/generation
+      llm_format: openai
+      model_name_header: false
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: gpt-5.4
+            provider: openai
+          route_type: video/v1/videos/generations
+    route: openai-videos-lifecycle
+ai_models:
+  - name: ignored-next-to-wildcard

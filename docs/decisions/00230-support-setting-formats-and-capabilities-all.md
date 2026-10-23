@@ -230,11 +230,13 @@ func TargetSupports(format string, target Target, spec EndpointSpec) bool
 3. A `gemini` target on `realtime/v1/realtime` uses the `gemini` format.
    See [Support for multiple model formats](#support-for-multiple-model-formats).
 4. A `mantle` target uses the `openai` or `anthropic` format. Its route
-   type is in the mantle list. See [Bedrock mantle](#bedrock-mantle).
+   type is in the mantle list. The mantle list replaces condition 2 for a
+   mantle target. See [Bedrock mantle](#bedrock-mantle).
 5. A `bedrock` target on `llm/v1/batches` sets `batch_bucket_prefix`.
 6. An `openai` or `anthropic` target on `llm/v1/skills` uses its own
    format. The existing `aimap.RequiresNativeFormat` check moves here.
-7. A `llama2` target with `format: raw` is not on `llm/v1/embeddings`.
+7. A `llama2` target with `format: raw` or `llama2_format: raw` is not on
+   `llm/v1/embeddings`. The converter sends both keys as `llama2_format`.
 
 `TargetSupports` applies to `*` and to explicit lists.
 
@@ -306,6 +308,9 @@ func LogStatisticsSupported(providerType string, spec EndpointSpec) bool
 
 - A mantle target serves only `llm/v1/chat`, `llm/v1/responses`,
   `llm/v1/files`, and `passthrough` in the `openai` or `anthropic` format.
+- This list replaces the `bedrock` row of the route type table. The
+  `bedrock` row has no `llm/v1/responses` or `llm/v1/files`, but a mantle
+  target serves both.
 - Condition 4 moves the existing `aimap.MantleSupports` check into
   `TargetSupports`.
 
@@ -401,7 +406,11 @@ formats and capabilities in pair order, with three changes:
   gives a capability of the same tie.
 - **Forced values**: it reads `log_statistics`, `log_payloads`, and
   `model_name_header` only from endpoints that support them, which changes
-  `10_bedrock_invoke_multitarget` and `60_skills_api`.
+  `60_skills_api`.
+  - A value that no endpoint of the model supports stays unset.
+  - A `log_statistics` value equal to the default also stays unset when
+    an endpoint of the model forces `false`. Set explicitly, it would give
+    a `CONFIG_FIELD_OVERRIDDEN` warning on the second conversion.
 - **Alias-less groups**: it groups alias-less routes by sorted target
   fingerprints and base paths, so one `type: api` model reverts to one
   model, a fix that can ship separately.
@@ -415,8 +424,9 @@ The round trip stays byte-identical. For a forward model with
 
 ## Code changes
 
-- `expandCapabilities` becomes `modelEndpoints(m, target)`, which returns
-  the ordered pairs of one target that `TargetSupports` accepts.
+- `expandCapabilities` becomes `targetPairs` in
+  `convert/model_endpoints.go`, which returns the ordered pairs of one
+  target that `TargetSupports` accepts.
 - The format loop of `convertModel` runs over those pairs, and the
   equal-path decision runs after all targets.
 - A pair with no endpoint is skipped, and the model fails only when no
@@ -428,7 +438,12 @@ The round trip stays byte-identical. For a forward model with
 - `targetSupports` becomes `aimap.TargetSupports`, and the `checkTarget`
   mantle check stays only for models with no `openai` or `anthropic`
   format.
-- The WebSocket auth-strategy check moves next to the global policy check.
+- Under `*`, `targetPairs` leaves out a WebSocket endpoint that a global
+  auth policy or more than one auth strategy cannot protect. An explicit
+  `realtime` keeps the existing checks, which fail the model.
+- An `openai` or `anthropic` target on `llm/v1/skills` in another format
+  now gives "no target can serve capability" instead of the old
+  "passthrough-only" error.
 - `buildTarget` and the reverter call `aimap.LogStatisticsSupported`
   instead of reading `spec.SupportsLogStatistics`.
 - `resolveEndpoint` returns tied capabilities, and
@@ -465,14 +480,17 @@ New cases in `convert/testdata`:
   models on one route.
 - `102_wildcard_realtime_auth_strategies`: `realtime` stays with one auth
   strategy.
-- `103_target_support_explicit`: a target that cannot serve an explicit
-  capability gives `BEHAVIOR_MAY_DIFFER`.
+- `103_target_support_explicit`: `anthropic` and raw `llama2` targets on
+  `embeddings` and an `azure` target on `skills` give `BEHAVIOR_MAY_DIFFER`.
+  The `skills` model is `type: api`, because a `type: model` model with
+  only `skills` reverts as `type: api`.
 - `104_wildcard_capabilities_multi_format`: `*` capabilities with two
   formats.
 - `105_wildcard_bedrock_mantle`: a mantle `bedrock` target gets only the
   mantle routes.
 - `106_wildcard_bedrock_batches`: a `bedrock` target without
-  `batch_bucket_prefix` loses `batches`.
+  `batch_bucket_prefix` loses `batches`. That model also has an `openai`
+  target, because a model with no route cannot round-trip.
 - `107_realtime_log_payloads`: the `realtime` route forces
   `log_payloads: false` with a warning.
 - `111_multi_format_explicit`: explicit lists with equal `realtime` paths.
@@ -490,8 +508,8 @@ Changed and unchanged cases:
 
 - `69_model_multi_format` is new: a model with routes in two sections
   reverts with both formats.
-- `10_bedrock_invoke_multitarget` and `60_skills_api` change because of the
-  forced values rule.
+- `60_skills_api` changes because of the forced values rule.
+  `10_bedrock_invoke_multitarget` does not change.
 - `revert/roundtrip_test.go` runs each new forward case and must stay
   byte-identical.
 
@@ -499,3 +517,9 @@ Changed and unchanged cases:
 
 - `wildcard_model_all_endpoints_2_0` to `_2_3` are new: the data plane of
   each version must load every route of a `*` model.
+  - The 2.0, 2.1, and 2.2 cases pass.
+  - The 2.3 case also has a mantle `bedrock` target. It fails only on the
+    Gemini Interactions routes until a data plane release ships that API.
+- `gemini_interactions_api` is new: the data plane accepts a `gemini`
+  target on `llm/v1/responses` in the `gemini` format. It fails until a
+  data plane release ships the Interactions API.

@@ -1,0 +1,55 @@
+# Explicit lists also apply the data plane rules. A target that cannot
+# serve a listed capability that another target serves is left out of its
+# routes with a warning:
+# - anthropic does not support embeddings,
+# - llama2 with format raw does not support embeddings,
+# - azure does not support skills.
+models:
+  - name: embeddings
+    type: model
+    capabilities: [generate, embeddings]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/embeddings]}
+    targets:
+      - name: text-embedding-3-large
+        provider: openai-prod
+      - name: claude-sonnet-4-5
+        provider: anthropic-prod
+      - name: llama3
+        provider: llama-local
+        config: {type: llama2, format: raw, upstream_url: "http://llama.local:8080/v1/chat"}
+  - name: skills
+    type: api
+    capabilities: [skills]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/skills]}
+    targets:
+      - name: gpt-5.4
+        provider: openai-prod
+      - name: gpt-5.4
+        provider: azure-prod
+        config: {type: azure, azure_deployment_id: gpt-5-4, azure_api_version: "2024-10-21"}
+model_providers:
+  - name: openai-prod
+    type: openai
+    config:
+      auth:
+        type: bearer
+        token: "{vault://ai/openai-key}"
+  - name: anthropic-prod
+    type: anthropic
+    config:
+      auth:
+        type: bearer
+        token: "{vault://ai/anthropic-key}"
+  - name: llama-local
+    type: llama2
+  - name: azure-prod
+    type: azure
+    config:
+      instance: kong-prod
+      auth:
+        type: basic
+        headers: [{name: api-key, value: "{vault://ai/azure-key}"}]

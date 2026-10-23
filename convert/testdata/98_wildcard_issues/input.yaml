@@ -1,0 +1,37 @@
+# An unknown format and a misspelled capability each fail their model. Next
+# to "*", the same values are ignored.
+models:
+  - name: unknown-format
+    type: model
+    capabilities: [generate]
+    formats: [{type: openai}, {type: opneai}]
+    config:
+      route: {paths: [/unknown-format]}
+    targets:
+      - name: gpt-5.4
+        provider: openai-prod
+  - name: misspelled-capability
+    type: model
+    capabilities: [generate, embedings]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/misspelled]}
+    targets:
+      - name: gpt-5.4
+        provider: openai-prod
+  - name: ignored-next-to-wildcard
+    type: model
+    capabilities: ["*", embedings]
+    formats: [{type: "*"}, {type: opneai}]
+    config:
+      route: {paths: [/ignored]}
+    targets:
+      - name: gpt-5.4
+        provider: openai-prod
+model_providers:
+  - name: openai-prod
+    type: openai
+    config:
+      auth:
+        type: bearer
+        token: "{vault://ai/openai-key}"

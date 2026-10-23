@@ -1,0 +1,26 @@
+- code: BEHAVIOR_MAY_DIFFER
+  reason: 'model "mixed" target "gemini-live-2.5-flash": the data plane does not accept this target for capability "realtime" with llm_format "openai, gemini". The routes of this capability will not fail over to it.'
+  source:
+    kind: model
+    name: mixed
+    fields:
+      - capabilities[0]
+      - targets[1]
+  severity: WARNING
+- code: CONFIG_FIELD_DROPPED
+  reason: 'model "gemini-only": no target supports an endpoint of format "openai". The converter makes no route for this format.'
+  source:
+    kind: model
+    name: gemini-only
+    fields:
+      - formats[1].type
+  severity: WARNING
+- code: BEHAVIOR_MAY_DIFFER
+  reason: 'model "cohere-and-openai" target "gpt-5.4": the data plane does not accept this target for capability "rerank" with llm_format "openai, cohere". The routes of this capability will not fail over to it.'
+  source:
+    kind: model
+    name: cohere-and-openai
+    fields:
+      - capabilities[1]
+      - targets[1]
+  severity: WARNING

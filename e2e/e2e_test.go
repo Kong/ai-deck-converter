@@ -42,9 +42,25 @@ func TestE2E(t *testing.T) {
 		{"model_scoped_request_termination_auth", func(t *testing.T) { testModelScopedRequestTermination(t, license) }},
 		{"gemini_model_all_capabilities", func(t *testing.T) { testGeminiModelAllCapabilities(t, license) }},
 		{"bedrock_model_all_endpoints", func(t *testing.T) { testBedrockModelAllEndpoints(t, license) }},
+		{"gemini_interactions_api", func(t *testing.T) { testGeminiInteractionsAPI(t, license) }},
 		{"reusable_toolsets_are_internal_only", func(t *testing.T) { testReusableToolsetsAreInternalOnly(t, license) }},
 		{"token_vault_gates_tools_and_enrolls", func(t *testing.T) { testTokenVaultGatesToolsAndEnrolls(t, license) }},
 		{"realtime_model_websocket_transport", func(t *testing.T) { testRealtimeModelWebSocketTransport(t, license) }},
+		{"wildcard_model_all_endpoints_2_0", func(t *testing.T) {
+			testWildcardModelAllEndpoints(t, license, "wildcard_model_all_endpoints_2_0", "2.0", "kong/kong-ai-gateway:2.0.3")
+		}},
+		{"wildcard_model_all_endpoints_2_1", func(t *testing.T) {
+			testWildcardModelAllEndpoints(t, license, "wildcard_model_all_endpoints_2_1", "2.1", "kong/kong-ai-gateway:2.1.0")
+		}},
+		{"wildcard_model_all_endpoints_2_2", func(t *testing.T) {
+			testWildcardModelAllEndpoints(t, license, "wildcard_model_all_endpoints_2_2", "2.2", "kong/kong-ai-gateway:2.2.0")
+		}},
+		{"wildcard_model_all_endpoints_2_3", func(t *testing.T) {
+			testWildcardModelAllEndpoints(t, license, "wildcard_model_all_endpoints_2_3", "2.3",
+				"kong/kong-ai-gateway-dev:39946325377-167b5f34f5ae4ac4be1782b22b9f250caefa76f5")
+			// TODO update the gateway image so that this test passes
+			// Gemini interactions API support is planned for AI Gateway 2.3, but is not yet available
+		}},
 	}
 	for _, c := range cases {
 		c := c

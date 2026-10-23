@@ -1,0 +1,826 @@
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: openai-chat
+        paths:
+          - /two/chat/completions
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-responses
+        paths:
+          - /two/responses
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-audio-speech
+        paths:
+          - /two/audio/speech
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-audio-transcribe
+        paths:
+          - /two/audio/transcriptions
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-audio-translate
+        paths:
+          - /two/audio/translations
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-embeddings
+        paths:
+          - /two/embeddings
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-images
+        paths:
+          - /two/images/generations
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-skills
+        paths:
+          - /two/skills
+        methods:
+          - GET
+          - POST
+          - DELETE
+          - OPTIONS
+        strip_path: false
+      - name: openai-videos
+        paths:
+          - /two/videos
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-chat-2
+        paths:
+          - /one/chat/completions
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-responses-2
+        paths:
+          - /one/responses
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-audio-speech-2
+        paths:
+          - /one/audio/speech
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-audio-transcribe-2
+        paths:
+          - /one/audio/transcriptions
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-audio-translate-2
+        paths:
+          - /one/audio/translations
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-embeddings-2
+        paths:
+          - /one/embeddings
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-images-2
+        paths:
+          - /one/images/generations
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-skills-2
+        paths:
+          - /one/skills
+        methods:
+          - GET
+          - POST
+          - DELETE
+          - OPTIONS
+        strip_path: false
+      - name: openai-videos-2
+        paths:
+          - /one/videos
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-videos-lifecycle
+        paths:
+          - /two/videos
+        methods:
+          - GET
+          - DELETE
+        strip_path: false
+        tags:
+          - aigw:video-lifecycle
+      - name: openai-videos-lifecycle-2
+        paths:
+          - /one/videos
+        methods:
+          - GET
+          - DELETE
+        strip_path: false
+        tags:
+          - aigw:video-lifecycle
+  - name: ai-gateway-websocket
+    url: ws://ai-gateway.upstream.local
+    routes:
+      - name: openai-realtime
+        paths:
+          - /one/realtime
+        protocols:
+          - ws
+          - wss
+        strip_path: false
+consumers:
+  - username: anonymous
+    custom_id: anonymous
+    plugins:
+      - name: request-termination
+        enabled: true
+        config:
+          message: Unauthorized
+          status_code: 401
+plugins:
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-chat
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: two-strategies
+            name: gpt-5.4
+            provider: openai
+          route_type: llm/v1/chat
+    route: openai-chat
+    model: two-strategies
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-responses
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: two-strategies
+            name: gpt-5.4
+            provider: openai
+          route_type: llm/v1/responses
+    route: openai-responses
+    model: two-strategies
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-audio-speech
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: audio/speech
+      llm_format: openai
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: false
+          model:
+            model_alias: two-strategies
+            name: gpt-5.4
+            provider: openai
+          route_type: audio/v1/audio/speech
+    route: openai-audio-speech
+    model: two-strategies
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-audio-transcribe
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: audio/transcription
+      llm_format: openai
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: false
+          model:
+            model_alias: two-strategies
+            name: gpt-5.4
+            provider: openai
+          route_type: audio/v1/audio/transcriptions
+    route: openai-audio-transcribe
+    model: two-strategies
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-audio-translate
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: audio/transcription
+      llm_format: openai
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: false
+          model:
+            model_alias: two-strategies
+            name: gpt-5.4
+            provider: openai
+          route_type: audio/v1/audio/translations
+    route: openai-audio-translate
+    model: two-strategies
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-embeddings
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/embeddings
+      llm_format: openai
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: two-strategies
+            name: gpt-5.4
+            provider: openai
+          route_type: llm/v1/embeddings
+    route: openai-embeddings
+    model: two-strategies
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-images
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: image/generation
+      llm_format: openai
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: two-strategies
+            name: gpt-5.4
+            provider: openai
+          route_type: image/v1/images/generations
+    route: openai-images
+    model: two-strategies
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      model_name_header: false
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: false
+          model:
+            model_alias: two-strategies
+            name: gpt-5.4
+            provider: openai
+          route_type: llm/v1/skills
+    route: openai-skills
+    model: two-strategies
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-videos
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: video/generation
+      llm_format: openai
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: two-strategies
+            name: gpt-5.4
+            provider: openai
+          route_type: video/v1/videos/generations
+    route: openai-videos
+    model: two-strategies
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-chat-2
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: one-strategy
+            name: gpt-5.4
+            provider: openai
+          route_type: llm/v1/chat
+    route: openai-chat-2
+    model: one-strategy
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-responses-2
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: one-strategy
+            name: gpt-5.4
+            provider: openai
+          route_type: llm/v1/responses
+    route: openai-responses-2
+    model: one-strategy
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-audio-speech-2
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: audio/speech
+      llm_format: openai
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: false
+          model:
+            model_alias: one-strategy
+            name: gpt-5.4
+            provider: openai
+          route_type: audio/v1/audio/speech
+    route: openai-audio-speech-2
+    model: one-strategy
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-audio-transcribe-2
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: audio/transcription
+      llm_format: openai
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: false
+          model:
+            model_alias: one-strategy
+            name: gpt-5.4
+            provider: openai
+          route_type: audio/v1/audio/transcriptions
+    route: openai-audio-transcribe-2
+    model: one-strategy
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-audio-translate-2
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: audio/transcription
+      llm_format: openai
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: false
+          model:
+            model_alias: one-strategy
+            name: gpt-5.4
+            provider: openai
+          route_type: audio/v1/audio/translations
+    route: openai-audio-translate-2
+    model: one-strategy
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-embeddings-2
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/embeddings
+      llm_format: openai
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: one-strategy
+            name: gpt-5.4
+            provider: openai
+          route_type: llm/v1/embeddings
+    route: openai-embeddings-2
+    model: one-strategy
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-images-2
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: image/generation
+      llm_format: openai
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: one-strategy
+            name: gpt-5.4
+            provider: openai
+          route_type: image/v1/images/generations
+    route: openai-images-2
+    model: one-strategy
+  - name: ai-proxy-advanced
+    protocols:
+      - ws
+      - wss
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: realtime/generation
+      llm_format: openai
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: gpt-5.4
+            provider: openai
+          route_type: realtime/v1/realtime
+    route: openai-realtime
+    tags:
+      - ai-gateway-realtime-model:one-strategy
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      model_name_header: false
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: false
+          model:
+            model_alias: one-strategy
+            name: gpt-5.4
+            provider: openai
+          route_type: llm/v1/skills
+    route: openai-skills-2
+    model: one-strategy
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-videos-2
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: video/generation
+      llm_format: openai
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: one-strategy
+            name: gpt-5.4
+            provider: openai
+          route_type: video/v1/videos/generations
+    route: openai-videos-2
+    model: one-strategy
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: video/generation
+      llm_format: openai
+      model_name_header: false
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: gpt-5.4
+            provider: openai
+          route_type: video/v1/videos/generations
+    route: openai-videos-lifecycle
+  - name: openid-connect
+    config:
+      anonymous: anonymous
+      issuer: https://dev-123456.okta.com/oauth2/default
+    route: openai-videos-lifecycle
+  - name: key-auth
+    config:
+      anonymous: anonymous
+      key_names:
+        - x-api-key
+    route: openai-videos-lifecycle
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: video/generation
+      llm_format: openai
+      model_name_header: false
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: gpt-5.4
+            provider: openai
+          route_type: video/v1/videos/generations
+    route: openai-videos-lifecycle-2
+  - name: openid-connect
+    config:
+      issuer: https://dev-123456.okta.com/oauth2/default
+    route: openai-videos-lifecycle-2
+  - name: openid-connect
+    config:
+      anonymous: anonymous
+      issuer: https://dev-123456.okta.com/oauth2/default
+    route: openai-chat
+  - name: key-auth
+    config:
+      anonymous: anonymous
+      key_names:
+        - x-api-key
+    route: openai-chat
+  - name: openid-connect
+    config:
+      anonymous: anonymous
+      issuer: https://dev-123456.okta.com/oauth2/default
+    route: openai-responses
+  - name: key-auth
+    config:
+      anonymous: anonymous
+      key_names:
+        - x-api-key
+    route: openai-responses
+  - name: openid-connect
+    config:
+      anonymous: anonymous
+      issuer: https://dev-123456.okta.com/oauth2/default
+    route: openai-audio-speech
+  - name: key-auth
+    config:
+      anonymous: anonymous
+      key_names:
+        - x-api-key
+    route: openai-audio-speech
+  - name: openid-connect
+    config:
+      anonymous: anonymous
+      issuer: https://dev-123456.okta.com/oauth2/default
+    route: openai-audio-transcribe
+  - name: key-auth
+    config:
+      anonymous: anonymous
+      key_names:
+        - x-api-key
+    route: openai-audio-transcribe
+  - name: openid-connect
+    config:
+      anonymous: anonymous
+      issuer: https://dev-123456.okta.com/oauth2/default
+    route: openai-audio-translate
+  - name: key-auth
+    config:
+      anonymous: anonymous
+      key_names:
+        - x-api-key
+    route: openai-audio-translate
+  - name: openid-connect
+    config:
+      anonymous: anonymous
+      issuer: https://dev-123456.okta.com/oauth2/default
+    route: openai-embeddings
+  - name: key-auth
+    config:
+      anonymous: anonymous
+      key_names:
+        - x-api-key
+    route: openai-embeddings
+  - name: openid-connect
+    config:
+      anonymous: anonymous
+      issuer: https://dev-123456.okta.com/oauth2/default
+    route: openai-images
+  - name: key-auth
+    config:
+      anonymous: anonymous
+      key_names:
+        - x-api-key
+    route: openai-images
+  - name: openid-connect
+    config:
+      anonymous: anonymous
+      issuer: https://dev-123456.okta.com/oauth2/default
+    route: openai-skills
+  - name: key-auth
+    config:
+      anonymous: anonymous
+      key_names:
+        - x-api-key
+    route: openai-skills
+  - name: openid-connect
+    config:
+      anonymous: anonymous
+      issuer: https://dev-123456.okta.com/oauth2/default
+    route: openai-videos
+  - name: key-auth
+    config:
+      anonymous: anonymous
+      key_names:
+        - x-api-key
+    route: openai-videos
+  - name: openid-connect
+    config:
+      issuer: https://dev-123456.okta.com/oauth2/default
+    route: openai-chat-2
+  - name: openid-connect
+    config:
+      issuer: https://dev-123456.okta.com/oauth2/default
+    route: openai-responses-2
+  - name: openid-connect
+    config:
+      issuer: https://dev-123456.okta.com/oauth2/default
+    route: openai-audio-speech-2
+  - name: openid-connect
+    config:
+      issuer: https://dev-123456.okta.com/oauth2/default
+    route: openai-audio-transcribe-2
+  - name: openid-connect
+    config:
+      issuer: https://dev-123456.okta.com/oauth2/default
+    route: openai-audio-translate-2
+  - name: openid-connect
+    config:
+      issuer: https://dev-123456.okta.com/oauth2/default
+    route: openai-embeddings-2
+  - name: openid-connect
+    config:
+      issuer: https://dev-123456.okta.com/oauth2/default
+    route: openai-images-2
+  - name: openid-connect
+    protocols:
+      - ws
+      - wss
+    config:
+      issuer: https://dev-123456.okta.com/oauth2/default
+    route: openai-realtime
+  - name: openid-connect
+    config:
+      issuer: https://dev-123456.okta.com/oauth2/default
+    route: openai-skills-2
+  - name: openid-connect
+    config:
+      issuer: https://dev-123456.okta.com/oauth2/default
+    route: openai-videos-2
+ai_models:
+  - name: two-strategies
+  - name: one-strategy

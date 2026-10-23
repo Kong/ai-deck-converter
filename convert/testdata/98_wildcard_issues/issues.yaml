@@ -1,0 +1,16 @@
+- code: CONFIG_FIELD_INVALID
+  reason: 'model "unknown-format": format "opneai" is not one of anthropic, bedrock, cohere, gemini, huggingface, openai, passthrough, typesafe'
+  source:
+    kind: model
+    name: unknown-format
+    fields:
+      - formats[1].type
+  severity: ERROR
+- code: CONFIG_FIELD_INVALID
+  reason: 'model "misspelled-capability": capability "embedings" is not supported with llm_format "openai"'
+  source:
+    kind: model
+    name: misspelled-capability
+    fields:
+      - capabilities[1]
+  severity: ERROR

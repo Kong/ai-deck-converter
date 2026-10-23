@@ -1,0 +1,600 @@
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: openai-chat
+        paths:
+          - /ai/chat/completions
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-responses
+        paths:
+          - /ai/responses
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-audio-speech
+        paths:
+          - /ai/audio/speech
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-audio-transcribe
+        paths:
+          - /ai/audio/transcriptions
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-audio-translate
+        paths:
+          - /ai/audio/translations
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-embeddings
+        paths:
+          - /ai/embeddings
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-images
+        paths:
+          - /ai/images/generations
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-skills
+        paths:
+          - /ai/skills
+        methods:
+          - GET
+          - POST
+          - DELETE
+          - OPTIONS
+        strip_path: false
+      - name: openai-videos
+        paths:
+          - /ai/videos
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: anthropic-messages
+        paths:
+          - /ai/v1/messages
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-videos-lifecycle
+        paths:
+          - /ai/videos
+        methods:
+          - GET
+          - DELETE
+        strip_path: false
+        tags:
+          - aigw:video-lifecycle
+      - name: openai-videos-lifecycle-2
+        paths:
+          - /ai/videos
+        methods:
+          - GET
+          - DELETE
+        strip_path: false
+        tags:
+          - aigw:video-lifecycle
+  - name: ai-gateway-websocket
+    url: ws://ai-gateway.upstream.local
+    routes:
+      - name: openai-realtime
+        paths:
+          - /ai/realtime
+        protocols:
+          - ws
+          - wss
+        strip_path: false
+plugins:
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-chat
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - description: primary
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: a
+            name: primary
+            provider: openai
+          route_type: llm/v1/chat
+        - auth:
+            header_name: api-key
+            header_value: '{vault://ai/azure-key}'
+          description: fallback
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: a
+            name: fallback
+            options:
+              azure_api_version: "2024-10-21"
+              azure_deployment_id: fallback
+              azure_instance: kong-prod
+            provider: azure
+          route_type: llm/v1/chat
+    route: openai-chat
+    model: a
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-responses
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - description: primary
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: a
+            name: primary
+            provider: openai
+          route_type: llm/v1/responses
+        - auth:
+            header_name: api-key
+            header_value: '{vault://ai/azure-key}'
+          description: fallback
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: a
+            name: fallback
+            options:
+              azure_api_version: "2024-10-21"
+              azure_deployment_id: fallback
+              azure_instance: kong-prod
+            provider: azure
+          route_type: llm/v1/responses
+    route: openai-responses
+    model: a
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-audio-speech
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: audio/speech
+      llm_format: openai
+      targets:
+        - description: primary
+          logging:
+            log_payloads: false
+            log_statistics: false
+          model:
+            model_alias: a
+            name: primary
+            provider: openai
+          route_type: audio/v1/audio/speech
+        - auth:
+            header_name: api-key
+            header_value: '{vault://ai/azure-key}'
+          description: fallback
+          logging:
+            log_payloads: false
+            log_statistics: false
+          model:
+            model_alias: a
+            name: fallback
+            options:
+              azure_api_version: "2024-10-21"
+              azure_deployment_id: fallback
+              azure_instance: kong-prod
+            provider: azure
+          route_type: audio/v1/audio/speech
+    route: openai-audio-speech
+    model: a
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-audio-transcribe
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: audio/transcription
+      llm_format: openai
+      targets:
+        - description: primary
+          logging:
+            log_payloads: false
+            log_statistics: false
+          model:
+            model_alias: a
+            name: primary
+            provider: openai
+          route_type: audio/v1/audio/transcriptions
+        - auth:
+            header_name: api-key
+            header_value: '{vault://ai/azure-key}'
+          description: fallback
+          logging:
+            log_payloads: false
+            log_statistics: false
+          model:
+            model_alias: a
+            name: fallback
+            options:
+              azure_api_version: "2024-10-21"
+              azure_deployment_id: fallback
+              azure_instance: kong-prod
+            provider: azure
+          route_type: audio/v1/audio/transcriptions
+    route: openai-audio-transcribe
+    model: a
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-audio-translate
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: audio/transcription
+      llm_format: openai
+      targets:
+        - description: primary
+          logging:
+            log_payloads: false
+            log_statistics: false
+          model:
+            model_alias: a
+            name: primary
+            provider: openai
+          route_type: audio/v1/audio/translations
+        - auth:
+            header_name: api-key
+            header_value: '{vault://ai/azure-key}'
+          description: fallback
+          logging:
+            log_payloads: false
+            log_statistics: false
+          model:
+            model_alias: a
+            name: fallback
+            options:
+              azure_api_version: "2024-10-21"
+              azure_deployment_id: fallback
+              azure_instance: kong-prod
+            provider: azure
+          route_type: audio/v1/audio/translations
+    route: openai-audio-translate
+    model: a
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-embeddings
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/embeddings
+      llm_format: openai
+      targets:
+        - description: primary
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: a
+            name: primary
+            provider: openai
+          route_type: llm/v1/embeddings
+        - auth:
+            header_name: api-key
+            header_value: '{vault://ai/azure-key}'
+          description: fallback
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: a
+            name: fallback
+            options:
+              azure_api_version: "2024-10-21"
+              azure_deployment_id: fallback
+              azure_instance: kong-prod
+            provider: azure
+          route_type: llm/v1/embeddings
+    route: openai-embeddings
+    model: a
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-images
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: image/generation
+      llm_format: openai
+      targets:
+        - description: primary
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: a
+            name: primary
+            provider: openai
+          route_type: image/v1/images/generations
+        - auth:
+            header_name: api-key
+            header_value: '{vault://ai/azure-key}'
+          description: fallback
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: a
+            name: fallback
+            options:
+              azure_api_version: "2024-10-21"
+              azure_deployment_id: fallback
+              azure_instance: kong-prod
+            provider: azure
+          route_type: image/v1/images/generations
+    route: openai-images
+    model: a
+  - name: ai-proxy-advanced
+    protocols:
+      - ws
+      - wss
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: realtime/generation
+      llm_format: openai
+      targets:
+        - description: primary
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: primary
+            provider: openai
+          route_type: realtime/v1/realtime
+        - auth:
+            header_name: api-key
+            header_value: '{vault://ai/azure-key}'
+          description: fallback
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: fallback
+            options:
+              azure_api_version: "2024-10-21"
+              azure_deployment_id: fallback
+              azure_instance: kong-prod
+            provider: azure
+          route_type: realtime/v1/realtime
+    route: openai-realtime
+    tags:
+      - ai-gateway-realtime-model:a
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      model_name_header: false
+      targets:
+        - description: primary
+          logging:
+            log_payloads: false
+            log_statistics: false
+          model:
+            model_alias: a
+            name: primary
+            provider: openai
+          route_type: llm/v1/skills
+    route: openai-skills
+    model: a
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-videos
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: video/generation
+      llm_format: openai
+      targets:
+        - description: primary
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: a
+            name: primary
+            provider: openai
+          route_type: video/v1/videos/generations
+        - auth:
+            header_name: api-key
+            header_value: '{vault://ai/azure-key}'
+          description: fallback
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: a
+            name: fallback
+            options:
+              azure_api_version: "2024-10-21"
+              azure_deployment_id: fallback
+              azure_instance: kong-prod
+            provider: azure
+          route_type: video/v1/videos/generations
+    route: openai-videos
+    model: a
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: video/generation
+      llm_format: openai
+      targets:
+        - description: sora-2
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: b
+            name: sora-2
+            provider: openai
+          route_type: video/v1/videos/generations
+    route: openai-videos
+    model: b
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: anthropic-messages
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      targets:
+        - description: primary
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: a
+            name: primary
+            provider: openai
+          route_type: llm/v1/chat
+        - auth:
+            header_name: api-key
+            header_value: '{vault://ai/azure-key}'
+          description: fallback
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: a
+            name: fallback
+            options:
+              azure_api_version: "2024-10-21"
+              azure_deployment_id: fallback
+              azure_instance: kong-prod
+            provider: azure
+          route_type: llm/v1/chat
+    route: anthropic-messages
+    model: a
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: video/generation
+      llm_format: openai
+      model_name_header: false
+      targets:
+        - description: primary
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: primary
+            provider: openai
+          route_type: video/v1/videos/generations
+        - auth:
+            header_name: api-key
+            header_value: '{vault://ai/azure-key}'
+          description: fallback
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: fallback
+            options:
+              azure_api_version: "2024-10-21"
+              azure_deployment_id: fallback
+              azure_instance: kong-prod
+            provider: azure
+          route_type: video/v1/videos/generations
+    route: openai-videos-lifecycle
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: video/generation
+      llm_format: openai
+      model_name_header: false
+      targets:
+        - description: sora-2
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: sora-2
+            provider: openai
+          route_type: video/v1/videos/generations
+    route: openai-videos-lifecycle-2
+ai_models:
+  - name: a
+  - name: b

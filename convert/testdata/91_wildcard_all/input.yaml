@@ -1,0 +1,31 @@
+# "*" in both lists on an openai and a bedrock target. Each route has only
+# the targets that support it. The bedrock target gets the openai routes it
+# supports and the bedrock routes. On the openai images route it gets
+# log_statistics false, because the data plane rejects statistics there.
+models:
+  - name: everything
+    type: model
+    capabilities: ["*"]
+    formats: [{type: "*"}]
+    config:
+      route: {paths: [/ai]}
+    targets:
+      - name: gpt-5.4
+        provider: openai-prod
+      - name: amazon.nova-pro-v1:0
+        provider: bedrock-prod
+        config: {type: bedrock, region: us-east-1}
+model_providers:
+  - name: openai-prod
+    type: openai
+    config:
+      auth:
+        type: bearer
+        token: "{vault://ai/openai-key}"
+  - name: bedrock-prod
+    type: bedrock
+    config:
+      auth:
+        type: aws
+        access_key_id: "{vault://ai/aws-access-key-id}"
+        secret_access_key: "{vault://ai/aws-secret-access-key}"

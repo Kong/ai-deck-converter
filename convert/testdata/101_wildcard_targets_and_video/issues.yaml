@@ -1,0 +1,8 @@
+- code: ROUTING_CONFLICT
+  reason: 'video lifecycle routes for models a, b: route is shared by multiple video models; emitting overlapping lifecycle routes'
+  source:
+    kind: model
+    name: b
+    fields:
+      - config.route
+  severity: WARNING

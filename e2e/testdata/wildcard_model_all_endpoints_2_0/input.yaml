@@ -1,0 +1,141 @@
+# A "*" model with one target of each provider type that AI Gateway 2.0
+# supports. The type api model covers batches and files. The data plane
+# must load every route.
+models:
+  - name: every-endpoint
+    type: model
+    capabilities: ["*"]
+    formats: [{type: "*"}]
+    config:
+      route: {paths: [/ai]}
+    targets:
+      - {name: gpt-5.4, provider: openai-prod}
+      - name: gpt-5-4
+        provider: azure-prod
+        config: {type: azure, azure_deployment_id: gpt-5-4, azure_api_version: "2024-10-21"}
+      - {name: claude-sonnet-4-5, provider: anthropic-prod}
+      - {name: command-r, provider: cohere-prod}
+      - name: mistral-large
+        provider: mistral-prod
+        config: {type: mistral, format: openai}
+      - name: llama-3
+        provider: llama2-prod
+        config: {type: llama2, format: openai, upstream_url: "http://llama.e2e.local:8080/v1/chat/completions"}
+      - {name: gemini-2.5-pro, provider: gemini-prod}
+      - name: amazon.nova-pro-v1:0
+        provider: bedrock-prod
+        config: {type: bedrock, region: us-east-1}
+      - {name: hf-zephyr, provider: huggingface-prod}
+      - {name: qwen-max, provider: dashscope-prod}
+      - {name: grok-4, provider: xai-prod}
+      - {name: llama-4-scout, provider: cerebras-prod}
+      - name: dbrx-instruct
+        provider: databricks-prod
+        config: {type: databricks, workspace_instance_id: dbc-a1b2c3d4}
+      - name: vllm-model
+        provider: vllm-prod
+        config: {type: vllm, upstream_url: "http://vllm.e2e.local:8000/v1/chat/completions"}
+      - {name: deepseek-chat, provider: deepseek-prod}
+      - {name: llama3.1, provider: ollama-prod}
+      - {name: v0-1.5-md, provider: vercel-prod}
+      - {name: kimi-k2, provider: kimi-prod}
+  - name: every-api-endpoint
+    type: api
+    capabilities: ["*"]
+    formats: [{type: "*"}]
+    config:
+      route: {paths: [/jobs]}
+    targets:
+      - {name: gpt-5.4, provider: openai-prod}
+      - name: gpt-5-4
+        provider: azure-prod
+        config: {type: azure, azure_deployment_id: gpt-5-4, azure_api_version: "2024-10-21"}
+      - {name: claude-sonnet-4-5, provider: anthropic-prod}
+      - {name: gemini-2.5-pro, provider: gemini-prod}
+      - name: batch-api
+        provider: bedrock-prod
+        config: {type: bedrock, region: us-east-1, batch_bucket_prefix: "s3://kong-e2e-batches/jobs/"}
+      - {name: kimi-k2, provider: kimi-prod}
+model_providers:
+  - name: openai-prod
+    type: openai
+    config:
+      auth: {type: bearer, token: e2e-fake-openai-key}
+  - name: azure-prod
+    type: azure
+    config:
+      instance: kong-e2e
+      auth:
+        type: basic
+        headers: [{name: api-key, value: e2e-fake-azure-key}]
+  - name: anthropic-prod
+    type: anthropic
+    config:
+      auth:
+        type: basic
+        headers: [{name: x-api-key, value: e2e-fake-anthropic-key}]
+  - name: cohere-prod
+    type: cohere
+    config:
+      auth: {type: bearer, token: e2e-fake-cohere-key}
+  - name: mistral-prod
+    type: mistral
+    config:
+      auth: {type: bearer, token: e2e-fake-mistral-key}
+  - name: llama2-prod
+    type: llama2
+    config:
+      auth: {type: bearer, token: e2e-fake-llama2-key}
+  - name: gemini-prod
+    type: gemini
+    config:
+      auth:
+        type: basic
+        headers: [{name: x-goog-api-key, value: e2e-fake-gemini-key}]
+  - name: bedrock-prod
+    type: bedrock
+    config:
+      auth:
+        type: aws
+        access_key_id: e2e-fake-access-key-id
+        secret_access_key: e2e-fake-secret-access-key
+  - name: huggingface-prod
+    type: huggingface
+    config:
+      auth: {type: bearer, token: e2e-fake-hf-key}
+  - name: dashscope-prod
+    type: dashscope
+    config:
+      auth: {type: bearer, token: e2e-fake-dashscope-key}
+  - name: xai-prod
+    type: xai
+    config:
+      auth: {type: bearer, token: e2e-fake-xai-key}
+  - name: cerebras-prod
+    type: cerebras
+    config:
+      auth: {type: bearer, token: e2e-fake-cerebras-key}
+  - name: databricks-prod
+    type: databricks
+    config:
+      auth: {type: bearer, token: e2e-fake-databricks-key}
+  - name: vllm-prod
+    type: vllm
+    config:
+      auth: {type: bearer, token: e2e-fake-vllm-key}
+  - name: deepseek-prod
+    type: deepseek
+    config:
+      auth: {type: bearer, token: e2e-fake-deepseek-key}
+  - name: ollama-prod
+    type: ollama
+    config:
+      auth: {type: bearer, token: e2e-fake-ollama-key}
+  - name: vercel-prod
+    type: vercel
+    config:
+      auth: {type: bearer, token: e2e-fake-vercel-key}
+  - name: kimi-prod
+    type: kimi
+    config:
+      auth: {type: bearer, token: e2e-fake-kimi-key}

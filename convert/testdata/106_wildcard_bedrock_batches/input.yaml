@@ -1,0 +1,53 @@
+# A bedrock target on llm/v1/batches must set batch_bucket_prefix.
+# Under "*", the bedrock target without it loses batches with no issue.
+# With an explicit batches capability, the openai target still serves
+# batches, so the bedrock target without the prefix gets a warning.
+models:
+  - name: with-prefix
+    type: api
+    capabilities: ["*"]
+    formats: [{type: bedrock}]
+    config:
+      route: {paths: [/with-prefix]}
+    targets:
+      - name: batch-api
+        provider: bedrock-prod
+        config: {type: bedrock, region: us-east-1, batch_bucket_prefix: "s3://kong-bedrock-batches/jobs/"}
+  - name: without-prefix
+    type: api
+    capabilities: ["*"]
+    formats: [{type: "*"}]
+    config:
+      route: {paths: [/without-prefix]}
+    targets:
+      - name: gpt-5.4
+        provider: openai-prod
+      - name: batch-api
+        provider: bedrock-prod
+        config: {type: bedrock, region: us-east-1}
+  - name: explicit
+    type: api
+    capabilities: [batches]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/explicit]}
+    targets:
+      - name: gpt-5.4
+        provider: openai-prod
+      - name: batch-api
+        provider: bedrock-prod
+        config: {type: bedrock, region: us-east-1}
+model_providers:
+  - name: openai-prod
+    type: openai
+    config:
+      auth:
+        type: bearer
+        token: "{vault://ai/openai-key}"
+  - name: bedrock-prod
+    type: bedrock
+    config:
+      auth:
+        type: aws
+        access_key_id: "{vault://ai/aws-access-key-id}"
+        secret_access_key: "{vault://ai/aws-secret-access-key}"

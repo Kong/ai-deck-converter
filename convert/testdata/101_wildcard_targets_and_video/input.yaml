@@ -1,0 +1,41 @@
+# Model a is the guide model: azure does not support skills, so the skills
+# route has only primary. Its video lifecycle route has two targets, but
+# video comes from "*", so it gives no warning.
+# Model b lists video and shares the lifecycle route of model a. Only
+# model b gets the routing conflict warning.
+models:
+  - name: a
+    type: model
+    capabilities: ["*"]
+    formats: [{type: "*"}]
+    config:
+      route: {paths: [/ai]}
+    targets:
+      - name: primary
+        provider: openai-prod
+      - name: fallback
+        provider: azure-prod
+        config: {type: azure, azure_deployment_id: fallback, azure_api_version: "2024-10-21"}
+  - name: b
+    type: model
+    capabilities: [video]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/ai]}
+    targets:
+      - name: sora-2
+        provider: openai-prod
+model_providers:
+  - name: openai-prod
+    type: openai
+    config:
+      auth:
+        type: bearer
+        token: "{vault://ai/openai-key}"
+  - name: azure-prod
+    type: azure
+    config:
+      instance: kong-prod
+      auth:
+        type: basic
+        headers: [{name: api-key, value: "{vault://ai/azure-key}"}]

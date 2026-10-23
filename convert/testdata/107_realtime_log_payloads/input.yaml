@@ -1,0 +1,21 @@
+# The data plane rejects log_payloads true on a realtime target. The
+# realtime route gets log_payloads false with a warning, also under "*".
+# The other routes keep log_payloads true.
+models:
+  - name: everything
+    type: model
+    capabilities: ["*"]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/ai]}
+      logging: {payloads: true}
+    targets:
+      - name: gpt-5.4
+        provider: openai-prod
+model_providers:
+  - name: openai-prod
+    type: openai
+    config:
+      auth:
+        type: bearer
+        token: "{vault://ai/openai-key}"

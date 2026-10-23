@@ -1,0 +1,8 @@
+- code: CONFIG_FIELD_OVERRIDDEN
+  reason: model "everything" sets config.logging.payloads to true. This will be ignored on the "openai-realtime" route, and log_payloads will be overridden to false because the data plane rejects it on realtime routes.
+  source:
+    kind: model
+    name: everything
+    fields:
+      - config.logging.payloads
+  severity: WARNING
