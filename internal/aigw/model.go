@@ -11,7 +11,7 @@ type Model struct {
 	DisplayName  string         `yaml:"display_name,omitempty"`
 	Name         string         `yaml:"name,omitempty"`
 	Enabled      *bool          `yaml:"enabled,omitempty"`
-	Capabilities []string       `yaml:"capabilities,omitempty"`
+	Capabilities []Capability   `yaml:"capabilities,omitempty"`
 	Formats      []Format       `yaml:"formats,omitempty"`
 	TargetModels []TargetModel  `yaml:"targets,omitempty"`
 	Policies     []string       `yaml:"policies,omitempty"`
@@ -44,6 +44,9 @@ func (a *ModelAccess) UnmarshalYAML(node *yaml.Node) error {
 	*a = ModelAccess(fields)
 	return nil
 }
+
+// Capability is a capability supported by a model.
+type Capability = string
 
 // Format is a request/response format supported by a model.
 type Format struct {

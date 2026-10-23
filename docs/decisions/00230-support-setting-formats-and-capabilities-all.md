@@ -14,390 +14,488 @@ jira: https://konghq.atlassian.net/browse/KOKO-4510
 
 Today the user must write each capability and format of a model. A release
 that adds one needs a change of these lists. Users ask for a `*` value that
-selects all possible endpoints.
+selects all endpoints that the targets of the model support.
 
 # Scope
 [scope]: #scope
 
-- In scope: `*` in `capabilities` and `formats`, and models with more than
-  one format.
-- Out of scope: the `passthrough` format. `*` never selects it.
+In scope:
+- setting `*` in model `capabilities`
+- setting `*` in model `formats`
+- support creating models with more than one format
+- the format rules that the data plane applies to each provider
+
+Out of scope:
+- including the `passthrough` format as part of `*`
 
 # Guide-level explanation
 [guide-level-explanation]: #guide-level-explanation
 
-### Case 1: all possible endpoints
+`*` will serve as a stand-in to represent selecting all formats and
+capabilities.
+
+To achieve the desired behavior the AI deck converter will expand `*` into
+the list of supported `formats`/`capabilities` by iterating over each
+model, inspecting its targets, and building the list of supported
+endpoints. Then the converter will create the supported endpoints for each
+model.
+
+Note: the data plane will reject configuration that contains endpoints that are
+not supported by the targets of the model.
+
+## Example
+
+In the below example, each route balances only over the targets that
+support its endpoint. As a result, failover can differ between routes.
 
 ```yaml
 models:
-  - name: a              # every capability except batches and files
+  - name: a                     # every capability except batches and files
     capabilities: ["*"]
     formats: [{type: "*"}]
-  - name: b
-    type: api            # only batches and files
-    capabilities: ["*"]
-    formats: [{type: "*"}]
-```
-
-### Case 2: all possible capabilities for the given formats
-
-```yaml
-models:
-  - name: a
-    formats: [{type: cohere}, {type: openai}]
-    capabilities: ["*"]
-```
-
-The model serves all possible capabilities of each format.
-
-### Case 3: targets with different providers
-
-The provider of a target changes the capabilities that `*` selects for it.
-The model serves each capability that at least one target serves. A route
-balances only over the targets that serve its capability.
-
-```yaml
-models:
-  - name: a
-    formats: [{type: openai}]
-    capabilities: ["*"]
     targets:
       - name: primary
-        provider: openai-prod   # serves skills
+        provider: openai-prod   # supports skills
       - name: fallback
-        provider: azure-prod    # cannot serve skills
+        provider: azure-prod    # does not support skills
+  - name: b
+    type: api                   # only batches and files
+    capabilities: ["*"]
+    formats: [{type: cohere}, {type: openai}]
+    targets:
+      - name: primary
+        provider: openai-prod
 ```
 
-The `skills` route has only the `primary` target. A failure on this route
-cannot fail over to `fallback`. The other routes have both targets. The
-converter gives no issue. An explicit `skills` capability gives a warning
-on `fallback`. The other sections of this RFC use this example.
+- Model `a` gets the `openai` endpoints and the `anthropic` `messages`
+  endpoint, with no issue. Its `skills` route has only `primary`, so it
+  cannot fail over to `fallback`.
+- Model `b` gets the `openai` `batches` and `files` endpoints. No target
+  supports the explicit `cohere` format, so it gets a `CONFIG_FIELD_DROPPED`
+  warning.
 
 # Reference-level explanation
 [reference-level-explanation]: #reference-level-explanation
 
-## Model fields
+## Parsing lists containing `*`
 
-`*` is a new value of `capabilities` and of `Format.Type`.
+- `*` is a new value of `capabilities` and of `Format.Type`.
+- A list with `*` ignores its other values.
+  - `capabilities` set to `["*", generate]` is equivalent to `["*"]`.
+  - `formats` set to `[{type: "*"}, {type: passthrough}]` is equivalent to
+    `[{type: "*"}]`.
+- An absent or empty list keeps its meaning of today.
+  - `formats` set to `[]` is equivalent to `[{type: openai}]`.
+  - `capabilities` set to `[]` selects no capability.
+- Each format must be a value of `aimap.Formats()` or `*`.
+  - Any other value fails the model. Today it fails only when no endpoint
+    serves its capabilities.
 
-When a list holds `*`, the converter ignores every other value of that list.
-`["*", generate]` is equal to `["*"]`. All other checks use this effective
-list. `[{type: "*"}, {type: passthrough}]` is therefore not a passthrough
-model.
-
-Each format that the converter uses must be `*` or a value of
-`aimap.Formats()`. Any other value fails the model. Today an unknown format
-fails only when no endpoint serves its capabilities.
-
-| Field          | Absent or `[]`     | `*` value             |
-|----------------|--------------------|-----------------------|
-| `formats`      | `[{type: openai}]` | every wildcard format |
-| `capabilities` | no capability      | every capability      |
-
-## Expansion of `*`
-
-`internal/aimap` owns the expansion of `*` to formats and capabilities:
+## Expansion of `*` into model formats and target capabilities
 
 ```go
 // Wildcard is the formats and capabilities value that selects every value.
 const Wildcard = "*"
 
-// WildcardFormats returns the formats that "*" selects for the minimum
-// runtime version. It also returns the formats that the version gates
-// leave out.
-func WildcardFormats(minRuntimeVersion Version) (selected, unsupported []string)
+// SupportedFormats returns the formats represented by "*" for a given
+// list of model targets and minRuntimeVersion.
+func SupportedFormats(targets []Target, minRuntimeVersion Version) []aigw.Format
 
-// WildcardCapabilities returns the capabilities that "*" selects for one
-// format, provider type, model type, and minimum runtime version.
-func WildcardCapabilities(
-	format, providerType, modelType string, minRuntimeVersion Version,
-) []string
+// SupportedCapabilities returns the capabilities represented by "*" for a given
+// format, target, model type, and minimum runtime version.
+func SupportedCapabilities(
+	format aigw.Format, target Target, modelType string, minRuntimeVersion Version,
+) []aigw.Capability
 ```
 
-The provider type changes the result. The converter therefore expands the
-lists for each target.
+The ai-deck-converter will convert `*` into the formats and capabilities
+supported by each model via new `SupportedFormats()` and
+`SupportedCapabilities()` methods. Details for these methods are provided
+in [Implementation Notes](#implementation-notes).
 
-`WildcardFormats` returns `aimap.Formats()` with `openai` first. It leaves
-out these formats:
+Note: `SupportedFormats()` and `SupportedCapabilities()` validate their
+inputs against two things: the AI data plane's validation rules, and the
+feature gates for the minimum runtime version. The feature gates keep
+version-specific capabilities and formats from leaking into runtimes that
+don't support them.
 
-- `passthrough`.
-- A format with a `FormatFeature` gate that `minRuntimeVersion` does not
-  support. The function returns it in `unsupported`.
+## Support for multiple model formats
 
-`WildcardCapabilities` starts from `aimap.CapabilitiesFor(format,
-providerType)`. That function already leaves out a passthrough-only
-capability, for example `skills`, when the provider does not speak the
-format. `WildcardCapabilities` then leaves out these capabilities:
+Today the converter only supports a single model format. With this RFC,
+the converter will need to support models having multiple formats.
 
-- For a `type: model` model, `batches` and `files`.
-- For a `type: api` model, every other capability.
-- A capability with a `CapabilityFeature` gate that `minRuntimeVersion`
-  does not support.
-- A capability whose endpoint shares a route with an earlier capability of
-  another genai category. One `ai-proxy-advanced` plugin serves one genai
-  category. For example, `generate` comes first on the `bedrock` `invoke`
-  route. `embeddings`, `image`, and `video` therefore do not get this
-  route.
-
-The converter also normalizes explicit formats and removes duplicates.
-
-Today a capability that the format does not serve fails the model. With this
-RFC, the converter leaves out the pairs that it cannot serve. See
-[Issues](#issues).
-
-## More than one format
-
-Today the converter reads only `formats[0]`. With this RFC, it converts every
-format. Route groups already use the section in their key. Routes of different
-formats therefore never merge. Each `ai-proxy-advanced` plugin carries the
-`llm_format` of its route. `ai_models` entries do not change. The video
-lifecycle route checks for an `openai` `video` pair, not for `formats[0]`.
-
-### Pair order
-
-The output lists routes in pair order. This order must not depend on the
-order of the lists, otherwise the round trip fails. When a model has more
-than one format or uses `*`, the converter uses a fixed pair order:
-
-- Formats in `WildcardFormats` order. `openai` is first. The other formats
-  follow in sorted order.
-- For each format, capabilities in `CapabilitiesFor` order. `generate` is
-  first. The other capabilities follow in sorted order.
-
-A model with one explicit format and explicit capabilities keeps the list
-order, as today.
-
-### Equal paths in two formats
-
-`openai` and `gemini` both serve `realtime` on `/realtime`. Two formats of
-one model can give equal paths and protocols. The model keeps the endpoint
-of the earlier format in pair order. This format is always `openai`.
-
-## `realtime` under `*`
-
-Two conditions prevent the protection of a WebSocket route:
-
-- A global authentication policy. A global plugin keeps the `http` and
-  `https` protocols. It cannot protect `ws` or `wss`.
-- More than one auth strategy on the model. A WebSocket route has no
-  `anonymous` fallback. Each strategy rejects the clients of the others.
-
-One auth strategy of any type protects the route, for example `jwt`. Under
-`*`, the converter leaves out only the `realtime` endpoint.
-
-## Version gates
-
-`*` is a converter feature. The output holds only routes and plugins that
-exist today. `*` therefore gets no `Feature` in
-`internal/aimap/versions.go`.
-
-## Video lifecycle routes
-
-Today `videoLifecycleCandidates` gives two warnings for a video model:
-
-- A model with more than one target gets a warning. A request without a
-  model alias can reach a target other than the target that made the job.
-- Two video models on one route each get a warning.
-
-When `video` comes from `*`, the model gets neither warning. The output does
-not change. A `*` model still counts toward a shared route. A model with an
-explicit `video` capability on that route therefore still gets its warning.
-The warning names every video model on the route.
-
-## Issues
-
-Two rules decide if `*` gives an issue:
-
-1. **No issue when `*` causes the result.** The model does not ask for the
-   value.
-2. **An issue when the model or a target cannot serve an explicit value as
-   asked.** The user asked for the value.
-
-Note: an unknown format gives an issue outside these rules.
-
-| Case                                                                                                                                 | Under `*`                  | Explicit list                                                                       | Code and field                                                                              | Rule |
-|--------------------------------------------------------------------------------------------------------------------------------------|----------------------------|-------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------|------|
-| `type` leaves out a capability                                                                                                       | left out, no issue         | not changed                                                                         |                                                                                             | 1    |
-| Passthrough-only pair, for example `(openai, skills)` on `anthropic`. The target serves the capability through another format        | pair left out, no issue    | pair left out, no issue                                                             |                                                                                             | 1    |
-| Pair that no endpoint serves, when another pair serves the capability, for example `(cohere, generate)` next to `(openai, generate)` | left out, no issue         | left out, no issue                                                                  |                                                                                             | 1    |
-| Capability that shares a route with another genai category, for example `(bedrock, embeddings)` on the `invoke` route                | left out, no issue         | left out, no issue when another endpoint serves the capability. Otherwise `WARNING` | `CONFIG_FIELD_DROPPED` on the capability                                                    | 1, 2 |
-| Gated format or capability                                                                                                           | left out, no issue         | model fails                                                                         | `UNSUPPORTED_IN_MIN_RUNTIME_VERSION`                                                        | 1, 2 |
-| Equal paths in two formats                                                                                                           | `openai` kept, no issue    | `openai` kept, no issue                                                             |                                                                                             | 1    |
-| Target cannot serve a capability that another target serves. See Case 3                                                              | target left out, no issue  | target left out, `WARNING`                                                          | `BEHAVIOR_MAY_DIFFER` on `capabilities[i]` and `targets[j]`                                 | 1, 2 |
-| Video lifecycle route with 2+ targets                                                                                                | no issue                   | `WARNING`                                                                           | `BEHAVIOR_MAY_DIFFER` on `targets`                                                          | 1, 2 |
-| Two video models on one route                                                                                                        | no issue for the `*` model | `WARNING`                                                                           | `ROUTING_CONFLICT` on `config.route`                                                        | 1, 2 |
-| `realtime` that the model cannot protect                                                                                             | left out, no issue         | model fails                                                                         | `CONFIG_FIELD_INVALID`                                                                      | 1, 2 |
-| No target serves a capability                                                                                                        | N/A                        | model fails                                                                         | `CONFIG_FIELD_INVALID` on the capability                                                    | 2    |
-| Only gated formats serve a capability. For future formats                                                                            | N/A                        | model fails                                                                         | `UNSUPPORTED_IN_MIN_RUNTIME_VERSION`                                                        | 2    |
-| A value next to `*`                                                                                                                  | value ignored, no issue    | N/A                                                                                 |                                                                                             | 1    |
-| Unknown format                                                                                                                       | model fails                | model fails                                                                         | `CONFIG_FIELD_INVALID` on `formats[i].type`                                                 |      |
-
-The expansion runs for each target. The converter reports each issue one
-time for each model. The exception is the "target cannot serve" warning. The
-converter reports it one time for each capability and target pair.
-
-## Reverse conversion
-
-The reverter never writes `*`. It writes the explicit lists that the
-converter expanded. It collects formats across the routes of a model group,
-in route order, as it collects capabilities today.
-
-### Alias-less groups
-
-A `type: api` model with `*` makes `batches` and `files` routes in several
-formats. Today the reverter keys an alias-less group by the route name. It
-merges only routes with the same capability. The routes of one model
-therefore give two groups. A `type: api` model with `[batches, files]` has
-this problem today. This fix can ship separately.
-
-The reverter keys an alias-less group by the target set and the base paths
-of the route. The target set is the sorted list of target fingerprints. It
-uses this key only when the groups and the free `ai_models` entries then
-have equal counts, otherwise it keys by the route name, as today. This
-keeps apart two models with the same target and different capabilities.
-
-### Round trip
-
-The collected formats and capabilities give the same pairs again. The
-[pair order](#pair-order) makes the order of the lists irrelevant.
-The round trip case that `revert/roundtrip_test.go` asserts stays 
-byte-identical.
-
-The round trip can add warnings. Under `*`, rule 1 gives no issue. The
-reverter writes explicit lists. The second conversion then applies rule 2.
-`unexpectedIssues` accepts these `WARNING` issues, only for a model with
-`capabilities: ["*"]` in the forward input:
-
-- `BEHAVIOR_MAY_DIFFER` on one `capabilities[i]` and one `targets[j]`.
-- `BEHAVIOR_MAY_DIFFER` on `targets`.
-- `ROUTING_CONFLICT` on `config.route`.
-
-Only `videoLifecycleCandidates` gives the last two.
+To support multiple formats for a model, the following updates will be
+needed:
+- add a loop over the model's formats around the existing target and
+  capability loop in `convertModel`
+  - for each format, work out its section and `llm_format`, then run the
+    existing target and capability logic for that format
+- order format/capability combinations to support round-trip stability
+  - the order should be `openai` first and then the remaining formats
+    sorted, and within each format `generate` first then the rest sorted
+- handle the case when one format can't serve a capability but another
+  format can
+  - this should be handled by skipping the combination that can't serve
+    the capability
+  - the model fails only when no format can serve the capability
+- handle the case when multiple format/capability combinations share the
+  same path
+  - this should be handled by choosing the first format in the set order
+    that still has at least one target using it
+  - any target that loses out but had explicitly asked for the capability
+    should get a warning
+- update the video lifecycle logic to check whether `openai` is anywhere
+  in the model's list of formats
 
 # Drawbacks
 [drawbacks]: #drawbacks
 
-- **Existing configurations can convert differently.**
-  - An unknown format now fails the model. Today a model with an unknown
-    format converts with no issue in two cases: with `capabilities: []`,
-    and after `formats[0]`.
-  - A model with more than one format now gets the routes of each format.
-- **Output changes with the converter release.** When a release adds an
-  endpoint, each model with `*` gets it.
-- **Many generated routes.** On the latest runtime version, one
-  `type: model` model on an `openai` provider makes 11 routes with
-  `capabilities: ["*"]` and 29 routes with `*` for both lists. Both counts
-  include the video lifecycle route.
-- **More routing conflicts.** A `*` model uses every path under its base
-  path. An MCP server or an agent on such a path conflicts with the model.
-- **Results under `*` that give no issue.** See rule 1 of
-  [Issues](#issues). The user gets no signal for these results:
-  - Failover differs for each endpoint. See Case 3.
-  - A video lifecycle request can reach a wrong target.
-  - Auth settings remove the `realtime` endpoint.
-  - A later runtime version adds endpoints.
-  - A value next to `*` is ignored. For example, the user can expect
-    `[{type: "*"}, {type: passthrough}]` to be a passthrough model.
-  - A `bedrock` model serves `generate` on `invoke`, never `embeddings`,
-    `image`, or `video`. A Bedrock embedding or image model needs an
-    explicit list.
-- **Untested format and provider pairs.** `formats: [{type: "*"}]` asks one
-  provider to serve every format.
-- **`type: api` models on one route stay merged after a revert.** These
-  models share one plugin. A target cannot carry a tag. Therefore, the
-  reverter cannot split two such models with equal base paths and shared
-  capabilities. This occurs today. `*` makes it more frequent.
+- **Some configurations that load today convert differently**: a second
+  format adds routes, an unknown second format fails the model, and the
+  new pair order can reorder routes and plugins.
+- **Many generated routes**: one `type: model` model on an `openai`
+  provider makes 12 routes with `*` in both lists.
+- **Requests can fail on a route that loads**, because `TargetSupports`
+  checks the provider and not the model.
+- **Some results under `*` give no issue**, for example, a failover that
+  differs for each endpoint.
+- **Output changes with the converter release**, because each model with
+  `*` gets every endpoint that a new release adds.
+- **More routing conflicts**, because a `*` model uses every supported path
+  under its base path.
+- **`type: api` models on one route stay merged after a revert**, which `*`
+  makes more frequent.
 
 # Rationale and alternatives
 [rationale-and-alternatives]: #rationale-and-alternatives
 
-- **Default absent or empty lists to every value.** An empty `capabilities`
-  list can show that the user wants no value. An absent `formats` list
-  means `openai` today. A change adds routes to every existing model.
-- **A boolean field, for example `all_capabilities: true`.** The
-  configuration then uses two fields for one list.
-- **Select only the capabilities that all targets serve.** Each route then
-  balances over all targets. A target with fewer capabilities then removes
-  endpoints from the whole model. This RFC uses the union.
-- **Warn for each value that `*` leaves out or changes.** This covers gated
-  values, a target that cannot serve a capability, the video lifecycle
-  warnings, `realtime` that the model cannot protect, and a value next to
-  `*`. The user cannot remove these warnings without removing `*`.
-  `-strict` callers then cannot use `*`. One warning for each model has the
-  same problem. This RFC follows rule 1 instead.
-- **Never warn for a target that cannot serve a capability.** The round
-  trip then needs no exception. The user gets no signal that failover
-  differs. This RFC warns only for explicit lists. See rule 1 of
-  [Issues](#issues).
+`*` must only select the endpoints that the targets of the model support,
+because the data plane rejects every other endpoint.
+
+Alternatives:
+- **Select every endpoint of every format**, which the data plane rejects.
+- **Apply `TargetSupports` only under `*`**, which breaks the round trip.
+- **Select only the endpoints that all targets support**, which lets one
+  limited target remove endpoints from the whole model.
+- **Default absent or empty lists to every value**, which adds routes to
+  every existing model.
+- **A boolean field such as `all_capabilities: true`**, which uses two
+  fields for one list.
+- **Warn for each value that `*` leaves out or changes**, which stops
+  `-strict` callers from using `*`.
+- **Never warn for a target that cannot serve a capability**, which hides
+  failover differences in explicit lists.
 
 # Unresolved questions
 [unresolved-questions]: #unresolved-questions
 
+None.
+
 # Implementation notes
 [implementation-notes]: #implementation-notes
 
-- `expandCapabilities` becomes `modelEndpoints(m, providerType)`. It returns
-  the ordered pairs of one target. `convertModel` and
-  `videoLifecycleCandidates` both call it.
-- Each `(format, capability)` pair gets its endpoints from
-  `aimap.EndpointsFor`. The section comes from the format of the pair.
-- `checkModelCapabilities` gets only the explicit capabilities.
-- `isPassthrough`, the passthrough format check, and `llmFormat` read the
-  effective format list.
-- The check for more than one auth strategy on a WebSocket route moves next
-  to the global policy check. The converter then never makes a `realtime`
-  route that it must remove.
-- The comment of `sharedLifecycleRoutes` in `convert/lint.go` says that
-  `videoLifecycleCandidates` reports equal lifecycle routes. Under `*`, no
-  function reports them. The comment must tell this.
-- The reverter makes the target set of a route before it reads the targets
-  of the route.
-- The genai category check in `convertModel` gives `CONFIG_FIELD_DROPPED`
-  only when no other endpoint of the model serves the capability. The
-  other endpoint can be in another format or in the same pair. For
-  example, `converse` still serves `generate` when `invoke` is lost.
+## Target support
+
+The data plane rejects the whole configuration when a target breaks one
+of its validation rules. The rules live in `kong/llm/schemas/init.lua`,
+`kong/llm/schemas/embeddings.lua`, and the `ai-proxy` and
+`ai-proxy-advanced` plugin schemas. `internal/aimap` copies the rules that
+depend on the endpoint for both directions:
+
+```go
+// Target holds the target facts that the data plane checks.
+type Target struct {
+	ProviderType string
+	// Mantle is true when a bedrock target sets endpoint_type to mantle.
+	Mantle bool
+	// BatchBucketPrefix is true when a bedrock target sets
+	// batch_bucket_prefix.
+	BatchBucketPrefix bool
+	// Llama2RawFormat is true when a llama2 target sets format to raw.
+	Llama2RawFormat bool
+}
+
+// TargetSupports reports whether the data plane accepts target on spec in
+// format.
+func TargetSupports(format string, target Target, spec EndpointSpec) bool
+```
+
+`TargetSupports` is true when all seven conditions are true:
+
+1. The format accepts the provider. This is true in these cases:
+    - The format is `openai`.
+    - The format equals the provider type.
+    - The format is `anthropic`, and the route type is `llm/v1/chat`.
+2. The route type accepts the provider. See [Route types](#route-types).
+3. A `gemini` target on `realtime/v1/realtime` uses the `gemini` format.
+   See [Support for multiple model formats](#support-for-multiple-model-formats).
+4. A `mantle` target uses the `openai` or `anthropic` format. Its route
+   type is in the mantle list. See [Bedrock mantle](#bedrock-mantle).
+5. A `bedrock` target on `llm/v1/batches` sets `batch_bucket_prefix`.
+6. An `openai` or `anthropic` target on `llm/v1/skills` uses its own
+   format. The existing `aimap.RequiresNativeFormat` check moves here.
+7. A `llama2` target with `format: raw` is not on `llm/v1/embeddings`.
+
+`TargetSupports` applies to `*` and to explicit lists.
+
+These rules need no condition:
+
+- `azure` with an Anthropic upstream rejects `llm/v1/completions`, but no
+  endpoint uses `llm/v1/completions`.
+- The `passthrough` rules stay in the existing checks, because `*` never
+  selects `passthrough`.
+- Provider-only rules, for example `gemini` with
+  `auth.allow_override: false`, do not depend on the endpoint.
+
+### Route types
+
+The table copies `SUPPORTED_ROUTE_TYPES` of `kong/llm/schemas/init.lua` for
+2.3, keyed by the plugin provider of the target:
+
+| Route type                      | Plugin providers                                                                                                                                                                                                                    |
+|---------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `llm/v1/chat`                   | `openai`, `azure`, `anthropic`, `cohere`, `mistral`, `llama2`, `gemini`, `bedrock`, `databricks`, `huggingface`, `dashscope`, `xai`, `cerebras`, `vllm`, `deepseek`, `ollama`, `kimi`, `vercel`, `sagemaker`, `typesafe`, `baseten` |
+| `llm/v1/completions`            | `openai`, `azure`, `anthropic`, `cohere`, `mistral`, `llama2`, `gemini`, `bedrock`, `huggingface`, `xai`, `ollama`                                                                                                                  |
+| `llm/v1/embeddings`             | `openai`, `azure`, `cohere`, `mistral`, `llama2`, `gemini`, `bedrock`, `databricks`, `huggingface`, `dashscope`, `ollama`, `vercel`                                                                                                 |
+| `llm/v1/responses`              | `openai`, `azure`, `xai`, `vercel`                                                                                                                                                                                                  |
+| `llm/v1/assistants`             | `openai`, `azure`                                                                                                                                                                                                                   |
+| `llm/v1/batches`                | `openai`, `azure`, `bedrock`, `anthropic`, `gemini`, `kimi`                                                                                                                                                                         |
+| `llm/v1/files`                  | `openai`, `azure`, `kimi`                                                                                                                                                                                                           |
+| `llm/v1/skills`                 | `openai`, `anthropic`                                                                                                                                                                                                               |
+| `image/v1/images/generations`   | `openai`, `azure`, `bedrock`, `gemini`, `dashscope`, `xai`, `vercel`                                                                                                                                                                |
+| `image/v1/images/edits`         | `openai`, `azure`, `bedrock`, `gemini`, `dashscope`                                                                                                                                                                                 |
+| `audio/v1/audio/speech`         | `openai`, `azure`                                                                                                                                                                                                                   |
+| `audio/v1/audio/translations`   | `openai`, `azure`                                                                                                                                                                                                                   |
+| `audio/v1/audio/transcriptions` | `openai`, `azure`                                                                                                                                                                                                                   |
+| `realtime/v1/realtime`          | `openai`, `azure`, `gemini`                                                                                                                                                                                                         |
+| `video/v1/videos/generations`   | `openai`, `azure`, `bedrock`, `gemini`, `huggingface`                                                                                                                                                                               |
+
+Earlier releases differ only by `sagemaker` (2.1), `typesafe` (2.2),
+`llm/v1/skills` (2.2), and `baseten` (2.3), which existing feature gates
+cover.
+
+### Statistics
+
+The table copies the union of `UNSUPPORTED_LOG_STATISTICS` in 2.0 to 2.3:
+
+| Route type                      | Plugin providers      | Releases   |
+|---------------------------------|-----------------------|------------|
+| `llm/v1/completions`            | `anthropic`           | 2.0 to 2.3 |
+| `llm/v1/assistants`             | `openai`, `azure`     | 2.0 to 2.3 |
+| `llm/v1/batches`                | `openai`, `azure`     | 2.0 to 2.3 |
+| `llm/v1/skills`                 | `openai`, `anthropic` | 2.2 to 2.3 |
+| `image/v1/images/generations`   | `bedrock`             | 2.0 to 2.3 |
+| `image/v1/images/edits`         | `bedrock`             | 2.0 to 2.3 |
+| `audio/v1/audio/speech`         | `openai`, `azure`     | 2.0 to 2.3 |
+| `audio/v1/audio/transcriptions` | `openai`, `azure`     | 2.0        |
+| `audio/v1/audio/translations`   | `openai`, `azure`     | 2.0 to 2.3 |
+
+```go
+// LogStatisticsSupported reports whether the data plane accepts
+// log_statistics on a target of providerType on spec.
+func LogStatisticsSupported(providerType string, spec EndpointSpec) bool
+```
+
+- When it is false, the converter sets `log_statistics: false` on the
+  target.
+- Today it changes only a `bedrock` target on the `openai` images route.
+- A model with `config.logging.statistics: true` gets a
+  `CONFIG_FIELD_OVERRIDDEN` warning, also under `*`.
+
+### Bedrock mantle
+
+- A mantle target serves only `llm/v1/chat`, `llm/v1/responses`,
+  `llm/v1/files`, and `passthrough` in the `openai` or `anthropic` format.
+- Condition 4 moves the existing `aimap.MantleSupports` check into
+  `TargetSupports`.
+
+### Required options
+
+- Condition 5 leaves out `batches` for a `bedrock` target without
+  `batch_bucket_prefix`.
+- Other required options depend only on the provider or on `passthrough`,
+  so `*` does not change them.
+  - `mistral_format` and `anthropic_version` are not required for
+    `passthrough`.
+  - A `databricks` target needs `upstream_url` for `passthrough` and
+    `workspace_instance_id` otherwise.
+
+### Model name header
+
+- The data plane forces `model_name_header: false` on `llm/v1/assistants`,
+  `llm/v1/files`, `llm/v1/batches`, and `llm/v1/skills`.
+- `aimap.SupportsModelNameHeader` moves this existing list out of
+  `convert/model.go`.
+
+### Realtime payloads
+
+- The converter sets `log_payloads: false` on each `realtime/generation`
+  target, because the data plane rejects `true`.
+- A model with `config.logging.payloads: true` gets a
+  `CONFIG_FIELD_OVERRIDDEN` warning, also under `*`.
+
+## SupportedFormats and SupportedCapabilities
+
+`SupportedFormats` returns `aimap.Formats()` without:
+
+- `passthrough`,
+- formats that a `FormatFeature` gate leaves out,
+- formats in which no target has an endpoint that `TargetSupports`
+  accepts.
+
+`SupportedCapabilities` returns `aimap.CapabilitiesFor(format.Type,
+target.ProviderType)` without:
+
+- capabilities with no endpoint that `TargetSupports` accepts,
+- capabilities that the model type does not allow (`type: api` gets only
+  `batches` and `files`),
+- capabilities that a `CapabilityFeature` gate leaves out,
+- capabilities whose endpoint an earlier capability of another genai
+  category already uses.
+
+A format whose capabilities are all left out makes no routes and gives no
+issue. The converter removes duplicate formats and uses the pair order of
+[Support for multiple model formats](#support-for-multiple-model-formats).
+
+## Special cases
+
+- **`realtime`**: under `*`, a model that cannot protect a WebSocket route
+  loses only its `realtime` endpoint.
+- **Video lifecycle routes**: a `video` capability from `*` gives no
+  lifecycle warning.
+- **Version gates**: `*` adds no `Feature`, because it makes only routes
+  and plugins that exist today.
+
+## Issues
+
+- **No issue when `*` causes the result.**
+- **An issue when the model or a target cannot serve an explicit value.**
+- A dropped pair or endpoint gives no issue while another pair or
+  endpoint still serves the capability.
+
+| Case                                                        | Under `*`       | Explicit list                                                                       |
+|-------------------------------------------------------------|-----------------|-------------------------------------------------------------------------------------|
+| `type` leaves out a capability                              | left out        | not changed                                                                         |
+| Format that gives no endpoint for any target                | left out        | `WARNING` `CONFIG_FIELD_DROPPED` on `formats[i].type`                               |
+| Only endpoint shares a route with another genai category    | left out        | `WARNING` `CONFIG_FIELD_DROPPED` on the capability                                  |
+| Gated format or capability                                  | left out        | model fails, `UNSUPPORTED_IN_MIN_RUNTIME_VERSION`                                   |
+| Target cannot serve a capability that another target serves | target left out | target left out, `WARNING` `BEHAVIOR_MAY_DIFFER` on `capabilities[i]`, `targets[j]` |
+| Target loses an equal path to another format                | target left out | target left out, `WARNING` `BEHAVIOR_MAY_DIFFER` on `capabilities[i]`, `targets[j]` |
+| Video lifecycle route with 2+ targets                       | no issue        | `WARNING` `BEHAVIOR_MAY_DIFFER` on `targets`                                        |
+| Two video models on one route                               | no issue        | `WARNING` `ROUTING_CONFLICT` on `config.route`                                      |
+| `realtime` that the model cannot protect                    | left out        | model fails, `CONFIG_FIELD_INVALID`                                                 |
+| No target serves a capability                               | N/A             | model fails, `CONFIG_FIELD_INVALID` on the capability                               |
+| Only gated formats serve a capability                       | N/A             | model fails, `UNSUPPORTED_IN_MIN_RUNTIME_VERSION`                                   |
+| A value next to `*`                                         | ignored         | N/A                                                                                 |
+
+An unknown format in an explicit list fails the model with
+`CONFIG_FIELD_INVALID` on `formats[i].type`.
+
+## Reverse conversion
+
+The reverter never writes `*`; it writes the union of all targets'
+formats and capabilities in pair order, with three changes:
+
+- **Tied endpoints**: it leaves out a capability that only tied routes
+  give, such as `audio/speech` on bedrock `invoke`, when another route
+  gives a capability of the same tie.
+- **Forced values**: it reads `log_statistics`, `log_payloads`, and
+  `model_name_header` only from endpoints that support them, which changes
+  `10_bedrock_invoke_multitarget` and `60_skills_api`.
+- **Alias-less groups**: it groups alias-less routes by sorted target
+  fingerprints and base paths, so one `type: api` model reverts to one
+  model, a fix that can ship separately.
+  - It uses this key only when the group count equals the count of free
+    `ai_models` entries.
+  - A free entry has no alias and no aliased model group uses it.
+
+The round trip stays byte-identical. For a forward model with
+`capabilities: ["*"]`, it accepts the `BEHAVIOR_MAY_DIFFER` and
+`ROUTING_CONFLICT` warnings of the Issues table.
+
+## Code changes
+
+- `expandCapabilities` becomes `modelEndpoints(m, target)`, which returns
+  the ordered pairs of one target that `TargetSupports` accepts.
+- The format loop of `convertModel` runs over those pairs, and the
+  equal-path decision runs after all targets.
+- A pair with no endpoint is skipped, and the model fails only when no
+  pair serves the capability.
+- `checkModelCapabilities` gets only explicit capabilities, and
+  `llmFormat` takes the format of the current pair.
+- `videoLifecycleCandidates` checks whether `openai` is in the effective
+  format list.
+- `targetSupports` becomes `aimap.TargetSupports`, and the `checkTarget`
+  mantle check stays only for models with no `openai` or `anthropic`
+  format.
+- The WebSocket auth-strategy check moves next to the global policy check.
+- `buildTarget` and the reverter call `aimap.LogStatisticsSupported`
+  instead of reading `spec.SupportsLogStatistics`.
+- `resolveEndpoint` returns tied capabilities, and
+  `aimap.SupportsModelNameHeader` replaces `supportsModelNameHeader`.
+- `convert/lint.go` and `CLAUDE.md` update their comments for `*` and the
+  new round-trip warnings.
 
 # Testing
 [testing]: #testing
 
-Forward golden cases in `convert/testdata`:
+## Unit tests
 
-- `87_min_runtime_wildcard_below_gate`: a `*` model at 2.1. No gated value,
-  no issue.
-- `91_wildcard_all`: `*` for both lists on one `openai` target. Every
-  expanded route. `gemini` `realtime` left out with no issue. `bedrock`
-  `embeddings`, `image`, and `video` left out with no issue. The round trip
-  gives no issue for them.
-- `95_wildcard_capabilities_multi_format`: `capabilities: ["*"]` with two
-  formats. Two `type: api` models on different base paths, one with `*`
-  and one with `[batches, files]`. Each gives one model after the round
-  trip.
-- `96_multi_format_explicit`: explicit formats and capabilities. A pair
-  that no endpoint serves. Equal `realtime` paths.
-- `97_wildcard_ignored_values`: `["*", generate]` and
-  `[{type: "*"}, {type: passthrough}]`. No issue.
-- `98_wildcard_issues`: an unknown format and a misspelled capability with
-  `*` formats.
-- `99_multi_format_order_and_normalization`: the fixed pair order for
-  `[gemini, openai]` and `(openai, skills)` on an `anthropic` provider.
-- `100_wildcard_realtime_global_auth`: a `*` model and a global
-  authentication policy. The model loses `realtime` with no issue. Separate
-  because a global policy applies to every model.
-- `102_wildcard_realtime_auth_strategies`: a `*` model with two auth
-  strategies loses `realtime` with no issue. A `*` model with one `jwt`
-  strategy keeps `realtime`.
-- `101_wildcard_targets_and_video`: the Case 3 model with explicit lists
-  and with `*`. Two `*` models and one explicit `video` model on their own
-  base path. The round-trip tests the accepted warnings.
+Unit tests in `internal/aimap` cover:
 
-The existing model of `26_multimodal_collapse_guard` keeps its warnings. It
-has only the `bedrock` format. No other endpoint serves its dropped
-capabilities. A new model in this case has `formats: [{type: bedrock}]` and
-`[embeddings, generate]`. `generate` loses `invoke` with no issue.
-`converse` still serves it.
+- `TargetSupports`, with one case for each of its seven conditions.
+- `LogStatisticsSupported`, with one case for each statistics table entry.
+- `SupportedFormats` and `SupportedCapabilities`, with the model type,
+  feature gate, and genai category rules.
+- Each spec of a native section accepts its native provider.
 
-Reverse golden case `revert/testdata/69_model_multi_format`: one model with
-routes in two sections. The expected model has both formats in route order.
+## Forward golden cases
 
-End-to-end tests in `e2e/`: one case for each data plane version 2.0, 2.1,
-2.2, and 2.3. The data plane accepts the routes that `*` expands to.
+New cases in `convert/testdata`:
+
+- `87_min_runtime_wildcard_skips_gated`: a `*` model at 2.1 with no issue.
+- `91_wildcard_all`: each route of a `*` model has only the targets that
+  support it.
+- `98_wildcard_issues`: an unknown format and a misspelled capability.
+- `99_multi_format_order`: pair order, duplicate formats, and
+  `(openai, skills)` on `anthropic`.
+- `100_wildcard_realtime_global_auth`: `realtime` is left out with no
+  issue.
+- `101_wildcard_targets_and_video`: a `*` model with two targets and video
+  models on one route.
+- `102_wildcard_realtime_auth_strategies`: `realtime` stays with one auth
+  strategy.
+- `103_target_support_explicit`: a target that cannot serve an explicit
+  capability gives `BEHAVIOR_MAY_DIFFER`.
+- `104_wildcard_capabilities_multi_format`: `*` capabilities with two
+  formats.
+- `105_wildcard_bedrock_mantle`: a mantle `bedrock` target gets only the
+  mantle routes.
+- `106_wildcard_bedrock_batches`: a `bedrock` target without
+  `batch_bucket_prefix` loses `batches`.
+- `107_realtime_log_payloads`: the `realtime` route forces
+  `log_payloads: false` with a warning.
+- `111_multi_format_explicit`: explicit lists with equal `realtime` paths.
+- `112_wildcard_ignored_values`: values next to `*` with no issue.
+
+Changed and unchanged cases:
+
+- `26_multimodal_collapse_guard` gets a new `[embeddings, generate]`
+  `bedrock` model: `generate` sorts first and keeps `invoke`, so
+  `embeddings` gives `CONFIG_FIELD_DROPPED`.
+- `108_bedrock_mantle_target_support` and `109_bedrock_mantle_files` must
+  not change.
+
+## Reverse golden cases
+
+- `69_model_multi_format` is new: a model with routes in two sections
+  reverts with both formats.
+- `10_bedrock_invoke_multitarget` and `60_skills_api` change because of the
+  forced values rule.
+- `revert/roundtrip_test.go` runs each new forward case and must stay
+  byte-identical.
+
+## End-to-end tests
+
+- `wildcard_model_all_endpoints_2_0` to `_2_3` are new: the data plane of
+  each version must load every route of a `*` model.
