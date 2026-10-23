@@ -200,6 +200,61 @@ func TestMCPOAuth2MapsAuthStrategyFields(t *testing.T) {
 	require.Contains(t, s, "insecure_relaxed_audience_validation: true")
 }
 
+func TestApplyOIDCFieldsToOAuth2CredentialClaim(t *testing.T) {
+	tests := []struct {
+		name     string
+		oidc     map[string]any
+		expected any
+	}{
+		{
+			name: "both fields absent",
+			oidc: map[string]any{},
+		},
+		{
+			name:     "credential_claim only",
+			oidc:     map[string]any{"credential_claim": []any{"user", "id"}},
+			expected: []any{"user", "id"},
+		},
+		{
+			name: "credential_claims only",
+			oidc: map[string]any{
+				"credential_claims": []any{[]any{"user", "id"}, []any{"email"}},
+			},
+			expected: []any{"user", "id"},
+		},
+		{
+			name: "credential_claims wins over credential_claim",
+			oidc: map[string]any{
+				"credential_claim":  []any{"sub"},
+				"credential_claims": []any{[]any{"user", "id"}},
+			},
+			expected: []any{"user", "id"},
+		},
+		{
+			name: "empty credential_claims keeps credential_claim",
+			oidc: map[string]any{
+				"credential_claim":  []any{"sub"},
+				"credential_claims": []any{},
+			},
+			expected: []any{"sub"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := map[string]any{}
+			applyOIDCFieldsToOAuth2(cfg, tt.oidc)
+
+			require.NotContains(t, cfg, "credential_claims")
+			if tt.expected == nil {
+				require.NotContains(t, cfg, "credential_claim")
+				return
+			}
+			require.Equal(t, tt.expected, cfg["credential_claim"])
+		})
+	}
+}
+
 func TestOIDCProxyConfigRejectsDistinctProxyAuthorization(t *testing.T) {
 	_, err := oidcProxyConfig(map[string]any{
 		"http_proxy":                "http://proxy.example.com:8080",

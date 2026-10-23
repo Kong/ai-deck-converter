@@ -378,7 +378,9 @@ and `formats` beyond the first.
   `leeway` (→ `jwt_claims_leeway`), `ssl_verify`, `consumer_by`,
   `consumer_claims` (→ `consumer_claim`), `consumer_optional`,
   `consumer_groups_claim`, `consumer_groups_optional`, `credential_claim`,
-  `keepalive`, `timeout`, and `http_version`. OIDC's flat `http(s)_proxy*` /
+  `keepalive`, `timeout`, and `http_version`. The plugin has only the
+  single-path `credential_claim`. The first `credential_claims` path wins over
+  `credential_claim`. The reverse gives back `credential_claim` only. OIDC's flat `http(s)_proxy*` /
   `no_proxy` fields lower to the plugin's structured `proxy_config` record;
   this requires a shared proxy scheme and Basic credentials, because the target
   has one shared credential pair. The reverse reconstructs an equivalent OIDC
