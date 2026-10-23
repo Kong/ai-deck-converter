@@ -3,6 +3,7 @@ package revert
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"slices"
 	"sort"
 	"strings"
@@ -26,6 +27,16 @@ type modelGroup struct {
 	// underlying model produced by route.model.values fan-out. Guard plugins
 	// scoped to any of these FKs belong to this model too.
 	mergedFKs []string
+	// capsUntied holds the capabilities that a route without a tie gives.
+	// capTies holds the tie sets that each other capability came from.
+	capsUntied map[string]bool
+	capTies    map[string][][]string
+	// statsSet, payloadsSet, and headerSet are true once a supporting
+	// endpoint gave the value. A forced value never becomes a model value.
+	statsSet, payloadsSet, headerSet bool
+	// statsForced and payloadsForced are true when an endpoint forced the
+	// value. With no supporting endpoint, the value stays unset.
+	statsForced, payloadsForced bool
 }
 
 // targetFingerprint returns a stable dedup key for a reconstructed target
@@ -165,12 +176,17 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 
 			var capability string
 			var bases []string
+			var spec *aimap.EndpointSpec
+			var ties []string
 			if routeType == aimap.PassthroughRouteType {
 				// A passthrough route is the model's base path itself and serves no
 				// capability of its own (see aimap.PassthroughEndpoint).
 				bases = rt.Paths
+				spec = &aimap.PassthroughEndpoint
 			} else if match, ok := resolveEndpoint(section, routeType, genai, rt.Name, path); ok {
 				capability = match.capability
+				spec = &match.spec
+				ties = match.ties
 				for _, p := range rt.Paths {
 					if b, ok := basePathFor(p, match.spec); ok {
 						bases = append(bases, b)
@@ -239,15 +255,24 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 			if realtimeModel != "" {
 				r.mergeAliasGroupMembers(g, realtimeModel)
 			}
-			// Logging is carried per target by ai-proxy-advanced but is a single
-			// model-level block in the AI Gateway model; lift it back from the
-			// first target that has it (all of a model's targets share the block).
-			if g.model.Config.Logging == nil {
-				g.model.Config.Logging = loggingFromBlockWithDefaults(getMap(target, "logging"), false, false)
+			if !slices.ContainsFunc(g.model.Formats, func(f aigw.Format) bool { return f.Type == llmFormat }) {
+				g.model.Formats = append(g.model.Formats, aigw.Format{Type: llmFormat})
 			}
-			if capability != "" && !g.capsSeen[capability] {
-				g.capsSeen[capability] = true
-				g.caps = append(g.caps, capability)
+			liftLogging(g, getMap(target, "logging"), providerType, spec)
+			if !g.headerSet && (spec == nil || aimap.SupportsModelNameHeader(*spec)) {
+				g.model.Config.Model.NameHeader = getBool(cfg, "model_name_header")
+				g.headerSet = true
+			}
+			if capability != "" {
+				if len(ties) == 0 {
+					g.capsUntied[capability] = true
+				} else {
+					g.capTies[capability] = append(g.capTies[capability], append([]string{capability}, ties...))
+				}
+				if !g.capsSeen[capability] {
+					g.capsSeen[capability] = true
+					g.caps = append(g.caps, capability)
+				}
 			}
 
 			if !g.targetsSeen[key] {
@@ -257,6 +282,80 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 		}
 	}
 	return nil
+}
+
+// liftLogging lifts the logging of one target into g. Logging is per target
+// in ai-proxy-advanced but one block in the AI Gateway model. A value comes
+// from the first target whose endpoint supports it. A spec of nil supports
+// every value.
+func liftLogging(g *modelGroup, block map[string]any, providerType string, spec *aimap.EndpointSpec) {
+	if g.model.Config.Logging == nil {
+		g.model.Config.Logging = loggingFromBlockWithDefaults(nil, false, false)
+	}
+	if v, ok := block["log_statistics"].(bool); ok {
+		switch {
+		case spec != nil && !aimap.LogStatisticsSupported(providerType, *spec):
+			g.statsForced = true
+		case !g.statsSet:
+			g.model.Config.Logging.Statistics = &v
+			g.statsSet = true
+		}
+	}
+	if v, ok := block["log_payloads"].(bool); ok {
+		switch {
+		case spec != nil && aimap.IsWebSocketEndpoint(*spec):
+			g.payloadsForced = true
+		case !g.payloadsSet:
+			g.model.Config.Logging.Payloads = &v
+			g.payloadsSet = true
+		}
+	}
+}
+
+// finishLogging leaves a value unset when only forcing endpoints gave it.
+// The forward default then gives the same output. A statistics value equal
+// to the default also stays unset next to a forcing endpoint. Set
+// explicitly, it would give a CONFIG_FIELD_OVERRIDDEN warning.
+func (g *modelGroup) finishLogging() {
+	l := g.model.Config.Logging
+	if l == nil {
+		return
+	}
+	if g.statsForced && (!g.statsSet || *l.Statistics == aimap.DefaultLogStatistics) {
+		l.Statistics = nil
+	}
+	if !g.payloadsSet && g.payloadsForced {
+		l.Payloads = nil
+	}
+}
+
+// capabilities returns the capabilities of g in pair order. It leaves out a
+// capability that only tied routes give when a route without a tie gives
+// another capability of the same tie.
+func (g *modelGroup) capabilities() []string {
+	var out []string
+	for _, capability := range g.caps {
+		if !g.capsUntied[capability] && slices.ContainsFunc(g.capTies[capability], func(tie []string) bool {
+			return slices.ContainsFunc(tie, func(other string) bool { return other != capability && g.capsUntied[other] })
+		}) {
+			continue
+		}
+		out = append(out, capability)
+	}
+	return aimap.OrderCapabilities(out)
+}
+
+// formats returns the formats of g in pair order.
+func (g *modelGroup) formats() []aigw.Format {
+	types := make([]string, len(g.model.Formats))
+	for i, f := range g.model.Formats {
+		types[i] = f.Type
+	}
+	out := make([]aigw.Format, 0, len(types))
+	for _, t := range aimap.OrderFormats(types) {
+		out = append(out, aigw.Format{Type: t})
+	}
+	return out
 }
 
 // modelRoutePaths returns the Config.Route.Paths of a model recovered from the
@@ -346,6 +445,8 @@ func (r *Reverter) modelGroupFor(
 	g := &modelGroup{
 		capsSeen:    map[string]bool{},
 		targetsSeen: map[string]bool{},
+		capsUntied:  map[string]bool{},
+		capTies:     map[string][][]string{},
 		aliasless:   aliasless,
 		routeName:   rt.Name,
 		model: aigw.Model{
@@ -360,7 +461,6 @@ func (r *Reverter) modelGroupFor(
 	if alias != "" {
 		setAliasField(&g.model.Config.Route.Model, alias, name, nextEntry())
 	}
-	g.model.Config.Model.NameHeader = getBool(cfg, "model_name_header")
 	g.model.Config.ResponseStreaming = getStr(cfg, "response_streaming")
 	g.model.Config.Proxy = proxyFromConfig(getMap(cfg, "proxy_config"))
 	g.model.Config.MaxRequestBodySize = getInt(cfg, "max_request_body_size")
@@ -637,8 +737,10 @@ func (r *Reverter) finalizeModels(acc *modelAcc) error {
 	built := map[string]bool{}
 	for _, key := range r.orderedModelKeys(acc) {
 		g := acc.groups[key]
-		g.model.Capabilities = g.caps
-		if isAPIOnly(g.caps) {
+		g.model.Capabilities = g.capabilities()
+		g.model.Formats = g.formats()
+		g.finishLogging()
+		if isAPIOnly(g.model.Capabilities) {
 			g.model.Type = "api"
 		}
 		if entry, ok := r.aiModelByName[g.model.Name]; ok {
@@ -755,10 +857,12 @@ func (r *Reverter) nameAliaslessGroups(acc *modelAcc) error {
 		return nil
 	}
 
-	var free []string
-	for _, m := range r.src.AIModels {
-		if m.Alias == "" || m.Alias == m.Name {
-			free = append(free, m.Name)
+	free := r.freeAIModels(acc)
+	if len(free) != len(unnamed) {
+		// One type api model with more than one capability or format makes
+		// several alias-less routes with the same targets and base paths.
+		if merged := mergeAliaslessGroups(acc, unnamed, false); len(merged) == len(free) {
+			unnamed = mergeAliaslessGroups(acc, unnamed, true)
 		}
 	}
 	if len(free) == len(unnamed) {
@@ -776,6 +880,93 @@ func (r *Reverter) nameAliaslessGroups(acc *modelAcc) error {
 		}
 	}
 	return nil
+}
+
+// freeAIModels returns the names of the ai-models entries that only give
+// naming help: the entry has no alias of its own, and no group with a model
+// FK or alias uses it.
+func (r *Reverter) freeAIModels(acc *modelAcc) []string {
+	used := map[string]bool{}
+	for _, key := range acc.order {
+		if g := acc.groups[key]; !g.aliasless {
+			used[g.model.Name] = true
+			for _, fk := range g.mergedFKs {
+				used[fk] = true
+			}
+		}
+	}
+	var free []string
+	for _, m := range r.src.AIModels {
+		if (m.Alias == "" || m.Alias == m.Name) && !used[m.Name] && !r.aiModelUsed[aiModelAlias(m)] {
+			free = append(free, m.Name)
+		}
+	}
+	return free
+}
+
+// mergeAliaslessGroups returns the alias-less groups after it merges the
+// groups with equal targets and base paths, in first-seen order. It changes
+// acc only when apply is true.
+func mergeAliaslessGroups(acc *modelAcc, unnamed []*modelGroup, apply bool) []*modelGroup {
+	byKey := map[string]*modelGroup{}
+	var out []*modelGroup
+	for _, g := range unnamed {
+		targets := slices.Sorted(maps.Keys(g.targetsSeen))
+		key := strings.Join(targets, "\x00") + "\x01" + strings.Join(g.model.Config.Route.Paths, "\x00")
+		first, ok := byKey[key]
+		if !ok {
+			byKey[key] = g
+			out = append(out, g)
+			continue
+		}
+		if apply {
+			first.absorb(g)
+			acc.remove(g)
+		}
+	}
+	return out
+}
+
+// absorb folds o into g. Both groups have the same targets and base paths.
+func (g *modelGroup) absorb(o *modelGroup) {
+	for _, capability := range o.caps {
+		if !g.capsSeen[capability] {
+			g.capsSeen[capability] = true
+			g.caps = append(g.caps, capability)
+		}
+		if o.capsUntied[capability] {
+			g.capsUntied[capability] = true
+		}
+		g.capTies[capability] = append(g.capTies[capability], o.capTies[capability]...)
+	}
+	for _, f := range o.model.Formats {
+		if !slices.Contains(g.model.Formats, f) {
+			g.model.Formats = append(g.model.Formats, f)
+		}
+	}
+	mergeAliasIntoGroup(g, "", o.model.Policies, o.model.Access.ACLs, o.model.Access.AuthStrategies)
+	if !g.statsSet && o.statsSet {
+		g.model.Config.Logging.Statistics, g.statsSet = o.model.Config.Logging.Statistics, true
+	}
+	if !g.payloadsSet && o.payloadsSet {
+		g.model.Config.Logging.Payloads, g.payloadsSet = o.model.Config.Logging.Payloads, true
+	}
+	if !g.headerSet && o.headerSet {
+		g.model.Config.Model.NameHeader, g.headerSet = o.model.Config.Model.NameHeader, true
+	}
+	g.statsForced = g.statsForced || o.statsForced
+	g.payloadsForced = g.payloadsForced || o.payloadsForced
+}
+
+// remove deletes g from acc.
+func (acc *modelAcc) remove(g *modelGroup) {
+	acc.order = slices.DeleteFunc(acc.order, func(key string) bool {
+		if acc.groups[key] == g {
+			delete(acc.groups, key)
+			return true
+		}
+		return false
+	})
 }
 
 // aiModelAlias returns the alias a target's model_alias references for an

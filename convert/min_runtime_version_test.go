@@ -40,10 +40,9 @@ func TestConvertFallsBackFromUnknownMinRuntimeVersion(t *testing.T) {
 	require.Equal(t, ConversionIssueSource{Kind: kindConversionOption, Name: "min_runtime_version"}, issue.Source)
 }
 
-// TestCheckModelCapabilitiesIgnoresThePassthroughSentinel: a passthrough
-// model serves one route under "", which no gate covers. A declared
-// "skills" below its gate must still fail.
-func TestCheckModelCapabilitiesIgnoresThePassthroughSentinel(t *testing.T) {
+// TestCheckModelCapabilitiesGatesOnlyExplicitCapabilities: "*" leaves out a
+// gated capability with no issue. A listed "skills" below its gate fails.
+func TestCheckModelCapabilitiesGatesOnlyExplicitCapabilities(t *testing.T) {
 	below := aimap.Since(aimap.FeatureSkillsCapability)
 	below.Minor--
 	c := newConverter(nil, Options{})
@@ -52,10 +51,11 @@ func TestCheckModelCapabilitiesIgnoresThePassthroughSentinel(t *testing.T) {
 	m := &aigw.Model{Name: "raw-gpt", Capabilities: []string{"skills"}}
 	src := issueSource(kindModel, m.Name)
 
-	require.NoError(t, c.checkModelCapabilities(src, m, []string{""}),
-		"the passthrough sentinel must never gate the model")
-	require.Error(t, c.checkModelCapabilities(src, m, []string{"skills"}),
-		"a real declared capability below its gate must still fail")
+	require.NoError(t, c.checkModelCapabilities(src, m, modelLists{formats: []string{"openai"}, capsWildcard: true}),
+		"a wildcard must never gate the model")
+	require.Error(t, c.checkModelCapabilities(src, m, modelLists{
+		formats: []string{"openai"}, capabilities: []string{"skills"},
+	}), "a listed capability below its gate must still fail")
 }
 
 // TestDisabledAPIModelIsNeverGated: a disabled, non-passthrough type:api

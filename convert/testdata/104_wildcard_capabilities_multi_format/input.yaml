@@ -1,0 +1,39 @@
+# "*" capabilities with two explicit formats. The anthropic format gives
+# only the messages endpoint for an openai target.
+# The two type api models each make two alias-less routes, batches and
+# files. Each reverts to one model.
+models:
+  - name: chat
+    type: model
+    capabilities: ["*"]
+    formats: [{type: anthropic}, {type: openai}]
+    config:
+      route: {paths: [/chat]}
+    targets:
+      - name: gpt-5.4
+        provider: openai-prod
+  - name: jobs-a
+    type: api
+    capabilities: ["*"]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/jobs-a]}
+    targets:
+      - name: gpt-5.4
+        provider: openai-prod
+  - name: jobs-b
+    type: api
+    capabilities: ["*"]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/jobs-b]}
+    targets:
+      - name: gpt-5.4-mini
+        provider: openai-prod
+model_providers:
+  - name: openai-prod
+    type: openai
+    config:
+      auth:
+        type: bearer
+        token: "{vault://ai/openai-key}"

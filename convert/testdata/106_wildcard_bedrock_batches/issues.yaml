@@ -1,0 +1,9 @@
+- code: BEHAVIOR_MAY_DIFFER
+  reason: 'model "explicit" target "batch-api": the data plane does not accept this target for capability "batches" with llm_format "openai". The routes of this capability will not fail over to it.'
+  source:
+    kind: model
+    name: explicit
+    fields:
+      - capabilities[0]
+      - targets[1]
+  severity: WARNING

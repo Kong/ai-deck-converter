@@ -1,0 +1,33 @@
+# A mantle bedrock target supports only llm/v1/chat, llm/v1/responses, and
+# llm/v1/files in the openai or anthropic format. A "*" model therefore gets
+# the openai generate and agentic routes and the anthropic messages route.
+# The files route needs type api.
+models:
+  - name: mantle
+    type: model
+    capabilities: ["*"]
+    formats: [{type: "*"}]
+    config:
+      route: {paths: [/mantle]}
+    targets:
+      - name: openai.gpt-oss-120b
+        provider: bedrock-prod
+        config: {type: bedrock, region: us-east-1, endpoint_type: mantle}
+  - name: mantle-files
+    type: api
+    capabilities: ["*"]
+    formats: [{type: "*"}]
+    config:
+      route: {paths: [/mantle-files]}
+    targets:
+      - name: openai.gpt-oss-120b
+        provider: bedrock-prod
+        config: {type: bedrock, region: us-east-1, endpoint_type: mantle}
+model_providers:
+  - name: bedrock-prod
+    type: bedrock
+    config:
+      auth:
+        type: aws
+        access_key_id: "{vault://ai/aws-access-key-id}"
+        secret_access_key: "{vault://ai/aws-secret-access-key}"

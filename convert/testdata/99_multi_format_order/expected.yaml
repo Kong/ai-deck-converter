@@ -1,0 +1,106 @@
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: openai-chat
+        paths:
+          - /ai/chat/completions
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: anthropic-messages
+        paths:
+          - /ai/v1/messages
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: anthropic-skills
+        paths:
+          - /ai/v1/skills
+        methods:
+          - GET
+          - POST
+          - DELETE
+          - OPTIONS
+        strip_path: false
+plugins:
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-chat
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - description: claude-sonnet-4-5
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: ordered
+            name: claude-sonnet-4-5
+            options:
+              anthropic_version: "2023-06-01"
+            provider: anthropic
+          route_type: llm/v1/chat
+    route: openai-chat
+    model: ordered
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: anthropic-messages
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      targets:
+        - description: claude-sonnet-4-5
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: ordered
+            name: claude-sonnet-4-5
+            options:
+              anthropic_version: "2023-06-01"
+            provider: anthropic
+          route_type: llm/v1/chat
+    route: anthropic-messages
+    model: ordered
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      model_name_header: false
+      targets:
+        - description: claude-sonnet-4-5
+          logging:
+            log_payloads: false
+            log_statistics: false
+          model:
+            model_alias: ordered
+            name: claude-sonnet-4-5
+            options:
+              anthropic_version: "2023-06-01"
+            provider: anthropic
+          route_type: llm/v1/skills
+    route: anthropic-skills
+    model: ordered
+ai_models:
+  - name: ordered

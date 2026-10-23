@@ -103,7 +103,8 @@ func ownerNames(owners []ConversionIssueSource) string {
 }
 
 // sharedLifecycleRoutes reports whether a and b are video lifecycle routes
-// with equal matchers. videoLifecycleCandidates already reports them.
+// with equal matchers. videoLifecycleCandidates already reports them. It
+// gives no issue for a model whose video comes from "*".
 func sharedLifecycleRoutes(a, b kong.Route) bool {
 	isLifecycle := func(r kong.Route) bool { return slices.Contains(r.Tags, aimap.VideoLifecycleRouteTag) }
 	if !isLifecycle(a) || !isLifecycle(b) {

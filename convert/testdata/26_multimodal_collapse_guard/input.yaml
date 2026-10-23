@@ -30,3 +30,16 @@ models:
     policies: []
     access:
       acls: {allow: [], deny: []}
+  # Routes follow the pair order, so generate claims /invoke before
+  # embeddings. /invoke is the only endpoint of embeddings, so embeddings
+  # warns. converse still serves generate.
+  - name: nova-chat
+    type: model
+    capabilities: [embeddings, generate]
+    formats: [{type: bedrock}]
+    config:
+      route: {paths: [/chat]}
+    targets:
+      - name: amazon.nova-pro-v1:0
+        provider: bedrock-prod
+        config: {type: bedrock, region: us-east-1}

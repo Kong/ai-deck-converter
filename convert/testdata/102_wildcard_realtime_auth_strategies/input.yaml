@@ -1,0 +1,42 @@
+# A WebSocket route has no anonymous fallback, so more than one auth
+# strategy cannot protect it. Under "*", the two-strategy model loses only
+# its realtime endpoint, with no issue. The one-strategy model keeps it.
+models:
+  - name: two-strategies
+    type: model
+    capabilities: ["*"]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/two]}
+    targets:
+      - name: gpt-5.4
+        provider: openai-prod
+    access:
+      auth_strategies: [okta-oidc, key-auth-default]
+  - name: one-strategy
+    type: model
+    capabilities: ["*"]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/one]}
+    targets:
+      - name: gpt-5.4
+        provider: openai-prod
+    access:
+      auth_strategies: [okta-oidc]
+model_providers:
+  - name: openai-prod
+    type: openai
+    config:
+      auth:
+        type: bearer
+        token: "{vault://ai/openai-key}"
+auth_strategies:
+  - name: okta-oidc
+    type: openid-connect
+    config:
+      issuer: https://dev-123456.okta.com/oauth2/default
+  - name: key-auth-default
+    type: key-auth
+    config:
+      key_names: [x-api-key]

@@ -1,0 +1,322 @@
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: openai-chat
+        paths:
+          - /ai/chat/completions
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-responses
+        paths:
+          - /ai/responses
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-audio-speech
+        paths:
+          - /ai/audio/speech
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-audio-transcribe
+        paths:
+          - /ai/audio/transcriptions
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-audio-translate
+        paths:
+          - /ai/audio/translations
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-embeddings
+        paths:
+          - /ai/embeddings
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-images
+        paths:
+          - /ai/images/generations
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-skills
+        paths:
+          - /ai/skills
+        methods:
+          - GET
+          - POST
+          - DELETE
+          - OPTIONS
+        strip_path: false
+      - name: openai-videos
+        paths:
+          - /ai/videos
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-videos-lifecycle
+        paths:
+          - /ai/videos
+        methods:
+          - GET
+          - DELETE
+        strip_path: false
+        tags:
+          - aigw:video-lifecycle
+plugins:
+  - name: key-auth
+    config:
+      key_names:
+        - x-api-key
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-chat
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: everything
+            name: gpt-5.4
+            provider: openai
+          route_type: llm/v1/chat
+    route: openai-chat
+    model: everything
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-responses
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: everything
+            name: gpt-5.4
+            provider: openai
+          route_type: llm/v1/responses
+    route: openai-responses
+    model: everything
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-audio-speech
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: audio/speech
+      llm_format: openai
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: false
+          model:
+            model_alias: everything
+            name: gpt-5.4
+            provider: openai
+          route_type: audio/v1/audio/speech
+    route: openai-audio-speech
+    model: everything
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-audio-transcribe
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: audio/transcription
+      llm_format: openai
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: false
+          model:
+            model_alias: everything
+            name: gpt-5.4
+            provider: openai
+          route_type: audio/v1/audio/transcriptions
+    route: openai-audio-transcribe
+    model: everything
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-audio-translate
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: audio/transcription
+      llm_format: openai
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: false
+          model:
+            model_alias: everything
+            name: gpt-5.4
+            provider: openai
+          route_type: audio/v1/audio/translations
+    route: openai-audio-translate
+    model: everything
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-embeddings
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/embeddings
+      llm_format: openai
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: everything
+            name: gpt-5.4
+            provider: openai
+          route_type: llm/v1/embeddings
+    route: openai-embeddings
+    model: everything
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-images
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: image/generation
+      llm_format: openai
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: everything
+            name: gpt-5.4
+            provider: openai
+          route_type: image/v1/images/generations
+    route: openai-images
+    model: everything
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      model_name_header: false
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: false
+          model:
+            model_alias: everything
+            name: gpt-5.4
+            provider: openai
+          route_type: llm/v1/skills
+    route: openai-skills
+    model: everything
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-videos
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: video/generation
+      llm_format: openai
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: everything
+            name: gpt-5.4
+            provider: openai
+          route_type: video/v1/videos/generations
+    route: openai-videos
+    model: everything
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: video/generation
+      llm_format: openai
+      model_name_header: false
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: gpt-5.4
+            provider: openai
+          route_type: video/v1/videos/generations
+    route: openai-videos-lifecycle
+ai_models:
+  - name: everything

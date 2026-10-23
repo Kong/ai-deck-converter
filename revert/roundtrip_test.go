@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/Kong/ai-deck-converter/convert"
@@ -75,15 +76,58 @@ func unexpectedIssues(t *testing.T, dir string, issues []convert.ConversionIssue
 		require.NoError(t, err, "read forward issues")
 		require.NoError(t, yaml.Unmarshal(data, &forward), "parse forward issues")
 	}
+	wildcard := wildcardModels(t, dir)
 	var out []convert.ConversionIssue
 	for _, issue := range issues {
 		known := issue.Severity == convert.Warning &&
-			slices.ContainsFunc(forward, func(f convert.ConversionIssue) bool { return reflect.DeepEqual(f, issue) })
+			(slices.ContainsFunc(forward, func(f convert.ConversionIssue) bool { return reflect.DeepEqual(f, issue) }) ||
+				wildcard[issue.Source.Name] && wildcardWarning(issue))
 		if !known {
 			out = append(out, issue)
 		}
 	}
 	return out
+}
+
+// wildcardFormat is one entry of a forward model's formats list.
+type wildcardFormat struct {
+	Type string `yaml:"type"`
+}
+
+// wildcardModels returns the names of the forward models with "*" in
+// capabilities or formats. The reverter writes their explicit lists, so the
+// re-conversion can warn where "*" gave no issue.
+func wildcardModels(t *testing.T, dir string) map[string]bool {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(dir, "input.yaml"))
+	require.NoError(t, err, "read forward input")
+	var doc struct {
+		Models []struct {
+			Name         string           `yaml:"name"`
+			Capabilities []string         `yaml:"capabilities"`
+			Formats      []wildcardFormat `yaml:"formats"`
+		} `yaml:"models"`
+	}
+	require.NoError(t, yaml.Unmarshal(data, &doc), "parse forward input")
+	out := map[string]bool{}
+	for _, m := range doc.Models {
+		formatIsWildcard := slices.ContainsFunc(m.Formats, func(f wildcardFormat) bool { return f.Type == aimap.Wildcard })
+		if slices.Contains(m.Capabilities, aimap.Wildcard) || formatIsWildcard {
+			out[m.Name] = true
+		}
+	}
+	return out
+}
+
+// wildcardWarning reports whether issue is one of the warnings that an
+// explicit list gives where "*" gives none.
+func wildcardWarning(issue convert.ConversionIssue) bool {
+	fields := issue.Source.Fields
+	if issue.Code == convert.RoutingConflict {
+		return slices.Equal(fields, []string{"config.route"})
+	}
+	return issue.Code == convert.BehaviorMayDiffer && (slices.Equal(fields, []string{"targets"}) ||
+		len(fields) == 2 && strings.HasPrefix(fields[0], "capabilities[") && strings.HasPrefix(fields[1], "targets["))
 }
 
 // latestConvertOptions targets the newest known release, as the convert

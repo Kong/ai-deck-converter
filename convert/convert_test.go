@@ -166,7 +166,7 @@ model_providers:
 models:
   - type: model
     name: local-llama
-    capabilities: [generate, agentic]
+    capabilities: [generate, embeddings]
     formats: [{type: openai}]
     targets:
       - name: llama3.1:8b
@@ -196,8 +196,8 @@ models:
 			TargetIndex:      0,
 			ModelName:        "local-llama",
 			ModelTargetIndex: 0,
-			Capabilities:     []string{"agentic"},
-			CapabilityLabels: []string{"Responses"},
+			Capabilities:     []string{"embeddings"},
+			CapabilityLabels: []string{"embeddings"},
 		},
 	}, metadata.PluginTargets)
 }
@@ -613,11 +613,8 @@ model_providers:
 	require.Len(t, result.Output.AIModels, 1)
 }
 
-// The skills API is served only as passthrough, so Kong rejects a llm/v1/skills
-// target whose provider renders a different wire format: there is no
-// cross-format conversion to fall back on. An openai-format model on an
-// anthropic provider is such a pairing; an unresolvable provider type is left to
-// the usual warning instead.
+// Kong rejects an openai or anthropic target on llm/v1/skills in a format
+// other than its own. The only target therefore cannot serve skills.
 func TestConvertRejectsSkillsWithCrossFormatProvider(t *testing.T) {
 	src := []byte(`
 models:
@@ -637,7 +634,7 @@ model_providers:
 `)
 	_, _, err := convertDoc(src, false)
 	require.Error(t, err, "skills on a provider rendering another format must be rejected")
-	require.Contains(t, err.Error(), "passthrough-only")
+	require.Contains(t, err.Error(), `no target can serve capability "skills"`)
 	require.Contains(t, err.Error(), "llm_format")
 }
 

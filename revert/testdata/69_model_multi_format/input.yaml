@@ -1,0 +1,117 @@
+# One model has routes in the openai and gemini sections. It reverts to one
+# model with both formats in pair order.
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: openai-chat
+        paths:
+          - /ai/chat/completions
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: gemini-generate
+        paths:
+          - ~/ai/v1beta/models/(?<model_name>[^:/]+):(?:generateContent|streamGenerateContent)
+        methods:
+          - GET
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: gemini-enterprise-generate
+        paths:
+          - ~/ai/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/(?<publisher>[^/]+)/models/(?<model_name>[^:/]+):(?:generateContent|streamGenerateContent)
+        methods:
+          - GET
+          - POST
+          - OPTIONS
+        strip_path: false
+plugins:
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-chat
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: x-goog-api-key
+            header_value: '{vault://ai/gemini-key}'
+          description: gemini-2.5-pro
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: gemini-chat
+            name: gemini-2.5-pro
+            provider: gemini
+          route_type: llm/v1/chat
+    route: openai-chat
+    model: gemini-chat
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - path_pattern: 'models/([%w%.%-]+):'
+          source: path
+    route: gemini-generate
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: gemini
+      targets:
+        - auth:
+            header_name: x-goog-api-key
+            header_value: '{vault://ai/gemini-key}'
+          description: gemini-2.5-pro
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: gemini-chat
+            name: gemini-2.5-pro
+            provider: gemini
+          route_type: llm/v1/chat
+    route: gemini-generate
+    model: gemini-chat
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - path_pattern: 'models/([%w%.%-]+):'
+          source: path
+    route: gemini-enterprise-generate
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: gemini
+      targets:
+        - auth:
+            header_name: x-goog-api-key
+            header_value: '{vault://ai/gemini-key}'
+          description: gemini-2.5-pro
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: gemini-chat
+            name: gemini-2.5-pro
+            provider: gemini
+          route_type: llm/v1/chat
+    route: gemini-enterprise-generate
+    model: gemini-chat
+ai_models:
+  - name: gemini-chat

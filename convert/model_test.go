@@ -625,7 +625,9 @@ func TestBedrockMantleEndpointType(t *testing.T) {
     targets: [{name: a, provider: b, config: {type: bedrock, region: us-east-1, endpoint_type: mantle}}]`,
 			1, 0,
 		},
-		"mantle with bedrock as the first format": {
+		// The openai format serves the mantle target. The runtime target
+		// also serves the four bedrock routes.
+		"mantle with bedrock and openai formats": {
 			`
   - name: m
     capabilities: [generate]
@@ -633,7 +635,7 @@ func TestBedrockMantleEndpointType(t *testing.T) {
     targets:
       - {name: a, provider: b, config: {type: bedrock, region: us-east-1}}
       - {name: c, provider: b, config: {type: bedrock, region: us-east-1, endpoint_type: mantle}}`,
-			1, 4,
+			0, 5,
 		},
 		// Passthrough forwards the provider's native format, which is bedrock here.
 		"mantle with passthrough format": {
@@ -643,7 +645,6 @@ func TestBedrockMantleEndpointType(t *testing.T) {
     targets: [{name: a, provider: b, config: {type: bedrock, region: us-east-1, endpoint_type: mantle}}]`,
 			1, 0,
 		},
-		// Only the first format sets llm_format.
 		"mantle with bedrock after openai": {
 			`
   - name: m

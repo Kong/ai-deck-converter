@@ -1,0 +1,27 @@
+- code: BEHAVIOR_MAY_DIFFER
+  reason: 'model "embeddings" target "claude-sonnet-4-5": the data plane does not accept this target for capability "embeddings" with llm_format "openai". The routes of this capability will not fail over to it.'
+  source:
+    kind: model
+    name: embeddings
+    fields:
+      - capabilities[1]
+      - targets[1]
+  severity: WARNING
+- code: BEHAVIOR_MAY_DIFFER
+  reason: 'model "embeddings" target "llama3": the data plane does not accept this target for capability "embeddings" with llm_format "openai". The routes of this capability will not fail over to it.'
+  source:
+    kind: model
+    name: embeddings
+    fields:
+      - capabilities[1]
+      - targets[2]
+  severity: WARNING
+- code: BEHAVIOR_MAY_DIFFER
+  reason: 'model "skills" target "gpt-5.4": the data plane does not accept this target for capability "skills" with llm_format "openai". The routes of this capability will not fail over to it.'
+  source:
+    kind: model
+    name: skills
+    fields:
+      - capabilities[0]
+      - targets[1]
+  severity: WARNING

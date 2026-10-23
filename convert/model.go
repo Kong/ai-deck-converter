@@ -344,7 +344,6 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 		return nil
 	}
 	bases := basePaths(m)
-	caps := c.expandCapabilities(m)
 
 	// extractModelAliases yields the name(s) a client uses to select this
 	// model: authored aliases, or the model name when none is authored. They
@@ -368,14 +367,6 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 	// revert recovers the ID and labels from it.
 	passthrough := isPassthrough(m)
 	fkScoped := modelScoped && !passthrough
-	// A passthrough model forwards every request under its base path, so its
-	// capabilities are irrelevant: it serves one route, PassthroughEndpoint,
-	// whatever it declares. The empty capability stands for that route. caps
-	// must carry this effective value before the capability gate below runs,
-	// or the gate would reject a capability the model never actually uses.
-	if passthrough {
-		caps = []string{""}
-	}
 	if passthrough {
 		// Passthrough is a property of the whole model's traffic, not one wire
 		// format among several a route could accept.
@@ -410,11 +401,19 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 			st.passthroughMatchers[key] = m.Name
 		}
 	}
+	lists, err := c.modelLists(src, m)
+	if err != nil {
+		return err
+	}
 	if err := c.checkModelFeatures(src, m); err != nil {
 		return err
 	}
-	if err := c.checkModelCapabilities(src, m, caps); err != nil {
-		return err
+	// A passthrough model serves one route, PassthroughEndpoint, whatever
+	// capabilities it declares. Its capabilities therefore never gate it.
+	if !passthrough {
+		if err := c.checkModelCapabilities(src, m, lists); err != nil {
+			return err
+		}
 	}
 	ownerKey := ""
 	if modelScoped || passthrough {
@@ -434,12 +433,12 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 
 	var routeNames []string
 	routeSeen := map[string]bool{}
+	statsWarned := map[string]bool{}
 	// The plugin's llm_format comes from the first target, and passthrough forwards
 	// the body unchanged, so every target must speak the same client format.
 	passthroughFormat := ""
 
-	var convertedTargets []int
-	servedBy := map[string][]int{}
+	var targets []plannedTarget
 	for j := range m.TargetModels {
 		tm := &m.TargetModels[j]
 		provider, providerType, problem := c.checkTarget(m, j)
@@ -452,7 +451,10 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 			return c.failUnsupported(src.at(field), aimap.FeatureBedrockVPCEndpoint, field)
 		}
 		c.warnUnsupportedCostLists(src, tm, j)
-		convertedTargets = append(convertedTargets, j)
+		targets = append(targets, plannedTarget{
+			index: j, tm: tm, provider: provider, providerType: providerType,
+			target: aimapTarget(tm, providerType),
+		})
 		if passthrough && !aimap.HasNativeFormat(providerType) {
 			c.warn(src.at(fmt.Sprintf("targets[%d].config.type", j)), BehaviorMayDiffer,
 				"model %q target %q: provider type %q has no native llm_format, so the passthrough "+
@@ -469,42 +471,51 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 					m.Name, tm.Name, passthroughFormat, passthroughFormat, format)
 			}
 		}
-		for _, capability := range caps {
-			var sec string
-			var specs []aimap.EndpointSpec
-			if passthrough {
-				sec = aimap.SectionFor(aimap.PassthroughFormat, providerType)
-				specs = []aimap.EndpointSpec{aimap.PassthroughEndpoint}
-			} else {
-				sec = aimap.SectionFor(llmFormat(m, providerType), providerType)
-				var ok bool
-				specs, ok = aimap.EndpointsFor(sec, capability)
-				if !ok {
-					return c.fail(src.at(capabilityField(m, capability)), ConfigFieldInvalid,
-						"model %q: capability %q is not supported with llm_format %q for provider type %q",
-						m.Name, capability, llmFormat(m, providerType), providerType)
-				}
+	}
+
+	formats := c.effectiveFormats(lists, targets)
+	pairsByTarget := map[int][]endpointPair{}
+	var supportedPairs map[int][]endpointPair
+	if passthrough {
+		for _, t := range targets {
+			pairsByTarget[t.index] = []endpointPair{{
+				format: aimap.PassthroughFormat, specs: []aimap.EndpointSpec{aimap.PassthroughEndpoint},
+			}}
+		}
+	} else {
+		if len(targets) > 0 {
+			if err := c.checkCapabilityEndpoints(src, m, lists, formats, targets[0].providerType); err != nil {
+				return err
 			}
-			// Passthrough-only capabilities have no cross-format converter, so a
-			// provider rendering another format can never serve them: Kong's schema
-			// rejects the pairing.
-			if aimap.RequiresNativeFormat(capability) &&
-				aimap.PluginProvider(providerType) != llmFormat(m, providerType) {
-				return c.fail(src.at(capabilityField(m, capability)), ConfigFieldInvalid,
-					"model %q: capability %q is passthrough-only, so provider type %q cannot serve llm_format %q",
-					m.Name, capability, providerType, llmFormat(m, providerType))
+		}
+		for _, t := range targets {
+			pairsByTarget[t.index] = c.targetPairs(m, lists, formats, t)
+		}
+		supportedPairs = maps.Clone(pairsByTarget)
+		keepEqualPaths(formats, pairsByTarget)
+	}
+
+	servedBy := map[string][]int{}
+	// routed holds the capabilities that got a route. collapsed holds the
+	// first genai category collision of each capability.
+	routed := map[string]bool{}
+	type collision struct{ category, route, existing string }
+	collapsed := map[string]collision{}
+	var collapsedOrder []string
+	for _, t := range targets {
+		j, tm, provider, providerType := t.index, t.tm, t.provider, t.providerType
+		for _, pair := range pairsByTarget[j] {
+			capability := pair.capability
+			if !slices.Contains(servedBy[capability], j) {
+				servedBy[capability] = append(servedBy[capability], j)
 			}
+			sec := aimap.SectionFor(pair.format, providerType)
+			format := aimap.ClientFormat(pair.format, providerType)
 			// A capability with secondary endpoints (bedrock generate, also
 			// reachable via invoke) emits one route per endpoint, each
 			// carrying this target; revert's capsSeen folds the routes back
 			// into the one capability.
-			for _, spec := range specs {
-				if !passthrough && !targetSupports(llmFormat(m, providerType), tm, providerType, spec) {
-					continue
-				}
-				if !slices.Contains(servedBy[capability], j) {
-					servedBy[capability] = append(servedBy[capability], j)
-				}
+			for _, spec := range pair.specs {
 				websocket := aimap.IsWebSocketEndpoint(spec)
 				// A global plugin keeps Kong's http/https default protocols. A
 				// global authentication policy therefore cannot protect a ws or
@@ -515,7 +526,8 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 							"keeps Kong's http/https default protocols and cannot authenticate it",
 						m.Name, capability, global.Name, global.Type)
 				}
-				logging := modelLoggingBlock(withLoggingDefaults(m.Config.Logging, false, false), spec.SupportsLogStatistics)
+				statsSupported := aimap.LogStatisticsSupported(providerType, spec)
+				logging := modelLoggingBlock(withLoggingDefaults(m.Config.Logging, false, false), statsSupported, websocket)
 				// Authentication plugins execute before the model selector. Models
 				// with different auth-strategy sets therefore cannot share a
 				// route: a route-scoped auth plugin would otherwise protect every
@@ -580,14 +592,17 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 				if !routeSeen[g.route.Name] {
 					routeSeen[g.route.Name] = true
 					routeNames = append(routeNames, g.route.Name)
-					if !spec.SupportsLogStatistics && loggingStatisticsSet(m.Config.Logging) {
-						c.warn(src.at("config.logging.statistics"), ConfigFieldOverridden,
-							"model %q sets config.logging.statistics to true. "+
-								"This will be ignored on the %q route, and log_statistics will be "+
-								"overridden to false because the endpoint does not support it.",
+					c.warnStatisticsOverride(src, m, g.route.Name, statsSupported, statsWarned)
+					if websocket && loggingPayloadsSet(m.Config.Logging) {
+						c.warn(src.at("config.logging.payloads"), ConfigFieldOverridden,
+							"model %q sets config.logging.payloads to true. "+
+								"This will be ignored on the %q route, and log_payloads will be "+
+								"overridden to false because the data plane rejects it on realtime routes.",
 							m.Name, g.route.Name)
 					}
 					c.warnTransportOverrides(src, m, g.route)
+				} else {
+					c.warnStatisticsOverride(src, m, g.route.Name, statsSupported, statsWarned)
 				}
 
 				pg := g.proxyByOwner[ownerKey]
@@ -639,7 +654,7 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 					}
 
 					modelNameHeader := boolPtr(false)
-					if supportsModelNameHeader(spec) {
+					if aimap.SupportsModelNameHeader(spec) {
 						modelNameHeader = m.Config.Model.NameHeader
 					}
 
@@ -647,7 +662,7 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 						routeName:         g.route.Name,
 						aliases:           pluginAliases,
 						realtimeModel:     realtimeModel,
-						llmFormat:         llmFormat(m, providerType),
+						llmFormat:         format,
 						genaiCategory:     spec.GenaiCategory,
 						balancer:          c.balancerConfig(m.Config.Balancer),
 						vectordb:          vectordb,
@@ -669,13 +684,13 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 					g.proxies = append(g.proxies, pg)
 				} else if pg.genaiCategory != spec.GenaiCategory {
 					// The data plane requires every target to match the plugin's category.
-					c.warn(src.at(capabilityField(m, capability)), ConfigFieldDropped,
-						"model %q: capability %q (genai_category %q) collapses onto route %q, which already "+
-							"serves genai_category %q; a single ai-proxy-advanced cannot serve multiple genai "+
-							"categories, skipping this capability",
-						m.Name, capability, spec.GenaiCategory, g.route.Name, pg.genaiCategory)
+					if _, ok := collapsed[capability]; !ok {
+						collapsed[capability] = collision{spec.GenaiCategory, g.route.Name, pg.genaiCategory}
+						collapsedOrder = append(collapsedOrder, capability)
+					}
 					continue
 				}
+				routed[capability] = true
 				// A target's model_alias decides which balancer pool it joins: the DP
 				// keys pools by model_alias and puts alias-less targets in the shared
 				// "<default>" pool, routing a request to an alias pool only when the
@@ -723,6 +738,19 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 			}
 		}
 	}
+	// A capability that another endpoint still serves loses the collided
+	// endpoint with no issue.
+	for _, capability := range collapsedOrder {
+		if routed[capability] || lists.capsWildcard {
+			continue
+		}
+		col := collapsed[capability]
+		c.warn(src.at(capabilityField(m, capability)), ConfigFieldDropped,
+			"model %q: capability %q (genai_category %q) collapses onto route %q, which already "+
+				"serves genai_category %q; a single ai-proxy-advanced cannot serve multiple genai "+
+				"categories, skipping this capability",
+			m.Name, capability, col.category, col.route, col.existing)
+	}
 
 	// ai-models entries (one per alias, so ai-model-selector can match a
 	// request against any of them). note: name is set to alias and alias is
@@ -759,14 +787,15 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 
 	// Model policy and ACL plugins scope to each route the model produces, plus
 	// the ai-model entity for type "model".
-	if len(m.TargetModels) > 0 && len(convertedTargets) == 0 {
+	if len(m.TargetModels) > 0 && len(targets) == 0 {
 		return c.fail(src.at("targets"), MissingRequiredConfigField,
 			"model %q has no target that the converter can convert", m.Name)
 	}
 	if !passthrough {
-		if err := c.checkTargetSupport(src, m, caps, servedBy, convertedTargets); err != nil {
+		if err := c.checkTargetSupport(src, m, lists, formats, servedBy, targets); err != nil {
 			return err
 		}
+		c.warnUnservedFormats(src, m, lists, supportedPairs)
 	}
 
 	plugins, err := c.scopedPlugins(src, m.Policies, m.Access.ACLs)
@@ -916,13 +945,13 @@ func (c *Converter) convertVideoLifecycle(
 	route.Source = source("model", candidate.model.Name, "config.route")
 	service.Routes = append(service.Routes, route)
 
-	logging := modelLoggingBlock(
-		withLoggingDefaults(candidate.model.Config.Logging, false, false),
-		candidate.spec.SupportsLogStatistics,
-	)
 	targets := make([]map[string]any, 0, len(candidate.targets))
 	targetSources := make([]kong.TargetSource, 0, len(candidate.targets))
 	for targetIndex, lifecycleTarget := range candidate.targets {
+		logging := modelLoggingBlock(
+			withLoggingDefaults(candidate.model.Config.Logging, false, false),
+			aimap.LogStatisticsSupported(lifecycleTarget.providerType, candidate.spec), false,
+		)
 		targets = append(targets, c.buildTarget(
 			lifecycleTarget.target,
 			lifecycleTarget.provider,
@@ -946,7 +975,7 @@ func (c *Converter) convertVideoLifecycle(
 	}
 	pg := &proxyGroup{
 		routeName:         routeName,
-		llmFormat:         llmFormat(candidate.model, ""),
+		llmFormat:         "openai",
 		genaiCategory:     candidate.spec.GenaiCategory,
 		balancer:          c.balancerConfig(candidate.model.Config.Balancer),
 		vectordb:          lifecycleVectorDB,
@@ -1033,6 +1062,9 @@ func (c *Converter) videoLifecycleCandidates(skipped map[int][]ConversionIssue) 
 	var candidates []videoLifecycleCandidate
 	sharedRoutes := map[string][]int{}
 	var sharedOrder []string
+	// explicitVideo holds the models that list video. A video capability
+	// from "*" gives no lifecycle warning.
+	explicitVideo := map[int]bool{}
 
 	for i := range c.src.Models {
 		m := &c.src.Models[i]
@@ -1041,18 +1073,37 @@ func (c *Converter) videoLifecycleCandidates(skipped map[int][]ConversionIssue) 
 		}
 		// A passthrough model's base-path route already forwards the lifecycle
 		// requests; it declares no video endpoint of its own.
-		if isPassthrough(m) || !slices.Contains(c.expandCapabilities(m), "video") {
+		if isPassthrough(m) {
+			continue
+		}
+		wildcard := capabilitiesWildcard(m)
+		explicitVideo[i] = !wildcard && slices.Contains(explicitCapabilities(m), "video")
+		if !explicitVideo[i] && (!wildcard || !isModelType(m)) {
 			continue
 		}
 		src := issueSource(kindModel, m.Name)
 		if len(m.TargetModels) == 0 {
-			c.warn(src.at("targets"), BehaviorMayDiffer,
-				"model %q: video lifecycle routes require at least one target; skipping them", m.Name)
+			if explicitVideo[i] {
+				c.warn(src.at("targets"), BehaviorMayDiffer,
+					"model %q: video lifecycle routes require at least one target; skipping them", m.Name)
+			}
 			continue
 		}
 
-		section := aimap.SectionFor(llmFormat(m, ""), "")
-		if section != "openai" {
+		var planned []plannedTarget
+		for j := range m.TargetModels {
+			provider, providerType, problem := c.checkTarget(m, j)
+			if problem != nil {
+				continue
+			}
+			planned = append(planned, plannedTarget{
+				index: j, tm: &m.TargetModels[j], provider: provider, providerType: providerType,
+				target: aimapTarget(&m.TargetModels[j], providerType),
+			})
+		}
+		lists := modelLists{formats: explicitFormats(m), formatsWildcard: formatsWildcard(m)}
+		section := "openai"
+		if !slices.Contains(c.effectiveFormats(lists, planned), section) {
 			continue
 		}
 		spec, ok := aimap.LookupEndpoint(section, "video")
@@ -1060,20 +1111,19 @@ func (c *Converter) videoLifecycleCandidates(skipped map[int][]ConversionIssue) 
 			continue
 		}
 		lifecycleTargets := make([]videoLifecycleTarget, 0, len(m.TargetModels))
-		for j := range m.TargetModels {
-			provider, providerType, problem := c.checkTarget(m, j)
-			if problem != nil || !targetSupports(section, &m.TargetModels[j], providerType, spec) {
+		for _, t := range planned {
+			if !aimap.TargetSupports(section, t.target, spec) {
 				continue
 			}
 			lifecycleTargets = append(lifecycleTargets, videoLifecycleTarget{
-				target: &m.TargetModels[j], provider: provider, providerType: providerType,
+				target: t.tm, provider: t.provider, providerType: t.providerType,
 			})
 		}
 		// convertModel fails the model when no target is left.
 		if len(lifecycleTargets) == 0 {
 			continue
 		}
-		if len(lifecycleTargets) > 1 {
+		if len(lifecycleTargets) > 1 && explicitVideo[i] {
 			c.warn(src.at("targets"), BehaviorMayDiffer,
 				"model %q: video lifecycle route has multiple targets; "+
 					"requests without a model alias may reach a different target than creation", m.Name)
@@ -1106,6 +1156,9 @@ func (c *Converter) videoLifecycleCandidates(skipped map[int][]ConversionIssue) 
 			names[k] = c.src.Models[i].Name
 		}
 		for _, i := range indexes {
+			if !explicitVideo[i] {
+				continue
+			}
 			c.warn(issueSource(kindModel, c.src.Models[i].Name).at("config.route"), RoutingConflict,
 				"video lifecycle routes for models %s: route is shared by multiple "+
 					"video models; emitting overlapping lifecycle routes", strings.Join(names, ", "))
@@ -1176,59 +1229,62 @@ func (c *Converter) checkTarget(m *aigw.Model, j int) (*aigw.Provider, string, *
 		}
 	}
 	// The Mantle endpoint does not serve the Converse or InvokeModel APIs.
-	if isMantleTarget(tm, providerType) {
-		format := llmFormat(m, providerType)
-		if format != "openai" && format != "anthropic" {
-			return nil, "", &targetProblem{
-				field: fmt.Sprintf("targets[%d].config.endpoint_type", j),
-				code:  ConfigFieldInvalid,
-				reason: fmt.Sprintf("model %q target %q: the mantle endpoint type is not supported with the "+
-					"%s format; the target is omitted", m.Name, tm.Name, format),
-			}
+	// Under "*", aimap.SupportedFormats always selects openai for it.
+	if formats := clientFormats(explicitFormats(m), providerType); isMantleTarget(tm, providerType) &&
+		formats != nil && !slices.Contains(formats, "openai") && !slices.Contains(formats, "anthropic") {
+		return nil, "", &targetProblem{
+			field: fmt.Sprintf("targets[%d].config.endpoint_type", j),
+			code:  ConfigFieldInvalid,
+			reason: fmt.Sprintf("model %q target %q: the mantle endpoint type is not supported with the "+
+				"%s format; the target is omitted", m.Name, tm.Name, strings.Join(formats, ", ")),
 		}
 	}
 	return provider, providerType, nil
+}
+
+// clientFormats returns the llm_format of each format for providerType.
+func clientFormats(formats []string, providerType string) []string {
+	if formats == nil {
+		return nil
+	}
+	out := make([]string, len(formats))
+	for i, format := range formats {
+		out[i] = aimap.ClientFormat(format, providerType)
+	}
+	return out
 }
 
 func isMantleTarget(tm *aigw.TargetModel, providerType string) bool {
 	return providerType == "bedrock" && tm.Config.Options["endpoint_type"] == aimap.BedrockEndpointTypeMantle
 }
 
-// targetSupports reports whether the data plane accepts tm on spec in format.
-func targetSupports(format string, tm *aigw.TargetModel, providerType string, spec aimap.EndpointSpec) bool {
-	if isMantleTarget(tm, providerType) {
-		return aimap.MantleSupports(format, spec)
-	}
-	return true
-}
-
-// checkTargetSupport fails m when no target serves a capability in caps.
-// served holds the indexes of the targets that serve each capability.
-// converted holds the indexes of the targets that checkTarget accepts.
+// checkTargetSupport fails m when no target serves an explicit capability.
+// It warns for each target that cannot serve a capability that another
+// target serves. served holds the indexes of the targets that serve each
+// capability.
 func (c *Converter) checkTargetSupport(
-	src ConversionIssueSource, m *aigw.Model, caps []string, served map[string][]int, converted []int,
+	src ConversionIssueSource, m *aigw.Model, lists modelLists, formats []string,
+	served map[string][]int, targets []plannedTarget,
 ) error {
-	if len(converted) == 0 {
+	if len(targets) == 0 || lists.capsWildcard {
 		return nil
 	}
-	for i, capability := range caps {
-		if slices.Contains(caps[:i], capability) {
-			continue
-		}
+	format := strings.Join(formats, ", ")
+	for _, capability := range lists.capabilities {
 		field := capabilityField(m, capability)
 		if len(served[capability]) == 0 {
 			return c.fail(src.at(field), ConfigFieldInvalid,
 				"model %q: no target can serve capability %q with llm_format %q",
-				m.Name, capability, llmFormat(m, ""))
+				m.Name, capability, format)
 		}
-		for _, j := range converted {
-			if slices.Contains(served[capability], j) {
+		for _, t := range targets {
+			if slices.Contains(served[capability], t.index) {
 				continue
 			}
-			c.warn(src.at(field, fmt.Sprintf("targets[%d]", j)), BehaviorMayDiffer,
+			c.warn(src.at(field, fmt.Sprintf("targets[%d]", t.index)), BehaviorMayDiffer,
 				"model %q target %q: the data plane does not accept this target for capability %q "+
 					"with llm_format %q. The routes of this capability will not fail over to it.",
-				m.Name, m.TargetModels[j].Name, capability, llmFormat(m, ""))
+				m.Name, t.tm.Name, capability, format)
 		}
 	}
 	return nil
@@ -1368,11 +1424,32 @@ func loggingStatisticsSet(l *aigw.Logging) bool {
 	return l != nil && l.Statistics != nil && *l.Statistics
 }
 
+func loggingPayloadsSet(l *aigw.Logging) bool {
+	return l != nil && l.Payloads != nil && *l.Payloads
+}
+
+// warnStatisticsOverride warns one time for each route when a target of m
+// gets log_statistics false although m sets statistics to true.
+func (c *Converter) warnStatisticsOverride(
+	src ConversionIssueSource, m *aigw.Model, routeName string, supported bool, warned map[string]bool,
+) {
+	if supported || warned[routeName] || !loggingStatisticsSet(m.Config.Logging) {
+		return
+	}
+	warned[routeName] = true
+	c.warn(src.at("config.logging.statistics"), ConfigFieldOverridden,
+		"model %q sets config.logging.statistics to true. "+
+			"This will be ignored on the %q route, and log_statistics will be "+
+			"overridden to false because the endpoint does not support it.",
+		m.Name, routeName)
+}
+
 // modelLoggingBlock maps a model's AI Gateway logging into the per-target logging
 // record accepted by the ai-proxy-advanced target schema, which only allows
 // log_statistics and log_payloads. Any extra keys loggingBlock may produce
 // (max_payload_size, log_audits) are dropped to avoid emitting unknown fields.
-func modelLoggingBlock(l *aigw.Logging, supportsLogStatistics bool) map[string]any {
+// The data plane rejects log_payloads true on a realtime target.
+func modelLoggingBlock(l *aigw.Logging, supportsLogStatistics, realtime bool) map[string]any {
 	block := loggingBlock(l)
 	if block == nil {
 		return nil
@@ -1380,6 +1457,9 @@ func modelLoggingBlock(l *aigw.Logging, supportsLogStatistics bool) map[string]a
 
 	if !supportsLogStatistics {
 		block["log_statistics"] = false
+	}
+	if realtime {
+		block["log_payloads"] = false
 	}
 	delete(block, "max_payload_size")
 	delete(block, "log_audits")
@@ -1465,6 +1545,9 @@ func targetFingerprint(target map[string]any) string {
 // balancerConfig leaves out. checkModelCapabilities covers capabilities.
 func (c *Converter) checkModelFeatures(src ConversionIssueSource, m *aigw.Model) error {
 	for i, format := range m.Formats {
+		if formatsWildcard(m) {
+			break
+		}
 		if f, gated := aimap.FormatFeature(format.Type); gated && !c.supports(f) {
 			field := fmt.Sprintf("formats[%d].type", i)
 			return c.failUnsupported(src.at(field), f, fmt.Sprintf("%s: %s", field, format.Type))
@@ -1478,21 +1561,6 @@ func (c *Converter) checkModelFeatures(src ConversionIssueSource, m *aigw.Model)
 				c.reportUnsupported(src.at(field), Warning, aimap.FeatureFailoverHTTPCodes,
 					fmt.Sprintf("%s: %s", field, code))
 			}
-		}
-	}
-	return nil
-}
-
-// checkModelCapabilities fails m when the minimum runtime version lacks one
-// of caps. Call it with the model's effective capabilities: a passthrough
-// model's caps must already be its post-override value ([""]), since its
-// declared capabilities never reach the data plane and so must never gate it.
-func (c *Converter) checkModelCapabilities(src ConversionIssueSource, m *aigw.Model, caps []string) error {
-	section := aimap.SectionFor(llmFormat(m, ""), "")
-	for _, capability := range caps {
-		if f, gated := aimap.CapabilityFeature(section, capability); gated && !c.supports(f) {
-			field := capabilityField(m, capability)
-			return c.failUnsupported(src.at(field), f, fmt.Sprintf("%s: %s", field, capability))
 		}
 	}
 	return nil
@@ -1521,15 +1589,6 @@ func (c *Converter) supportedTargetOptions(opts map[string]any) map[string]any {
 	out := maps.Clone(opts)
 	for _, key := range aimap.TargetCostListKeys {
 		delete(out, key)
-	}
-	return out
-}
-
-// expandCapabilities normalizes a model's capabilities into canonical keys.
-func (c *Converter) expandCapabilities(m *aigw.Model) []string {
-	var out []string
-	for _, capability := range m.Capabilities {
-		out = append(out, aimap.NormalizeCapability(capability)...)
 	}
 	return out
 }
@@ -1647,15 +1706,6 @@ func basePaths(m *aigw.Model) []string {
 	return out
 }
 
-// The assistants, batches, files, and skills endpoints do not route by model,
-// as a result, they do not support the model name header.
-func supportsModelNameHeader(spec aimap.EndpointSpec) bool {
-	return spec.RouteType != "llm/v1/assistants" &&
-		spec.RouteType != "llm/v1/batches" &&
-		spec.RouteType != "llm/v1/files" &&
-		spec.RouteType != "llm/v1/skills"
-}
-
 // isDisabled reports whether m sets enabled to false.
 func isDisabled(m *aigw.Model) bool { return m.Enabled != nil && !*m.Enabled }
 
@@ -1771,16 +1821,6 @@ func (c *Converter) extractModelAliases(src ConversionIssueSource, m *aigw.Model
 	return unique
 }
 
-// llmFormat returns the ai-proxy-advanced llm_format for a model. providerType
-// is only consulted for the passthrough format, which renders as the provider's
-// own native wire format; pass "" where no single provider applies.
-func llmFormat(m *aigw.Model, providerType string) string {
-	if len(m.Formats) > 0 && m.Formats[0].Type != "" {
-		return aimap.ClientFormat(m.Formats[0].Type, providerType)
-	}
-	return aimap.DefaultLLMFormat
-}
-
 // balancerAlgorithm returns the algorithm a model's balancer selects, defaulted as
 // balancerConfig defaults it.
 func balancerAlgorithm(b *aigw.Balancer) string {
@@ -1827,7 +1867,8 @@ func (c *Converter) warnPassthroughPolicies(src ConversionIssueSource, m *aigw.M
 // format), so every target of the model is passthrough or none is — which is
 // also what ai-proxy-advanced requires of one plugin's targets.
 func isPassthrough(m *aigw.Model) bool {
-	return slices.ContainsFunc(m.Formats, func(f aigw.Format) bool { return f.Type == aimap.PassthroughFormat })
+	return !formatsWildcard(m) &&
+		slices.ContainsFunc(m.Formats, func(f aigw.Format) bool { return f.Type == aimap.PassthroughFormat })
 }
 
 // bodySizeOrDefault returns the ai-model-selector's max_request_body_size: at

@@ -1,0 +1,22 @@
+# Routes follow the pair order: openai first, then the other formats
+# sorted, and generate first in each format. The order of the lists and
+# duplicate formats do not change the output.
+# (openai, skills) on an anthropic target is left out with no issue,
+# because (anthropic, skills) still serves skills.
+models:
+  - name: ordered
+    type: model
+    capabilities: [skills, generate]
+    formats: [{type: anthropic}, {type: openai}, {type: anthropic}]
+    config:
+      route: {paths: [/ai]}
+    targets:
+      - name: claude-sonnet-4-5
+        provider: anthropic-prod
+model_providers:
+  - name: anthropic-prod
+    type: anthropic
+    config:
+      auth:
+        type: bearer
+        token: "{vault://ai/anthropic-key}"
