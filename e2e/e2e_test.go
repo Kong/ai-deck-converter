@@ -45,6 +45,9 @@ func TestE2E(t *testing.T) {
 		{"reusable_toolsets_are_internal_only", func(t *testing.T) { testReusableToolsetsAreInternalOnly(t, license) }},
 		{"token_vault_gates_tools_and_enrolls", func(t *testing.T) { testTokenVaultGatesToolsAndEnrolls(t, license) }},
 		{"realtime_model_websocket_transport", func(t *testing.T) { testRealtimeModelWebSocketTransport(t, license) }},
+		{"token_vault_exchange_credential_placement", func(t *testing.T) { testTokenVaultExchangeCredentialPlacement(t, license) }},
+		{"token_vault_callback_oidc_enrollment", func(t *testing.T) { testTokenVaultCallbackOIDCEnrollment(t, license) }},
+		{"token_vault_manager_session_enrollment", func(t *testing.T) { testTokenVaultManagerSessionEnrollment(t, license) }},
 	}
 	for _, c := range cases {
 		c := c
@@ -56,6 +59,11 @@ func TestE2E(t *testing.T) {
 		})
 	}
 }
+
+// tokenVaultImage is an aigw-master build that carries the Token Vault
+// plugins, which merged in kong/kong-ee#21787. A released tag can replace
+// this once one ships.
+const tokenVaultImage = "kong/kong-ai-gateway-dev:40195361547-9c956dfc8efa257e040aaf99cbb6a4c64fa8664d-ubuntu"
 
 func gatewayImage(t *testing.T, fallback string) string {
 	t.Helper()

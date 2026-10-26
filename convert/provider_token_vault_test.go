@@ -93,7 +93,7 @@ func TestProviderTokenVaultScopedLikeProxy(t *testing.T) {
 		},
 	}, exchanges[0].Config)
 	require.Nil(t, proxies[0].Config["targets"].([]map[string]any)[0]["auth"])
-	require.Len(t, result.Output.Routes, 1)
+	requireCallbackRoutes(t, result.Output.Routes)
 }
 
 func TestProviderTokenVaultRejects(t *testing.T) {
@@ -393,7 +393,7 @@ model_providers:` + vaultProvider + `
 	issue := requireIssue(t, result.Issues, Error, ConfigFieldInvalid, kindModel, "claude-other", "targets[0].provider")
 	require.Contains(t, issue.Reason, "another entity already uses a different token-vault datastore")
 	require.Len(t, pluginsNamed(result.Output, tokenVaultExchangePlugin), 1)
-	require.Len(t, result.Output.Routes, 1)
+	requireCallbackRoutes(t, result.Output.Routes)
 }
 
 func TestProviderTokenVaultBelowGate(t *testing.T) {
@@ -424,7 +424,7 @@ mcp_servers:
 	require.NoError(t, err)
 	requireIssue(t, result.Issues, Warning, ConfigFieldDropped, kindMCPServer, "orphan")
 	require.Len(t, pluginsNamed(result.Output, tokenVaultExchangePlugin), 1)
-	require.Len(t, result.Output.Routes, 1)
+	requireCallbackRoutes(t, result.Output.Routes)
 }
 
 // The video lifecycle route has its own ai-proxy-advanced. It needs the same
@@ -519,6 +519,48 @@ mcp_servers:
 	result, err := Convert([]byte(src), testOptions)
 	require.NoError(t, err)
 	require.Empty(t, result.Issues)
-	require.Len(t, result.Output.Routes, 1)
+	requireCallbackRoutes(t, result.Output.Routes)
 	require.Len(t, pluginsNamed(result.Output, tokenVaultExchangePlugin), 1)
+}
+
+// The datastore supplies the directory, so an inline token_vault.directory is
+// ignored with a warning.
+func TestProviderTokenVaultDatastoreOverridesInlineDirectory(t *testing.T) {
+	src := providerTokenVaultDatastores + "models:" +
+		providerTokenVaultModel("claude", "vault") + `
+model_providers:
+  - name: vault
+    type: anthropic
+    datastores: [{name: tv}]
+    token_vault: {provider: anthropic, directory: inline}
+`
+	result, err := Convert([]byte(src), testOptions)
+	require.NoError(t, err)
+	issue := requireIssue(t, result.Issues, Warning, ConfigFieldIgnored,
+		kindModelProvider, "vault", "token_vault.directory")
+	require.Contains(t, issue.Reason, `"tv"`)
+	exchanges := pluginsNamed(result.Output, tokenVaultExchangePlugin)
+	require.Len(t, exchanges, 1)
+	require.Equal(t, "d", exchanges[0].Config["directory"])
+}
+
+func TestProviderTokenVaultKeepsInlineDirectoryWithoutDatastoreDirectory(t *testing.T) {
+	src := providerTokenVaultDatastores + `
+  - name: tv-nodir
+    type: token-vault
+    config: {current_version: v1, keys: [{version: v1, key: k}]}
+models:` +
+		providerTokenVaultModel("claude", "vault") + `
+model_providers:
+  - name: vault
+    type: anthropic
+    datastores: [{name: tv-nodir}]
+    token_vault: {provider: anthropic, directory: inline}
+`
+	result, err := Convert([]byte(src), testOptions)
+	require.NoError(t, err)
+	require.Empty(t, result.Issues)
+	exchanges := pluginsNamed(result.Output, tokenVaultExchangePlugin)
+	require.Len(t, exchanges, 1)
+	require.Equal(t, "inline", exchanges[0].Config["directory"])
 }

@@ -3,6 +3,7 @@ package convert
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 
@@ -298,13 +299,17 @@ mcp_servers:
 		res, err := Convert([]byte(fmt.Sprintf(doc, typ, datastores)), testOptions)
 		return res, err
 	}
-	t.Run("openid-connect adds the callback route once", func(t *testing.T) {
+	t.Run("openid-connect adds the callback routes once", func(t *testing.T) {
 		res, err := run("openid-connect", "[{name: tv}]")
 		require.NoError(t, err)
 		require.Empty(t, res.Issues)
-		require.Len(t, res.Output.Routes, 2)
+		require.Len(t, res.Output.Routes, 4)
 		require.Equal(t, aimap.TokenVaultCallbackName, res.Output.Routes[0].Name)
-		require.Equal(t, aimap.TokenVaultCredentialManagerName+"-sso", res.Output.Routes[1].Name)
+		require.Equal(t, aimap.TokenVaultCallbackInitiateName, res.Output.Routes[1].Name)
+		require.Equal(t, aimap.TokenVaultCredentialManagerName+"-sso", res.Output.Routes[2].Name)
+		require.Equal(t, aimap.TokenVaultCredentialManagerName+"-sso-login", res.Output.Routes[3].Name)
+		require.Len(t, res.Output.Consumers, 1)
+		require.Equal(t, managerAnonymousConsumerName, res.Output.Consumers[0].Username)
 	})
 	t.Run("other type fails", func(t *testing.T) {
 		res, _ := run("key-auth", "[{name: tv}]")
@@ -376,15 +381,17 @@ mcp_servers:
       - {name: report, description: Get a report}
 `
 
-// tokenVaultOIDC holds the openid-connect configs of a conversion by route.
-type tokenVaultOIDC struct {
+// tvOIDCConfigs holds the openid-connect configs of a conversion by route.
+type tvOIDCConfigs struct {
 	entity   []map[string]any
 	callback map[string]any
-	manager  map[string]any
+	initiate map[string]any
+	page     map[string]any
+	login    map[string]any
 }
 
-func tokenVaultOIDCPlugins(res *ConversionResult) tokenVaultOIDC {
-	var out tokenVaultOIDC
+func tvOIDCPlugins(res *ConversionResult) tvOIDCConfigs {
+	var out tvOIDCConfigs
 	for _, svc := range res.Output.Services {
 		for _, route := range svc.Routes {
 			for _, p := range route.Plugins {
@@ -401,20 +408,29 @@ func tokenVaultOIDCPlugins(res *ConversionResult) tokenVaultOIDC {
 			}
 			if route.Name == aimap.TokenVaultCallbackName {
 				out.callback = p.Config
+			} else if route.Name == aimap.TokenVaultCallbackInitiateName {
+				out.initiate = p.Config
+			} else if strings.HasPrefix(route.Name, aimap.TokenVaultCredentialManagerName+"-") &&
+				strings.HasSuffix(route.Name, "-login") {
+				out.login = p.Config
 			} else {
-				out.manager = p.Config
+				out.page = p.Config
 			}
 		}
 	}
 	return out
 }
 
-func convertTokenVaultStrategy(t *testing.T, extra string, enabled bool) tokenVaultOIDC {
+func convertTokenVaultStrategy(t *testing.T, extra string, enabled bool) tvOIDCConfigs {
+	t.Helper()
+	return tvOIDCPlugins(convertTokenVaultStrategyResult(t, extra, enabled))
+}
+
+func convertTokenVaultStrategyResult(t *testing.T, extra string, enabled bool) *ConversionResult {
 	t.Helper()
 	res, err := Convert([]byte(fmt.Sprintf(tokenVaultStrategyDoc, extra, enabled)), testOptions)
 	require.NoError(t, err)
-	require.Empty(t, res.Issues)
-	return tokenVaultOIDCPlugins(res)
+	return res
 }
 
 func stubSessionSecret(t *testing.T, fn func() (string, error)) {
@@ -437,13 +453,39 @@ func TestAuthStrategyTokenVaultDisabledAddsNoRoute(t *testing.T) {
 	got := convertTokenVaultStrategy(t, "", false)
 
 	require.Nil(t, got.callback, "no Token Vault use adds no callback route")
-	require.Nil(t, got.manager)
+	require.Nil(t, got.initiate)
+	require.Nil(t, got.page)
+	require.Nil(t, got.login)
 	for _, cfg := range got.entity {
 		require.Equal(t, map[string]any{"issuer": "https://idp.example.com"}, cfg)
 	}
 }
 
-func TestAuthStrategyTokenVaultCredentialManagerDefaults(t *testing.T) {
+// The page route serves the plugin page for an anonymous caller. The
+// anonymous consumer makes the failed session pass through, and session is
+// the only method, so the route starts no authorization code flow.
+func TestAuthStrategyTokenVaultCredentialManagerPageConfig(t *testing.T) {
+	got := convertTokenVaultStrategy(t, "", true)
+
+	require.Equal(t, map[string]any{
+		"issuer":                       "https://idp.example.com",
+		"hide_credentials":             false,
+		"upstream_access_token_header": "authorization:bearer",
+		"anonymous":                    managerAnonymousConsumerName,
+		"logout_query_arg":             "logout",
+		"auth_methods":                 []any{"session"},
+		"token_endpoint_auth_method":   "none",
+		"session_secret":               got.page["session_secret"],
+	}, got.page)
+	require.NotContains(t, got.page, "redirect_uri",
+		"the login route owns the authorization code flow")
+}
+
+// The login route starts the browser login. Without a strategy redirect_uri
+// the plugin derives the redirect URI from the request, the exchange
+// completes on the route itself, and the default login action serves the
+// page there. A public client always uses PKCE.
+func TestAuthStrategyTokenVaultCredentialManagerLoginConfig(t *testing.T) {
 	calls := 0
 	stubSessionSecret(t, func() (string, error) {
 		calls++
@@ -452,57 +494,192 @@ func TestAuthStrategyTokenVaultCredentialManagerDefaults(t *testing.T) {
 
 	got := convertTokenVaultStrategy(t, "", true)
 
-	require.Equal(t, "authorization:bearer", got.manager["upstream_access_token_header"])
-	require.Equal(t, []any{"/vuc/sso/oidc/callback"}, got.manager["redirect_uri"])
-	require.Equal(t, false, got.manager["hide_credentials"])
-	require.Equal(t, "generated", got.manager["session_secret"])
-	require.Equal(t, "generated", got.callback["session_secret"])
+	require.Equal(t, map[string]any{
+		"issuer":                              "https://idp.example.com",
+		"hide_credentials":                    false,
+		"upstream_access_token_header":        "authorization:bearer",
+		"auth_methods":                        []any{"session", "authorization_code"},
+		"authorization_cookie_path":           "/vuc/sso",
+		"token_endpoint_auth_method":          "none",
+		"require_proof_key_for_code_exchange": true,
+		"session_secret":                      got.login["session_secret"],
+	}, got.login)
+	require.NotContains(t, got.login, "login_action")
+	require.NotContains(t, got.login, "login_redirect_uri")
+	require.Nil(t, got.callback, "the /_vault route carries no openid-connect plugin")
+	require.Equal(t, "generated", got.initiate["session_secret"])
 	require.Equal(t, 1, calls, "the secret is generated once per strategy")
 }
 
-func TestAuthStrategyTokenVaultCredentialManagerKeepsConfiguredValues(t *testing.T) {
-	got := convertTokenVaultStrategy(t, `      upstream_access_token_header: x-token
-      redirect_uri: [/custom]
-      session_secret: mine`, true)
+// A strategy redirect_uri sends the exchange to its own path, so the
+// authorization cookie must reach that path. The login action covers a
+// session-authenticated visit too, so it bounces a signed-in caller back to
+// the page route instead of serving the page under /login.
+func TestAuthStrategyTokenVaultCredentialManagerLoginRedirectURI(t *testing.T) {
+	got := convertTokenVaultStrategy(t,
+		"      redirect_uri: [https://app.example.com/signin]", true)
 
-	require.Equal(t, "x-token", got.manager["upstream_access_token_header"])
-	require.Equal(t, []any{"/custom"}, got.manager["redirect_uri"])
-	require.Equal(t, "mine", got.manager["session_secret"])
-	require.Equal(t, "mine", got.callback["session_secret"])
+	require.Equal(t, "/signin", got.login["authorization_cookie_path"])
+	require.Equal(t, "redirect", got.login["login_action"])
+	require.Equal(t, []any{"https://app.example.com/vuc/sso"}, got.login["login_redirect_uri"])
+	require.Equal(t, []any{"session", "authorization_code"}, got.login["login_methods"])
+	require.Equal(t, []any{}, got.login["login_tokens"],
+		"the redirect must not carry the signed id token")
+	require.Equal(t, []any{"https://app.example.com/signin"}, got.login["redirect_uri"])
+	require.NotContains(t, got.page, "redirect_uri")
 }
 
-func TestAuthStrategyTokenVaultCallbackConfig(t *testing.T) {
-	got := convertTokenVaultStrategy(t, `      hide_credentials: true
-      preserve_query_args: false
+// Every route of one strategy shares one session secret, so the browser
+// session works on each of them.
+func TestAuthStrategyTokenVaultCredentialManagerSessionSecretShared(t *testing.T) {
+	res := convertTokenVaultStrategyResult(t, "      session_secret: mine", true)
+	got := tvOIDCPlugins(res)
+
+	require.Equal(t, "mine", got.page["session_secret"])
+	require.Equal(t, "mine", got.login["session_secret"])
+	require.Equal(t, "mine", got.initiate["session_secret"])
+}
+
+// A client secret means a confidential client. The plugin then picks the token
+// endpoint authentication method from the discovery document.
+func TestAuthStrategyTokenVaultConfidentialClientKeepsClientAuth(t *testing.T) {
+	got := convertTokenVaultStrategy(t, "      client_secret: [s3cr3t]", true)
+
+	require.NotContains(t, got.page, "token_endpoint_auth_method")
+	require.NotContains(t, got.login, "token_endpoint_auth_method")
+	require.NotContains(t, got.initiate, "token_endpoint_auth_method")
+}
+
+func TestAuthStrategyTokenVaultKeepsConfiguredTokenEndpointAuthMethod(t *testing.T) {
+	got := convertTokenVaultStrategy(t, "      token_endpoint_auth_method: private_key_jwt", true)
+
+	require.Equal(t, "private_key_jwt", got.initiate["token_endpoint_auth_method"])
+}
+
+// The Token Vault routes always override upstream_access_token_header. The
+// callback handler reads the subject token from the Authorization header.
+// The login route keeps a strategy-set redirect_uri; the page route and the
+// enrollment routes strip it.
+func TestAuthStrategyTokenVaultCredentialManagerOverridesHeader(t *testing.T) {
+	res := convertTokenVaultStrategyResult(t, `      upstream_access_token_header: x-token
       redirect_uri: [/custom]
-      authorization_cookie_path: /
+      session_secret: mine`, true)
+	got := tvOIDCPlugins(res)
+
+	require.Equal(t, "authorization:bearer", got.page["upstream_access_token_header"])
+	require.Equal(t, "authorization:bearer", got.login["upstream_access_token_header"])
+	require.Equal(t, "mine", got.page["session_secret"])
+	require.Equal(t, "mine", got.initiate["session_secret"])
+	require.Equal(t, []any{"/custom"}, got.login["redirect_uri"],
+		"the credential manager login returns to the strategy redirect URI")
+	require.NotContains(t, got.page, "redirect_uri")
+	require.Equal(t, "/vuc/sso", got.login["authorization_cookie_path"],
+		"a relative redirect_uri drives no derivation")
+	require.NotContains(t, got.initiate, "redirect_uri",
+		"the enrollment route path is the one redirect URI the authorization server knows")
+	requireStrategyIssue(t, res.Issues, ConfigFieldIgnored, "config.redirect_uri")
+	requireStrategyIssue(t, res.Issues, ConfigFieldOverridden, "config.upstream_access_token_header")
+}
+
+// The start route reports each strategy field that it removes or replaces.
+// Only there does the browser login run, and a login_action other than
+// redirect loses the session cookie mid-flow.
+func TestAuthStrategyTokenVaultInitiateOverrides(t *testing.T) {
+	res := convertTokenVaultStrategyResult(t, `      hide_credentials: true
+      preserve_query_args: false
+      redirect_uri: [https://app.example.com/callback]
       session_cookie_path: /other
       session_cookie_same_site: Strict
-      login_action: redirect
+      login_action: upstream
       upstream_access_token_header: x-token
       auth_methods: [bearer, session]`, true)
+	got := tvOIDCPlugins(res)
+
+	require.Equal(t, false, got.initiate["hide_credentials"])
+	require.Equal(t, true, got.initiate["preserve_query_args"])
+	require.Equal(t, "redirect", got.initiate["login_action"])
+	require.Equal(t, "authorization:bearer", got.initiate["upstream_access_token_header"])
+	require.NotContains(t, got.initiate, "redirect_uri")
+	require.NotContains(t, got.initiate, "session_cookie_path")
+	require.NotContains(t, got.initiate, "session_cookie_same_site")
+	requireStrategyIssue(t, res.Issues, ConfigFieldOverridden, "config.hide_credentials")
+	requireStrategyIssue(t, res.Issues, ConfigFieldOverridden, "config.preserve_query_args")
+	requireStrategyIssue(t, res.Issues, ConfigFieldOverridden, "config.login_action")
+	requireStrategyIssue(t, res.Issues, ConfigFieldOverridden, "config.upstream_access_token_header")
+	requireStrategyIssue(t, res.Issues, ConfigFieldIgnored, "config.redirect_uri")
+	requireStrategyIssue(t, res.Issues, ConfigFieldIgnored, "config.session_cookie_path")
+	requireStrategyIssue(t, res.Issues, ConfigFieldIgnored, "config.session_cookie_same_site")
+}
+
+// Only the enrollment start route runs its own authorization code flow, so
+// only it carries the login and cookie settings of that flow. The route
+// lists its methods, because the plugin default enables every method. The
+// empty login_tokens keeps the signed id token out of the redirect URL.
+func TestAuthStrategyTokenVaultInitiateConfig(t *testing.T) {
+	got := convertTokenVaultStrategy(t, "      auth_methods: [bearer]", true)
 
 	require.Equal(t, map[string]any{
 		"issuer":                       "https://idp.example.com",
 		"hide_credentials":             false,
 		"preserve_query_args":          true,
-		"authorization_cookie_path":    "/_vault",
+		"authorization_cookie_path":    "/_vault/callback/initiate",
 		"upstream_access_token_header": "authorization:bearer",
-		"auth_methods":                 []any{"bearer", "session", "authorization_code"},
-		"session_secret":               got.callback["session_secret"],
-	}, got.callback)
-	require.NotEmpty(t, got.callback["session_secret"])
+		"login_action":                 "redirect",
+		"login_methods":                []any{"authorization_code"},
+		"login_tokens":                 []any{},
+		"token_endpoint_auth_method":   "none",
+		"auth_methods":                 []any{"session", "authorization_code"},
+		"session_secret":               got.initiate["session_secret"],
+	}, got.initiate)
 }
 
-func TestAuthStrategyTokenVaultCallbackAuthMethods(t *testing.T) {
-	t.Run("unset stays unset", func(t *testing.T) {
+func TestAuthStrategyTokenVaultInitiateAuthMethods(t *testing.T) {
+	t.Run("unset becomes the explicit login methods", func(t *testing.T) {
 		got := convertTokenVaultStrategy(t, "", true)
-		require.NotContains(t, got.callback, "auth_methods")
+		require.Equal(t, []any{"session", "authorization_code"}, got.initiate["auth_methods"])
 	})
-	t.Run("complete list stays", func(t *testing.T) {
-		got := convertTokenVaultStrategy(t, "      auth_methods: [authorization_code, bearer, session]", true)
-		require.Equal(t, []any{"authorization_code", "bearer", "session"}, got.callback["auth_methods"])
+	t.Run("a different strategy list is replaced with a warning", func(t *testing.T) {
+		res := convertTokenVaultStrategyResult(t, "      auth_methods: [bearer]", true)
+		require.Equal(t, []any{"session", "authorization_code"},
+			tvOIDCPlugins(res).initiate["auth_methods"])
+		requireStrategyIssue(t, res.Issues, ConfigFieldOverridden, "config.auth_methods")
 	})
+	t.Run("the login list stays", func(t *testing.T) {
+		got := convertTokenVaultStrategy(t,
+			"      auth_methods: [session, authorization_code]", true)
+		require.Equal(t, []any{"session", "authorization_code"}, got.initiate["auth_methods"])
+		require.Equal(t, []any{"session"}, got.page["auth_methods"])
+		require.Equal(t, []any{"session", "authorization_code"}, got.login["auth_methods"])
+	})
+}
+
+func TestEnsureManagerAnonymousConsumer(t *testing.T) {
+	c := newConverter(nil, Options{})
+
+	c.ensureManagerAnonymousConsumer()
+	c.ensureManagerAnonymousConsumer()
+	require.Len(t, c.out.Consumers, 1)
+	require.Equal(t, managerAnonymousConsumerName, c.out.Consumers[0].Username)
+	require.Empty(t, c.out.Consumers[0].Plugins,
+		"the manager page route must reach the credential manager")
+
+	c.out.Consumers = append(c.out.Consumers, kong.Consumer{Username: "other"})
+	c.ensureManagerAnonymousConsumer()
+	require.Len(t, c.out.Consumers, 2, "an existing consumer is reused")
+}
+
+// requireStrategyIssue asserts that issues hold a warning with code for one
+// auth strategy field.
+func requireStrategyIssue(t *testing.T, issues []ConversionIssue, code ConversionIssueCode, field string) {
+	t.Helper()
+	for _, issue := range issues {
+		if issue.Code == code && issue.Source.Kind == kindAuthStrategy &&
+			slices.Equal(issue.Source.Fields, []string{field}) {
+			require.Equal(t, Warning, issue.Severity)
+			return
+		}
+	}
+	require.Failf(t, "issue not found", "no %s issue for %s in %v", code, field, issues)
 }
 
 func TestAuthStrategyTokenVaultSessionSecretFailure(t *testing.T) {
@@ -553,16 +730,20 @@ func convertTokenVaultCallback(t *testing.T, strategies, refs string) *Conversio
 	return res
 }
 
-func TestAuthStrategyTokenVaultDatastoreProtectsCallbackRoute(t *testing.T) {
+// The /_vault route stays open, and only the enrollment start route runs the
+// authorization code flow, so only it carries an authorization cookie.
+func TestAuthStrategyTokenVaultDatastoreProtectsCallbackRoutes(t *testing.T) {
 	res := convertTokenVaultCallback(t, `  - name: sso
     type: openid-connect
     datastores: [{name: tv}]
     config: {issuer: https://idp.example.com}`, "sso")
 
 	require.Empty(t, res.Issues)
-	require.Len(t, res.Output.Routes, 1, "no credential manager route")
-	got := tokenVaultOIDCPlugins(res)
-	require.Equal(t, "/_vault", got.callback["authorization_cookie_path"])
+	requireCallbackRoutes(t, res.Output.Routes,
+		aimap.TokenVaultCallbackName, aimap.TokenVaultCallbackInitiateName)
+	got := tvOIDCPlugins(res)
+	require.Nil(t, got.callback, "the /_vault route carries no openid-connect plugin")
+	require.Equal(t, "/_vault/callback/initiate", got.initiate["authorization_cookie_path"])
 	require.Equal(t, []map[string]any{{"issuer": "https://idp.example.com"}}, got.entity)
 }
 
@@ -572,8 +753,9 @@ func TestAuthStrategyWithoutDatastoreLeavesCallbackRouteOpen(t *testing.T) {
     config: {issuer: https://idp.example.com}`, "sso")
 
 	require.Empty(t, res.Issues)
-	require.Len(t, res.Output.Routes, 1)
-	require.Nil(t, tokenVaultOIDCPlugins(res).callback)
+	requireCallbackRoutes(t, res.Output.Routes)
+	require.Nil(t, tvOIDCPlugins(res).initiate,
+		"without a matching strategy no start route exists")
 }
 
 func TestAuthStrategyTokenVaultUnusedStrategyLeavesCallbackRouteOpen(t *testing.T) {
@@ -585,7 +767,9 @@ func TestAuthStrategyTokenVaultUnusedStrategyLeavesCallbackRouteOpen(t *testing.
     type: key-auth`, "ka")
 
 	require.Empty(t, res.Issues)
-	require.Nil(t, tokenVaultOIDCPlugins(res).callback)
+	requireCallbackRoutes(t, res.Output.Routes)
+	require.Nil(t, tvOIDCPlugins(res).initiate,
+		"an unused strategy adds no start route")
 }
 
 func TestAuthStrategyTokenVaultOtherDatastoreWarns(t *testing.T) {
@@ -596,7 +780,9 @@ func TestAuthStrategyTokenVaultOtherDatastoreWarns(t *testing.T) {
 
 	requireIssue(t, res.Issues, Warning, ConfigFieldIgnored, kindAuthStrategy, "sso", "datastores[0].name")
 	require.Len(t, res.Issues, 1)
-	require.Nil(t, tokenVaultOIDCPlugins(res).callback)
+	requireCallbackRoutes(t, res.Output.Routes)
+	require.Nil(t, tvOIDCPlugins(res).initiate,
+		"a strategy with another datastore adds no start route")
 }
 
 func TestAuthStrategyTokenVaultFirstStrategyProtectsCallbackRoute(t *testing.T) {
@@ -636,7 +822,7 @@ mcp_servers:
 
 	requireIssue(t, res.Issues, Warning, ConfigFieldIgnored, kindAuthStrategy, "second", "datastores")
 	require.Len(t, res.Issues, 1)
-	require.Equal(t, "https://first.example.com", tokenVaultOIDCPlugins(res).callback["issuer"])
+	require.Equal(t, "https://first.example.com", tvOIDCPlugins(res).initiate["issuer"])
 }
 
 func TestAuthStrategyTokenVaultNonTokenVaultDatastoreFails(t *testing.T) {

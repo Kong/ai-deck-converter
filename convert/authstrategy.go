@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"maps"
+	"net/url"
 	"reflect"
 	"slices"
 
@@ -22,6 +23,12 @@ const enableCredentialManagerKey = "enable_credential_manager" //nolint:gosec
 // defaultUpstreamAccessTokenHeader is the openid-connect default of an enabled
 // Token Vault strategy that sets no upstream_access_token_header.
 const defaultUpstreamAccessTokenHeader = "authorization:bearer"
+
+// managerAnonymousConsumerName is the username/custom_id of the Consumer
+// that the credential manager page route falls back to. It carries no
+// request-termination, because the unauthenticated caller must reach the
+// credential manager, which serves its login page.
+const managerAnonymousConsumerName = aimap.TokenVaultCredentialManagerName + "-anonymous"
 
 // anonymousConsumerName is the username/custom_id of the synthesized Consumer
 // that auth-strategy authentication plugins fall back to when a request
@@ -75,6 +82,8 @@ func (c *Converter) checkAuthStrategyType(src ConversionIssueSource, field strin
 // strategy, also of a strategy that no entity references.
 // The output does not keep the callback route of an unused strategy.
 func (c *Converter) validateAuthStrategyTokenVaults() {
+	c.tvOIDCSilent = true
+	defer func() { c.tvOIDCSilent = false }()
 	for i := range c.src.AuthStrategies {
 		snapshot := *c.out
 		_ = c.applyAuthStrategyTokenVault(&c.src.AuthStrategies[i])
@@ -145,23 +154,99 @@ func (c *Converter) authStrategyTokenVaultDatastore(
 	return ds, nil
 }
 
-// applyTokenVaultOIDCDefaults sets the openid-connect fields that the
-// credential manager route needs and the strategy does not set.
-func (c *Converter) applyTokenVaultOIDCDefaults(
-	src ConversionIssueSource, idp *aigw.AuthStrategy, cfg map[string]any,
-) error {
-	if isEmptyConfigValue(cfg["upstream_access_token_header"]) {
-		cfg["upstream_access_token_header"] = defaultUpstreamAccessTokenHeader
+// tvManagerOIDCConfig returns the openid-connect config of the Token Vault
+// self-serve credential manager page route. The plugin serves a browser page
+// and does no authentication of its own. Session is the only method, and the
+// anonymous consumer makes a failed session pass through, so the credential
+// manager serves its login page instead of a 401. The route starts no
+// authorization code flow, so it carries no redirect_uri.
+func (c *Converter) tvManagerOIDCConfig(
+	src ConversionIssueSource, idp *aigw.AuthStrategy,
+) (map[string]any, error) {
+	b := c.tvOIDC(src, idp)
+	b.remove(tvManagerOIDCRemovedFields...)
+	delete(b.cfg, "redirect_uri")
+	b.set("hide_credentials", false)
+	b.set("upstream_access_token_header", defaultUpstreamAccessTokenHeader)
+	b.set("anonymous", managerAnonymousConsumerName)
+	b.set("logout_query_arg", tvManagerOIDCLogoutQueryArg) // must match ?logout=true in manager page
+	b.forceAuthMethods("The credential manager page route uses [session], "+
+		"because an anonymous caller must reach the plugin login page.",
+		tvOIDCSessionMethod)
+	b.applyTokenEndpointAuthMethod()
+	return b.finish()
+}
+
+// tvManagerLoginOIDCConfig returns the openid-connect config of the Token
+// Vault credential manager login route. An anonymous caller starts the
+// authorization code flow here. The strategy redirect_uri names the route
+// that completes the exchange. Without one the plugin derives the redirect
+// URI from the request, and the exchange completes on this route.
+func (c *Converter) tvManagerLoginOIDCConfig(
+	src ConversionIssueSource, idp *aigw.AuthStrategy,
+) (map[string]any, error) {
+	b := c.tvOIDC(src, idp)
+	b.remove(tvManagerOIDCRemovedFields...)
+	b.remove("anonymous")
+	b.set("hide_credentials", false)
+	b.set("upstream_access_token_header", defaultUpstreamAccessTokenHeader)
+	b.forceAuthMethods("The credential manager login route uses [session, authorization_code], "+
+		"because the route starts the browser login.",
+		tvOIDCSessionMethod, tvOIDCAuthCodeMethod)
+	b.applyTokenEndpointAuthMethod()
+	b.set("authorization_cookie_path", c.managerAuthorizationCookiePath(b.cfg, idp))
+	// The redirect mode is fragment, and nothing in this flow reads it. An
+	// empty login_tokens keeps the signed id token out of the browser URL.
+	if target := managerRedirectTarget(b.cfg["redirect_uri"], idp.Name); target != nil {
+		b.set("login_action", "redirect")
+		b.set("login_redirect_uri", []any{target.loginRedirectURI})
+		b.set("login_methods", []any{tvOIDCSessionMethod, tvOIDCAuthCodeMethod})
+		b.set("login_tokens", []any{})
 	}
-	if _, ok := cfg["hide_credentials"]; !ok {
-		cfg["hide_credentials"] = false
+	if method, _ := b.cfg["token_endpoint_auth_method"].(string); method == tvOIDCPublicClientAuthMethod {
+		b.set("require_proof_key_for_code_exchange", true)
 	}
-	if isEmptyConfigValue(cfg["redirect_uri"]) {
-		cfg["redirect_uri"] = []any{
-			aimap.TokenVaultCredentialManagerPath + "/" + idp.Name + "/oidc/callback",
-		}
+	return b.finish()
+}
+
+// managerAuthorizationCookiePath returns the path that the authorization
+// cookie of the login route must reach. A strategy redirect_uri sends the
+// exchange to its own path. Without one the exchange completes on the login
+// route, and the page route path covers both routes.
+func (c *Converter) managerAuthorizationCookiePath(cfg map[string]any, idp *aigw.AuthStrategy) string {
+	if target := managerRedirectTarget(cfg["redirect_uri"], idp.Name); target != nil {
+		return target.cookiePath
 	}
-	return c.applySessionSecret(src, idp, cfg)
+	return aimap.TokenVaultCredentialManagerPath + "/" + idp.Name
+}
+
+// managerRedirectTarget holds the paths of a manager login flow that a
+// strategy redirect_uri drives.
+type managerRedirectTargetData struct {
+	cookiePath       string
+	loginRedirectURI string
+}
+
+// managerRedirectTarget reads the strategy redirect_uri. It reports nil for
+// an unset or relative value, because the plugin derives the redirect URI
+// from the request.
+func managerRedirectTarget(redirect any, strategyName string) *managerRedirectTargetData {
+	uri := firstConfigString(map[string]any{"redirect_uri": redirect}, "redirect_uri")
+	if uri == "" {
+		return nil
+	}
+	u, err := url.Parse(uri)
+	if err != nil || u.Host == "" {
+		return nil
+	}
+	cookiePath := u.Path
+	if cookiePath == "" {
+		cookiePath = "/"
+	}
+	return &managerRedirectTargetData{
+		cookiePath:       cookiePath,
+		loginRedirectURI: u.Scheme + "://" + u.Host + aimap.TokenVaultCredentialManagerPath + "/" + strategyName,
+	}
 }
 
 // applySessionSecret sets a generated session_secret when cfg has none. Every
@@ -174,7 +259,7 @@ func (c *Converter) applySessionSecret(src ConversionIssueSource, idp *aigw.Auth
 	secret, ok := c.sessionSecrets[idp.Name]
 	if !ok {
 		var err error
-		if secret, err = newSessionSecret(); err != nil {
+		if secret, err = c.sessionSecret(); err != nil {
 			return c.fail(src.at("config.session_secret"), InternalError,
 				"auth strategy %q: cannot generate session_secret: %v", idp.Name, err)
 		}
@@ -195,57 +280,179 @@ func generateSessionSecret() (string, error) {
 	return hex.EncodeToString(bytes), nil
 }
 
-// callbackOIDCRemovedFields are the openid-connect fields that the callback
-// route must have at their defaults.
-var callbackOIDCRemovedFields = []string{
-	"redirect_uri",
-	"login_action",
-	"session_cookie_same_site",
-	"session_cookie_path",
+// sessionSecret returns the configured session secret generator, or the
+// default random one.
+func (c *Converter) sessionSecret() (string, error) {
+	if c.opts.SessionSecret != nil {
+		return c.opts.SessionSecret()
+	}
+	return newSessionSecret()
 }
 
-// callbackOIDCAuthMethods are the openid-connect auth methods that the browser
-// flow on the callback route needs.
-var callbackOIDCAuthMethods = []string{"session", "authorization_code"}
+// tvManagerOIDCRemovedFields are the openid-connect fields that the
+// credential manager routes must have at their defaults. The page route
+// sets anonymous, and the login route keeps a strategy-set redirect_uri.
+var tvManagerOIDCRemovedFields = []string{
+	"authorization_cookie_same_site",
+	"authorization_cookie_samesite",
+	"login_redirect_uri",
+	"session_cookie_path",
+	"session_cookie_same_site",
+	"session_cookie_samesite",
+}
 
-// callbackOIDCConfig returns the openid-connect config of the Token Vault
-// callback route. The callback handler reads the access token from the
-// Authorization header. With no redirect_uri, the login returns to the
-// requested callback URL.
-func (c *Converter) callbackOIDCConfig(src ConversionIssueSource, idp *aigw.AuthStrategy) (map[string]any, error) {
+// Callbacks for Token Vault enrollment require specific configuration to avoid
+// clobbering the enrollment flow itself, so unlike the self-serve manager,
+// we enforce the callback to return to /_vault/callback/initiate rather than
+// adopting the auth strategy's redirect_uri (if available)
+var tvEnrollmentOIDCRemovedFields = slices.Concat(
+	tvManagerOIDCRemovedFields, []string{"anonymous", "redirect_uri"})
+
+const (
+	// tvEnrollmentOIDCLoginAction makes the login redirect carry the session
+	// cookie on the plugin's own response. Any other login_action lets the
+	// callback handler's 302 replace that Set-Cookie, and the caller loses the
+	// session mid-flow.
+	tvEnrollmentOIDCLoginAction = "redirect"
+
+	// tvOIDCPublicClientAuthMethod is the token endpoint
+	// authentication method of a client with no secret.
+	tvOIDCPublicClientAuthMethod = "none"
+
+	// tvManagerOIDCLogoutQueryArg is the logout query argument used by the
+	// credential manager page.
+	tvManagerOIDCLogoutQueryArg = "logout"
+
+	tvOIDCSessionMethod  = "session"
+	tvOIDCAuthCodeMethod = "authorization_code"
+)
+
+// tvOIDC builds the openid-connect config of a Token Vault route from
+// an auth strategy. It reports each field that it removes or replaces.
+type tvOIDC struct {
+	c   *Converter
+	src ConversionIssueSource
+	idp *aigw.AuthStrategy
+	cfg map[string]any
+}
+
+func (c *Converter) tvOIDC(src ConversionIssueSource, idp *aigw.AuthStrategy) *tvOIDC {
 	cfg := maps.Clone(idp.Config)
 	if cfg == nil {
 		cfg = map[string]any{}
 	}
-	for _, field := range callbackOIDCRemovedFields {
-		delete(cfg, field)
-	}
-	cfg["hide_credentials"] = false
-	cfg["preserve_query_args"] = true
-	cfg["authorization_cookie_path"] = aimap.TokenVaultCallbackPath
-	cfg["upstream_access_token_header"] = defaultUpstreamAccessTokenHeader
-	if methods := configStrings(cfg, "auth_methods"); len(methods) > 0 {
-		out := make([]any, 0, len(methods)+len(callbackOIDCAuthMethods))
-		for _, m := range methods {
-			out = append(out, m)
-		}
-		for _, m := range callbackOIDCAuthMethods {
-			if !slices.Contains(methods, m) {
-				out = append(out, m)
-			}
-		}
-		cfg["auth_methods"] = out
-	}
-	if err := c.applySessionSecret(src, idp, cfg); err != nil {
-		return nil, err
-	}
-	return cfg, nil
+	return &tvOIDC{c: c, src: src, idp: idp, cfg: cfg}
 }
 
-// secureTokenVaultCallbackRoute adds an openid-connect plugin to the Token
-// Vault callback route. The first used strategy with the Datastore of the
-// route gives the config. The callback handler then binds each enrollment to
-// the principal that starts it.
+// remove deletes each field and reports the ones that the strategy sets.
+func (b *tvOIDC) remove(fields ...string) {
+	for _, field := range fields {
+		if !isEmptyConfigValue(b.cfg[field]) {
+			reason := "auth strategy %q sets config.%s. The Token Vault enrollment routes " +
+				"leave it out, because the enrollment flow needs the default value."
+			if field == "redirect_uri" {
+				reason = "auth strategy %q sets config.%s. The Token Vault enrollment routes " +
+					"leave it out. The authorization server must recognize the enrollment route URL " +
+					"(gateway-hosted /_vault/callback/initiate)."
+			}
+			b.report(ConfigFieldIgnored, field, reason, b.idp.Name, field)
+		}
+		delete(b.cfg, field)
+	}
+}
+
+// set replaces a field and reports a different value that the strategy sets.
+func (b *tvOIDC) set(field string, value any) {
+	if old := b.cfg[field]; !isEmptyConfigValue(old) && !reflect.DeepEqual(old, value) {
+		b.report(ConfigFieldOverridden, field,
+			"auth strategy %q sets config.%s to %v. The Token Vault enrollment routes use %v, "+
+				"because the browser flow needs that value.",
+			b.idp.Name, field, old, value)
+	}
+	b.cfg[field] = value
+}
+
+// forceAuthMethods sets auth_methods and reports a different list that the
+// strategy sets. A Token Vault route must list its methods, because the
+// plugin default enables every method.
+func (b *tvOIDC) forceAuthMethods(reason string, methods ...string) {
+	if old := configStrings(b.cfg, "auth_methods"); len(old) > 0 && !slices.Equal(old, methods) {
+		b.report(ConfigFieldOverridden, "auth_methods",
+			"auth strategy %q sets config.auth_methods to %v. "+reason,
+			b.idp.Name, old)
+	}
+	out := make([]any, len(methods))
+	for i, m := range methods {
+		out[i] = m
+	}
+	b.cfg["auth_methods"] = out
+}
+
+// applyTokenEndpointAuthMethod sets the token endpoint authentication method
+// of a public client. A strategy with a client secret, or with its own value,
+// keeps what it has. The plugin then picks a method from the discovery
+// document.
+func (b *tvOIDC) applyTokenEndpointAuthMethod() {
+	if !isEmptyConfigValue(b.cfg["token_endpoint_auth_method"]) ||
+		!isEmptyConfigValue(b.cfg["client_secret"]) {
+		return
+	}
+	b.cfg["token_endpoint_auth_method"] = tvOIDCPublicClientAuthMethod
+}
+
+// finish adds the session secret and returns the config.
+func (b *tvOIDC) finish() (map[string]any, error) {
+	if err := b.c.applySessionSecret(b.src, b.idp, b.cfg); err != nil {
+		return nil, err
+	}
+	return b.cfg, nil
+}
+
+// report records one issue per auth strategy field. Every Token Vault route
+// rewrites the same strategy config, so the same field arrives many times.
+// A strategy that no entity uses makes no output, so it reports nothing.
+func (b *tvOIDC) report(code ConversionIssueCode, field, format string, args ...any) {
+	if b.c.tvOIDCSilent {
+		return
+	}
+	key := b.idp.Name + "\x00" + field
+	if b.c.tvOIDCWarned[key] {
+		return
+	}
+	b.c.tvOIDCWarned[key] = true
+	b.c.warn(b.src.at("config."+field), code, format, args...)
+}
+
+// tvEnrollmentOIDCConfig returns the openid-connect config of the Token Vault
+// enrollment start route. A sessionless browser logs in here. The login
+// returns to this path, which is the one redirect URI that the authorization
+// server knows, and login_action then sends the browser back to the start URL
+// with the enrollment token.
+func (c *Converter) tvEnrollmentOIDCConfig(src ConversionIssueSource, idp *aigw.AuthStrategy) (map[string]any, error) {
+	b := c.tvOIDC(src, idp)
+	b.remove(tvEnrollmentOIDCRemovedFields...)
+	b.set("hide_credentials", false)
+	b.set("upstream_access_token_header", defaultUpstreamAccessTokenHeader)
+	b.set("preserve_query_args", true)
+	b.set("authorization_cookie_path", aimap.TokenVaultCallbackInitiatePath)
+	b.set("login_action", tvEnrollmentOIDCLoginAction)
+	b.set("login_methods", []any{tvOIDCAuthCodeMethod})
+	// The handler keeps the query args; the default login_tokens would
+	// append the signed id token to the redirect URL fragment.
+	b.set("login_tokens", []any{})
+	b.applyTokenEndpointAuthMethod()
+	b.forceAuthMethods("The enrollment start route uses [session, authorization_code], "+
+		"because the route starts the browser login.",
+		tvOIDCSessionMethod, tvOIDCAuthCodeMethod)
+	return b.finish()
+}
+
+// secureTokenVaultCallbackRoute adds the enrollment start route with its
+// openid-connect plugin. The first used strategy with the Datastore of the
+// callback route gives the config. The callback handler then binds each
+// enrollment to the principal that starts it. The completion path stays on
+// the open /_vault route: the state cookie protects its single-use code, and
+// a login there would discard the code.
 func (c *Converter) secureTokenVaultCallbackRoute() {
 	i := slices.IndexFunc(c.out.Routes, func(r kong.Route) bool { return r.Name == aimap.TokenVaultCallbackName })
 	if i < 0 {
@@ -277,19 +484,33 @@ func (c *Converter) secureTokenVaultCallbackRoute() {
 		return
 	}
 	src := issueSource(kindAuthStrategy, chosen.Name)
-	cfg, err := c.callbackOIDCConfig(src, chosen)
+	initiate, err := c.tvEnrollmentOIDCConfig(src, chosen)
 	if err != nil {
-		// An unprotected route lets a victim complete an enrollment of an attacker.
-		c.out.Routes = slices.Delete(slices.Clone(c.out.Routes), i, i+1)
+		// The /_vault route would serve an unprotected start path.
+		c.out.Routes = slices.DeleteFunc(slices.Clone(c.out.Routes), func(r kong.Route) bool {
+			return r.Name == aimap.TokenVaultCallbackName || r.Name == aimap.TokenVaultCallbackInitiateName
+		})
 		return
 	}
-	routes := slices.Clone(c.out.Routes)
-	routes[i].Plugins = append(slices.Clone(routes[i].Plugins), kong.Plugin{
-		Name:   authStrategyTypeOpenIDConnect,
-		Config: cfg,
-		Source: source(kindAuthStrategy, chosen.Name, "datastores"),
+	callback := c.out.Routes[i]
+	c.out.Routes = slices.Insert(slices.Clone(c.out.Routes), i+1, kong.Route{
+		Name:      aimap.TokenVaultCallbackInitiateName,
+		Paths:     []string{aimap.TokenVaultCallbackInitiatePath},
+		Protocols: []string{"http", "https"},
+		Plugins: []kong.Plugin{
+			{
+				Name:   aimap.TokenVaultCallbackName,
+				Config: maps.Clone(callback.Plugins[0].Config),
+				Source: callback.Plugins[0].Source,
+			},
+			{
+				Name:   authStrategyTypeOpenIDConnect,
+				Config: initiate,
+				Source: source(kindAuthStrategy, chosen.Name, "datastores"),
+			},
+		},
+		Source: callback.Source,
 	})
-	c.out.Routes = routes
 }
 
 // revealTokenVaultCredentials sets hide_credentials to false on each
@@ -390,23 +611,29 @@ func (c *Converter) revealedTokenVaultPlugins(
 	return out, true
 }
 
-// credentialManagerRoute adds the route of the auth strategy that serves the
-// Token Vault credential manager. The route has its own openid-connect plugin
-// with the config of the strategy.
+// credentialManagerRoute adds the routes of the auth strategy that serve the
+// Token Vault credential manager. The page route renders the plugin page, and
+// the login route starts the authorization code flow of the browser login.
+// Both routes carry the credential manager, because the page route also
+// serves the plugin data, and the login route serves the page after a login
+// that completes on it.
 func (c *Converter) credentialManagerRoute(
 	src ConversionIssueSource, idp *aigw.AuthStrategy, ds *aigw.Datastore,
 ) error {
 	name := aimap.TokenVaultCredentialManagerName + "-" + idp.Name
-	for _, route := range c.out.Routes {
-		if route.Name == name {
-			return nil
+	for _, suffix := range []string{"", "-login"} {
+		for _, route := range c.out.Routes {
+			if route.Name == name+suffix {
+				return nil
+			}
 		}
 	}
-	oidcConfig := maps.Clone(idp.Config)
-	if oidcConfig == nil {
-		oidcConfig = map[string]any{}
+	pageConfig, err := c.tvManagerOIDCConfig(src, idp)
+	if err != nil {
+		return err
 	}
-	if err := c.applyTokenVaultOIDCDefaults(src, idp, oidcConfig); err != nil {
+	loginConfig, err := c.tvManagerLoginOIDCConfig(src, idp)
+	if err != nil {
 		return err
 	}
 	config, err := aimap.ApplyTokenVaultDatastore(nil, ds)
@@ -414,24 +641,32 @@ func (c *Converter) credentialManagerRoute(
 		return c.fail(src.at("datastores[0].name"), ConfigFieldInvalid, "auth strategy %q: %v", idp.Name, err)
 	}
 	routeSource := source(kindAuthStrategy, idp.Name, "token_vault")
-	c.out.Routes = append(c.out.Routes, kong.Route{
-		Name:      name,
-		Paths:     []string{aimap.TokenVaultCredentialManagerPath + "/" + idp.Name},
-		Protocols: []string{"http", "https"},
-		Plugins: []kong.Plugin{
-			{
-				Name:   authStrategyTypeOpenIDConnect,
-				Config: oidcConfig,
-				Source: routeSource,
-			},
-			{
-				Name:   aimap.TokenVaultCredentialManagerName,
-				Config: config,
-				Source: routeSource,
-			},
-		},
+	base := aimap.TokenVaultCredentialManagerPath + "/" + idp.Name
+	managerPlugin := kong.Plugin{
+		Name:   aimap.TokenVaultCredentialManagerName,
+		Config: config,
 		Source: routeSource,
-	})
+	}
+	oidcPlugin := func(cfg map[string]any) kong.Plugin {
+		return kong.Plugin{Name: authStrategyTypeOpenIDConnect, Config: cfg, Source: routeSource}
+	}
+	c.ensureManagerAnonymousConsumer()
+	c.out.Routes = append(c.out.Routes,
+		kong.Route{
+			Name:      name,
+			Paths:     []string{base},
+			Protocols: []string{"http", "https"},
+			Plugins:   []kong.Plugin{oidcPlugin(pageConfig), managerPlugin},
+			Source:    routeSource,
+		},
+		kong.Route{
+			Name:      name + "-login",
+			Paths:     []string{base + "/login"},
+			Protocols: []string{"http", "https"},
+			Plugins:   []kong.Plugin{oidcPlugin(loginConfig), managerPlugin},
+			Source:    routeSource,
+		},
+	)
 	return nil
 }
 
@@ -533,7 +768,8 @@ func (c *Converter) ensureAnonymousConsumer() {
 	providedConfigContainsAnonConsumer := false
 	var consumers []kong.Consumer
 	for i := range c.out.Consumers {
-		if c.out.Consumers[i].Username != anonymousConsumerName && c.out.Consumers[i].CustomID != anonymousConsumerName {
+		if c.out.Consumers[i].Username != anonymousConsumerName &&
+			c.out.Consumers[i].CustomID != anonymousConsumerName {
 			continue
 		}
 		providedConfigContainsAnonConsumer = true
@@ -557,6 +793,23 @@ func (c *Converter) ensureAnonymousConsumer() {
 		Username: anonymousConsumerName,
 		CustomID: anonymousConsumerName,
 		Plugins:  []kong.Plugin{requestTerminationPlugin},
+	})
+}
+
+// ensureManagerAnonymousConsumer appends the Consumer that the credential
+// manager page route falls back to. It carries no request-termination plugin,
+// because the unauthenticated caller must reach the credential manager. The
+// credential manager rejects the data requests itself.
+func (c *Converter) ensureManagerAnonymousConsumer() {
+	for i := range c.out.Consumers {
+		if c.out.Consumers[i].Username == managerAnonymousConsumerName ||
+			c.out.Consumers[i].CustomID == managerAnonymousConsumerName {
+			return
+		}
+	}
+	c.out.Consumers = append(c.out.Consumers, kong.Consumer{
+		Username: managerAnonymousConsumerName,
+		CustomID: managerAnonymousConsumerName,
 	})
 }
 

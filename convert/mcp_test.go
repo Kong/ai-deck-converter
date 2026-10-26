@@ -614,7 +614,7 @@ mcp_servers:
 	})
 }
 
-func TestTokenVaultCallbackRouteAddedOnce(t *testing.T) {
+func TestTokenVaultCallbackRoutesAddedOnce(t *testing.T) {
 	server := func(name string) string {
 		return `
   - type: passthrough-listener
@@ -642,9 +642,9 @@ mcp_servers:`+server("a")+server("b")+"\n"), false)
 	callbackRoute := dbless.Routes[2]
 	require.Equal(t, aimap.TokenVaultCallbackName, callbackRoute.Name)
 	require.Equal(t, []string{aimap.TokenVaultCallbackPath}, callbackRoute.Paths)
-	require.Equal(t, []string{"http", "https"}, callbackRoute.Protocols)
 	require.NotEmpty(t, callbackRoute.ID)
-	require.Nil(t, callbackRoute.Service, "the callback route has no service")
+	require.Equal(t, []string{"http", "https"}, callbackRoute.Protocols)
+	require.Nil(t, callbackRoute.Service, "a callback route has no service")
 	for _, route := range dbless.Routes[:2] {
 		require.NotNil(t, route.Service)
 		require.NotEqual(t, callbackRoute.ID, route.ID)
@@ -759,7 +759,7 @@ mcp_servers:
 `), false)
 		require.NoError(t, err)
 		require.Len(t, out.Services, 1)
-		require.Len(t, out.Routes, 1)
+		requireCallbackRoutes(t, out.Routes)
 	})
 }
 
@@ -784,4 +784,64 @@ mcp_servers:
 	require.NotContains(t, block, "directory")
 	require.Equal(t, "github", block["provider"])
 	require.Equal(t, map[string]any{"backend": "konnect", "current_version": "v1"}, block["storage"])
+}
+
+// requireCallbackRoutes asserts that routes holds exactly the given Token
+// Vault callback route names, in order. Without names it expects the one
+// open /_vault route.
+func requireCallbackRoutes(t *testing.T, routes []kong.Route, want ...string) {
+	t.Helper()
+	if len(want) == 0 {
+		want = []string{aimap.TokenVaultCallbackName}
+	}
+	names := make([]string, len(routes))
+	for i, route := range routes {
+		names[i] = route.Name
+	}
+	require.Equal(t, want, names)
+}
+
+// A referenced token-vault datastore overrides the server's inline
+// token_vault.directory with a warning.
+func TestTokenVaultDatastoreOverridesInlineDirectory(t *testing.T) {
+	result, err := Convert([]byte(`
+datastores:
+  - name: tv
+    type: token-vault
+    config: {directory: from-datastore}
+mcp_servers:
+  - type: passthrough-listener
+    name: vaulted
+    upstream_url: https://mcp.internal
+    datastores: [{name: tv}]
+    token_vault: {directory: inline, provider: github}
+    tools:
+      - {name: report, description: Get a report}
+`), testOptions)
+	require.NoError(t, err)
+	issue := requireIssue(t, result.Issues, Warning, ConfigFieldIgnored,
+		kindMCPServer, "vaulted", "token_vault.directory")
+	require.Contains(t, issue.Reason, `"tv"`)
+	auth := routePlugins(t, result.Output, "vaulted")[0].Config["auth"].(map[string]any)
+	require.Equal(t, "from-datastore", auth["token_vault"].(map[string]any)["directory"])
+}
+
+func TestTokenVaultInlineDirectoryWithoutDatastoreDirectory(t *testing.T) {
+	out, _, err := convertDoc([]byte(`
+datastores:
+  - name: tv
+    type: token-vault
+    config: {current_version: v1}
+mcp_servers:
+  - type: passthrough-listener
+    name: vaulted
+    upstream_url: https://mcp.internal
+    datastores: [{name: tv}]
+    token_vault: {directory: inline, provider: github}
+    tools:
+      - {name: report, description: Get a report}
+`), false)
+	require.NoError(t, err)
+	auth := routePlugins(t, out, "vaulted")[0].Config["auth"].(map[string]any)
+	require.Equal(t, "inline", auth["token_vault"].(map[string]any)["directory"])
 }

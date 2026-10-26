@@ -1,0 +1,30 @@
+_format_version: "3.0"
+services:
+  - name: tools-a
+    url: https://a.internal.kongair.com
+    routes:
+      - name: tools-a-route
+        paths:
+          - /mcp/tools-a
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              include_consumer_groups: true
+              logging:
+                log_audits: false
+                log_payloads: false
+                log_statistics: true
+              mode: passthrough-listener
+              tools:
+                - description: Get a report
+                  name: report
+          - name: ai-mcp-oauth2
+            config:
+              authorization_servers:
+                - https://konghq.okta.com
+              insecure_relaxed_audience_validation: true
+              metadata_discovery_endpoint: https://konghq.okta.com/.well-known/openid-configuration
+              resource: http://localhost:54661/mcp/tools-a
+              scopes_supported:
+                - openid
+                - profile

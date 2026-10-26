@@ -53,6 +53,7 @@ func (r *Reverter) applyMCPOAuth2(m *aigw.MCPServer, p kong.Plugin) {
 
 	meta := &aigw.MCPProtectedResourceMetadata{
 		Endpoint:             getStr(cfg, "metadata_endpoint"),
+		DiscoveryEndpoint:    getStr(cfg, "metadata_discovery_endpoint"),
 		Resource:             getStr(cfg, "resource"),
 		AuthorizationServers: toStrings(cfg["authorization_servers"]),
 		ScopesSupported:      toStrings(cfg["scopes_supported"]),

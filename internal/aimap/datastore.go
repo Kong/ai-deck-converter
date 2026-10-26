@@ -405,3 +405,13 @@ const TokenVaultCredentialManagerPath = "/vuc"
 
 // TokenVaultCallbackPath is the path of the Token Vault callback route.
 const TokenVaultCallbackPath = "/_vault"
+
+// TokenVaultCallbackInitiateName is the name of the route that starts a Token
+// Vault enrollment.
+const TokenVaultCallbackInitiateName = "token-vault-callback-handler-initiate"
+
+// TokenVaultCallbackInitiatePath is the path of the enrollment start route.
+// The route is a longer prefix than TokenVaultCallbackPath, so Kong matches it
+// first. Only this path runs an openid-connect authorization code flow, and
+// only this path is a redirect URI of the authorization server.
+const TokenVaultCallbackInitiatePath = TokenVaultCallbackPath + "/callback/initiate"
