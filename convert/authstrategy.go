@@ -91,6 +91,26 @@ func (c *Converter) validateAuthStrategyTokenVaults() {
 	}
 }
 
+// convertCredentialManagers adds the credential manager routes of each
+// strategy that enables the credential manager, also of an unused strategy.
+// It runs after the entities, so a used strategy keeps its priority on the
+// callback route.
+func (c *Converter) convertCredentialManagers() {
+	for i := range c.src.AuthStrategies {
+		idp := &c.src.AuthStrategies[i]
+		if idp.Type != authStrategyTypeOpenIDConnect {
+			continue
+		}
+		if enabled, _ := idp.TokenVault[enableCredentialManagerKey].(bool); !enabled {
+			continue
+		}
+		snapshot := *c.out
+		if err := c.applyAuthStrategyTokenVault(idp); err != nil {
+			*c.out = snapshot
+		}
+	}
+}
+
 // applyAuthStrategyTokenVault records an openid-connect strategy with a
 // token-vault Datastore for secureTokenVaultCallbackRoute. An enabled
 // credential manager also adds the callback and credential manager routes.
@@ -424,7 +444,7 @@ func (b *tvOIDC) finish() (map[string]any, error) {
 
 // report records one issue per auth strategy field. Every Token Vault route
 // rewrites the same strategy config, so the same field arrives many times.
-// A strategy that no entity uses makes no output, so it reports nothing.
+// The validation pass reports nothing.
 func (b *tvOIDC) report(code ConversionIssueCode, field, format string, args ...any) {
 	if b.c.tvOIDCSilent {
 		return

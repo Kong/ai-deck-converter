@@ -1,0 +1,16 @@
+- code: CONFIG_FIELD_OVERRIDDEN
+  reason: auth strategy "okta-vault" sets config.hide_credentials to true. The Token Vault enrollment routes use false, because the browser flow needs that value.
+  source:
+    kind: auth_strategy
+    name: okta-vault
+    fields:
+      - config.hide_credentials
+  severity: WARNING
+- code: CONFIG_FIELD_OVERRIDDEN
+  reason: auth strategy "okta-vault" sets config.auth_methods to [session authorization_code]. The credential manager page route uses [session], because an anonymous caller must reach the plugin login page.
+  source:
+    kind: auth_strategy
+    name: okta-vault
+    fields:
+      - config.auth_methods
+  severity: WARNING

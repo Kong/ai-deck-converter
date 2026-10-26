@@ -1,0 +1,20 @@
+datastores:
+  - name: token-vault
+    type: token-vault
+    config:
+      directory: default
+
+auth_strategies:
+  - name: okta-vault
+    display_name: Okta Credential Manager
+    type: openid-connect
+    datastores: [{name: token-vault}]
+    config:
+      issuer: https://trial-3663202.okta.com/oauth2/default
+      client_id: ["0oa195umql5e4I37r698"]
+      client_auth: [client_secret_post]
+      auth_methods: [session, authorization_code]
+      scopes: [openid, offline_access]
+      hide_credentials: true
+    token_vault:
+      enable_credential_manager: true

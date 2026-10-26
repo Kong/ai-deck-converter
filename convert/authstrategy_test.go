@@ -347,7 +347,100 @@ auth_strategies:
 `), testOptions)
 	requireIssue(t, res.Issues, Error, ConfigFieldInvalid, kindAuthStrategy, "ka", "token_vault")
 	require.Len(t, res.Issues, 1)
-	require.Empty(t, res.Output.Routes, "an unused strategy adds no callback route")
+	requireRouteNames(t, res.Output.Routes,
+		aimap.TokenVaultCallbackName,
+		aimap.TokenVaultCallbackInitiateName,
+		aimap.TokenVaultCredentialManagerName+"-oidc",
+		aimap.TokenVaultCredentialManagerName+"-oidc-login")
+}
+
+// The credential manager page does not need an entity that uses the strategy.
+func TestAuthStrategyTokenVaultUnusedStrategyAddsCredentialManager(t *testing.T) {
+	res, err := Convert([]byte(`
+datastores:
+  - name: tv
+    type: token-vault
+    config: {directory: d}
+auth_strategies:
+  - name: sso
+    type: openid-connect
+    datastores: [{name: tv}]
+    config: {issuer: https://idp.example.com}
+    token_vault: {enable_credential_manager: true}
+`), testOptions)
+	require.NoError(t, err)
+
+	require.Empty(t, res.Issues)
+	requireRouteNames(t, res.Output.Routes,
+		aimap.TokenVaultCallbackName,
+		aimap.TokenVaultCallbackInitiateName,
+		aimap.TokenVaultCredentialManagerName+"-sso",
+		aimap.TokenVaultCredentialManagerName+"-sso-login")
+	plugins := tvOIDCPlugins(res)
+	require.Equal(t, "https://idp.example.com", plugins.page["issuer"])
+	require.Equal(t, "https://idp.example.com", plugins.login["issuer"])
+	require.Equal(t, "https://idp.example.com", plugins.initiate["issuer"])
+}
+
+func TestAuthStrategyTokenVaultUnusedStrategyDisabledAddsNoRoute(t *testing.T) {
+	res, err := Convert([]byte(`
+datastores:
+  - name: tv
+    type: token-vault
+    config: {directory: d}
+auth_strategies:
+  - name: sso
+    type: openid-connect
+    datastores: [{name: tv}]
+    config: {issuer: https://idp.example.com}
+    token_vault: {enable_credential_manager: false}
+`), testOptions)
+	require.NoError(t, err)
+
+	require.Empty(t, res.Issues)
+	require.Empty(t, res.Output.Routes)
+}
+
+func TestAuthStrategyTokenVaultUsedStrategyKeepsCallbackPriority(t *testing.T) {
+	res, err := Convert([]byte(`
+datastores:
+  - name: tv
+    type: token-vault
+    config: {directory: d}
+auth_strategies:
+  - name: unused
+    type: openid-connect
+    datastores: [{name: tv}]
+    config: {issuer: https://unused.example.com}
+    token_vault: {enable_credential_manager: true}
+  - name: used
+    type: openid-connect
+    datastores: [{name: tv}]
+    config: {issuer: https://used.example.com}
+mcp_servers:
+  - type: passthrough-listener
+    name: a
+    upstream_url: https://a.internal
+    config: {route: {paths: [/mcp/a]}}
+    access: {auth_strategies: [used]}
+    tools:
+      - {name: report, description: Get a report}
+`), testOptions)
+	require.NoError(t, err)
+
+	requireIssue(t, res.Issues, Warning, ConfigFieldIgnored, kindAuthStrategy, "unused", "datastores")
+	require.Len(t, res.Issues, 1)
+	require.Equal(t, "https://used.example.com", tvOIDCPlugins(res).initiate["issuer"])
+	require.Equal(t, "https://unused.example.com", tvOIDCPlugins(res).page["issuer"])
+}
+
+func requireRouteNames(t *testing.T, routes []kong.Route, want ...string) {
+	t.Helper()
+	names := make([]string, 0, len(routes))
+	for _, r := range routes {
+		names = append(names, r.Name)
+	}
+	require.ElementsMatch(t, want, names)
 }
 
 //nolint:gosec
