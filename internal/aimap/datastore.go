@@ -376,6 +376,9 @@ func ApplyTokenVaultDatastore(block map[string]any, ds *aigw.Datastore) (map[str
 		return nil, fmt.Errorf("an MCP server does not support a %q datastore; use %q instead",
 			ds.Type, DatastoreTypeTokenVault)
 	}
+	if err := CheckTokenVaultDirectory(ds); err != nil {
+		return nil, err
+	}
 	out := make(map[string]any, len(block)+2) //nolint:mnd
 	maps.Copy(out, block)
 	storage := make(map[string]any, len(ds.Config))
@@ -389,6 +392,15 @@ func ApplyTokenVaultDatastore(block map[string]any, ds *aigw.Datastore) (map[str
 	storage["backend"] = TokenVaultStorageBackendKonnect
 	out["storage"] = storage
 	return out, nil
+}
+
+// CheckTokenVaultDirectory reports a token-vault Datastore without a
+// directory. The Token Vault plugins require a directory.
+func CheckTokenVaultDirectory(ds *aigw.Datastore) error {
+	if dir, _ := ds.Config["directory"].(string); dir == "" {
+		return fmt.Errorf("token-vault datastore %q requires config.directory", ds.Name)
+	}
+	return nil
 }
 
 // TokenVaultCallbackName is the name of the route and of the plugin that

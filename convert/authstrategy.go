@@ -151,6 +151,11 @@ func (c *Converter) authStrategyTokenVaultDatastore(
 			"auth strategy %q does not support a %q datastore; use %q instead",
 			idp.Name, ds.Type, aimap.DatastoreTypeTokenVault)
 	}
+	// Only the credential manager routes put the directory in plugin config.
+	if err := aimap.CheckTokenVaultDirectory(ds); required && err != nil {
+		return nil, c.fail(src.at("datastores[0].name"), ConfigFieldInvalid,
+			"auth strategy %q: %v", idp.Name, err)
+	}
 	return ds, nil
 }
 
@@ -194,6 +199,15 @@ func (c *Converter) tvManagerLoginOIDCConfig(
 		"because the route starts the browser login.",
 		tvOIDCSessionMethod, tvOIDCAuthCodeMethod)
 	b.applyTokenEndpointAuthMethod()
+	// openid-connect rejects a redirect_uri without a scheme and host.
+	redirect := b.cfg["redirect_uri"]
+	if !isEmptyConfigValue(redirect) && managerRedirectTarget(redirect, idp.Name) == nil {
+		b.report(ConfigFieldIgnored, "redirect_uri",
+			"auth strategy %q sets config.redirect_uri without a scheme and host. "+
+				"The credential manager login route leaves it out. "+
+				"The plugin gets the redirect URI from the request.", idp.Name)
+		delete(b.cfg, "redirect_uri")
+	}
 	b.set("authorization_cookie_path", c.managerAuthorizationCookiePath(b.cfg, idp))
 	// The redirect mode is fragment, and nothing in this flow reads it. An
 	// empty login_tokens keeps the signed id token out of the browser URL.

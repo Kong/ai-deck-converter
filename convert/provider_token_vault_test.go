@@ -544,7 +544,8 @@ model_providers:
 	require.Equal(t, "d", exchanges[0].Config["directory"])
 }
 
-func TestProviderTokenVaultKeepsInlineDirectoryWithoutDatastoreDirectory(t *testing.T) {
+// An inline token_vault.directory does not replace the datastore directory.
+func TestProviderTokenVaultDatastoreWithoutDirectory(t *testing.T) {
 	src := providerTokenVaultDatastores + `
   - name: tv-nodir
     type: token-vault
@@ -559,8 +560,8 @@ model_providers:
 `
 	result, err := Convert([]byte(src), testOptions)
 	require.NoError(t, err)
-	require.Empty(t, result.Issues)
-	exchanges := pluginsNamed(result.Output, tokenVaultExchangePlugin)
-	require.Len(t, exchanges, 1)
-	require.Equal(t, "inline", exchanges[0].Config["directory"])
+	issue := requireIssue(t, result.Issues, Error, ConfigFieldInvalid,
+		kindModelProvider, "vault", "datastores[0].name")
+	require.Contains(t, issue.Reason, "requires config.directory")
+	require.Empty(t, pluginsNamed(result.Output, tokenVaultExchangePlugin))
 }

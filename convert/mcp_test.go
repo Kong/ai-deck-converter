@@ -763,8 +763,15 @@ mcp_servers:
 	})
 }
 
+// The Token Vault plugins require a directory. An inline
+// token_vault.directory does not replace the datastore directory.
 func TestTokenVaultDatastoreWithoutDirectory(t *testing.T) {
-	out, _, err := convertDoc([]byte(`
+	for name, tokenVault := range map[string]string{
+		"no inline directory": "{provider: github}",
+		"inline directory":    "{directory: inline, provider: github}",
+	} {
+		t.Run(name, func(t *testing.T) {
+			result, err := Convert([]byte(`
 datastores:
   - name: tv
     type: token-vault
@@ -774,16 +781,18 @@ mcp_servers:
     name: vaulted
     upstream_url: https://mcp.internal
     datastores: [{name: tv}]
-    token_vault: {provider: github}
+    token_vault: `+tokenVault+`
     tools:
       - {name: report, description: Get a report}
-`), false)
-	require.NoError(t, err)
-	auth := routePlugins(t, out, "vaulted")[0].Config["auth"].(map[string]any)
-	block := auth["token_vault"].(map[string]any)
-	require.NotContains(t, block, "directory")
-	require.Equal(t, "github", block["provider"])
-	require.Equal(t, map[string]any{"backend": "konnect", "current_version": "v1"}, block["storage"])
+`), testOptions)
+			require.NoError(t, err)
+			issue := requireIssue(t, result.Issues, Error, ConfigFieldInvalid,
+				kindMCPServer, "vaulted", "datastores")
+			require.Contains(t, issue.Reason, "requires config.directory")
+			require.Empty(t, result.Output.Services)
+			require.Empty(t, result.Output.Routes, "no callback route without a directory")
+		})
+	}
 }
 
 // requireCallbackRoutes asserts that routes holds exactly the given Token
@@ -824,24 +833,4 @@ mcp_servers:
 	require.Contains(t, issue.Reason, `"tv"`)
 	auth := routePlugins(t, result.Output, "vaulted")[0].Config["auth"].(map[string]any)
 	require.Equal(t, "from-datastore", auth["token_vault"].(map[string]any)["directory"])
-}
-
-func TestTokenVaultInlineDirectoryWithoutDatastoreDirectory(t *testing.T) {
-	out, _, err := convertDoc([]byte(`
-datastores:
-  - name: tv
-    type: token-vault
-    config: {current_version: v1}
-mcp_servers:
-  - type: passthrough-listener
-    name: vaulted
-    upstream_url: https://mcp.internal
-    datastores: [{name: tv}]
-    token_vault: {directory: inline, provider: github}
-    tools:
-      - {name: report, description: Get a report}
-`), false)
-	require.NoError(t, err)
-	auth := routePlugins(t, out, "vaulted")[0].Config["auth"].(map[string]any)
-	require.Equal(t, "inline", auth["token_vault"].(map[string]any)["directory"])
 }

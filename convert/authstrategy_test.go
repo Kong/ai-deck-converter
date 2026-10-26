@@ -449,6 +449,25 @@ func TestAuthStrategyTokenVaultLeavesEntityPluginUnchanged(t *testing.T) {
 	}
 }
 
+// The credential manager routes need the datastore directory. A strategy
+// without the credential manager puts no directory in plugin config.
+func TestAuthStrategyTokenVaultDatastoreWithoutDirectory(t *testing.T) {
+	doc := strings.Replace(tokenVaultStrategyDoc,
+		"config: {directory: d}", "config: {current_version: v1}", 1)
+
+	res, err := Convert([]byte(fmt.Sprintf(doc, "", true)), testOptions)
+	require.NoError(t, err)
+	issue := requireIssue(t, res.Issues, Error, ConfigFieldInvalid,
+		kindAuthStrategy, "sso", "datastores[0].name")
+	require.Contains(t, issue.Reason, "requires config.directory")
+	require.Empty(t, res.Output.Routes)
+
+	res, err = Convert([]byte(fmt.Sprintf(doc, "", false)), testOptions)
+	require.NoError(t, err)
+	require.Empty(t, res.Issues)
+	require.Len(t, res.Output.Services, 2)
+}
+
 func TestAuthStrategyTokenVaultDisabledAddsNoRoute(t *testing.T) {
 	got := convertTokenVaultStrategy(t, "", false)
 
@@ -558,8 +577,8 @@ func TestAuthStrategyTokenVaultKeepsConfiguredTokenEndpointAuthMethod(t *testing
 
 // The Token Vault routes always override upstream_access_token_header. The
 // callback handler reads the subject token from the Authorization header.
-// The login route keeps a strategy-set redirect_uri; the page route and the
-// enrollment routes strip it.
+// openid-connect rejects a relative redirect_uri, so every Token Vault route
+// leaves it out.
 func TestAuthStrategyTokenVaultCredentialManagerOverridesHeader(t *testing.T) {
 	res := convertTokenVaultStrategyResult(t, `      upstream_access_token_header: x-token
       redirect_uri: [/custom]
@@ -570,9 +589,9 @@ func TestAuthStrategyTokenVaultCredentialManagerOverridesHeader(t *testing.T) {
 	require.Equal(t, "authorization:bearer", got.login["upstream_access_token_header"])
 	require.Equal(t, "mine", got.page["session_secret"])
 	require.Equal(t, "mine", got.initiate["session_secret"])
-	require.Equal(t, []any{"/custom"}, got.login["redirect_uri"],
-		"the credential manager login returns to the strategy redirect URI")
+	require.NotContains(t, got.login, "redirect_uri")
 	require.NotContains(t, got.page, "redirect_uri")
+	require.NotContains(t, got.login, "login_redirect_uri")
 	require.Equal(t, "/vuc/sso", got.login["authorization_cookie_path"],
 		"a relative redirect_uri drives no derivation")
 	require.NotContains(t, got.initiate, "redirect_uri",

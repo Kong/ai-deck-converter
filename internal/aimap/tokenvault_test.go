@@ -292,21 +292,21 @@ func TestApplyTokenVaultDatastore(t *testing.T) {
 
 	t.Run("no directory", func(t *testing.T) {
 		t.Parallel()
-		got, err := ApplyTokenVaultDatastore(nil, &aigw.Datastore{
+		_, err := ApplyTokenVaultDatastore(nil, &aigw.Datastore{
+			Name:   "tv",
 			Type:   DatastoreTypeTokenVault,
 			Config: map[string]any{"current_version": "v1"},
 		})
-		require.NoError(t, err)
-		require.Equal(t, map[string]any{
-			"storage": map[string]any{"backend": "konnect", "current_version": "v1"},
-		}, got)
+		require.ErrorContains(t, err, `token-vault datastore "tv" requires config.directory`)
 	})
 
-	t.Run("empty config still sets backend", func(t *testing.T) {
+	t.Run("empty directory", func(t *testing.T) {
 		t.Parallel()
-		got, err := ApplyTokenVaultDatastore(nil, &aigw.Datastore{Type: DatastoreTypeTokenVault})
-		require.NoError(t, err)
-		require.Equal(t, map[string]any{"storage": map[string]any{"backend": "konnect"}}, got)
+		_, err := ApplyTokenVaultDatastore(nil, &aigw.Datastore{
+			Type:   DatastoreTypeTokenVault,
+			Config: map[string]any{"directory": ""},
+		})
+		require.ErrorContains(t, err, "requires config.directory")
 	})
 
 	t.Run("wrong type", func(t *testing.T) {
