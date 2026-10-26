@@ -36,34 +36,6 @@ routes:
       - http
       - https
     strip_path: false
-  - id: 0b3d41ee-cd0b-51a2-ba17-192fbf50cad8
-    name: gemini-batches
-    service:
-      id: 947a4e23-b483-5a65-8165-da9aed24565b
-    paths:
-      - /gemini/v1beta/batches
-    methods:
-      - GET
-      - POST
-      - OPTIONS
-    protocols:
-      - http
-      - https
-    strip_path: false
-  - id: a77dd8e9-17ff-5236-b291-761e4874b365
-    name: gemini-enterprise-batches
-    service:
-      id: 947a4e23-b483-5a65-8165-da9aed24565b
-    paths:
-      - ~/gemini/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/batchPredictionJobs
-    methods:
-      - GET
-      - POST
-      - OPTIONS
-    protocols:
-      - http
-      - https
-    strip_path: false
   - id: a52aa612-4383-505f-8126-223ecf6adf57
     name: gemini-embeddings
     service:
@@ -92,12 +64,12 @@ routes:
       - http
       - https
     strip_path: false
-  - id: cf8371c0-4886-5860-aba0-ddbf24d941a6
-    name: gemini-files
+  - id: f6269af6-c4d1-5182-bd8b-0277dc6dacec
+    name: gemini-predict
     service:
       id: 947a4e23-b483-5a65-8165-da9aed24565b
     paths:
-      - ~/gemini/(?:upload/)?v1beta/files
+      - ~/gemini/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/(?<publisher>[^/]+)/models/(?<model_name>[^:/]+):predict
     methods:
       - GET
       - POST
@@ -106,12 +78,12 @@ routes:
       - http
       - https
     strip_path: false
-  - id: f6269af6-c4d1-5182-bd8b-0277dc6dacec
-    name: gemini-predict
+  - id: ec635808-315e-5e7d-9d25-1008e4e52862
+    name: gemini-predict-long-running
     service:
       id: 947a4e23-b483-5a65-8165-da9aed24565b
     paths:
-      - ~/gemini/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/(?<publisher>[^/]+)/models/(?<model_name>[^:/]+):predict
+      - ~/gemini/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/(?<publisher>[^/]+)/models/(?<model_name>[^:/]+):predictLongRunning
     methods:
       - GET
       - POST
@@ -134,12 +106,40 @@ routes:
       - http
       - https
     strip_path: false
-  - id: ec635808-315e-5e7d-9d25-1008e4e52862
-    name: gemini-predict-long-running
+  - id: 0b3d41ee-cd0b-51a2-ba17-192fbf50cad8
+    name: gemini-batches
     service:
       id: 947a4e23-b483-5a65-8165-da9aed24565b
     paths:
-      - ~/gemini/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/(?<publisher>[^/]+)/models/(?<model_name>[^:/]+):predictLongRunning
+      - /gemini/v1beta/batches
+    methods:
+      - GET
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: a77dd8e9-17ff-5236-b291-761e4874b365
+    name: gemini-enterprise-batches
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - ~/gemini/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/batchPredictionJobs
+    methods:
+      - GET
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: cf8371c0-4886-5860-aba0-ddbf24d941a6
+    name: gemini-files
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - ~/gemini/(?:upload/)?v1beta/files
     methods:
       - GET
       - POST
@@ -215,7 +215,163 @@ plugins:
       id: 090ce054-21c9-5fd3-a8f0-e0733e5dcc43
     model:
       id: 9b861656-36c6-5243-9329-7b80541958cf
-  - id: 12106a5c-cbd2-5942-8432-ef9bc4adca1b
+  - id: 5477cac7-3c38-581b-899b-f9d520e9d5e4
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - path_pattern: 'models/([%w%.%-]+):'
+          source: path
+    route:
+      id: a52aa612-4383-505f-8126-223ecf6adf57
+  - id: 628550fd-b362-5247-b3ba-f2f6fa95de13
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/embeddings
+      llm_format: gemini
+      targets:
+        - auth:
+            header_name: x-goog-api-key
+            header_value: e2e-fake-gemini-key
+          description: gemini-2.5-pro
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: gemini-all-capabilities
+            name: gemini-2.5-pro
+            provider: gemini
+          route_type: llm/v1/embeddings
+    route:
+      id: a52aa612-4383-505f-8126-223ecf6adf57
+    model:
+      id: 9b861656-36c6-5243-9329-7b80541958cf
+  - id: 3912bf60-1edb-5602-89ae-a8a2e41177f4
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - path_pattern: 'models/([%w%.%-]+):'
+          source: path
+    route:
+      id: 05b6b580-1be6-57bc-a0ac-403501e7e580
+  - id: ccc68bd9-2622-5864-b026-137e5c06c755
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/embeddings
+      llm_format: gemini
+      targets:
+        - auth:
+            header_name: x-goog-api-key
+            header_value: e2e-fake-gemini-key
+          description: gemini-2.5-pro
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: gemini-all-capabilities
+            name: gemini-2.5-pro
+            provider: gemini
+          route_type: llm/v1/embeddings
+    route:
+      id: 05b6b580-1be6-57bc-a0ac-403501e7e580
+    model:
+      id: 9b861656-36c6-5243-9329-7b80541958cf
+  - id: cd4aa418-5dc5-57fe-860c-f5ddb6889d88
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - path_pattern: 'models/([%w%.%-]+):'
+          source: path
+    route:
+      id: f6269af6-c4d1-5182-bd8b-0277dc6dacec
+  - id: d7038ac4-55db-505a-824e-d2a548ec7424
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: image/generation
+      llm_format: gemini
+      targets:
+        - auth:
+            header_name: x-goog-api-key
+            header_value: e2e-fake-gemini-key
+          description: gemini-2.5-pro
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: gemini-all-capabilities
+            name: gemini-2.5-pro
+            provider: gemini
+          route_type: image/v1/images/generations
+    route:
+      id: f6269af6-c4d1-5182-bd8b-0277dc6dacec
+    model:
+      id: 9b861656-36c6-5243-9329-7b80541958cf
+  - id: b5fb23d3-496f-532c-9b75-245ccfee68d3
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - path_pattern: 'models/([%w%.%-]+):'
+          source: path
+    route:
+      id: ec635808-315e-5e7d-9d25-1008e4e52862
+  - id: e4b46606-e4f5-57c3-9298-949d4e990f2d
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: video/generation
+      llm_format: gemini
+      targets:
+        - auth:
+            header_name: x-goog-api-key
+            header_value: e2e-fake-gemini-key
+          description: gemini-2.5-pro
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: gemini-all-capabilities
+            name: gemini-2.5-pro
+            provider: gemini
+          route_type: video/v1/videos/generations
+    route:
+      id: ec635808-315e-5e7d-9d25-1008e4e52862
+    model:
+      id: 9b861656-36c6-5243-9329-7b80541958cf
+  - id: 0041d7bf-ccdd-5413-9839-9e1fa7ecc34e
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: gemini
+      targets:
+        - auth:
+            header_name: x-goog-api-key
+            header_value: e2e-fake-gemini-key
+          description: gemini-2.5-pro
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: gemini-all-capabilities
+            name: gemini-2.5-pro
+            provider: gemini
+          route_type: llm/v1/chat
+    route:
+      id: d737a125-0d34-5ee4-b5ff-4900a3ac7761
+    model:
+      id: 9b861656-36c6-5243-9329-7b80541958cf
+  - id: 1fc0cc9b-eb94-5eb9-8c69-d8361c990007
     name: ai-proxy-advanced
     config:
       balancer:
@@ -240,7 +396,7 @@ plugins:
       id: 0b3d41ee-cd0b-51a2-ba17-192fbf50cad8
     model:
       id: 9b861656-36c6-5243-9329-7b80541958cf
-  - id: 628550fd-b362-5247-b3ba-f2f6fa95de13
+  - id: 7f38955a-5cc4-5370-b6ad-aae52d1f7c2f
     name: ai-proxy-advanced
     config:
       balancer:
@@ -265,73 +421,7 @@ plugins:
       id: a77dd8e9-17ff-5236-b291-761e4874b365
     model:
       id: 9b861656-36c6-5243-9329-7b80541958cf
-  - id: 3912bf60-1edb-5602-89ae-a8a2e41177f4
-    name: ai-model-selector
-    config:
-      max_request_body_size: 8388608
-      sources:
-        - path_pattern: 'models/([%w%.%-]+):'
-          source: path
-    route:
-      id: a52aa612-4383-505f-8126-223ecf6adf57
-  - id: ccc68bd9-2622-5864-b026-137e5c06c755
-    name: ai-proxy-advanced
-    config:
-      balancer:
-        algorithm: round-robin
-      genai_category: text/embeddings
-      llm_format: gemini
-      targets:
-        - auth:
-            header_name: x-goog-api-key
-            header_value: e2e-fake-gemini-key
-          description: gemini-2.5-pro
-          logging:
-            log_payloads: false
-            log_statistics: true
-          model:
-            model_alias: gemini-all-capabilities
-            name: gemini-2.5-pro
-            provider: gemini
-          route_type: llm/v1/embeddings
-    route:
-      id: a52aa612-4383-505f-8126-223ecf6adf57
-    model:
-      id: 9b861656-36c6-5243-9329-7b80541958cf
-  - id: cd4aa418-5dc5-57fe-860c-f5ddb6889d88
-    name: ai-model-selector
-    config:
-      max_request_body_size: 8388608
-      sources:
-        - path_pattern: 'models/([%w%.%-]+):'
-          source: path
-    route:
-      id: 05b6b580-1be6-57bc-a0ac-403501e7e580
-  - id: d7038ac4-55db-505a-824e-d2a548ec7424
-    name: ai-proxy-advanced
-    config:
-      balancer:
-        algorithm: round-robin
-      genai_category: text/embeddings
-      llm_format: gemini
-      targets:
-        - auth:
-            header_name: x-goog-api-key
-            header_value: e2e-fake-gemini-key
-          description: gemini-2.5-pro
-          logging:
-            log_payloads: false
-            log_statistics: true
-          model:
-            model_alias: gemini-all-capabilities
-            name: gemini-2.5-pro
-            provider: gemini
-          route_type: llm/v1/embeddings
-    route:
-      id: 05b6b580-1be6-57bc-a0ac-403501e7e580
-    model:
-      id: 9b861656-36c6-5243-9329-7b80541958cf
-  - id: d59d0f0a-e311-59af-937d-02dc12719ca2
+  - id: cf7316be-1398-5d7d-bed6-bacd43b095b8
     name: ai-proxy-advanced
     config:
       balancer:
@@ -353,96 +443,6 @@ plugins:
           route_type: llm/v1/chat
     route:
       id: cf8371c0-4886-5860-aba0-ddbf24d941a6
-    model:
-      id: 9b861656-36c6-5243-9329-7b80541958cf
-  - id: 0c628171-03a6-5e5e-a900-b6a5651353b2
-    name: ai-model-selector
-    config:
-      max_request_body_size: 8388608
-      sources:
-        - path_pattern: 'models/([%w%.%-]+):'
-          source: path
-    route:
-      id: f6269af6-c4d1-5182-bd8b-0277dc6dacec
-  - id: 0041d7bf-ccdd-5413-9839-9e1fa7ecc34e
-    name: ai-proxy-advanced
-    config:
-      balancer:
-        algorithm: round-robin
-      genai_category: image/generation
-      llm_format: gemini
-      targets:
-        - auth:
-            header_name: x-goog-api-key
-            header_value: e2e-fake-gemini-key
-          description: gemini-2.5-pro
-          logging:
-            log_payloads: false
-            log_statistics: true
-          model:
-            model_alias: gemini-all-capabilities
-            name: gemini-2.5-pro
-            provider: gemini
-          route_type: image/v1/images/generations
-    route:
-      id: f6269af6-c4d1-5182-bd8b-0277dc6dacec
-    model:
-      id: 9b861656-36c6-5243-9329-7b80541958cf
-  - id: 1fc0cc9b-eb94-5eb9-8c69-d8361c990007
-    name: ai-proxy-advanced
-    config:
-      balancer:
-        algorithm: round-robin
-      genai_category: text/generation
-      llm_format: gemini
-      targets:
-        - auth:
-            header_name: x-goog-api-key
-            header_value: e2e-fake-gemini-key
-          description: gemini-2.5-pro
-          logging:
-            log_payloads: false
-            log_statistics: true
-          model:
-            model_alias: gemini-all-capabilities
-            name: gemini-2.5-pro
-            provider: gemini
-          route_type: llm/v1/chat
-    route:
-      id: d737a125-0d34-5ee4-b5ff-4900a3ac7761
-    model:
-      id: 9b861656-36c6-5243-9329-7b80541958cf
-  - id: b21a1b0e-3d70-5c23-84a5-d25fee046ce9
-    name: ai-model-selector
-    config:
-      max_request_body_size: 8388608
-      sources:
-        - path_pattern: 'models/([%w%.%-]+):'
-          source: path
-    route:
-      id: ec635808-315e-5e7d-9d25-1008e4e52862
-  - id: cf7316be-1398-5d7d-bed6-bacd43b095b8
-    name: ai-proxy-advanced
-    config:
-      balancer:
-        algorithm: round-robin
-      genai_category: video/generation
-      llm_format: gemini
-      targets:
-        - auth:
-            header_name: x-goog-api-key
-            header_value: e2e-fake-gemini-key
-          description: gemini-2.5-pro
-          logging:
-            log_payloads: false
-            log_statistics: true
-          model:
-            model_alias: gemini-all-capabilities
-            name: gemini-2.5-pro
-            provider: gemini
-          route_type: video/v1/videos/generations
-    route:
-      id: ec635808-315e-5e7d-9d25-1008e4e52862
     model:
       id: 9b861656-36c6-5243-9329-7b80541958cf
 ai_models:

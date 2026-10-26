@@ -279,10 +279,10 @@ func testGeminiModelAllCapabilities(t *testing.T, license string) {
 // ships the Gemini Interactions API. Earlier images reject the config with
 // "gemini does not support llm/v1/responses API".
 func testGeminiInteractionsAPI(t *testing.T, license string) {
-	configPath := convertCase(t, "gemini_interactions_api", "2.4", nil)
+	configPath := convertCase(t, "gemini_interactions_api", "2.3", nil)
 
 	// TODO update the gateway image so that this test passes
-	// Gemini interactions API support is planned for AI Gateway 2.4, which is not yet available
+	// Gemini interactions API support is planned for AI Gateway 2.3, but is not yet available
 	gateway := startGateway(t, GatewayOptions{
 		Image:  gatewayImage(t, "kong/kong-ai-gateway-dev:39946325377-167b5f34f5ae4ac4be1782b22b9f250caefa76f5"),
 		Config: configPath,

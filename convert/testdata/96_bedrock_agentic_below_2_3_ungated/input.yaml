@@ -1,5 +1,5 @@
 # Bedrock's agentic capability shipped before the gemini-only agentic gate
-# (FeatureGeminiAgenticCapability), so it stays ungated at any version.
+# (FeatureGeminiAgenticCapability), so it stays ungated below 2.3.
 model_providers:
   - name: bedrock-prod
     type: bedrock
