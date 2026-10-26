@@ -1,6 +1,7 @@
 package convert
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -381,4 +382,64 @@ func TestMCPMetadataDropsTokenExchange(t *testing.T) {
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "token_exchange")
 	})
+}
+
+// tokenVaultMCPWithMetadata is an upstream Token Vault MCP server with
+// access.metadata. ai-mcp-oauth2 must keep the caller's bearer token, or the
+// Token Vault exchange has no subject token.
+const tokenVaultMCPWithMetadata = `
+auth_strategies:
+  - name: okta-oidc
+    type: openid-connect
+    config:
+      issuer: https://issuer.example.com/oauth2
+mcp_servers:
+  - type: passthrough-listener
+    name: vaulted-mcp
+    upstream_url: https://tools.example.com
+    config:
+      route:
+        paths: [/mcp/vaulted]
+    token_vault:
+      provider: github
+      credential:
+        outbound:
+          location: header
+          name: x-github-token
+          prefix: ""
+    access:
+      auth_strategies: [okta-oidc]
+      metadata:
+        endpoint: /mcp/vaulted/.well-known/oauth-protected-resource
+        resource: https://api.example.com/mcp/vaulted
+        authorization_servers: [https://issuer.example.com/oauth2]
+    tools:
+      - name: ping
+        description: Ping
+        method: GET
+        path: /ping
+        scheme: https
+        host: tools.example.com
+`
+
+func TestMCPOAuth2PassthroughForTokenVault(t *testing.T) {
+	out, warnings, err := convertYAML([]byte(tokenVaultMCPWithMetadata))
+	require.NoError(t, err)
+	require.Len(t, warnings, 1, "token_vault without a datastore warns")
+	s := string(out)
+	require.Contains(t, s, "passthrough_credentials: true")
+}
+
+func TestMCPOAuth2PassthroughForTokenVaultOverridesHideCredentials(t *testing.T) {
+	src := strings.Replace(tokenVaultMCPWithMetadata,
+		"      issuer: https://issuer.example.com/oauth2\n",
+		"      issuer: https://issuer.example.com/oauth2\n      hide_credentials: true\n", 1)
+	result, err := Convert([]byte(src), testOptions)
+	require.NoError(t, err)
+	issue := requireIssue(t, result.Issues, Warning, ConfigFieldOverridden,
+		kindMCPServer, "vaulted-mcp", "access.auth_strategies[0]")
+	require.Contains(t, issue.Reason, "passthrough_credentials will be set to true")
+	s, err := result.Output.ToYAML()
+	require.NoError(t, err)
+	require.Contains(t, string(s), "passthrough_credentials: true")
 }

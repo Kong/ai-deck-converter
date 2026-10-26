@@ -1,0 +1,8 @@
+- code: CONFIG_FIELD_IGNORED
+  reason: MCP server "tools-a" auth strategy "okta-public" sets client_id but no client_secret. The gateway requires a client credential with client_id, so the plugin leaves client_id out. Token validation does not use it.
+  source:
+    kind: mcp_server
+    name: tools-a
+    fields:
+      - access.auth_strategies[0]
+  severity: WARNING

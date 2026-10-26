@@ -62,6 +62,7 @@ services:
               resource: https://api.example.com/mcp/meta
               authorization_servers: [https://issuer.example.com]
               metadata_endpoint: /mcp/meta/.well-known/oauth-protected-resource
+              metadata_discovery_endpoint: https://issuer.example.com/.well-known/openid-configuration
 `
 
 func TestRevertMCPOAuth2MetadataOnly(t *testing.T) {
@@ -71,6 +72,7 @@ func TestRevertMCPOAuth2MetadataOnly(t *testing.T) {
 	s := string(out)
 	require.Contains(t, s, "metadata:")
 	require.Contains(t, s, "resource: https://api.example.com/mcp/meta")
+	require.Contains(t, s, "discovery_endpoint: https://issuer.example.com/.well-known/openid-configuration")
 	require.Contains(t, s, "endpoint: /mcp/meta/.well-known/oauth-protected-resource")
 	// The .well-known path is stripped from the route paths.
 	require.NotContains(t, strings.SplitN(s, "access:", 2)[0],

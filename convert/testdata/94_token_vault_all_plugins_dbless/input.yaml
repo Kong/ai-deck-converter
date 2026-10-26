@@ -1,0 +1,66 @@
+# One document producing every Token Vault surface: ai-mcp-proxy with an
+# empty outbound prefix, token-vault-exchange with every credential lever
+# omitted (the plugin defaults and the vault advertisement decide at
+# runtime), the callback route, and the credential manager route behind its
+# openid-connect guard. Encoded db-less to cover the deterministic IDs of the
+# two generated top-level routes.
+datastores:
+  - name: vault-konnect-prod
+    type: token-vault
+    config:
+      directory: my-directory
+      current_version: v1
+      keys:
+        - version: v1
+          key: "{vault://hcv/vault-enc-key}"
+
+models:
+  - name: claude
+    type: model
+    capabilities: [generate]
+    formats:
+      - type: anthropic
+    config:
+      route:
+        paths: [/ai]
+    targets:
+      - name: claude-sonnet
+        provider: anthropic-vault
+        config:
+          type: anthropic
+
+model_providers:
+  - name: anthropic-vault
+    type: anthropic
+    datastores: [{name: vault-konnect-prod}]
+    token_vault:
+      provider: anthropic
+
+auth_strategies:
+  - name: okta-ai-se
+    display_name: Okta AI SE
+    type: openid-connect
+    datastores: [{name: vault-konnect-prod}]
+    token_vault:
+      enable_credential_manager: true
+    config:
+      issuer: https://dev-123456.okta.com
+      client_id: ["0oa1b2c3d4e5f6g7h8i9"]
+
+mcp_servers:
+  - type: passthrough-listener
+    name: tools-a
+    upstream_url: https://a.internal.kongair.com
+    config: {route: {paths: [/mcp/tools-a]}}
+    datastores: [{name: vault-konnect-prod}]
+    token_vault:
+      provider: anthropic
+      credential:
+        outbound:
+          location: header
+          name: x-api-key
+          prefix: ""
+    access:
+      auth_strategies: [okta-ai-se]
+    tools:
+      - {name: report, description: Get a report}

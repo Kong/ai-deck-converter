@@ -16,7 +16,6 @@ var (
 	fixtureRedisVaultRef    = "{vault://env/redis-pass}"
 	fixtureSentinelVaultRef = "{vault://env/sentinel-pass}"
 	fixtureAWSVaultRef      = "{vault://env/aws-secret}"
-	fixtureVaultEncRef      = "{vault://env/TOKEN_VAULT_ENC_SECRET}"
 	fixtureAWSID            = "AKIA..."
 	fixtureAzureClientValue = "fake-azure-client-secret"
 )
@@ -146,22 +145,6 @@ func TestTokenVaultRedisFromPluginOmissions(t *testing.T) {
 func TestTokenVaultToFromPlugin(t *testing.T) {
 	t.Parallel()
 
-	tv := &aigw.TokenVaultConfig{
-		Directory:         "my-directory",
-		Provider:          "my-upstream-provider",
-		Redis:             tokenVaultRedisFixture(),
-		EncryptionSecrets: []string{fixtureVaultEncRef},
-	}
-	block := TokenVaultToPlugin(tv)
-	require.Equal(t, map[string]any{
-		"directory":          "my-directory",
-		"provider":           "my-upstream-provider",
-		"redis":              TokenVaultRedisToPlugin(tokenVaultRedisFixture()),
-		"encryption_secrets": []string{fixtureVaultEncRef},
-	}, block)
-	require.Equal(t, tv, TokenVaultFromPlugin(block))
-
-	// Bare block (no redis, no secrets): the PR's first sample config.
 	bare := TokenVaultToPlugin(&aigw.TokenVaultConfig{
 		Directory: "my-directory",
 		Provider:  "my-upstream-provider",
@@ -230,3 +213,119 @@ func TestCloudAuthToFromPluginVariants(t *testing.T) {
 }
 
 func intPtr(i int) *int { return &i }
+
+func TestTokenVaultSubjectTokenTypeCredentialCache(t *testing.T) {
+	t.Parallel()
+
+	location := &aigw.TokenVaultCredentialLocation{Location: "header", Name: "Authorization", Prefix: new("Bearer ")}
+	tv := &aigw.TokenVaultConfig{
+		Provider:         "github",
+		SubjectTokenType: "api_key",
+		Credential:       &aigw.TokenVaultCredential{Inbound: location, Outbound: location},
+		Cache:            map[string]any{"redis": map[string]any{"host": "redis.internal"}},
+	}
+	block := TokenVaultToPlugin(tv)
+	wantLocation := map[string]any{"location": "header", "name": "Authorization", "prefix": "Bearer "}
+	require.Equal(t, map[string]any{
+		"provider":           "github",
+		"subject_token_type": "api_key",
+		"credential":         map[string]any{"inbound": wantLocation, "outbound": wantLocation},
+		"cache":              map[string]any{"redis": map[string]any{"host": "redis.internal"}},
+	}, block)
+	require.Equal(t, tv, TokenVaultFromPlugin(block))
+}
+
+func TestTokenVaultCredentialPartial(t *testing.T) {
+	t.Parallel()
+
+	inbound := &aigw.TokenVaultCredentialLocation{Location: "header", Name: "X-Token"}
+	tv := &aigw.TokenVaultConfig{
+		Provider:   "github",
+		Credential: &aigw.TokenVaultCredential{Inbound: inbound},
+	}
+	block := TokenVaultToPlugin(tv)
+	require.Equal(t, map[string]any{
+		"provider":   "github",
+		"credential": map[string]any{"inbound": map[string]any{"location": "header", "name": "X-Token"}},
+	}, block)
+	require.Equal(t, tv, TokenVaultFromPlugin(block))
+
+	empty := TokenVaultToPlugin(&aigw.TokenVaultConfig{
+		Provider:   "github",
+		Credential: &aigw.TokenVaultCredential{},
+		Cache:      map[string]any{},
+	})
+	require.Equal(t, map[string]any{"provider": "github"}, empty)
+}
+
+func TestApplyTokenVaultDatastore(t *testing.T) {
+	t.Parallel()
+
+	keys := []any{map[string]any{"version": "v1", "key": "{vault://hcv/vault-enc-key}"}}
+	ds := &aigw.Datastore{
+		Name: "tv",
+		Type: DatastoreTypeTokenVault,
+		Config: map[string]any{
+			"directory":       "my-directory",
+			"current_version": "v1",
+			"keys":            keys,
+		},
+	}
+	block := map[string]any{"provider": "github", "directory": "overridden"}
+
+	got, err := ApplyTokenVaultDatastore(block, ds)
+	require.NoError(t, err)
+	require.Equal(t, map[string]any{
+		"provider":  "github",
+		"directory": "my-directory",
+		"storage": map[string]any{
+			"backend":         TokenVaultStorageBackendKonnect,
+			"current_version": "v1",
+			"keys":            keys,
+		},
+	}, got)
+
+	// Inputs stay unchanged.
+	require.Equal(t, map[string]any{"provider": "github", "directory": "overridden"}, block)
+	require.Contains(t, ds.Config, "directory")
+	require.NotContains(t, ds.Config, "backend")
+
+	t.Run("no directory", func(t *testing.T) {
+		t.Parallel()
+		_, err := ApplyTokenVaultDatastore(nil, &aigw.Datastore{
+			Name:   "tv",
+			Type:   DatastoreTypeTokenVault,
+			Config: map[string]any{"current_version": "v1"},
+		})
+		require.ErrorContains(t, err, `token-vault datastore "tv" requires config.directory`)
+	})
+
+	t.Run("empty directory", func(t *testing.T) {
+		t.Parallel()
+		_, err := ApplyTokenVaultDatastore(nil, &aigw.Datastore{
+			Type:   DatastoreTypeTokenVault,
+			Config: map[string]any{"directory": ""},
+		})
+		require.ErrorContains(t, err, "requires config.directory")
+	})
+
+	t.Run("wrong type", func(t *testing.T) {
+		t.Parallel()
+		_, err := ApplyTokenVaultDatastore(nil, &aigw.Datastore{Type: DatastoreTypeRedisEE})
+		require.ErrorContains(t, err, "token-vault")
+	})
+}
+
+func TestTokenVaultCredentialEmptyPrefix(t *testing.T) {
+	t.Parallel()
+
+	outbound := &aigw.TokenVaultCredentialLocation{Location: "header", Name: "x-api-key", Prefix: new("")}
+	tv := &aigw.TokenVaultConfig{
+		Provider:   "anthropic",
+		Credential: &aigw.TokenVaultCredential{Outbound: outbound},
+	}
+	block := TokenVaultToPlugin(tv)
+	require.Equal(t, map[string]any{"location": "header", "name": "x-api-key", "prefix": ""},
+		block["credential"].(map[string]any)["outbound"])
+	require.Equal(t, tv, TokenVaultFromPlugin(block))
+}

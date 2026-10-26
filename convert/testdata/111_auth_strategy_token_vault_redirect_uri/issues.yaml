@@ -1,0 +1,16 @@
+- code: CONFIG_FIELD_OVERRIDDEN
+  reason: auth strategy "okta-ai-se" sets config.auth_methods to [session authorization_code]. The credential manager page route uses [session], because an anonymous caller must reach the plugin login page.
+  source:
+    kind: auth_strategy
+    name: okta-ai-se
+    fields:
+      - config.auth_methods
+  severity: WARNING
+- code: CONFIG_FIELD_IGNORED
+  reason: auth strategy "okta-ai-se" sets config.redirect_uri. The Token Vault enrollment routes leave it out. The authorization server must recognize the enrollment route URL (gateway-hosted /_vault/callback/initiate).
+  source:
+    kind: auth_strategy
+    name: okta-ai-se
+    fields:
+      - config.redirect_uri
+  severity: WARNING

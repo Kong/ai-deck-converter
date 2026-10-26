@@ -1,0 +1,161 @@
+_format_version: "3.0"
+services:
+  - name: vaulted-mcp
+    url: https://mcp.internal
+    routes:
+      - name: vaulted-mcp-route
+        paths:
+          - /mcp/vaulted
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              auth:
+                provider: token_vault
+                token_vault:
+                  directory: my-directory
+                  provider: my-upstream-provider
+                  storage:
+                    backend: konnect
+                    current_version: v1
+                    keys:
+                      - key: '{vault://hcv/vault-enc-key}'
+                        version: v1
+              include_consumer_groups: true
+              logging:
+                log_audits: false
+                log_payloads: false
+                log_statistics: true
+              mode: passthrough-listener
+              tools: []
+          - name: openid-connect
+            config:
+              auth_methods:
+                - session
+                - authorization_code
+              client_id:
+                - 0oa1b2c3d4e5f6g7h8i9
+              issuer: https://dev-123456.okta.com
+              redirect_uri:
+                - https://gw.example.com/signin/callback
+routes:
+  - name: token-vault-callback-handler
+    paths:
+      - /_vault
+    protocols:
+      - http
+      - https
+    plugins:
+      - name: token-vault-callback-handler
+        config:
+          directory: my-directory
+          storage:
+            backend: konnect
+            current_version: v1
+            keys:
+              - key: '{vault://hcv/vault-enc-key}'
+                version: v1
+  - name: token-vault-callback-handler-initiate
+    paths:
+      - /_vault/callback/initiate
+    protocols:
+      - http
+      - https
+    plugins:
+      - name: token-vault-callback-handler
+        config:
+          directory: my-directory
+          storage:
+            backend: konnect
+            current_version: v1
+            keys:
+              - key: '{vault://hcv/vault-enc-key}'
+                version: v1
+      - name: openid-connect
+        config:
+          auth_methods:
+            - session
+            - authorization_code
+          authorization_cookie_path: /_vault/callback/initiate
+          client_id:
+            - 0oa1b2c3d4e5f6g7h8i9
+          hide_credentials: false
+          issuer: https://dev-123456.okta.com
+          login_action: redirect
+          login_methods:
+            - authorization_code
+          login_tokens: []
+          preserve_query_args: true
+          session_secret: 0123456789abcdef0123456789abcdef
+          token_endpoint_auth_method: none
+          upstream_access_token_header: authorization:bearer
+  - name: token-vault-credential-manager-okta-ai-se
+    paths:
+      - /vuc/okta-ai-se
+    protocols:
+      - http
+      - https
+    plugins:
+      - name: openid-connect
+        config:
+          anonymous: token-vault-credential-manager-anonymous
+          auth_methods:
+            - session
+          client_id:
+            - 0oa1b2c3d4e5f6g7h8i9
+          hide_credentials: false
+          issuer: https://dev-123456.okta.com
+          logout_query_arg: logout
+          session_secret: 0123456789abcdef0123456789abcdef
+          token_endpoint_auth_method: none
+          upstream_access_token_header: authorization:bearer
+      - name: token-vault-credential-manager
+        config:
+          directory: my-directory
+          storage:
+            backend: konnect
+            current_version: v1
+            keys:
+              - key: '{vault://hcv/vault-enc-key}'
+                version: v1
+  - name: token-vault-credential-manager-okta-ai-se-login
+    paths:
+      - /vuc/okta-ai-se/login
+    protocols:
+      - http
+      - https
+    plugins:
+      - name: openid-connect
+        config:
+          auth_methods:
+            - session
+            - authorization_code
+          authorization_cookie_path: /signin/callback
+          client_id:
+            - 0oa1b2c3d4e5f6g7h8i9
+          hide_credentials: false
+          issuer: https://dev-123456.okta.com
+          login_action: redirect
+          login_methods:
+            - session
+            - authorization_code
+          login_redirect_uri:
+            - https://gw.example.com/vuc/okta-ai-se
+          login_tokens: []
+          redirect_uri:
+            - https://gw.example.com/signin/callback
+          require_proof_key_for_code_exchange: true
+          session_secret: 0123456789abcdef0123456789abcdef
+          token_endpoint_auth_method: none
+          upstream_access_token_header: authorization:bearer
+      - name: token-vault-credential-manager
+        config:
+          directory: my-directory
+          storage:
+            backend: konnect
+            current_version: v1
+            keys:
+              - key: '{vault://hcv/vault-enc-key}'
+                version: v1
+consumers:
+  - username: token-vault-credential-manager-anonymous
+    custom_id: token-vault-credential-manager-anonymous

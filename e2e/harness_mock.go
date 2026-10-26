@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -19,6 +18,7 @@ type recordedRequest struct {
 	Path          string
 	Query         string
 	Authorization string
+	ExtraHeaders  map[string]string
 	Body          string
 	WebSocket     bool
 }
@@ -57,6 +57,7 @@ func startMockUpstream(t *testing.T) *mockUpstream {
 			Path:          r.URL.Path,
 			Query:         r.URL.RawQuery,
 			Authorization: r.Header.Get("Authorization"),
+			ExtraHeaders:  map[string]string{"x-api-key": r.Header.Get("x-api-key")},
 			Body:          string(body),
 		})
 
@@ -96,68 +97,46 @@ func serveOnFreePort(t *testing.T, handler http.Handler) int {
 }
 
 const (
-	mockEnrollmentURL  = "https://auth.example.com/authorize?state=mock-123"
 	mockExchangedCred  = "upstream-cred-123"
 	mockUpstreamSessID = "mock-upstream-session-1"
 )
 
 // tokenVaultMocks stands in for the two services the token-vault case needs:
-// the Kong Identity token endpoint the vault exchanges subject tokens against,
-// and the upstream MCP server whose tools unlock after enrollment.
+// the Kong Identity vault (identityMock) and the upstream MCP server whose
+// tools unlock after enrollment.
 type tokenVaultMocks struct {
 	IdentityURL  string
 	IdentityPort int
 	UpstreamURL  string
 	UpstreamPort int
 
-	enrolled atomic.Bool
-
-	mu       sync.Mutex
-	identity []recordedRequest
-	authSeen []string
+	identity *identityMock
 }
 
 func startTokenVaultMocks(t *testing.T) *tokenVaultMocks {
 	t.Helper()
-	mocks := &tokenVaultMocks{}
+	identity := startIdentityMock(t)
+	identity.Secret = mockExchangedCred
+	identity.BearerMethods = []string{"header"}
+	port := serveOnFreePort(t, tokenVaultMCPUpstream(t))
+	return &tokenVaultMocks{
+		IdentityURL:  identity.URL,
+		IdentityPort: identity.Port,
+		UpstreamURL:  fmt.Sprintf("http://host.docker.internal:%d", port),
+		UpstreamPort: port,
+		identity:     identity,
+	}
+}
 
-	identityMux := http.NewServeMux()
-	identityMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		if err := r.ParseForm(); err != nil {
-			http.Error(w, "bad form", http.StatusBadRequest)
-			return
-		}
-		mocks.mu.Lock()
-		mocks.identity = append(mocks.identity, recordedRequest{
-			Path:          r.URL.Path,
-			Authorization: r.Header.Get("Authorization"),
-			Body:          r.Form.Get("subject_token") + "|" + r.Form.Get("resource"),
-		})
-		mocks.mu.Unlock()
-
-		w.Header().Set("Content-Type", "application/json")
-		if !mocks.enrolled.Load() {
-			w.WriteHeader(http.StatusBadRequest)
-			_ = json.NewEncoder(w).Encode(map[string]any{
-				"error":                 "x_kong_enrollment_required",
-				"x_kong_enrollment_url": mockEnrollmentURL,
-			})
-			return
-		}
-		_ = json.NewEncoder(w).Encode(map[string]any{
-			"access_token":                    mockExchangedCred,
-			"expires_in":                      300,
-			"x-kong-bearer-methods-supported": []string{"header"},
-		})
-	})
-
-	upstreamMux := http.NewServeMux()
-	upstreamMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+// tokenVaultMCPUpstream serves a JSON-RPC MCP server whose flights-search
+// tool reports the Authorization header it received, so the case can assert
+// the exchanged credential was applied upstream.
+func tokenVaultMCPUpstream(t *testing.T) http.Handler {
+	t.Helper()
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
 		auth := r.Header.Get("Authorization")
-		mocks.mu.Lock()
-		mocks.authSeen = append(mocks.authSeen, r.URL.Path+" "+auth)
-		mocks.mu.Unlock()
 
 		var req struct {
 			ID     any    `json:"id"`
@@ -198,24 +177,19 @@ func startTokenVaultMocks(t *testing.T) *tokenVaultMocks {
 			writeJSONRPC(w, req.ID, -32601, "method not found: "+req.Method, "")
 		}
 	})
-
-	identityPort := serveOnFreePort(t, identityMux)
-	upstreamPort := serveOnFreePort(t, upstreamMux)
-	mocks.IdentityPort = identityPort
-	mocks.UpstreamPort = upstreamPort
-	mocks.IdentityURL = fmt.Sprintf("http://host.docker.internal:%d", identityPort)
-	mocks.UpstreamURL = fmt.Sprintf("http://host.docker.internal:%d", upstreamPort)
-	return mocks
+	return mux
 }
 
 func (m *tokenVaultMocks) enroll() {
-	m.enrolled.Store(true)
+	m.identity.enroll()
 }
 
 func (m *tokenVaultMocks) identityHits() []recordedRequest {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	return append([]recordedRequest(nil), m.identity...)
+	var out []recordedRequest
+	for _, form := range m.identity.calls("/v2/vault/token") {
+		out = append(out, recordedRequest{Body: form.Get("subject_token") + "|" + form.Get("resource")})
+	}
+	return out
 }
 
 func writeJSONRPCResult(w http.ResponseWriter, id any, result any, session string) {

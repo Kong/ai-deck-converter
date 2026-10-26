@@ -1,0 +1,8 @@
+- code: CONFIG_FIELD_INVALID
+  reason: 'auth strategy "api-key-strategy": token_vault requires type "openid-connect", not "key-auth"'
+  source:
+    kind: auth_strategy
+    name: api-key-strategy
+    fields:
+      - token_vault
+  severity: ERROR

@@ -1,0 +1,48 @@
+- code: CONFIG_FIELD_IGNORED
+  reason: auth strategy "okta-ai-se" sets config.session_cookie_same_site. The Token Vault enrollment routes leave it out, because the enrollment flow needs the default value.
+  source:
+    kind: auth_strategy
+    name: okta-ai-se
+    fields:
+      - config.session_cookie_same_site
+  severity: WARNING
+- code: CONFIG_FIELD_IGNORED
+  reason: auth strategy "okta-ai-se" sets config.redirect_uri. The Token Vault enrollment routes leave it out. The authorization server must recognize the enrollment route URL (gateway-hosted /_vault/callback/initiate).
+  source:
+    kind: auth_strategy
+    name: okta-ai-se
+    fields:
+      - config.redirect_uri
+  severity: WARNING
+- code: CONFIG_FIELD_OVERRIDDEN
+  reason: auth strategy "okta-ai-se" sets config.hide_credentials to true. The Token Vault enrollment routes use false, because the browser flow needs that value.
+  source:
+    kind: auth_strategy
+    name: okta-ai-se
+    fields:
+      - config.hide_credentials
+  severity: WARNING
+- code: CONFIG_FIELD_OVERRIDDEN
+  reason: auth strategy "okta-ai-se" sets config.upstream_access_token_header to x-token. The Token Vault enrollment routes use authorization:bearer, because the browser flow needs that value.
+  source:
+    kind: auth_strategy
+    name: okta-ai-se
+    fields:
+      - config.upstream_access_token_header
+  severity: WARNING
+- code: CONFIG_FIELD_OVERRIDDEN
+  reason: auth strategy "okta-ai-se" sets config.auth_methods to [bearer]. The enrollment start route uses [session, authorization_code], because the route starts the browser login.
+  source:
+    kind: auth_strategy
+    name: okta-ai-se
+    fields:
+      - config.auth_methods
+  severity: WARNING
+- code: CONFIG_FIELD_OVERRIDDEN
+  reason: auth strategy "okta-ai-se" sets config.hide_credentials to true. On a route that uses a Token Vault, hide_credentials will be overridden to false, because the Token Vault reads the subject token of the caller from the request.
+  source:
+    kind: auth_strategy
+    name: okta-ai-se
+    fields:
+      - config.hide_credentials
+  severity: WARNING

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"os/exec"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -58,6 +59,10 @@ type GatewayOptions struct {
 	RunArgs   []string
 	// ProxyTLS adds a TLS proxy listener with Kong's self-signed certificate.
 	ProxyTLS bool
+	// ProxyPort pins the host port of the proxy listener. A case whose
+	// fixture names the gateway origin (a redirect_uri) needs a stable port.
+	// A pinned port breaks AIDC_E2E_PARALLEL=1: two gateways cannot share it.
+	ProxyPort int
 }
 
 func startGateway(t *testing.T, opts GatewayOptions) *Gateway {
@@ -68,6 +73,9 @@ func startGateway(t *testing.T, opts GatewayOptions) *Gateway {
 	d.remove(name)
 
 	proxyPort := freePort(t)
+	if opts.ProxyPort != 0 {
+		proxyPort = opts.ProxyPort
+	}
 	adminPort := freePort(t)
 	proxyListen := "0.0.0.0:8000"
 	var proxyTLSPort int
@@ -84,9 +92,13 @@ func startGateway(t *testing.T, opts GatewayOptions) *Gateway {
 		"-e", "KONG_PROXY_LISTEN=" + proxyListen,
 		"-e", "KONG_ADMIN_LISTEN=0.0.0.0:8001",
 		"-e", "KONG_LOG_LEVEL=info",
-		"--add-host", "host.docker.internal:host-gateway",
 		"-p", fmt.Sprintf("%d:8000", proxyPort),
 		"-p", fmt.Sprintf("%d:8001", adminPort),
+	}
+	// Docker Desktop resolves host.docker.internal to the host forwarder
+	// itself; host-gateway points at the in-VM bridge, which is unreachable.
+	if runtime.GOOS != "darwin" {
+		args = append(args, "--add-host", "host.docker.internal:host-gateway")
 	}
 	if opts.ProxyTLS {
 		args = append(args, "-p", fmt.Sprintf("%d:8443", proxyTLSPort))

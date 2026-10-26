@@ -1,0 +1,32 @@
+# An openid-connect strategy with client_id and no client_secret: a public
+# client, like the Token Vault credential-manager browser flow. On an MCP server
+# with access.metadata it lowers to ai-mcp-oauth2, whose gateway schema
+# requires a client credential with client_id. The plugin leaves client_id
+# out; token validation does not use it.
+auth_strategies:
+  - display_name: Okta Public Client
+    name: okta-public
+    type: openid-connect
+    config:
+      issuer: https://konghq.okta.com
+      client_id: [0oa1zlwt4wuQdH7xt358]
+      scopes: [openid, profile]
+
+mcp_servers:
+  - type: passthrough-listener
+    display_name: Tools A
+    name: tools-a
+    upstream_url: https://a.internal.kongair.com
+    config: {route: {paths: [/mcp/tools-a]}}
+    access:
+      auth_strategies: [okta-public]
+      metadata:
+        resource: http://localhost:54661/mcp/tools-a
+        authorization_servers:
+          - https://konghq.okta.com
+        scopes_supported:
+          - openid
+          - profile
+        discovery_endpoint: https://konghq.okta.com/.well-known/openid-configuration
+    tools:
+      - {name: report, description: Get a report}

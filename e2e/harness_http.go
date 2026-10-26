@@ -3,8 +3,13 @@
 package e2e
 
 import (
+	"context"
+	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/http/cookiejar"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -27,6 +32,111 @@ type httpResponse struct {
 	Status int
 	Header http.Header
 	Body   string
+}
+
+// Location returns the response's redirect target, or "" when absent.
+func (r httpResponse) Location() string {
+	return r.Header.Get("Location")
+}
+
+// setCookie returns the first Set-Cookie attribute string for a name.
+func setCookie(resp httpResponse, name string) string {
+	for _, c := range resp.Header.Values("Set-Cookie") {
+		if strings.HasPrefix(c, name+"=") {
+			return c
+		}
+	}
+	return ""
+}
+
+// httpGetNoRedirect performs a GET that never follows redirects, so a case
+// can assert on Location and Set-Cookie.
+func httpGetNoRedirect(t *testing.T, client *http.Client, url string, headers map[string]string) httpResponse {
+	t.Helper()
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		t.Fatalf("building request for %s: %v", url, err)
+	}
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+	client = clientWithNoRedirect(client)
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("GET %s: %v", url, err)
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("reading response body from %s: %v", url, err)
+	}
+	return httpResponse{Status: resp.StatusCode, Header: resp.Header, Body: string(body)}
+}
+
+// httpGetFollow performs a GET that follows redirects, returning the final
+// response of the chain.
+func httpGetFollow(t *testing.T, client *http.Client, url string) httpResponse {
+	t.Helper()
+	resp, err := client.Get(url)
+	if err != nil {
+		t.Fatalf("GET %s: %v", url, err)
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("reading response body from %s: %v", url, err)
+	}
+	return httpResponse{Status: resp.StatusCode, Header: resp.Header, Body: string(body)}
+}
+
+func clientWithNoRedirect(client *http.Client) *http.Client {
+	clone := *client
+	clone.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+		return http.ErrUseLastResponse
+	}
+	return &clone
+}
+
+// newBrowserClient returns a cookie-jar client that follows the same
+// redirects a browser would. It dials host.docker.internal as 127.0.0.1, so
+// one issuer string stays valid inside and outside the container, and it
+// dials the gateway's internal port 8000 as the published proxy port, since
+// openid-connect builds redirect URIs from the listener port. The jar is
+// returned so a case can assert cookie paths and values.
+func newBrowserClient(t *testing.T, proxyURL string) (*http.Client, *cookiejar.Jar) {
+	t.Helper()
+	proxyPort := ""
+	if u, err := url.Parse(proxyURL); err == nil {
+		proxyPort = u.Port()
+	}
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		t.Fatalf("creating cookie jar: %v", err)
+	}
+	transport := &http.Transport{
+		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			host, port, splitErr := net.SplitHostPort(addr)
+			if splitErr == nil {
+				if host == "host.docker.internal" {
+					host = "127.0.0.1"
+				}
+				if ip := net.ParseIP(host); ip != nil && ip.IsLoopback() && port == "8000" && proxyPort != "" {
+					port = proxyPort
+				}
+				addr = net.JoinHostPort(host, port)
+			}
+			var dialer net.Dialer
+			return dialer.DialContext(ctx, network, addr)
+		},
+	}
+	client := &http.Client{Jar: jar, Transport: transport, Timeout: 30 * time.Second}
+	client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+		if len(via) >= 10 {
+			return fmt.Errorf("stopped after %d redirects", len(via))
+		}
+		return nil
+	}
+	return client, jar
 }
 
 func httpPost(t *testing.T, url string, headers map[string]string, body string) httpResponse {

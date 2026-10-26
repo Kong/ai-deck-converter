@@ -18,6 +18,13 @@ type AuthStrategy struct {
 	Name        string         `yaml:"name,omitempty"`
 	Config      map[string]any `yaml:"config,omitempty"`
 	Labels      Labels         `yaml:"labels,omitempty"`
+
+	// Datastores references the token-vault Datastore (at most one) that fills
+	// TokenVault.
+	Datastores []DatastoreRef `yaml:"datastores,omitempty"`
+	// TokenVault is the openid-connect plugin's token_vault block. The
+	// Datastore adds its storage.
+	TokenVault map[string]any `yaml:"token_vault,omitempty"`
 }
 
 // rejectIdentityProviders returns an error if node has an identity_providers key.

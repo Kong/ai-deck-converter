@@ -61,6 +61,11 @@ func (c *Converter) mcpAuthStrategyPlugins(
 		return nil, err
 	}
 
+	if idp != nil {
+		if err := c.applyAuthStrategyTokenVault(idp); err != nil {
+			return nil, err
+		}
+	}
 	// key-auth cannot serve OAuth 2.0 Protected Resource Metadata; reject the
 	// combination unconditionally.
 	if meta != nil && idp != nil && idp.Type == "key-auth" {
@@ -217,6 +222,18 @@ func (c *Converter) mcpOAuth2Plugin(
 				m.Name, idp.Name)
 		}
 		applyOIDCFieldsToOAuth2(cfg, idp.Config)
+		// The gateway rejects client_id without a client credential.
+		// client_secret is the only credential that maps onto the plugin.
+		// A client_id without a secret is left out.
+		if firstConfigString(idp.Config, "client_id") != "" &&
+			firstConfigString(idp.Config, "client_secret") == "" {
+			delete(cfg, "client_id")
+			c.warn(src.at("access.auth_strategies[0]"), ConfigFieldIgnored,
+				"MCP server %q auth strategy %q sets client_id but no client_secret. "+
+					"The gateway requires a client credential with client_id, so the plugin "+
+					"leaves client_id out. Token validation does not use it.",
+				m.Name, idp.Name)
+		}
 		proxyConfig, err := oidcProxyConfig(idp.Config)
 		if err != nil {
 			return kong.Plugin{}, c.fail(src.at("access.auth_strategies[0]"), ConfigFieldInvalid,
@@ -232,6 +249,23 @@ func (c *Converter) mcpOAuth2Plugin(
 		if hide, ok := idp.Config["hide_credentials"].(bool); ok && !hide {
 			cfg["passthrough_credentials"] = true
 		}
+	}
+
+	// The Token Vault auth provider exchanges the caller's bearer token for
+	// the upstream credential. ai-mcp-oauth2 clears the Authorization header
+	// by default, and the exchange then fails. passthrough_credentials keeps
+	// the token; the Token Vault auth provider removes it before proxying.
+	if m.TokenVault != nil {
+		if idp != nil {
+			if hide, _ := idp.Config["hide_credentials"].(bool); hide {
+				c.warn(src.at("access.auth_strategies[0]"), ConfigFieldOverridden,
+					"MCP server %q references openid-connect auth strategy %q with hide_credentials: true. "+
+						"This will be ignored, and passthrough_credentials will be set to true "+
+						"because the Token Vault needs the caller's bearer token to resolve the upstream credential.",
+					m.Name, idp.Name)
+			}
+		}
+		cfg["passthrough_credentials"] = true
 	}
 
 	// insecure_relaxed_audience_validation mirrors the provider's audience

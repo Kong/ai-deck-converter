@@ -1,0 +1,41 @@
+# The credential manager flow with a strategy redirect_uri: the login route
+# sends the authorization cookie to the redirect path (an out-of-band route
+# completes the exchange there) and bounces a signed-in caller back to the
+# page route. The strategy sets auth_methods, so the page and login routes
+# report the replacement.
+datastores:
+  - name: vault-konnect-prod
+    type: token-vault
+    config:
+      directory: my-directory
+      current_version: v1
+      keys:
+        - version: v1
+          key: "{vault://hcv/vault-enc-key}"
+
+auth_strategies:
+  - name: okta-ai-se
+    display_name: Okta AI SE
+    type: openid-connect
+    datastores: [{name: vault-konnect-prod}]
+    token_vault:
+      enable_credential_manager: true
+    config:
+      issuer: https://dev-123456.okta.com
+      client_id: [0oa1b2c3d4e5f6g7h8i9]
+      redirect_uri: [https://gw.example.com/signin/callback]
+      auth_methods: [session, authorization_code]
+
+mcp_servers:
+  - type: passthrough-listener
+    display_name: Vaulted MCP
+    name: vaulted-mcp
+    upstream_url: https://mcp.internal
+    datastores: [{name: vault-konnect-prod}]
+    token_vault:
+      provider: my-upstream-provider
+    access:
+      auth_strategies: [okta-ai-se]
+    config:
+      route: {name: vaulted-mcp-route, paths: [/mcp/vaulted]}
+    tools: []

@@ -1,0 +1,47 @@
+# Server-level token_vault + access.metadata: the generated ai-mcp-oauth2
+# plugin must carry passthrough_credentials: true, because the Token Vault
+# auth provider exchanges the caller's Authorization: Bearer token for the
+# upstream credential and ai-mcp-oauth2 clears that header by default.
+# Case 96 covers the auth-strategy token_vault variant of the same rule.
+datastores:
+  - name: vault-konnect-prod
+    type: token-vault
+    config:
+      directory: my-directory
+      current_version: v1
+      keys:
+        - version: v1
+          key: "{vault://hcv/vault-enc-key}"
+
+auth_strategies:
+  - name: okta-oidc
+    type: openid-connect
+    config:
+      issuer: https://dev-123456.okta.com/oauth2/default
+      client_id: [ "0oa1b2c3d4e5f6g7h8i9" ]
+      client_secret: [ "{vault://hcv/okta/client-secret}" ]
+
+mcp_servers:
+  - type: passthrough-listener
+    name: github-tools-mcp
+    upstream_url: https://a.internal.kongair.com
+    config:
+      route:
+        paths: [/mcp/tools-a]
+    token_vault:
+      provider: github
+    datastores: [ {name: vault-konnect-prod} ]
+    access:
+      auth_strategies: [okta-oidc]
+      metadata:
+        endpoint: /mcp/tools-a/.well-known/oauth-protected-resource
+        resource: https://api.example.com/mcp/tools-a
+        authorization_servers:
+          - https://dev-123456.okta.com/oauth2/default
+    tools:
+      - name: report
+        description: Get a report
+        method: GET
+        path: /reports
+        scheme: https
+        host: a.internal.kongair.com
