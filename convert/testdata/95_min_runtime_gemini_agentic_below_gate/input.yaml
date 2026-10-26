@@ -1,4 +1,4 @@
-# Gemini's agentic capability needs 2.3. At 2.2 the agentic model is absent
+# Gemini's agentic capability needs 2.4. At 2.2 the agentic model is absent
 # with an error. The generate model still converts.
 models:
   - name: gemini-agentic

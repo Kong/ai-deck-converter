@@ -1,6 +1,6 @@
 # Gemini serves the Interactions API beside its native generateContent, so
 # "agentic" emits a route for each: the Gemini-style path and its Gemini
-# Enterprise counterpart. This is gated at 2.3 or later
+# Enterprise counterpart. This is gated at 2.4 or later
 # (FeatureGeminiAgenticCapability); this case has no options.yaml, so the
 # default LatestVersion applies.
 model_providers:
