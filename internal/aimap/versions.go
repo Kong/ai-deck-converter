@@ -16,7 +16,7 @@ type Version struct {
 var SupportFloor = mustVersion("2.0")
 
 // LatestVersion is the newest AI Gateway release that the converter knows.
-var LatestVersion = mustVersion("2.3")
+var LatestVersion = mustVersion("2.4")
 
 // versionPattern is the pattern of the Konnect min_runtime_version field. It
 // also rejects leading zeros, so each version has one spelling.
@@ -99,7 +99,7 @@ var featureSince = map[Feature]Version{
 	FeatureBedrockVPCEndpoint:         mustVersion("2.3"),
 	FeatureMCPTokenVault:              mustVersion("2.3"),
 	FeatureMCPRateLimiting:            mustVersion("2.3"),
-	FeatureGeminiAgenticCapability:    mustVersion("2.3"),
+	FeatureGeminiAgenticCapability:    mustVersion("2.4"),
 	FeatureBaseten:                    mustVersion("2.3"),
 	FeatureSagemaker:                  mustVersion("2.1"),
 }

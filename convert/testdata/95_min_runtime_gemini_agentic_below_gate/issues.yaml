@@ -1,5 +1,5 @@
 - code: UNSUPPORTED_IN_MIN_RUNTIME_VERSION
-  reason: 'capabilities[0]: agentic requires minimum runtime version "2.3", but the configured minimum is "2.2"'
+  reason: 'capabilities[0]: agentic requires minimum runtime version "2.4", but the configured minimum is "2.2"'
   source:
     kind: model
     name: gemini-agentic
