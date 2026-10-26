@@ -1,0 +1,33 @@
+# A target with project_id and location_id gets the Gemini Enterprise
+# interactions routes. The public routes are not made.
+model_providers:
+  - name: gemini-prod
+    type: gemini
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://ai/gemini-token}"
+models:
+  - name: gemini-agentic
+    type: model
+    capabilities: [agentic]
+    formats: [{type: gemini}]
+    config:
+      route: {paths: [/ai]}
+    targets:
+      - name: regional
+        provider: gemini-prod
+        config:
+          type: gemini
+          gcp_environment:
+            project_id: my-project
+            location_id: us-central1
+      - name: global
+        provider: gemini-prod
+        config:
+          type: gemini
+          gcp_environment:
+            project_id: my-project
+            location_id: global

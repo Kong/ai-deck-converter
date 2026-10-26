@@ -101,6 +101,7 @@ func aimapTarget(tm *aigw.TargetModel, providerType string) aimap.Target {
 		Mantle:            isMantleTarget(tm, providerType),
 		BatchBucketPrefix: prefix != "",
 		Llama2RawFormat:   providerType == "llama2" && (opts["format"] == "raw" || opts["llama2_format"] == "raw"),
+		GeminiEnterprise:  aimap.GeminiEnvFromOptions(opts).IsEnterprise(),
 	}
 }
 

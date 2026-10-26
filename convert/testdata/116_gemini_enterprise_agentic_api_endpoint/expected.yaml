@@ -3,22 +3,6 @@ services:
   - name: ai-gateway
     url: http://ai-gateway.upstream.local
     routes:
-      - name: gemini-responses
-        paths:
-          - /ai/v1/interactions
-        methods:
-          - GET
-          - POST
-          - OPTIONS
-        strip_path: false
-      - name: gemini-beta-responses
-        paths:
-          - /ai/v1beta/interactions
-        methods:
-          - GET
-          - POST
-          - OPTIONS
-        strip_path: false
       - name: gemini-enterprise-responses
         paths:
           - ~/ai/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/interactions
@@ -42,62 +26,6 @@ plugins:
       sources:
         - body_path: model
           source: body
-    route: gemini-responses
-  - name: ai-proxy-advanced
-    config:
-      balancer:
-        algorithm: round-robin
-      genai_category: text/generation
-      llm_format: gemini
-      targets:
-        - auth:
-            header_name: Authorization
-            header_value: '{vault://ai/gemini-token}'
-          description: gemini-2.5-pro
-          logging:
-            log_payloads: false
-            log_statistics: true
-          model:
-            model_alias: gemini-agentic
-            name: gemini-2.5-pro
-            provider: gemini
-          route_type: llm/v1/responses
-    route: gemini-responses
-    model: gemini-agentic
-  - name: ai-model-selector
-    config:
-      max_request_body_size: 8388608
-      sources:
-        - body_path: model
-          source: body
-    route: gemini-beta-responses
-  - name: ai-proxy-advanced
-    config:
-      balancer:
-        algorithm: round-robin
-      genai_category: text/generation
-      llm_format: gemini
-      targets:
-        - auth:
-            header_name: Authorization
-            header_value: '{vault://ai/gemini-token}'
-          description: gemini-2.5-pro
-          logging:
-            log_payloads: false
-            log_statistics: true
-          model:
-            model_alias: gemini-agentic
-            name: gemini-2.5-pro
-            provider: gemini
-          route_type: llm/v1/responses
-    route: gemini-beta-responses
-    model: gemini-agentic
-  - name: ai-model-selector
-    config:
-      max_request_body_size: 8388608
-      sources:
-        - body_path: model
-          source: body
     route: gemini-enterprise-responses
   - name: ai-proxy-advanced
     config:
@@ -109,13 +37,19 @@ plugins:
         - auth:
             header_name: Authorization
             header_value: '{vault://ai/gemini-token}'
-          description: gemini-2.5-pro
+          description: custom-endpoint
           logging:
             log_payloads: false
             log_statistics: true
           model:
             model_alias: gemini-agentic
-            name: gemini-2.5-pro
+            name: custom-endpoint
+            options:
+              gemini:
+                api_endpoint: https://gemini.internal.example.com
+                location_id: europe-west4
+                project_id: my-project
+              upstream_url: https://gemini.internal.example.com/v1/projects/my-project/locations/europe-west4/interactions
             provider: gemini
           route_type: llm/v1/responses
     route: gemini-enterprise-responses
@@ -137,13 +71,19 @@ plugins:
         - auth:
             header_name: Authorization
             header_value: '{vault://ai/gemini-token}'
-          description: gemini-2.5-pro
+          description: custom-endpoint
           logging:
             log_payloads: false
             log_statistics: true
           model:
             model_alias: gemini-agentic
-            name: gemini-2.5-pro
+            name: custom-endpoint
+            options:
+              gemini:
+                api_endpoint: https://gemini.internal.example.com
+                location_id: europe-west4
+                project_id: my-project
+              upstream_url: https://gemini.internal.example.com/v1beta1/projects/my-project/locations/europe-west4/interactions
             provider: gemini
           route_type: llm/v1/responses
     route: gemini-enterprise-beta-responses

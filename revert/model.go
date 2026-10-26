@@ -223,6 +223,7 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 			}
 			d := defoldTarget(target, providerType)
 			tm.AllowAuthOverride = d.allowOverride
+			dropEndpointUpstreamURL(&d, section, spec)
 			tm.Config.Options = d.options
 			tm.Provider = r.providerFor(providerType, &d)
 
@@ -1062,4 +1063,18 @@ func allTargetsPassthrough(cfg map[string]any) bool {
 		}
 	}
 	return true
+}
+
+func dropEndpointUpstreamURL(d *defoldedTarget, section string, spec *aimap.EndpointSpec) {
+	if spec == nil {
+		return
+	}
+	want, ok := aimap.EndpointUpstreamURL(section, *spec, d.options)
+	if !ok || d.options["upstream_url"] != want {
+		return
+	}
+	delete(d.options, "upstream_url")
+	if len(d.options) == 0 {
+		d.options = nil
+	}
 }

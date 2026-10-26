@@ -1,0 +1,27 @@
+# api_endpoint replaces the scheme and host of the Gemini Enterprise upstream_url.
+# The path stays.
+model_providers:
+  - name: gemini-prod
+    type: gemini
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://ai/gemini-token}"
+models:
+  - name: gemini-agentic
+    type: model
+    capabilities: [agentic]
+    formats: [{type: gemini}]
+    config:
+      route: {paths: [/ai]}
+    targets:
+      - name: custom-endpoint
+        provider: gemini-prod
+        config:
+          type: gemini
+          gcp_environment:
+            project_id: my-project
+            location_id: europe-west4
+            api_endpoint: https://gemini.internal.example.com

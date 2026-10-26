@@ -92,8 +92,12 @@ func TestTargetSupportsConditions(t *testing.T) {
 func TestNativeSectionsAcceptTheirProvider(t *testing.T) {
 	for section := range EndpointTable {
 		target := Target{ProviderType: section, BatchBucketPrefix: true}
+		enterprise := target
+		enterprise.GeminiEnterprise = true
 		for _, ce := range SectionEndpoints(section) {
-			require.True(t, TargetSupports(section, target, ce.Spec), "%s %s %s", section, ce.Capability, ce.Spec.RouteLabel)
+			require.True(t,
+				TargetSupports(section, target, ce.Spec) || TargetSupports(section, enterprise, ce.Spec),
+				"%s %s %s", section, ce.Capability, ce.Spec.RouteLabel)
 		}
 	}
 }
@@ -161,4 +165,15 @@ func TestSupportedCapabilities(t *testing.T) {
 	// lose it, and invoke is their only endpoint.
 	require.Equal(t, []aigw.Capability{"generate", "agentic", "audio/speech", "rerank"},
 		SupportedCapabilities(aigw.Format{Type: "bedrock"}, Target{ProviderType: "bedrock"}, "model", LatestVersion))
+}
+
+func TestGeminiInteractionsNeedProjectAndLocation(t *testing.T) {
+	for _, ce := range SectionEndpoints("gemini") {
+		if ce.Capability != "agentic" {
+			continue
+		}
+		enterprise := isGeminiEnterpriseInteractions(ce.Spec)
+		require.Equal(t, !enterprise, TargetSupports("gemini", Target{ProviderType: "gemini"}, ce.Spec), ce.Spec.RouteLabel)
+		require.Equal(t, enterprise, TargetSupports("gemini", Target{ProviderType: "gemini", GeminiEnterprise: true}, ce.Spec), ce.Spec.RouteLabel)
+	}
 }

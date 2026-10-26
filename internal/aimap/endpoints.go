@@ -710,3 +710,90 @@ var BedrockOptionKeys = map[string]bool{
 	"batch_bucket_prefix": true, "batch_role_arn": true, "performance_config_latency": true,
 	"vpc_endpoint": true, "endpoint_type": true, "mantle_openai_path_prefix": true,
 }
+
+// GeminiEnv is the Gemini Enterprise part of a gemini target's gcp_environment.
+type GeminiEnv struct {
+	ProjectID, LocationID, APIEndpoint string
+}
+
+// GeminiEnvFromOptions reads the gcp_environment block of target options.
+func GeminiEnvFromOptions(opts map[string]any) GeminiEnv {
+	env, _ := opts["gcp_environment"].(map[string]any)
+	get := func(key string) string {
+		v, _ := env[key].(string)
+		return v
+	}
+	return GeminiEnv{
+		ProjectID: get("project_id"), LocationID: get("location_id"), APIEndpoint: get("api_endpoint"),
+	}
+}
+
+// IsEnterprise reports whether the target uses the Gemini Enterprise API.
+func (e GeminiEnv) IsEnterprise() bool {
+	return e.ProjectID != "" && e.LocationID != ""
+}
+
+// isGeminiInteractions reports whether spec is an Interactions endpoint.
+func isGeminiInteractions(spec EndpointSpec) bool {
+	return spec.RouteType == "llm/v1/responses" && strings.HasSuffix(spec.PathSuffix, "/interactions")
+}
+
+// isGeminiEnterpriseInteractions reports whether spec is a Gemini Enterprise
+// Interactions endpoint.
+func isGeminiEnterpriseInteractions(spec EndpointSpec) bool {
+	return spec.RouteType == "llm/v1/responses" &&
+		(spec.RouteLabel == "enterprise-responses" || spec.RouteLabel == "enterprise-beta-responses")
+}
+
+// EndpointUpstreamURL returns the upstream URL that a target needs on spec
+// when the plugin cannot get it from the route. It returns false when spec
+// needs none.
+func EndpointUpstreamURL(section string, spec EndpointSpec, opts map[string]any) (string, bool) {
+	if section == "gemini" {
+		return geminiInteractionsURL(section, spec, GeminiEnvFromOptions(opts))
+	}
+	return "", false
+}
+
+// geminiInteractionsURL returns the upstream URL of the Interactions API for
+// spec and env. It returns false for any other endpoint, and for an endpoint
+// that env does not select.
+func geminiInteractionsURL(section string, spec EndpointSpec, env GeminiEnv) (string, bool) {
+	if section != "gemini" || spec.RouteType != "llm/v1/responses" {
+		return "", false
+	}
+	enterprise := env.IsEnterprise()
+	switch spec.RouteLabel {
+	case "responses":
+		if !enterprise {
+			return "https://generativelanguage.googleapis.com/v1/interactions", true
+		}
+	case "beta-responses":
+		if !enterprise {
+			return "https://generativelanguage.googleapis.com/v1beta/interactions", true
+		}
+	case "enterprise-responses":
+		if enterprise {
+			return geminiEnterpriseURL(env, "v1"), true
+		}
+	case "enterprise-beta-responses":
+		if enterprise {
+			return geminiEnterpriseURL(env, "v1beta1"), true
+		}
+	}
+	return "", false
+}
+
+func geminiEnterpriseURL(env GeminiEnv, version string) string {
+	host := "https://aiplatform.googleapis.com"
+	if env.LocationID != "global" {
+		host = "https://" + env.LocationID + "-aiplatform.googleapis.com"
+	}
+	if env.APIEndpoint != "" {
+		host = strings.TrimSuffix(env.APIEndpoint, "/")
+		if !strings.Contains(host, "://") {
+			host = "https://" + host
+		}
+	}
+	return host + "/" + version + "/projects/" + env.ProjectID + "/locations/" + env.LocationID + "/interactions"
+}

@@ -20,6 +20,9 @@ type Target struct {
 	BatchBucketPrefix bool
 	// Llama2RawFormat is true when a llama2 target sets format to raw.
 	Llama2RawFormat bool
+	// GeminiEnterprise is true when a gemini target sets project_id and
+	// location_id.
+	GeminiEnterprise bool
 }
 
 // supportedRouteTypes copies SUPPORTED_ROUTE_TYPES of
@@ -88,6 +91,9 @@ func TargetSupports(format string, target Target, spec EndpointSpec) bool {
 		return false
 	}
 	if provider == "gemini" && routeType == RealtimeRouteType && format != "gemini" {
+		return false
+	}
+	if provider == "gemini" && isGeminiInteractions(spec) && isGeminiEnterpriseInteractions(spec) != target.GeminiEnterprise {
 		return false
 	}
 	if provider == "bedrock" && routeType == "llm/v1/batches" && !target.BatchBucketPrefix {

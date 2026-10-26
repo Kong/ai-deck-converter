@@ -759,6 +759,7 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 				// A passthrough target carries no model_alias either (the plugin refuses
 				// it): fkScoped leaves pluginAliases empty, so emission never stamps one.
 				target := c.buildTarget(tm, provider, providerType, spec.RouteType, logging)
+				setEndpointUpstreamURL(target, sec, spec, tm)
 				// Dedup on the built target's full shape rather than
 				// (name, route_type): two targets can share a model name yet
 				// be genuinely distinct via different providers (distinct
@@ -2103,4 +2104,20 @@ func pathHasNamedCapture(s, param string) bool {
 		}
 	}
 	return false
+}
+
+func setEndpointUpstreamURL(target map[string]any, section string, spec aimap.EndpointSpec, tm *aigw.TargetModel) {
+	url, ok := aimap.EndpointUpstreamURL(section, spec, tm.Config.Options)
+	if !ok {
+		return
+	}
+	model := target["model"].(map[string]any)
+	opts, _ := model["options"].(map[string]any)
+	if opts == nil {
+		opts = map[string]any{}
+		model["options"] = opts
+	}
+	if opts["upstream_url"] == nil {
+		opts["upstream_url"] = url
+	}
 }
