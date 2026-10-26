@@ -58,8 +58,6 @@ func TestE2E(t *testing.T) {
 		{"wildcard_model_all_endpoints_2_3", func(t *testing.T) {
 			testWildcardModelAllEndpoints(t, license, "wildcard_model_all_endpoints_2_3", "2.3",
 				"kong/kong-ai-gateway-dev:2.3.0-rc.1")
-			// TODO update the gateway image so that this test passes
-			// Gemini interactions API support is planned for AI Gateway 2.3, but is not yet available
 		}},
 		{"token_vault_exchange_credential_placement", func(t *testing.T) { testTokenVaultExchangeCredentialPlacement(t, license) }},
 		{"token_vault_callback_oidc_enrollment", func(t *testing.T) { testTokenVaultCallbackOIDCEnrollment(t, license) }},

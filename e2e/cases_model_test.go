@@ -275,16 +275,12 @@ func testGeminiModelAllCapabilities(t *testing.T, license string) {
 }
 
 // testGeminiInteractionsAPI proves the data plane accepts gemini targets on
-// llm/v1/responses in the gemini format. It fails until a data plane release
-// ships the Gemini Interactions API. Earlier images reject the config with
-// "gemini does not support llm/v1/responses API".
+// llm/v1/responses in the gemini format.
 func testGeminiInteractionsAPI(t *testing.T, license string) {
 	configPath := convertCase(t, "gemini_interactions_api", "2.3", nil)
 
-	// TODO update the gateway image so that this test passes
-	// Gemini interactions API support is planned for AI Gateway 2.3, but is not yet available
 	gateway := startGateway(t, GatewayOptions{
-		Image:  gatewayImage(t, "kong/kong-ai-gateway-dev:39946325377-167b5f34f5ae4ac4be1782b22b9f250caefa76f5"),
+		Image:  gatewayImage(t, "kong/kong-ai-gateway-dev:40297149637-31feba6c730157531163768230c9874b8f830f98"),
 		Config: configPath,
 		Env:    []string{licenseEnv(license)},
 	})
