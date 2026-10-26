@@ -1,0 +1,39 @@
+# token_vault on a non-OIDC auth strategy fails the entity, but the valid OIDC
+# strategy with the same datastore still converts, with its /vuc and /_vault
+# routes. The MCP server keeps the surviving strategy's routes.
+datastores:
+  - name: vault-konnect-prod
+    type: token-vault
+    config:
+      directory: my-directory
+      current_version: v1
+      keys:
+        - version: v1
+          key: "{vault://hcv/vault-enc-key}"
+
+auth_strategies:
+  - name: api-key-strategy
+    display_name: API Key Strategy
+    type: key-auth
+    datastores: [{name: vault-konnect-prod}]
+    token_vault:
+      enable_credential_manager: true
+  - name: okta-ai-se
+    display_name: Okta AI SE
+    type: openid-connect
+    datastores: [{name: vault-konnect-prod}]
+    config:
+      issuer: https://dev-123456.okta.com
+      client_id: ["0oa1b2c3d4e5f6g7h8i9"]
+    token_vault:
+      enable_credential_manager: true
+
+mcp_servers:
+  - type: passthrough-listener
+    name: tools-a
+    upstream_url: https://a.internal.kongair.com
+    config: {route: {paths: [/mcp/tools-a]}}
+    access:
+      auth_strategies: [okta-ai-se]
+    tools:
+      - {name: report, description: Get a report}

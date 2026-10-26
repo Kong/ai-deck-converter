@@ -1,0 +1,73 @@
+# An OIDC strategy whose token-vault datastore protects the /_vault callback
+# route (the 98 shape: no credential manager, no /vuc route). The MCP server
+# creates the callback route and uses the strategy, which registers the
+# strategy for callback protection; the strategy's config is rewritten onto
+# the callback route with the load-bearing OIDC keys (hide_credentials,
+# preserve_query_args, authorization_cookie_path, session+authorization_code
+# auth methods).
+datastores:
+  - name: vault-konnect-prod
+    type: token-vault
+    config:
+      directory: my-directory
+      current_version: v1
+      keys:
+        - version: v1
+          key: |
+            -----BEGIN RSA PRIVATE KEY-----
+            MIIEpAIBAAKCAQEAt2VCbR85SCwNbU3qwV7v/UPJZftr41+DLETO5pk8F/mhep+L
+            RRQdGeyZeICguNwG67NzQXCbXAUqQLOnoztAB42e1CGP428nG1Ze/jYMYpwlSEIK
+            20TCb47pF4POzoO7svouhsqJLApxcqQX4eVd0hiUl0RXF9ze0awbTKb7e9t4N9B0
+            XILGXaD6ybb8rBbRPXhhBd0FsKk5ND6lCIzEirRf5povaS+deBdnTaLdrPv0CnT4
+            uLQzk/BiSGDp/uFDxk/tTfDDTYesapZX7793jY+8pZCV9FpMBTDNgCpCG5+Tm66j
+            p7LSfCit3Hk6H9tJI7YoJdJNvb6V5sxK8mQWrQIDAQABAoIBAAalwXgiGxnuGth8
+            7AbxUYKdG+Y57Em0ExWeMt+x6zc1QbCnqs0osvtXE6MGCo1Y0FlnykQzeDYoK8Vn
+            napxgdskO38V7ljAlSrNASl2vREv9rv9RNZ40hFoHTPQf8UFil6s6dXR7pHtmPoe
+            T41NGo78fBpVjFCdnWf9NIodPV1aYcJvfQko4RSXu3ORk1x6s3+MBOH9rvhdk8o9
+            GEocGlWB7F3aFx1CyFCOzAOj5HY9EYScqgYKitTR6I+LD31VkkjzEUeWGqdWjF5x
+            kzzi3QzCIagEpRxOQ67B4dwIKXPoVAhMFRN3pnD4CrbEixaGv94LcMc8K9rxxVmC
+            nsV59KECgYEA/m7Jk2EueCVnflJqumJTJDo9k6yNPBccTWCZPDQpsn8llWDAA+OB
+            5OUuT9DdHuIplTUOF7QXrnzkFQGtHFhUV5qsA2UwclOlRCxLfIllIadDjE9kj30D
+            sIoLN22SA8YFHBVTvMvAvkpKE9ZVc/bpwGRoKxuoVAvB/RfkyJWMHdECgYEAuIZ0
+            Q+VM2ACjF8eG/9gQTOlq7XZZAXi6+Yhv9EH/VqB2uALdyKmFrW/tnDV+qX6FBSb2
+            MbaUxj/5PXCOgzHws6UAaCQyeCfTPmB14+rlJWQ0HLT5ajWq/XBPK+59kqeHnTrM
+            Vwn91dbBKV/T7zYplZf9j0KjomRF9FNoJwUY1h0CgYEAumNak/bbXfS4zld+DDA/
+            jAiGV4pOpLihaSXc27ey3Co81CNeRvsBizdBKANwGVHA+Kc3PbIWryKay7DAqkUi
+            9FJAtPQJ+5a/OSPh4MeeKHsqBr2ag2snqspV0TMZhl4oHBybjXEOL9ioT8PyMdOu
+            Bd0IWpwWQgui/s/kL/UuAiECgYAFnfouEu3a6XINiEJgyWf9n2Fk5yRgehde/ztB
+            OT0XmvziLxwnPpnWJMEb7zjy2eoctQnri35N5qakqyd7cOq93Tj88pUiuTuh+3e7
+            P2xIThuUACJTjFyvKFsQoErsSvNC4wZTY/d5KfdpVgRylLiBWEYctU+b4ueKP3u9
+            LFeMNQKBgQD8ZUUHqYhPeHZn+1WnMt4UcH+7PV6Dbthr06nIUTCF0XQWe9ZLDqCv
+            b7562NMXjf7FaXNu+ez1uCogXND2WMmfgU+ENN+/FlegZNZe5ZflfDg+ItChYv9d
+            jm9K9f8LkGU4f5ijQzaYv2JuVb/f35k2x9vmV0pn4pU9UT6h4F6xAQ==
+            -----END RSA PRIVATE KEY-----
+
+auth_strategies:
+  - name: okta-ai-se
+    display_name: Okta AI SE
+    type: openid-connect
+    datastores: [{name: vault-konnect-prod}]
+    config:
+      issuer: http://host.docker.internal:18090
+      client_id: [e2e-client]
+      client_secret: [e2e-client-secret]
+      auth_methods: [bearer]
+      # Okta needs the offline_access scope and rejects its own signatures
+      # on the token exchange grants.
+      scopes: [openid, offline_access]
+      ignore_signature: [authorization_code, refresh_token]
+
+mcp_servers:
+  - type: passthrough-listener
+    display_name: Vaulted MCP
+    name: vaulted-mcp
+    upstream_url: http://host.docker.internal:18081
+    datastores: [{name: vault-konnect-prod}]
+    token_vault:
+      directory: my-directory
+      provider: my-upstream-provider
+    access:
+      auth_strategies: [okta-ai-se]
+    config:
+      route: {name: vaulted-mcp-route, paths: [/mcp/vaulted]}
+    tools: []

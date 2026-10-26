@@ -1,0 +1,63 @@
+_format_version: "3.0"
+services:
+  - name: github-tools-mcp
+    url: https://a.internal.kongair.com
+    routes:
+      - name: github-tools-mcp-route
+        paths:
+          - /mcp/tools-a
+          - /mcp/tools-a/.well-known/oauth-protected-resource
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              auth:
+                provider: token_vault
+                token_vault:
+                  directory: my-directory
+                  provider: github
+                  storage:
+                    backend: konnect
+                    current_version: v1
+                    keys:
+                      - key: '{vault://hcv/vault-enc-key}'
+                        version: v1
+              include_consumer_groups: true
+              logging:
+                log_audits: false
+                log_payloads: false
+                log_statistics: true
+              mode: passthrough-listener
+              tools:
+                - description: Get a report
+                  host: a.internal.kongair.com
+                  method: GET
+                  name: report
+                  path: /reports
+                  scheme: https
+          - name: ai-mcp-oauth2
+            config:
+              authorization_servers:
+                - https://dev-123456.okta.com/oauth2/default
+              client_id: 0oa1b2c3d4e5f6g7h8i9
+              client_secret: '{vault://hcv/okta/client-secret}'
+              insecure_relaxed_audience_validation: true
+              metadata_endpoint: /mcp/tools-a/.well-known/oauth-protected-resource
+              passthrough_credentials: true
+              resource: https://api.example.com/mcp/tools-a
+routes:
+  - name: token-vault-callback-handler
+    paths:
+      - /_vault
+    protocols:
+      - http
+      - https
+    plugins:
+      - name: token-vault-callback-handler
+        config:
+          directory: my-directory
+          storage:
+            backend: konnect
+            current_version: v1
+            keys:
+              - key: '{vault://hcv/vault-enc-key}'
+                version: v1

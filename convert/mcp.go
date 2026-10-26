@@ -2,6 +2,7 @@ package convert
 
 import (
 	"fmt"
+	"maps"
 	"reflect"
 	"slices"
 	"strings"
@@ -269,7 +270,7 @@ func (c *Converter) pruneUnexposedSources(conversionOnlyServices []int, exposed 
 	c.pruneUnusedTokenVaultCallbackRoute()
 }
 
-// pruneUnusedTokenVaultCallbackRoute removes the Token Vault callback route
+// pruneUnusedTokenVaultCallbackRoute removes both Token Vault callback routes
 // when no remaining service, model provider or credential manager uses a
 // Token Vault.
 func (c *Converter) pruneUnusedTokenVaultCallbackRoute() {
@@ -294,7 +295,7 @@ func (c *Converter) pruneUnusedTokenVaultCallbackRoute() {
 		}
 	}
 	c.out.Routes = slices.DeleteFunc(c.out.Routes, func(r kong.Route) bool {
-		return r.Name == aimap.TokenVaultCallbackName
+		return r.Name == aimap.TokenVaultCallbackName || r.Name == aimap.TokenVaultCallbackInitiateName
 	})
 }
 
@@ -343,6 +344,12 @@ func (c *Converter) mcpPlugin(src ConversionIssueSource, m *aigw.MCPServer) (kon
 	tvDatastore, err := c.resolveMCPDatastore(src, m)
 	if err != nil {
 		return kong.Plugin{}, err
+	}
+	if tvDatastore != nil && m.TokenVault.Directory != "" {
+		if _, ok := tvDatastore.Config["directory"]; ok {
+			c.warn(src.at("token_vault.directory"), ConfigFieldIgnored,
+				"Datastore %q overrides token_vault.directory of MCP server %q.", tvDatastore.Name, m.Name)
+		}
 	}
 	// A present but empty token_vault block would otherwise lower to
 	// auth.token_vault: {} — the plugin schema requires provider when the auth
@@ -547,6 +554,10 @@ func (c *Converter) resolveMCPDatastore(src ConversionIssueSource, m *aigw.MCPSe
 // ensureTokenVaultCallbackRoute adds the Token Vault callback route once. A
 // later entity with a different connection fails, because one route cannot
 // serve two connections.
+//
+// The /_vault path serves every enrollment path alone. Only
+// secureTokenVaultCallbackRoute adds the start path as its own route, and
+// only there does the openid-connect login run.
 func (c *Converter) ensureTokenVaultCallbackRoute(
 	at ConversionIssueSource, owner string, ds *aigw.Datastore, routeSource *kong.Source,
 ) error {
@@ -571,7 +582,7 @@ func (c *Converter) ensureTokenVaultCallbackRoute(
 		Protocols: []string{"http", "https"},
 		Plugins: []kong.Plugin{{
 			Name:   aimap.TokenVaultCallbackName,
-			Config: config,
+			Config: maps.Clone(config),
 			Source: routeSource,
 		}},
 		Source: routeSource,

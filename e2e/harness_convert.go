@@ -75,9 +75,16 @@ func convertCase(t *testing.T, caseName, minRuntimeVersion string, patch func(sr
 }
 
 // convertDBLess logs every conversion issue. An Error issue fails the test.
+// e2eSessionSecret keeps the e2e snapshots deterministic, like the convert
+// goldens do (convert/golden_test.go).
+func e2eSessionSecret() (string, error) { return "0123456789abcdef0123456789abcdef", nil }
+
 func convertDBLess(t *testing.T, src []byte, minRuntimeVersion string) ([]byte, error) {
 	t.Helper()
-	result, err := convert.Convert(src, convert.Options{MinRuntimeVersion: minRuntimeVersion})
+	result, err := convert.Convert(src, convert.Options{
+		MinRuntimeVersion: minRuntimeVersion,
+		SessionSecret:     e2eSessionSecret,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -222,6 +229,73 @@ func patchMCPPort(oldPort, newPort int) func([]byte) ([]byte, error) {
 		for _, server := range servers.Content {
 			if u := mappingChild(server, "upstream_url"); u != nil && u.Kind == yaml.ScalarNode {
 				u.Value = strings.Replace(u.Value, fmt.Sprintf(":%d", oldPort), fmt.Sprintf(":%d", newPort), 1)
+			}
+		}
+		return remarshal(&doc)
+	}
+}
+
+// patchAll applies each patch in order.
+func patchAll(patches ...func([]byte) ([]byte, error)) func([]byte) ([]byte, error) {
+	return func(src []byte) ([]byte, error) {
+		var err error
+		for _, patch := range patches {
+			src, err = patch(src)
+			if err != nil {
+				return nil, err
+			}
+		}
+		return src, nil
+	}
+}
+
+// patchVaultedTargets points every model target at the mock upstream. Unlike
+// patchMockUpstream it does not touch provider auth headers, which a vaulted
+// provider does not have.
+func patchVaultedTargets(port int) func([]byte) ([]byte, error) {
+	return func(src []byte) ([]byte, error) {
+		var doc yaml.Node
+		if err := yaml.Unmarshal(src, &doc); err != nil {
+			return nil, fmt.Errorf("parsing input.yaml: %w", err)
+		}
+		upstream := fmt.Sprintf("http://host.docker.internal:%d", port)
+
+		models := mappingChild(&doc, "models")
+		if models == nil || models.Kind != yaml.SequenceNode {
+			return nil, errors.New("input.yaml has no models list")
+		}
+		for _, model := range models.Content {
+			targets := mappingChild(model, "targets")
+			if targets == nil || targets.Kind != yaml.SequenceNode {
+				continue
+			}
+			for _, target := range targets.Content {
+				setScalar(mappingChild(target, "config"), "upstream_url", upstream)
+			}
+		}
+		return remarshal(&doc)
+	}
+}
+
+// patchIssuer rewrites the port of every auth_strategies[].config.issuer
+// and every policies[].config.issuer (the fixtures pin a fixed port; the
+// harness allocates a free one).
+func patchIssuer(oldPort, newPort int) func([]byte) ([]byte, error) {
+	return func(src []byte) ([]byte, error) {
+		var doc yaml.Node
+		if err := yaml.Unmarshal(src, &doc); err != nil {
+			return nil, fmt.Errorf("parsing input.yaml: %w", err)
+		}
+		for _, section := range []string{"auth_strategies", "policies"} {
+			entries := mappingChild(&doc, section)
+			if entries == nil || entries.Kind != yaml.SequenceNode {
+				continue
+			}
+			for _, entry := range entries.Content {
+				issuer := mappingChild(mappingChild(entry, "config"), "issuer")
+				if issuer != nil && issuer.Kind == yaml.ScalarNode {
+					issuer.Value = strings.Replace(issuer.Value, fmt.Sprintf(":%d", oldPort), fmt.Sprintf(":%d", newPort), 1)
+				}
 			}
 		}
 		return remarshal(&doc)

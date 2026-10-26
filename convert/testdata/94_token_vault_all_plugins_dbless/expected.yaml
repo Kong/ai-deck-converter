@@ -1,0 +1,261 @@
+_format_version: "3.0"
+_transform: false
+services:
+  - id: 947a4e23-b483-5a65-8165-da9aed24565b
+    name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    host: ai-gateway.upstream.local
+    port: 80
+    protocol: http
+  - id: 13704072-a3fe-518c-8a11-c4c8f57f62dc
+    name: tools-a
+    url: https://a.internal.kongair.com
+    host: a.internal.kongair.com
+    port: 443
+    protocol: https
+routes:
+  - id: bb559a54-dc17-5c0f-b946-b0d9c5cebd7a
+    name: anthropic-messages
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /ai/v1/messages
+    methods:
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: b0d3e53d-2a03-51d9-886a-95a81bf161d7
+    name: tools-a-route
+    service:
+      id: 13704072-a3fe-518c-8a11-c4c8f57f62dc
+    paths:
+      - /mcp/tools-a
+    protocols:
+      - http
+      - https
+  - id: 00761a8d-f6bf-5691-bad3-e67da4a21bbf
+    name: token-vault-callback-handler
+    paths:
+      - /_vault
+    protocols:
+      - http
+      - https
+  - id: 385691ef-9969-5a92-9979-3082412c6860
+    name: token-vault-callback-handler-initiate
+    paths:
+      - /_vault/callback/initiate
+    protocols:
+      - http
+      - https
+  - id: 88f0e5a9-47af-594b-95f6-0c0fda35affc
+    name: token-vault-credential-manager-okta-ai-se
+    paths:
+      - /vuc/okta-ai-se
+    protocols:
+      - http
+      - https
+  - id: 28b01ec6-50e9-5282-8913-ac9b136b4a17
+    name: token-vault-credential-manager-okta-ai-se-login
+    paths:
+      - /vuc/okta-ai-se/login
+    protocols:
+      - http
+      - https
+consumers:
+  - id: ecaa031b-4a31-5a81-aea9-ab8f08f47608
+    username: token-vault-credential-manager-anonymous
+    custom_id: token-vault-credential-manager-anonymous
+plugins:
+  - id: 566a0511-1863-5aa6-b34b-ea4d6afed819
+    name: ai-mcp-proxy
+    config:
+      auth:
+        provider: token_vault
+        token_vault:
+          credential:
+            outbound:
+              location: header
+              name: x-api-key
+              prefix: ""
+          directory: my-directory
+          provider: anthropic
+          storage:
+            backend: konnect
+            current_version: v1
+            keys:
+              - key: '{vault://hcv/vault-enc-key}'
+                version: v1
+      include_consumer_groups: true
+      logging:
+        log_audits: false
+        log_payloads: false
+        log_statistics: true
+      mode: passthrough-listener
+      tools:
+        - description: Get a report
+          name: report
+    route:
+      id: b0d3e53d-2a03-51d9-886a-95a81bf161d7
+  - id: fd304aa3-69b9-58cd-a501-d3f33f7b14f1
+    name: openid-connect
+    config:
+      client_id:
+        - 0oa1b2c3d4e5f6g7h8i9
+      issuer: https://dev-123456.okta.com
+    route:
+      id: b0d3e53d-2a03-51d9-886a-95a81bf161d7
+  - id: 8090a9c8-dcde-52c6-8a5b-777d70893ab8
+    name: token-vault-callback-handler
+    config:
+      directory: my-directory
+      storage:
+        backend: konnect
+        current_version: v1
+        keys:
+          - key: '{vault://hcv/vault-enc-key}'
+            version: v1
+    route:
+      id: 00761a8d-f6bf-5691-bad3-e67da4a21bbf
+  - id: a2daeb04-4bf6-571e-a24a-d692937dab9c
+    name: token-vault-callback-handler
+    config:
+      directory: my-directory
+      storage:
+        backend: konnect
+        current_version: v1
+        keys:
+          - key: '{vault://hcv/vault-enc-key}'
+            version: v1
+    route:
+      id: 385691ef-9969-5a92-9979-3082412c6860
+  - id: 39ecede7-b70e-5bb2-b3d3-5a9f0640dfce
+    name: openid-connect
+    config:
+      auth_methods:
+        - session
+        - authorization_code
+      authorization_cookie_path: /_vault/callback/initiate
+      client_id:
+        - 0oa1b2c3d4e5f6g7h8i9
+      hide_credentials: false
+      issuer: https://dev-123456.okta.com
+      login_action: redirect
+      login_methods:
+        - authorization_code
+      login_tokens: []
+      preserve_query_args: true
+      session_secret: 0123456789abcdef0123456789abcdef
+      token_endpoint_auth_method: none
+      upstream_access_token_header: authorization:bearer
+    route:
+      id: 385691ef-9969-5a92-9979-3082412c6860
+  - id: 280fc1ac-e65e-5f16-9575-2e277c00ba55
+    name: openid-connect
+    config:
+      anonymous: token-vault-credential-manager-anonymous
+      auth_methods:
+        - session
+      client_id:
+        - 0oa1b2c3d4e5f6g7h8i9
+      hide_credentials: false
+      issuer: https://dev-123456.okta.com
+      logout_query_arg: logout
+      session_secret: 0123456789abcdef0123456789abcdef
+      token_endpoint_auth_method: none
+      upstream_access_token_header: authorization:bearer
+    route:
+      id: 88f0e5a9-47af-594b-95f6-0c0fda35affc
+  - id: ba5c14c9-d548-5718-b065-2d3c801123b7
+    name: token-vault-credential-manager
+    config:
+      directory: my-directory
+      storage:
+        backend: konnect
+        current_version: v1
+        keys:
+          - key: '{vault://hcv/vault-enc-key}'
+            version: v1
+    route:
+      id: 88f0e5a9-47af-594b-95f6-0c0fda35affc
+  - id: be796687-0cba-5b9d-9346-a6ec32298bfe
+    name: openid-connect
+    config:
+      auth_methods:
+        - session
+        - authorization_code
+      authorization_cookie_path: /vuc/okta-ai-se
+      client_id:
+        - 0oa1b2c3d4e5f6g7h8i9
+      hide_credentials: false
+      issuer: https://dev-123456.okta.com
+      require_proof_key_for_code_exchange: true
+      session_secret: 0123456789abcdef0123456789abcdef
+      token_endpoint_auth_method: none
+      upstream_access_token_header: authorization:bearer
+    route:
+      id: 28b01ec6-50e9-5282-8913-ac9b136b4a17
+  - id: f17faf27-da56-5414-bee5-5ea3604cb2bd
+    name: token-vault-credential-manager
+    config:
+      directory: my-directory
+      storage:
+        backend: konnect
+        current_version: v1
+        keys:
+          - key: '{vault://hcv/vault-enc-key}'
+            version: v1
+    route:
+      id: 28b01ec6-50e9-5282-8913-ac9b136b4a17
+  - id: 17fa8192-4b9f-5b5a-8379-20ad8bc836a7
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route:
+      id: bb559a54-dc17-5c0f-b946-b0d9c5cebd7a
+  - id: f3adc007-171c-5519-8763-3a0eef79bde3
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      targets:
+        - description: claude-sonnet
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: claude
+            name: claude-sonnet
+            options:
+              anthropic_version: "2023-06-01"
+            provider: anthropic
+          route_type: llm/v1/chat
+    route:
+      id: bb559a54-dc17-5c0f-b946-b0d9c5cebd7a
+    model:
+      id: 0a6904fa-4d19-5e62-aa3c-ab58139fcc54
+  - id: fbc69ddd-395a-52cc-94dc-458e16ac484e
+    name: token-vault-exchange
+    config:
+      directory: my-directory
+      provider: anthropic
+      storage:
+        backend: konnect
+        current_version: v1
+        keys:
+          - key: '{vault://hcv/vault-enc-key}'
+            version: v1
+    route:
+      id: bb559a54-dc17-5c0f-b946-b0d9c5cebd7a
+    model:
+      id: 0a6904fa-4d19-5e62-aa3c-ab58139fcc54
+ai_models:
+  - id: 0a6904fa-4d19-5e62-aa3c-ab58139fcc54
+    name: claude

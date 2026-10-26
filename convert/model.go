@@ -333,12 +333,11 @@ func (c *Converter) appendTokenVaultExchange(pg *proxyGroup, model *kong.StringR
 		return
 	}
 	c.out.Plugins = append(c.out.Plugins, kong.Plugin{
-		Name:    tokenVaultExchangePlugin,
-		Enabled: new(true),
-		Route:   kong.NewStringRef(pg.routeName),
-		Model:   model,
-		Config:  pg.tokenVault,
-		Source:  source(kindModel, pg.source.EntityName, "targets"),
+		Name:   tokenVaultExchangePlugin,
+		Route:  kong.NewStringRef(pg.routeName),
+		Model:  model,
+		Config: pg.tokenVault,
+		Source: source(kindModel, pg.source.EntityName, "targets"),
 	})
 }
 

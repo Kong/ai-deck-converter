@@ -12,8 +12,8 @@ import (
 // testTokenVaultGatesToolsAndEnrolls walks the Token Vault lifecycle: an
 // unenrolled caller is gated to the virtual enrollment tools, the mock Kong
 // Identity service answers the exchange with x_kong_enrollment_required until
-// enrollment, and afterwards the exchanged credential (shared through Redis,
-// encrypted) is applied to proxied upstream MCP calls.
+// enrollment, and afterwards the exchanged credential (shared through the
+// Redis cache) is applied to proxied upstream MCP calls.
 func testTokenVaultGatesToolsAndEnrolls(t *testing.T, license string) {
 	d := dockerCLI{t: t}
 	runID := fmt.Sprintf("%d", time.Now().UnixNano()%1e6)
@@ -32,7 +32,7 @@ func testTokenVaultGatesToolsAndEnrolls(t *testing.T, license string) {
 	redisIP := d.run("inspect", "-f", "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}", redisName)
 
 	gateway := startGateway(t, GatewayOptions{
-		Image:  gatewayImage(t, "kong/kong-ai-gateway-dev:35727837758-070f4458537dcb4fe4d6c7321447cf902d2e07c9"),
+		Image:  gatewayImage(t, tokenVaultImage),
 		Config: configPath,
 		Env: []string{
 			licenseEnv(license),
@@ -59,15 +59,15 @@ func testTokenVaultGatesToolsAndEnrolls(t *testing.T, license string) {
 
 	resp := httpPost(t, mcpURL, mcpHeaders("", ""),
 		`{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": {"name": "e2e", "version": "1.0"}}}`)
-	if resp.Status != 500 {
-		t.Fatalf("request without a subject token returned %d, expected 500 (the plugin cannot resolve the upstream credential)\n%s", resp.Status, resp.Body)
+	if resp.Status != 401 || !strings.Contains(resp.Body, "missing bearer token") {
+		t.Fatalf("request without a subject token returned %d, expected 401 with the missing bearer token error\n%s",
+			resp.Status, resp.Body)
 	}
-	t.Log("PASS: no subject token -> upstream auth failure (token_vault is active)")
-
+	t.Log("PASS: no subject token -> missing bearer token error (token_vault is active)")
 	resp = request("initialize (gated)", mcpInitializeBody(1), "")
-	requireStatus(t, resp, 200, "gated initialize")
-	if !strings.Contains(resp.Body, `"result"`) {
-		t.Fatalf("gated initialize did not succeed:\n%s\nidentity mock requests: %v", resp.Body, mocks.identityHits())
+	if resp.Status != 200 {
+		t.Fatalf("gated initialize: got HTTP %d, want 200\nresponse body:\n%s\n%s",
+			resp.Status, resp.Body, gateway.logs(200))
 	}
 	sess := sessionID(resp)
 	t.Logf("session: %s", sess)
@@ -87,10 +87,10 @@ func testTokenVaultGatesToolsAndEnrolls(t *testing.T, license string) {
 
 	resp = request("tools/call token_vault_authenticate",
 		`{"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {"name": "token_vault_authenticate", "arguments": {}}}`, sess)
-	if !strings.Contains(resp.Body, mockEnrollmentURL) {
-		t.Fatalf("authenticate did not return the enrollment URL (%s):\n%s", mockEnrollmentURL, resp.Body)
+	if !strings.Contains(resp.Body, "/_vault/callback/initiate?token="+mockEnrollmentBlob) {
+		t.Fatalf("authenticate did not return the gateway-rehosted enrollment URL:\n%s", resp.Body)
 	}
-	t.Log("PASS: authenticate returned the enrollment URL")
+	t.Log("PASS: authenticate returned the rehosted enrollment URL")
 
 	mocks.enroll()
 

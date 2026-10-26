@@ -475,6 +475,12 @@ func (c *Converter) validateModelProviderTokenVaults() {
 			// A model that targets p adds this route during the model pass.
 			_ = c.ensureTokenVaultCallbackRoute(src.at("datastores[0].name"), owner, ds,
 				source(kindModelProvider, p.Name, "token_vault"))
+			if p.TokenVault.Directory != "" {
+				if _, ok := ds.Config["directory"]; ok {
+					c.warn(src.at("token_vault.directory"), ConfigFieldIgnored,
+						"Datastore %q overrides token_vault.directory of provider %q.", ds.Name, p.Name)
+				}
+			}
 		}
 		*c.out = snapshot
 	}

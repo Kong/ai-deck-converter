@@ -59,17 +59,37 @@ routes:
             keys:
               - key: '{vault://hcv/vault-enc-key}'
                 version: v1
+  - name: token-vault-callback-handler-initiate
+    paths:
+      - /_vault/callback/initiate
+    protocols:
+      - http
+      - https
+    plugins:
+      - name: token-vault-callback-handler
+        config:
+          directory: my-directory
+          storage:
+            backend: konnect
+            current_version: v1
+            keys:
+              - key: '{vault://hcv/vault-enc-key}'
+                version: v1
       - name: openid-connect
         config:
           auth_methods:
-            - bearer
             - session
             - authorization_code
-          authorization_cookie_path: /_vault
+          authorization_cookie_path: /_vault/callback/initiate
           client_id:
             - 0oa1b2c3d4e5f6g7h8i9
           hide_credentials: false
           issuer: https://dev-123456.okta.com
+          login_action: redirect
+          login_methods:
+            - authorization_code
+          login_tokens: []
           preserve_query_args: true
           session_secret: 0123456789abcdef0123456789abcdef
+          token_endpoint_auth_method: none
           upstream_access_token_header: authorization:bearer

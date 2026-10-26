@@ -24,6 +24,11 @@ type Options struct {
 	// output, in the form MAJOR.MINOR. It is required. It has the meaning of
 	// the min_runtime_version field of the Konnect AI Gateway API.
 	MinRuntimeVersion string `yaml:"min_runtime_version"`
+
+	// SessionSecret generates the session_secret of an auth strategy config
+	// that has none. The default is random; tests pass a constant so
+	// snapshots stay deterministic.
+	SessionSecret func() (string, error)
 }
 
 // Convert parses a YAML AI Gateway document and returns the Kong decK document
@@ -94,6 +99,12 @@ type Converter struct {
 	authStrategies map[string]*aigw.AuthStrategy
 	// sessionSecrets holds the generated session secret of each auth strategy.
 	sessionSecrets map[string]string
+	// tvOIDCWarned holds the auth strategy fields that a Token Vault
+	// route already reported. Each route rewrites the same strategy config.
+	tvOIDCWarned map[string]bool
+	// tvOIDCSilent stops those reports. A strategy that no entity
+	// uses makes no output, so its route config reports nothing.
+	tvOIDCSilent   bool
 	consumerGroups map[string]*aigw.ConsumerGroup
 	datastores     map[string]*aigw.Datastore
 
@@ -117,6 +128,7 @@ func newConverter(doc *aigw.Document, opts Options) *Converter {
 		policies:          map[string]*aigw.Policy{},
 		authStrategies:    map[string]*aigw.AuthStrategy{},
 		sessionSecrets:    map[string]string{},
+		tvOIDCWarned:      map[string]bool{},
 		consumerGroups:    map[string]*aigw.ConsumerGroup{},
 		datastores:        map[string]*aigw.Datastore{},
 	}

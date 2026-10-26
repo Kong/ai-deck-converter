@@ -19,9 +19,12 @@ import (
 // forward golden itself is still asserted by convert's TestGolden.
 var roundTripSkip = map[string]string{
 	"92_model_provider_token_vault":              "revert does not lift token-vault-exchange or the callback route",
+	"93_auth_strategy_token_vault_non_oidc":      "revert does not lift auth strategy token_vault or the callback route",
+	"94_token_vault_all_plugins_dbless":          "revert does not lift token-vault-exchange or the callback route",
 	"96_auth_strategy_token_vault_mcp_oauth2":    "revert does not lift auth strategy token_vault or the callback route",
 	"95_auth_strategy_token_vault":               "revert does not lift auth strategy token_vault or the callback route",
 	"98_auth_strategy_token_vault_callback_only": "revert does not lift auth strategy datastores or the callback route",
+	"111_auth_strategy_token_vault_redirect_uri": "revert does not lift auth strategy token_vault or the callback route",
 }
 
 // TestRoundTrip verifies that reverting the forward converter's output and

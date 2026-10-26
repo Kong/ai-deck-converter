@@ -1,0 +1,244 @@
+_format_version: "3.0"
+_transform: false
+services:
+  - id: 947a4e23-b483-5a65-8165-da9aed24565b
+    name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    host: ai-gateway.upstream.local
+    port: 80
+    protocol: http
+routes:
+  - id: bb559a54-dc17-5c0f-b946-b0d9c5cebd7a
+    name: anthropic-messages
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /explicit/v1/messages
+    methods:
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+    name: openai-chat
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /defaults/chat/completions
+    methods:
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: 00761a8d-f6bf-5691-bad3-e67da4a21bbf
+    name: token-vault-callback-handler
+    paths:
+      - /_vault
+    protocols:
+      - http
+      - https
+plugins:
+  - id: 8090a9c8-dcde-52c6-8a5b-777d70893ab8
+    name: token-vault-callback-handler
+    config:
+      directory: my-directory
+      storage:
+        backend: konnect
+        current_version: v1
+        keys:
+          - key: |
+              -----BEGIN RSA PRIVATE KEY-----
+              MIIEpAIBAAKCAQEAt2VCbR85SCwNbU3qwV7v/UPJZftr41+DLETO5pk8F/mhep+L
+              RRQdGeyZeICguNwG67NzQXCbXAUqQLOnoztAB42e1CGP428nG1Ze/jYMYpwlSEIK
+              20TCb47pF4POzoO7svouhsqJLApxcqQX4eVd0hiUl0RXF9ze0awbTKb7e9t4N9B0
+              XILGXaD6ybb8rBbRPXhhBd0FsKk5ND6lCIzEirRf5povaS+deBdnTaLdrPv0CnT4
+              uLQzk/BiSGDp/uFDxk/tTfDDTYesapZX7793jY+8pZCV9FpMBTDNgCpCG5+Tm66j
+              p7LSfCit3Hk6H9tJI7YoJdJNvb6V5sxK8mQWrQIDAQABAoIBAAalwXgiGxnuGth8
+              7AbxUYKdG+Y57Em0ExWeMt+x6zc1QbCnqs0osvtXE6MGCo1Y0FlnykQzeDYoK8Vn
+              napxgdskO38V7ljAlSrNASl2vREv9rv9RNZ40hFoHTPQf8UFil6s6dXR7pHtmPoe
+              T41NGo78fBpVjFCdnWf9NIodPV1aYcJvfQko4RSXu3ORk1x6s3+MBOH9rvhdk8o9
+              GEocGlWB7F3aFx1CyFCOzAOj5HY9EYScqgYKitTR6I+LD31VkkjzEUeWGqdWjF5x
+              kzzi3QzCIagEpRxOQ67B4dwIKXPoVAhMFRN3pnD4CrbEixaGv94LcMc8K9rxxVmC
+              nsV59KECgYEA/m7Jk2EueCVnflJqumJTJDo9k6yNPBccTWCZPDQpsn8llWDAA+OB
+              5OUuT9DdHuIplTUOF7QXrnzkFQGtHFhUV5qsA2UwclOlRCxLfIllIadDjE9kj30D
+              sIoLN22SA8YFHBVTvMvAvkpKE9ZVc/bpwGRoKxuoVAvB/RfkyJWMHdECgYEAuIZ0
+              Q+VM2ACjF8eG/9gQTOlq7XZZAXi6+Yhv9EH/VqB2uALdyKmFrW/tnDV+qX6FBSb2
+              MbaUxj/5PXCOgzHws6UAaCQyeCfTPmB14+rlJWQ0HLT5ajWq/XBPK+59kqeHnTrM
+              Vwn91dbBKV/T7zYplZf9j0KjomRF9FNoJwUY1h0CgYEAumNak/bbXfS4zld+DDA/
+              jAiGV4pOpLihaSXc27ey3Co81CNeRvsBizdBKANwGVHA+Kc3PbIWryKay7DAqkUi
+              9FJAtPQJ+5a/OSPh4MeeKHsqBr2ag2snqspV0TMZhl4oHBybjXEOL9ioT8PyMdOu
+              Bd0IWpwWQgui/s/kL/UuAiECgYAFnfouEu3a6XINiEJgyWf9n2Fk5yRgehde/ztB
+              OT0XmvziLxwnPpnWJMEb7zjy2eoctQnri35N5qakqyd7cOq93Tj88pUiuTuh+3e7
+              P2xIThuUACJTjFyvKFsQoErsSvNC4wZTY/d5KfdpVgRylLiBWEYctU+b4ueKP3u9
+              LFeMNQKBgQD8ZUUHqYhPeHZn+1WnMt4UcH+7PV6Dbthr06nIUTCF0XQWe9ZLDqCv
+              b7562NMXjf7FaXNu+ez1uCogXND2WMmfgU+ENN+/FlegZNZe5ZflfDg+ItChYv9d
+              jm9K9f8LkGU4f5ijQzaYv2JuVb/f35k2x9vmV0pn4pU9UT6h4F6xAQ==
+              -----END RSA PRIVATE KEY-----
+            version: v1
+    route:
+      id: 00761a8d-f6bf-5691-bad3-e67da4a21bbf
+  - id: 17fa8192-4b9f-5b5a-8379-20ad8bc836a7
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route:
+      id: bb559a54-dc17-5c0f-b946-b0d9c5cebd7a
+  - id: f3adc007-171c-5519-8763-3a0eef79bde3
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      targets:
+        - description: claude-sonnet
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: claude
+            name: claude-sonnet
+            options:
+              anthropic_version: "2023-06-01"
+            provider: anthropic
+          route_type: llm/v1/chat
+    route:
+      id: bb559a54-dc17-5c0f-b946-b0d9c5cebd7a
+    model:
+      id: 0a6904fa-4d19-5e62-aa3c-ab58139fcc54
+  - id: fbc69ddd-395a-52cc-94dc-458e16ac484e
+    name: token-vault-exchange
+    config:
+      credential:
+        inbound:
+          location: header
+          name: x-api-key
+          prefix: ""
+        outbound:
+          location: header
+          name: x-api-key
+          prefix: ""
+      directory: my-directory
+      provider: anthropic
+      storage:
+        backend: konnect
+        current_version: v1
+        keys:
+          - key: |
+              -----BEGIN RSA PRIVATE KEY-----
+              MIIEpAIBAAKCAQEAt2VCbR85SCwNbU3qwV7v/UPJZftr41+DLETO5pk8F/mhep+L
+              RRQdGeyZeICguNwG67NzQXCbXAUqQLOnoztAB42e1CGP428nG1Ze/jYMYpwlSEIK
+              20TCb47pF4POzoO7svouhsqJLApxcqQX4eVd0hiUl0RXF9ze0awbTKb7e9t4N9B0
+              XILGXaD6ybb8rBbRPXhhBd0FsKk5ND6lCIzEirRf5povaS+deBdnTaLdrPv0CnT4
+              uLQzk/BiSGDp/uFDxk/tTfDDTYesapZX7793jY+8pZCV9FpMBTDNgCpCG5+Tm66j
+              p7LSfCit3Hk6H9tJI7YoJdJNvb6V5sxK8mQWrQIDAQABAoIBAAalwXgiGxnuGth8
+              7AbxUYKdG+Y57Em0ExWeMt+x6zc1QbCnqs0osvtXE6MGCo1Y0FlnykQzeDYoK8Vn
+              napxgdskO38V7ljAlSrNASl2vREv9rv9RNZ40hFoHTPQf8UFil6s6dXR7pHtmPoe
+              T41NGo78fBpVjFCdnWf9NIodPV1aYcJvfQko4RSXu3ORk1x6s3+MBOH9rvhdk8o9
+              GEocGlWB7F3aFx1CyFCOzAOj5HY9EYScqgYKitTR6I+LD31VkkjzEUeWGqdWjF5x
+              kzzi3QzCIagEpRxOQ67B4dwIKXPoVAhMFRN3pnD4CrbEixaGv94LcMc8K9rxxVmC
+              nsV59KECgYEA/m7Jk2EueCVnflJqumJTJDo9k6yNPBccTWCZPDQpsn8llWDAA+OB
+              5OUuT9DdHuIplTUOF7QXrnzkFQGtHFhUV5qsA2UwclOlRCxLfIllIadDjE9kj30D
+              sIoLN22SA8YFHBVTvMvAvkpKE9ZVc/bpwGRoKxuoVAvB/RfkyJWMHdECgYEAuIZ0
+              Q+VM2ACjF8eG/9gQTOlq7XZZAXi6+Yhv9EH/VqB2uALdyKmFrW/tnDV+qX6FBSb2
+              MbaUxj/5PXCOgzHws6UAaCQyeCfTPmB14+rlJWQ0HLT5ajWq/XBPK+59kqeHnTrM
+              Vwn91dbBKV/T7zYplZf9j0KjomRF9FNoJwUY1h0CgYEAumNak/bbXfS4zld+DDA/
+              jAiGV4pOpLihaSXc27ey3Co81CNeRvsBizdBKANwGVHA+Kc3PbIWryKay7DAqkUi
+              9FJAtPQJ+5a/OSPh4MeeKHsqBr2ag2snqspV0TMZhl4oHBybjXEOL9ioT8PyMdOu
+              Bd0IWpwWQgui/s/kL/UuAiECgYAFnfouEu3a6XINiEJgyWf9n2Fk5yRgehde/ztB
+              OT0XmvziLxwnPpnWJMEb7zjy2eoctQnri35N5qakqyd7cOq93Tj88pUiuTuh+3e7
+              P2xIThuUACJTjFyvKFsQoErsSvNC4wZTY/d5KfdpVgRylLiBWEYctU+b4ueKP3u9
+              LFeMNQKBgQD8ZUUHqYhPeHZn+1WnMt4UcH+7PV6Dbthr06nIUTCF0XQWe9ZLDqCv
+              b7562NMXjf7FaXNu+ez1uCogXND2WMmfgU+ENN+/FlegZNZe5ZflfDg+ItChYv9d
+              jm9K9f8LkGU4f5ijQzaYv2JuVb/f35k2x9vmV0pn4pU9UT6h4F6xAQ==
+              -----END RSA PRIVATE KEY-----
+            version: v1
+      subject_token_type: api_key
+    route:
+      id: bb559a54-dc17-5c0f-b946-b0d9c5cebd7a
+    model:
+      id: 0a6904fa-4d19-5e62-aa3c-ab58139fcc54
+  - id: b7976da4-d8ec-5d03-8d6c-4e33dddb35db
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+  - id: 12106a5c-cbd2-5942-8432-ef9bc4adca1b
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - description: gpt-5.2
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: gpt
+            name: gpt-5.2
+            provider: openai
+          route_type: llm/v1/chat
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+    model:
+      id: fb0cdd7a-7f38-5e67-82ce-26906ba42574
+  - id: 699253c3-21a3-5952-bb06-cc8f6d9d29ba
+    name: token-vault-exchange
+    config:
+      directory: my-directory
+      provider: openai
+      storage:
+        backend: konnect
+        current_version: v1
+        keys:
+          - key: |
+              -----BEGIN RSA PRIVATE KEY-----
+              MIIEpAIBAAKCAQEAt2VCbR85SCwNbU3qwV7v/UPJZftr41+DLETO5pk8F/mhep+L
+              RRQdGeyZeICguNwG67NzQXCbXAUqQLOnoztAB42e1CGP428nG1Ze/jYMYpwlSEIK
+              20TCb47pF4POzoO7svouhsqJLApxcqQX4eVd0hiUl0RXF9ze0awbTKb7e9t4N9B0
+              XILGXaD6ybb8rBbRPXhhBd0FsKk5ND6lCIzEirRf5povaS+deBdnTaLdrPv0CnT4
+              uLQzk/BiSGDp/uFDxk/tTfDDTYesapZX7793jY+8pZCV9FpMBTDNgCpCG5+Tm66j
+              p7LSfCit3Hk6H9tJI7YoJdJNvb6V5sxK8mQWrQIDAQABAoIBAAalwXgiGxnuGth8
+              7AbxUYKdG+Y57Em0ExWeMt+x6zc1QbCnqs0osvtXE6MGCo1Y0FlnykQzeDYoK8Vn
+              napxgdskO38V7ljAlSrNASl2vREv9rv9RNZ40hFoHTPQf8UFil6s6dXR7pHtmPoe
+              T41NGo78fBpVjFCdnWf9NIodPV1aYcJvfQko4RSXu3ORk1x6s3+MBOH9rvhdk8o9
+              GEocGlWB7F3aFx1CyFCOzAOj5HY9EYScqgYKitTR6I+LD31VkkjzEUeWGqdWjF5x
+              kzzi3QzCIagEpRxOQ67B4dwIKXPoVAhMFRN3pnD4CrbEixaGv94LcMc8K9rxxVmC
+              nsV59KECgYEA/m7Jk2EueCVnflJqumJTJDo9k6yNPBccTWCZPDQpsn8llWDAA+OB
+              5OUuT9DdHuIplTUOF7QXrnzkFQGtHFhUV5qsA2UwclOlRCxLfIllIadDjE9kj30D
+              sIoLN22SA8YFHBVTvMvAvkpKE9ZVc/bpwGRoKxuoVAvB/RfkyJWMHdECgYEAuIZ0
+              Q+VM2ACjF8eG/9gQTOlq7XZZAXi6+Yhv9EH/VqB2uALdyKmFrW/tnDV+qX6FBSb2
+              MbaUxj/5PXCOgzHws6UAaCQyeCfTPmB14+rlJWQ0HLT5ajWq/XBPK+59kqeHnTrM
+              Vwn91dbBKV/T7zYplZf9j0KjomRF9FNoJwUY1h0CgYEAumNak/bbXfS4zld+DDA/
+              jAiGV4pOpLihaSXc27ey3Co81CNeRvsBizdBKANwGVHA+Kc3PbIWryKay7DAqkUi
+              9FJAtPQJ+5a/OSPh4MeeKHsqBr2ag2snqspV0TMZhl4oHBybjXEOL9ioT8PyMdOu
+              Bd0IWpwWQgui/s/kL/UuAiECgYAFnfouEu3a6XINiEJgyWf9n2Fk5yRgehde/ztB
+              OT0XmvziLxwnPpnWJMEb7zjy2eoctQnri35N5qakqyd7cOq93Tj88pUiuTuh+3e7
+              P2xIThuUACJTjFyvKFsQoErsSvNC4wZTY/d5KfdpVgRylLiBWEYctU+b4ueKP3u9
+              LFeMNQKBgQD8ZUUHqYhPeHZn+1WnMt4UcH+7PV6Dbthr06nIUTCF0XQWe9ZLDqCv
+              b7562NMXjf7FaXNu+ez1uCogXND2WMmfgU+ENN+/FlegZNZe5ZflfDg+ItChYv9d
+              jm9K9f8LkGU4f5ijQzaYv2JuVb/f35k2x9vmV0pn4pU9UT6h4F6xAQ==
+              -----END RSA PRIVATE KEY-----
+            version: v1
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+    model:
+      id: fb0cdd7a-7f38-5e67-82ce-26906ba42574
+ai_models:
+  - id: 0a6904fa-4d19-5e62-aa3c-ab58139fcc54
+    name: claude
+  - id: fb0cdd7a-7f38-5e67-82ce-26906ba42574
+    name: gpt

@@ -162,7 +162,7 @@ See `convert/testdata/*/input.yaml` for worked examples.
 |---|---|
 | Model | One **route per (provider endpoint, capability)** under a single shared `ai-gateway` Service, with the path derived from each of the model's `formats` (llm_format) + capability via the endpoint table. Routes follow the pair order: `openai` first, then the other formats sorted, and `generate` first in each format. A route carries only the targets that the data plane accepts on it (`aimap.TargetSupports`). Each route gets an `ai-proxy-advanced` plugin (`route:` FK) — models that resolve to the same endpoint share one route, contributing one `targets[]` entry each. Body-model routes also get an `ai-model-selector` plugin. One `ai-models` entry (`name` + `alias`) is emitted per model — one per `config.route.model.values` entry when the model declares several aliases, each with its own `ai-proxy-advanced` (and policy/ACL) copy scoped to that alias, so requests naming any alias select the model. |
 | Provider | Not a standalone entity. Its `type` and `config.auth` populate each referencing target's `model.provider`, `model.options`, and `auth`. |
-| MCP Server | Service + Route + `ai-mcp-proxy` (`config.mode` = source type). Server ACLs / per-tool ACLs are written into the plugin config (`default_acl`, `tools[].acl`), not Kong `acl` plugins. `access.auth_strategies` + `access.metadata` (openid-connect) add an `ai-mcp-oauth2` plugin and append `metadata.endpoint` to the route (listener / conversion-listener / passthrough-listener only); a `key-auth` strategy adds a `key-auth` plugin (and is rejected if `metadata` is set). `config.upstream.auth` (AWS SigV4) and the top-level `token_vault` lower to the plugin's `auth` record (mutually exclusive). A `conversion-only` server serves no MCP traffic of its own and cannot declare `access` itself, so its route gets a `pre-function` gate (tagged `aigw-generated:mcp-toolset-gate`) that answers 404 to any request not arriving over the unix socket `ai-mcp-proxy` re-enters Kong through to execute a listener's tool call: its tools are reachable only through the listeners that name it in `config.sources`, on their access terms. The gate is dropped again on revert. A `conversion-only` server that no listener names is dropped entirely, with a warning: it reaches no client. `key-auth` access on an MCP server is always emitted with `hide_credentials: false`, so the client's key survives onto the internal request `ai-mcp-proxy` issues when executing a tool. |
+| MCP Server | Service + Route + `ai-mcp-proxy` (`config.mode` = source type). Server ACLs / per-tool ACLs are written into the plugin config (`default_acl`, `tools[].acl`), not Kong `acl` plugins. `access.auth_strategies` + `access.metadata` (openid-connect) add an `ai-mcp-oauth2` plugin and append `metadata.endpoint` to the route (listener / conversion-listener / passthrough-listener only); a `key-auth` strategy adds a `key-auth` plugin (and is rejected if `metadata` is set). `config.upstream.auth` (AWS SigV4) and the top-level `token_vault` lower to the plugin's `auth` record (mutually exclusive). A `conversion-only` server serves no MCP traffic of its own and cannot declare `access` itself, so its route gets a `pre-function` gate (tagged `aigw-generated:mcp-toolset-gate`) that answers 404 to any request not arriving over the unix socket `ai-mcp-proxy` re-enters Kong through to execute a listener's tool call: its tools are reachable only through the listeners that name it in `config.sources`, on their access terms. The gate is dropped again on revert. A `conversion-only` server that no listener names is dropped entirely, with a warning: it reaches no client. `key-auth` access on an MCP server is always emitted with `hide_credentials: false`, so the client's key survives onto the internal request `ai-mcp-proxy` issues when executing a tool. An MCP server with `token_vault` gets `passthrough_credentials: true` on its generated `ai-mcp-oauth2` plugin, because the Token Vault auth provider exchanges the caller's `Authorization: Bearer` token for the upstream credential and `ai-mcp-oauth2` clears that header by default. |
 | Agent (`a2a`) | Service (`config.url`) + Route + `ai-a2a-proxy` plugin (logging). `config.upstream.auth` (AWS SigV4) lowers to the plugin's `auth` record, and `config.proxy` to `proxy_config`. |
 | Agent (`http`) | Service (`config.url`) + Route, no AI plugin. |
 | MCP Server / Agent `config.certificates`, `config.ca_certificates` | Set the generated Service's `client_certificate` and `ca_certificates` to the IDs of the named Certificate and CA Certificates. A Service presents one client certificate, so only the first entry of `certificates` is used. A referenced entity without an `id` gets the `id` that `db-less` mode derives for it. The fields are ignored with a warning if the Service URL is not `https`, because Kong rejects them there. An unknown name warns and is dropped; `-strict` makes it an error. |
@@ -309,7 +309,9 @@ and `formats` beyond the first.
   exactly one `token-vault` datastore lowers to a `token-vault-exchange`
   plugin. The plugin has the scope of the model's `ai-proxy-advanced` (route,
   plus the `ai-model` FK for each alias). The datastore supplies `directory`
-  and `storage`, and adds the `/_vault` callback route. Hard errors, which
+  and `storage`, and adds the `/_vault` callback route. A `directory` set on
+  the provider's `token_vault` is ignored with a warning when the datastore
+  supplies one. Hard errors, which
   leave out the model: credentials in `config.auth` on the same provider,
   targets of one model that do not share the same token vault, `type: api`
   models on one route with different token vaults, a WebSocket capability, and
@@ -376,7 +378,9 @@ and `formats` beyond the first.
   `datastores: [{name: ...}]`. Without a reference, the server converts with a
   warning and gets no callback route. An unknown reference leaves out the
   server with an error. The datastore's `config.directory` becomes
-  `auth.token_vault.directory`. The other `config` keys go under
+  `auth.token_vault.directory`; a `directory` set on the server's
+  `token_vault` is ignored with a warning when the datastore supplies one.
+  The other `config` keys go under
   `auth.token_vault.storage`, together with `backend: konnect`.
   The first server that uses a datastore also adds one top-level
   `token-vault-callback-handler` route (`/_vault`, `http` and `https`) with
@@ -388,23 +392,75 @@ and `formats` beyond the first.
   does not read the callback route. The whole feature round-trips through
   `revert/roundtrip_test.go`.
 - **Auth strategy Token Vault.** An `openid-connect` auth strategy takes at
-  most one `token-vault` datastore. When an entity uses the strategy, an
-  `openid-connect` plugin protects the `/_vault` callback route. The callback
-  handler then binds each enrollment to the principal that starts it. The
-  route plugin has `hide_credentials: false`, `preserve_query_args: true`,
-  `authorization_cookie_path: /_vault` and
-  `upstream_access_token_header: authorization:bearer`. `auth_methods` gets
-  `session` and `authorization_code`. `redirect_uri`, `login_action`,
-  `session_cookie_same_site` and `session_cookie_path` are removed, so their
-  defaults apply. The first strategy with the datastore of the route protects
-  it. Any other strategy gets a `CONFIG_FIELD_IGNORED` warning.
+  most one `token-vault` datastore. When the first used strategy carries the
+  datastore of the callback route, convert adds a second route,
+  `token-vault-callback-handler-initiate` (`/_vault/callback/initiate`),
+  with its own `token-vault-callback-handler` and `openid-connect` plugin,
+  and the callback handler binds each enrollment to the principal that
+  starts it. Any other strategy gets a `CONFIG_FIELD_IGNORED` warning.
+
+  The `openid-connect` plugin exists only on the initiate route; `/_vault`
+  stays open, because the state cookie protects the completion's single-use
+  code. The initiate plugin gets `hide_credentials: false`,
+  `upstream_access_token_header: authorization:bearer`,
+  `preserve_query_args: true`,
+  `authorization_cookie_path: /_vault/callback/initiate`,
+  `login_action: redirect` (any other value makes the handler's 302 drop
+  the session cookie), `login_methods: [authorization_code]`,
+  `login_tokens: []` (the plugin default would append the signed id token
+  to the redirect URL fragment), and an
+  explicit `auth_methods: [session, authorization_code]`. A public client
+  (no `client_secret`, no own value) gets `token_endpoint_auth_method:
+  none`. `anonymous`, `login_redirect_uri`, `redirect_uri` and the
+  session-cookie path and same-site fields are removed, and each removed
+  or replaced field reports one issue. With no `redirect_uri` the plugin
+  derives the redirect URI from the request, so the authorization server
+  must know `<origin>/_vault/callback/initiate`.
+
   `token_vault.enable_credential_manager: true` requires the datastore and
-  runtime 2.3. It also adds the callback route and a
-  `token-vault-credential-manager-<strategy>` route on `/vuc/<strategy>`.
+  runtime 2.3. It also adds the callback route and two
+  `token-vault-credential-manager-<strategy>` routes on `/vuc/<strategy>`
+  and `/vuc/<strategy>/login`, each also carrying the
+  `token-vault-credential-manager` plugin. Every Token Vault route of the
+  strategy shares one `session_secret`, so the browser session works on
+  each of them.
+
+  The page route (`/vuc/<strategy>`) serves the plugin page and does no
+  authentication of its own. Its plugin gets `auth_methods: [session]` and
+  `anonymous: token-vault-credential-manager-anonymous`, a synthesized
+  Consumer with no request-termination plugin: a failed session passes
+  through, so the credential manager serves its login page to an anonymous
+  caller and its connectors page to a signed-in one, and its data endpoint
+  rejects anonymous callers itself. It also gets
+  `logout_query_arg: logout` and carries no `redirect_uri`.
+
+  The login route (`/vuc/<strategy>/login`) starts the browser login. Its
+  plugin gets `auth_methods: [session, authorization_code]` and an
+  `authorization_cookie_path` that must reach the path the exchange
+  completes on. A strategy-set absolute `redirect_uri` sends the exchange
+  to that URI, so the cookie path becomes the redirect URI's path; the
+  caller manages the route that serves it out of band, and the plugin also
+  gets `login_action: redirect` with
+  `login_redirect_uri: <redirect origin>/vuc/<strategy>`,
+  `login_methods: [session, authorization_code]` and `login_tokens: []`
+  (the plugin default would append the signed id token to the redirect
+  URL fragment), so a fresh login and a signed-in visit both bounce back
+  to the page instead of serving the plugin page under `/login`. A public
+  client also gets `require_proof_key_for_code_exchange: true`. Without a
+  `redirect_uri` the plugin derives the redirect URI from the request,
+  the exchange completes on the login route itself, and the authorization
+  server must know `<origin>/vuc/<strategy>/login`.
+
   The entity `openid-connect` plugin keeps the strategy config. On a route
   with a Token Vault plugin, `hide_credentials` is set to `false` with a
   `CONFIG_FIELD_OVERRIDDEN` warning. The Token Vault reads the subject token
   of the caller from the request.
+
+  Known limitation: `openid-connect` reads `token_endpoint_auth_method` only
+  on a grant token request. A session refresh does not pass it, so a public
+  client's session ends when its access token expires. A refresh token
+  needs the `offline_access` scope, which convert never adds; set it on
+  the strategy.
 - **MCP rate limiting.** An MCP Server's top-level `rate_limiting` (`limits[]`
   with `method` or `tool`, `limit`, `window_size`) is copied 1:1 to the
   `ai-mcp-proxy` `config.rate_limiting` and round-trips in both directions. It
