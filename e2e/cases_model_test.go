@@ -280,7 +280,7 @@ func testGeminiInteractionsAPI(t *testing.T, license string) {
 	configPath := convertCase(t, "gemini_interactions_api", "2.3", nil)
 
 	gateway := startGateway(t, GatewayOptions{
-		Image:  gatewayImage(t, "kong/kong-ai-gateway-dev:40297149637-31feba6c730157531163768230c9874b8f830f98"),
+		Image:  gatewayImage(t, "kong/kong-ai-gateway-dev:2.3.0-rc.1"),
 		Config: configPath,
 		Env:    []string{licenseEnv(license)},
 	})

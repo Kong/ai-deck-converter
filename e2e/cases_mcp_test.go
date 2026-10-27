@@ -49,7 +49,7 @@ func testReusableToolsetsAreInternalOnly(t *testing.T, license string) {
 	configPath := convertCase(t, "reusable_toolsets_are_internal_only", "2.1", patchMCPPort(18082, mock.Port))
 
 	gateway := startGateway(t, GatewayOptions{
-		Image:  gatewayImage(t, "kong/kong-ai-gateway-dev:2.1.0-rc.3"),
+		Image:  gatewayImage(t, "kong/kong-ai-gateway-dev:2.1.0"),
 		Config: configPath,
 		Env:    []string{licenseEnv(license)},
 	})
