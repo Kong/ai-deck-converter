@@ -42,7 +42,6 @@ plugins:
             log_payloads: false
             log_statistics: true
           model:
-            model_alias: gemini-agentic
             name: custom-endpoint
             options:
               gemini:
@@ -76,7 +75,6 @@ plugins:
             log_payloads: false
             log_statistics: true
           model:
-            model_alias: gemini-agentic
             name: custom-endpoint
             options:
               gemini:

@@ -1,5 +1,6 @@
 # The Gemini Interactions API: a gemini model with the agentic capability
-# gets the Gemini and Gemini Enterprise interactions routes, v1 and beta.
+# gets the Gemini interactions routes for a public target and the Gemini
+# Enterprise routes for a target with a full gcp_environment, v1 and beta.
 # Each target has route_type llm/v1/responses in the gemini format.
 models:
   - name: gemini-agentic
@@ -11,6 +12,15 @@ models:
     targets:
       - name: gemini-2.5-pro
         provider: gemini-prod
+        config: {type: gemini}
+      - name: gemini-2.5-pro-enterprise
+        provider: gemini-prod
+        config:
+          type: gemini
+          gcp_environment:
+            api_endpoint: https://us-central1-aiplatform.googleapis.com
+            project_id: my-project
+            location_id: us-central1
 model_providers:
   - name: gemini-prod
     type: gemini

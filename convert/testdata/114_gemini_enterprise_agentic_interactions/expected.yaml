@@ -42,10 +42,10 @@ plugins:
             log_payloads: false
             log_statistics: true
           model:
-            model_alias: gemini-agentic
             name: regional
             options:
               gemini:
+                api_endpoint: https://us-central1-aiplatform.googleapis.com
                 location_id: us-central1
                 project_id: my-project
               upstream_url: https://us-central1-aiplatform.googleapis.com/v1/projects/my-project/locations/us-central1/interactions
@@ -59,10 +59,10 @@ plugins:
             log_payloads: false
             log_statistics: true
           model:
-            model_alias: gemini-agentic
             name: global
             options:
               gemini:
+                api_endpoint: https://aiplatform.googleapis.com
                 location_id: global
                 project_id: my-project
               upstream_url: https://aiplatform.googleapis.com/v1/projects/my-project/locations/global/interactions
@@ -92,10 +92,10 @@ plugins:
             log_payloads: false
             log_statistics: true
           model:
-            model_alias: gemini-agentic
             name: regional
             options:
               gemini:
+                api_endpoint: https://us-central1-aiplatform.googleapis.com
                 location_id: us-central1
                 project_id: my-project
               upstream_url: https://us-central1-aiplatform.googleapis.com/v1beta1/projects/my-project/locations/us-central1/interactions
@@ -109,10 +109,10 @@ plugins:
             log_payloads: false
             log_statistics: true
           model:
-            model_alias: gemini-agentic
             name: global
             options:
               gemini:
+                api_endpoint: https://aiplatform.googleapis.com
                 location_id: global
                 project_id: my-project
               upstream_url: https://aiplatform.googleapis.com/v1beta1/projects/my-project/locations/global/interactions

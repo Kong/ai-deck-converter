@@ -87,7 +87,7 @@ func TargetSupports(format string, target Target, spec EndpointSpec) bool {
 			return false
 		}
 	} else if providers, ok := supportedRouteTypes[routeType]; ok && !slices.Contains(providers, provider) &&
-		!geminiInteractions(format, provider, routeType) {
+		!GeminiInteractions(format, provider, routeType) {
 		return false
 	}
 	if provider == "gemini" && routeType == RealtimeRouteType && format != "gemini" {
@@ -109,10 +109,10 @@ func TargetSupports(format string, target Target, spec EndpointSpec) bool {
 	return true
 }
 
-// geminiInteractions reports whether the pair is the Gemini Interactions API.
+// GeminiInteractions reports whether the pair is the Gemini Interactions API.
 // The 2.3 route type table has no gemini row for llm/v1/responses, but
 // FeatureGeminiAgenticCapability serves it in the gemini format.
-func geminiInteractions(format, provider, routeType string) bool {
+func GeminiInteractions(format, provider, routeType string) bool {
 	return format == "gemini" && provider == "gemini" && routeType == "llm/v1/responses"
 }
 

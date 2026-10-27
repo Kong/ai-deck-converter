@@ -58,7 +58,6 @@ plugins:
             log_payloads: false
             log_statistics: true
           model:
-            model_alias: gemini-agentic
             name: gemini-2.5-pro
             options:
               upstream_url: https://generativelanguage.googleapis.com/v1/interactions
@@ -88,7 +87,6 @@ plugins:
             log_payloads: false
             log_statistics: true
           model:
-            model_alias: gemini-agentic
             name: gemini-2.5-pro
             options:
               upstream_url: https://generativelanguage.googleapis.com/v1beta/interactions
@@ -118,10 +116,10 @@ plugins:
             log_payloads: false
             log_statistics: true
           model:
-            model_alias: gemini-agentic
             name: enterprise
             options:
               gemini:
+                api_endpoint: https://us-central1-aiplatform.googleapis.com
                 location_id: us-central1
                 project_id: my-project
               upstream_url: https://us-central1-aiplatform.googleapis.com/v1/projects/my-project/locations/us-central1/interactions
@@ -151,10 +149,10 @@ plugins:
             log_payloads: false
             log_statistics: true
           model:
-            model_alias: gemini-agentic
             name: enterprise
             options:
               gemini:
+                api_endpoint: https://us-central1-aiplatform.googleapis.com
                 location_id: us-central1
                 project_id: my-project
               upstream_url: https://us-central1-aiplatform.googleapis.com/v1beta1/projects/my-project/locations/us-central1/interactions

@@ -25,5 +25,6 @@ models:
         config:
           type: gemini
           gcp_environment:
+            api_endpoint: https://us-central1-aiplatform.googleapis.com
             project_id: my-project
             location_id: us-central1

@@ -297,7 +297,7 @@ func (c *Converter) convertModelsPass(skipped map[int][]ConversionIssue) bool {
 			// targets' model_alias set to that same alias.
 			for _, alias := range pg.aliases {
 				cfg := pg.proxyConfig()
-				cfg["targets"] = withModelAlias(pg.targets, alias)
+				cfg["targets"] = withModelAlias(pg.targets, alias, pg.llmFormat)
 				c.out.Plugins = append(c.out.Plugins, kong.Plugin{
 					Name:          "ai-proxy-advanced",
 					Route:         kong.NewStringRef(pg.routeName),
@@ -1568,13 +1568,20 @@ func (c *Converter) buildTarget(
 
 // withModelAlias clones each target (and its nested "model" map) with
 // model_alias set to alias, so the N ai-proxy-advanced plugins emitted for a
-// multi-alias model don't share mutable map state.
-func withModelAlias(targets []map[string]any, alias string) []map[string]any {
+// multi-alias model don't share mutable map state. A Gemini Interactions
+// target keeps no model_alias.
+func withModelAlias(targets []map[string]any, alias, llmFormat string) []map[string]any {
 	out := make([]map[string]any, len(targets))
 	for i, t := range targets {
+		model, _ := t["model"].(map[string]any)
+		provider, _ := model["provider"].(string)
+		routeType, _ := t["route_type"].(string)
+		if aimap.GeminiInteractions(llmFormat, provider, routeType) {
+			out[i] = t
+			continue
+		}
 		clone := make(map[string]any, len(t))
 		maps.Copy(clone, t)
-		model, _ := t["model"].(map[string]any)
 		modelClone := make(map[string]any, len(model)+1)
 		maps.Copy(modelClone, model)
 		modelClone["model_alias"] = alias
