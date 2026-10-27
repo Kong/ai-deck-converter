@@ -1,0 +1,40 @@
+mcp_servers:
+  # A server CEL expression leaves out the MCP server below the gate.
+  - type: conversion-listener
+    display_name: Partner Flights MCP
+    name: partner-flights-mcp
+    upstream_url: https://flights.internal.kongair.com
+    config:
+      route: {paths: [/mcp/flights]}
+    access:
+      acls:
+        allow_when:
+          - "has(principal.metadata.tier) && principal.metadata.tier == 'partner'"
+    tools:
+      - name: search_flights
+        description: Search flights
+        method: GET
+        path: /flights
+  # A tool CEL expression leaves out only the tool below the gate.
+  - type: conversion-listener
+    display_name: Booking MCP
+    name: booking-mcp
+    upstream_url: https://bookings.internal.kongair.com
+    config:
+      route: {paths: [/mcp/bookings]}
+    access:
+      acls:
+        allow: [partners]
+    tools:
+      - name: list_bookings
+        description: List bookings
+        method: GET
+        path: /bookings
+      - name: book_flight
+        description: Book a flight
+        method: POST
+        path: /bookings
+        access:
+          acls:
+            deny_when:
+              - "has(principal.metadata.status) && principal.metadata.status == 'suspended'"

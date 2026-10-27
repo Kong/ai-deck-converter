@@ -53,6 +53,7 @@ var allFeatures = []Feature{
 	FeatureMCPTokenVault,
 	FeatureProviderTokenVault,
 	FeatureMCPRateLimiting,
+	FeatureMCPACLWhen,
 	FeatureBaseten,
 	FeatureGeminiAgenticCapability,
 	FeatureSagemaker,

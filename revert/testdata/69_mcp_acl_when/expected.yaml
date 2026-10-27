@@ -1,0 +1,33 @@
+mcp_servers:
+  - type: conversion-listener
+    name: partner-flights-mcp
+    config:
+      route:
+        paths:
+          - /mcp/flights
+      logging:
+        payloads: false
+        statistics: true
+        audits: false
+    tools:
+      - name: search_flights
+        description: Search flights
+        method: GET
+        path: /flights
+      - name: book_flight
+        description: Book a flight
+        method: POST
+        path: /bookings
+        access:
+          acls:
+            deny:
+              - interns
+            allow_when:
+              - has(principal.metadata.role) && principal.metadata.role == 'buyer'
+    access:
+      default_tool_acls:
+        allow_when:
+          - has(principal.metadata.tier) && principal.metadata.tier == 'gold'
+        deny_when:
+          - has(principal.metadata.status) && principal.metadata.status == 'suspended'
+    upstream_url: https://flights.internal.kongair.com

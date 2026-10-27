@@ -1,0 +1,16 @@
+- code: UNSUPPORTED_IN_MIN_RUNTIME_VERSION
+  reason: access.acls.allow_when requires minimum runtime version "2.3", but the configured minimum is "2.2"
+  source:
+    kind: mcp_server
+    name: partner-flights-mcp
+    fields:
+      - access.acls.allow_when
+  severity: ERROR
+- code: UNSUPPORTED_IN_MIN_RUNTIME_VERSION
+  reason: tools[1].access.acls.deny_when requires minimum runtime version "2.3", but the configured minimum is "2.2"
+  source:
+    kind: mcp_server
+    name: booking-mcp
+    fields:
+      - tools[1].access.acls.deny_when
+  severity: WARNING
