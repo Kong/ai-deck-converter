@@ -1,0 +1,137 @@
+_format_version: "3.0"
+_transform: false
+routes:
+  - id: 00761a8d-f6bf-5691-bad3-e67da4a21bbf
+    name: token-vault-callback-handler
+    paths:
+      - /_vault
+    protocols:
+      - http
+      - https
+  - id: 385691ef-9969-5a92-9979-3082412c6860
+    name: token-vault-callback-handler-initiate
+    paths:
+      - /_vault/callback/initiate
+    protocols:
+      - http
+      - https
+  - id: 50cc4ba1-ba25-5d2f-87b6-6829a6869e65
+    name: token-vault-credential-manager-okta-vault
+    paths:
+      - /vuc/okta-vault
+    protocols:
+      - http
+      - https
+  - id: 9b0c55a7-8ad0-510d-8350-91b2bcdf94a2
+    name: token-vault-credential-manager-okta-vault-login
+    paths:
+      - /vuc/okta-vault/login
+    protocols:
+      - http
+      - https
+consumers:
+  - id: ecaa031b-4a31-5a81-aea9-ab8f08f47608
+    username: token-vault-credential-manager-anonymous
+    custom_id: token-vault-credential-manager-anonymous
+plugins:
+  - id: 8090a9c8-dcde-52c6-8a5b-777d70893ab8
+    name: token-vault-callback-handler
+    config:
+      directory: default
+      storage:
+        backend: konnect
+    route:
+      id: 00761a8d-f6bf-5691-bad3-e67da4a21bbf
+  - id: a2daeb04-4bf6-571e-a24a-d692937dab9c
+    name: token-vault-callback-handler
+    config:
+      directory: default
+      storage:
+        backend: konnect
+    route:
+      id: 385691ef-9969-5a92-9979-3082412c6860
+  - id: 39ecede7-b70e-5bb2-b3d3-5a9f0640dfce
+    name: openid-connect
+    config:
+      auth_methods:
+        - session
+        - authorization_code
+      authorization_cookie_path: /_vault/callback/initiate
+      client_auth:
+        - client_secret_post
+      client_id:
+        - 0oa195umql5e4I37r698
+      hide_credentials: false
+      issuer: https://trial-3663202.okta.com/oauth2/default
+      login_action: redirect
+      login_methods:
+        - authorization_code
+      login_tokens: []
+      preserve_query_args: true
+      scopes:
+        - openid
+        - offline_access
+      session_secret: 0123456789abcdef0123456789abcdef
+      token_endpoint_auth_method: none
+      upstream_access_token_header: authorization:bearer
+    route:
+      id: 385691ef-9969-5a92-9979-3082412c6860
+  - id: a09804aa-e99d-546b-834c-d2901487fe73
+    name: openid-connect
+    config:
+      anonymous: token-vault-credential-manager-anonymous
+      auth_methods:
+        - session
+      client_auth:
+        - client_secret_post
+      client_id:
+        - 0oa195umql5e4I37r698
+      hide_credentials: false
+      issuer: https://trial-3663202.okta.com/oauth2/default
+      logout_query_arg: logout
+      scopes:
+        - openid
+        - offline_access
+      session_secret: 0123456789abcdef0123456789abcdef
+      token_endpoint_auth_method: none
+      upstream_access_token_header: authorization:bearer
+    route:
+      id: 50cc4ba1-ba25-5d2f-87b6-6829a6869e65
+  - id: 9239fa49-86f2-5879-9f84-d493e8cde4d6
+    name: token-vault-credential-manager
+    config:
+      directory: default
+      storage:
+        backend: konnect
+    route:
+      id: 50cc4ba1-ba25-5d2f-87b6-6829a6869e65
+  - id: a96bd47c-929c-5fdb-8411-03c203e23562
+    name: openid-connect
+    config:
+      auth_methods:
+        - session
+        - authorization_code
+      authorization_cookie_path: /vuc/okta-vault
+      client_auth:
+        - client_secret_post
+      client_id:
+        - 0oa195umql5e4I37r698
+      hide_credentials: false
+      issuer: https://trial-3663202.okta.com/oauth2/default
+      require_proof_key_for_code_exchange: true
+      scopes:
+        - openid
+        - offline_access
+      session_secret: 0123456789abcdef0123456789abcdef
+      token_endpoint_auth_method: none
+      upstream_access_token_header: authorization:bearer
+    route:
+      id: 9b0c55a7-8ad0-510d-8350-91b2bcdf94a2
+  - id: 86cc68a8-ca6c-546e-997b-4b9380c7fbe2
+    name: token-vault-credential-manager
+    config:
+      directory: default
+      storage:
+        backend: konnect
+    route:
+      id: 9b0c55a7-8ad0-510d-8350-91b2bcdf94a2

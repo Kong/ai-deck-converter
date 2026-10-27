@@ -102,8 +102,8 @@ type Converter struct {
 	// tvOIDCWarned holds the auth strategy fields that a Token Vault
 	// route already reported. Each route rewrites the same strategy config.
 	tvOIDCWarned map[string]bool
-	// tvOIDCSilent stops those reports. A strategy that no entity
-	// uses makes no output, so its route config reports nothing.
+	// tvOIDCSilent stops those reports. A strategy that no entity uses
+	// and that has no credential manager makes no output.
 	tvOIDCSilent   bool
 	consumerGroups map[string]*aigw.ConsumerGroup
 	datastores     map[string]*aigw.Datastore
@@ -160,6 +160,7 @@ func (c *Converter) run() {
 	c.warnGlobalPoliciesForWebSocket()
 	c.convertMCPServers()
 	c.convertAgents()
+	c.convertCredentialManagers()
 	c.secureTokenVaultCallbackRoute()
 	c.revealTokenVaultCredentials()
 	c.lint()
