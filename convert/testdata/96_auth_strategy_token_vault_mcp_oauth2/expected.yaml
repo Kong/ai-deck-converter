@@ -89,7 +89,6 @@ routes:
           principals:
             directory: my-directory
             enabled: true
-          session_secret: 0123456789abcdef0123456789abcdef
           upstream_access_token_header: authorization:bearer
   - name: token-vault-credential-manager-okta-ai-se
     paths:
@@ -114,7 +113,6 @@ routes:
           principals:
             directory: my-directory
             enabled: true
-          session_secret: 0123456789abcdef0123456789abcdef
           upstream_access_token_header: authorization:bearer
       - name: token-vault-credential-manager
         config:
@@ -148,7 +146,6 @@ routes:
           principals:
             directory: my-directory
             enabled: true
-          session_secret: 0123456789abcdef0123456789abcdef
           upstream_access_token_header: authorization:bearer
       - name: token-vault-credential-manager
         config:

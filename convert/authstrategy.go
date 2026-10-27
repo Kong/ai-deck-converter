@@ -1,8 +1,6 @@
 package convert
 
 import (
-	"crypto/rand"
-	"encoding/hex"
 	"fmt"
 	"maps"
 	"net/url"
@@ -199,7 +197,7 @@ func (c *Converter) tvManagerOIDCConfig(
 		"because an anonymous caller must reach the plugin login page.",
 		tvOIDCSessionMethod)
 	b.applyTokenEndpointAuthMethod()
-	return b.finish()
+	return b.cfg, nil
 }
 
 // tvManagerLoginOIDCConfig returns the openid-connect config of the Token
@@ -240,7 +238,7 @@ func (c *Converter) tvManagerLoginOIDCConfig(
 	if method, _ := b.cfg["token_endpoint_auth_method"].(string); method == tvOIDCPublicClientAuthMethod {
 		b.set("require_proof_key_for_code_exchange", true)
 	}
-	return b.finish()
+	return b.cfg, nil
 }
 
 // managerAuthorizationCookiePath returns the path that the authorization
@@ -281,46 +279,6 @@ func managerRedirectTarget(redirect any, strategyName string) *managerRedirectTa
 		cookiePath:       cookiePath,
 		loginRedirectURI: u.Scheme + "://" + u.Host + aimap.TokenVaultCredentialManagerPath + "/" + strategyName,
 	}
-}
-
-// applySessionSecret sets a generated session_secret when cfg has none. Every
-// plugin of the strategy gets the same secret. The browser session then works
-// on the credential manager route and on the callback route.
-func (c *Converter) applySessionSecret(src ConversionIssueSource, idp *aigw.AuthStrategy, cfg map[string]any) error {
-	if !isEmptyConfigValue(cfg["session_secret"]) {
-		return nil
-	}
-	secret, ok := c.sessionSecrets[idp.Name]
-	if !ok {
-		var err error
-		if secret, err = c.sessionSecret(); err != nil {
-			return c.fail(src.at("config.session_secret"), InternalError,
-				"auth strategy %q: cannot generate session_secret: %v", idp.Name, err)
-		}
-		c.sessionSecrets[idp.Name] = secret
-	}
-	cfg["session_secret"] = secret
-	return nil
-}
-
-// newSessionSecret makes the session secret of a strategy. Tests replace it.
-var newSessionSecret = generateSessionSecret
-
-func generateSessionSecret() (string, error) {
-	bytes := make([]byte, 16) //nolint:mnd
-	if _, err := rand.Read(bytes); err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(bytes), nil
-}
-
-// sessionSecret returns the configured session secret generator, or the
-// default random one.
-func (c *Converter) sessionSecret() (string, error) {
-	if c.opts.SessionSecret != nil {
-		return c.opts.SessionSecret()
-	}
-	return newSessionSecret()
 }
 
 // tvManagerOIDCRemovedFields are the openid-connect fields that the
@@ -434,14 +392,6 @@ func (b *tvOIDC) applyTokenEndpointAuthMethod() {
 	b.cfg["token_endpoint_auth_method"] = tvOIDCPublicClientAuthMethod
 }
 
-// finish adds the session secret and returns the config.
-func (b *tvOIDC) finish() (map[string]any, error) {
-	if err := b.c.applySessionSecret(b.src, b.idp, b.cfg); err != nil {
-		return nil, err
-	}
-	return b.cfg, nil
-}
-
 // report records one issue per auth strategy field. Every Token Vault route
 // rewrites the same strategy config, so the same field arrives many times.
 // The validation pass reports nothing.
@@ -478,7 +428,7 @@ func (c *Converter) tvEnrollmentOIDCConfig(src ConversionIssueSource, idp *aigw.
 	b.forceAuthMethods("The enrollment start route uses [session, authorization_code], "+
 		"because the route starts the browser login.",
 		tvOIDCSessionMethod, tvOIDCAuthCodeMethod)
-	return b.finish()
+	return b.cfg, nil
 }
 
 // secureTokenVaultCallbackRoute adds the enrollment start route with its

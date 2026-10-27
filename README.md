@@ -421,9 +421,7 @@ and `formats` beyond the first.
   runtime 2.3. It also adds the callback route and two
   `token-vault-credential-manager-<strategy>` routes on `/vuc/<strategy>`
   and `/vuc/<strategy>/login`, each also carrying the
-  `token-vault-credential-manager` plugin. Every Token Vault route of the
-  strategy shares one `session_secret`, so the browser session works on
-  each of them.
+  `token-vault-credential-manager` plugin.
 
   The page route (`/vuc/<strategy>`) serves the plugin page and does no
   authentication of its own. Its plugin gets `auth_methods: [session]` and

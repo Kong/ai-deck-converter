@@ -75,15 +75,10 @@ func convertCase(t *testing.T, caseName, minRuntimeVersion string, patch func(sr
 }
 
 // convertDBLess logs every conversion issue. An Error issue fails the test.
-// e2eSessionSecret keeps the e2e snapshots deterministic, like the convert
-// goldens do (convert/golden_test.go).
-func e2eSessionSecret() (string, error) { return "0123456789abcdef0123456789abcdef", nil }
-
 func convertDBLess(t *testing.T, src []byte, minRuntimeVersion string) ([]byte, error) {
 	t.Helper()
 	result, err := convert.Convert(src, convert.Options{
 		MinRuntimeVersion: minRuntimeVersion,
-		SessionSecret:     e2eSessionSecret,
 	})
 	if err != nil {
 		return nil, err

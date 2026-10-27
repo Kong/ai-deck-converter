@@ -85,7 +85,6 @@ routes:
             - authorization_code
           login_tokens: []
           preserve_query_args: true
-          session_secret: 0123456789abcdef0123456789abcdef
           token_endpoint_auth_method: none
           upstream_access_token_header: authorization:bearer
   - name: token-vault-credential-manager-okta-ai-se
@@ -105,7 +104,6 @@ routes:
           hide_credentials: false
           issuer: https://dev-123456.okta.com
           logout_query_arg: logout
-          session_secret: 0123456789abcdef0123456789abcdef
           token_endpoint_auth_method: none
           upstream_access_token_header: authorization:bearer
       - name: token-vault-credential-manager
@@ -144,7 +142,6 @@ routes:
           redirect_uri:
             - https://gw.example.com/signin/callback
           require_proof_key_for_code_exchange: true
-          session_secret: 0123456789abcdef0123456789abcdef
           token_endpoint_auth_method: none
           upstream_access_token_header: authorization:bearer
       - name: token-vault-credential-manager
