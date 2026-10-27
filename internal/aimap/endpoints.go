@@ -6,6 +6,7 @@
 package aimap
 
 import (
+	"regexp"
 	"slices"
 	"sort"
 	"strings"
@@ -731,6 +732,27 @@ func GeminiEnvFromOptions(opts map[string]any) GeminiEnv {
 // IsEnterprise reports whether the target uses the Gemini Enterprise API.
 func (e GeminiEnv) IsEnterprise() bool {
 	return e.ProjectID != "" && e.LocationID != ""
+}
+
+var (
+	// gcpProjectIDPattern accepts the Google Cloud project ID format.
+	// The optional domain prefix is for legacy domain-scoped projects.
+	gcpProjectIDPattern = regexp.MustCompile(`^(?:[a-z][a-z0-9.-]*[a-z0-9]:)?[a-z][a-z0-9-]{4,28}[a-z0-9]$`)
+	// gcpLocationIDPattern accepts one DNS label. The location starts the
+	// Gemini Enterprise host name.
+	gcpLocationIDPattern = regexp.MustCompile(`^[a-z][a-z0-9-]*[a-z0-9]$`)
+)
+
+// InvalidField returns the gcp_environment key of e whose value cannot go in
+// a Gemini Enterprise URL. It returns "" when no set value is invalid.
+func (e GeminiEnv) InvalidField() string {
+	if e.ProjectID != "" && !gcpProjectIDPattern.MatchString(e.ProjectID) {
+		return "project_id"
+	}
+	if e.LocationID != "" && !gcpLocationIDPattern.MatchString(e.LocationID) {
+		return "location_id"
+	}
+	return ""
 }
 
 // isGeminiInteractions reports whether spec is an Interactions endpoint.

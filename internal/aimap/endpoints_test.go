@@ -288,3 +288,26 @@ func TestRoutePath(t *testing.T) {
 		require.Equalf(t, tc.want, RoutePath(tc.base, tc.spec), "RoutePath(%q) [%s]", tc.base, tc.name)
 	}
 }
+
+func TestGeminiEnvInvalidField(t *testing.T) {
+	tests := []struct {
+		name string
+		env  GeminiEnv
+		want string
+	}{
+		{"valid regional", GeminiEnv{ProjectID: "my-project", LocationID: "us-central1"}, ""},
+		{"valid global", GeminiEnv{ProjectID: "my-project", LocationID: "global"}, ""},
+		{"valid domain-scoped project", GeminiEnv{ProjectID: "example.com:my-project", LocationID: "global"}, ""},
+		{"unset", GeminiEnv{}, ""},
+		{"project with slash", GeminiEnv{ProjectID: "my/project", LocationID: "global"}, "project_id"},
+		{"project with uppercase", GeminiEnv{ProjectID: "My-Project", LocationID: "global"}, "project_id"},
+		{"project too short", GeminiEnv{ProjectID: "abc", LocationID: "global"}, "project_id"},
+		{"location with dot", GeminiEnv{ProjectID: "my-project", LocationID: "evil.example.com"}, "location_id"},
+		{"location with slash", GeminiEnv{ProjectID: "my-project", LocationID: "us/central1"}, "location_id"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, tt.env.InvalidField())
+		})
+	}
+}
