@@ -93,7 +93,8 @@ func TargetSupports(format string, target Target, spec EndpointSpec) bool {
 	if provider == "gemini" && routeType == RealtimeRouteType && format != "gemini" {
 		return false
 	}
-	if provider == "gemini" && isGeminiInteractions(spec) && isGeminiEnterpriseInteractions(spec) != target.GeminiEnterprise {
+	if provider == "gemini" && isGeminiInteractions(spec) &&
+		isGeminiEnterpriseInteractions(spec) != target.GeminiEnterprise {
 		return false
 	}
 	if provider == "bedrock" && routeType == "llm/v1/batches" && !target.BatchBucketPrefix {

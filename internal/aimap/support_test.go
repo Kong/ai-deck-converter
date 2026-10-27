@@ -174,6 +174,7 @@ func TestGeminiInteractionsNeedProjectAndLocation(t *testing.T) {
 		}
 		enterprise := isGeminiEnterpriseInteractions(ce.Spec)
 		require.Equal(t, !enterprise, TargetSupports("gemini", Target{ProviderType: "gemini"}, ce.Spec), ce.Spec.RouteLabel)
-		require.Equal(t, enterprise, TargetSupports("gemini", Target{ProviderType: "gemini", GeminiEnterprise: true}, ce.Spec), ce.Spec.RouteLabel)
+		require.Equal(t, enterprise,
+			TargetSupports("gemini", Target{ProviderType: "gemini", GeminiEnterprise: true}, ce.Spec), ce.Spec.RouteLabel)
 	}
 }
