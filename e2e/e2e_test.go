@@ -77,7 +77,7 @@ func TestE2E(t *testing.T) {
 // tokenVaultImage is an aigw-master build that carries the Token Vault
 // plugins, which merged in kong/kong-ee#21787. A released tag can replace
 // this once one ships.
-const tokenVaultImage = "kong/kong-ai-gateway-dev:40195361547-9c956dfc8efa257e040aaf99cbb6a4c64fa8664d-ubuntu"
+const tokenVaultImage = "kong/kong-ai-gateway-dev:2.3.0-rc.1"
 
 func gatewayImage(t *testing.T, fallback string) string {
 	t.Helper()
