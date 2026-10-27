@@ -1,0 +1,30 @@
+# One model with a public target and a Gemini Enterprise target gets both sets
+# of routes. Each target joins only the routes that it supports.
+model_providers:
+  - name: gemini-prod
+    type: gemini
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://ai/gemini-token}"
+models:
+  - name: gemini-agentic
+    type: model
+    capabilities: [agentic]
+    formats: [{type: gemini}]
+    config:
+      route: {paths: [/ai]}
+    targets:
+      - name: gemini-2.5-pro
+        provider: gemini-prod
+        config: {type: gemini}
+      - name: enterprise
+        provider: gemini-prod
+        config:
+          type: gemini
+          gcp_environment:
+            api_endpoint: https://us-central1-aiplatform.googleapis.com
+            project_id: my-project
+            location_id: us-central1

@@ -297,7 +297,7 @@ func (c *Converter) convertModelsPass(skipped map[int][]ConversionIssue) bool {
 			// targets' model_alias set to that same alias.
 			for _, alias := range pg.aliases {
 				cfg := pg.proxyConfig()
-				cfg["targets"] = withModelAlias(pg.targets, alias)
+				cfg["targets"] = withModelAlias(pg.targets, alias, pg.llmFormat)
 				c.out.Plugins = append(c.out.Plugins, kong.Plugin{
 					Name:          "ai-proxy-advanced",
 					Route:         kong.NewStringRef(pg.routeName),
@@ -759,6 +759,7 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 				// A passthrough target carries no model_alias either (the plugin refuses
 				// it): fkScoped leaves pluginAliases empty, so emission never stamps one.
 				target := c.buildTarget(tm, provider, providerType, spec.RouteType, logging)
+				setEndpointUpstreamURL(target, sec, spec, tm)
 				// Dedup on the built target's full shape rather than
 				// (name, route_type): two targets can share a model name yet
 				// be genuinely distinct via different providers (distinct
@@ -1295,6 +1296,17 @@ func (c *Converter) checkTarget(m *aigw.Model, j int) (*aigw.Provider, string, *
 				"%s format; the target is omitted", m.Name, tm.Name, strings.Join(formats, ", ")),
 		}
 	}
+	if providerType == "gemini" {
+		env := aimap.GeminiEnvFromOptions(tm.Config.Options)
+		if key := env.InvalidField(); key != "" {
+			return nil, "", &targetProblem{
+				field: fmt.Sprintf("targets[%d].config.gcp_environment.%s", j, key),
+				code:  ConfigFieldInvalid,
+				reason: fmt.Sprintf("model %q target %q: gcp_environment.%s is not a valid Google Cloud ID; "+
+					"the target is omitted", m.Name, tm.Name, key),
+			}
+		}
+	}
 	return provider, providerType, nil
 }
 
@@ -1567,13 +1579,20 @@ func (c *Converter) buildTarget(
 
 // withModelAlias clones each target (and its nested "model" map) with
 // model_alias set to alias, so the N ai-proxy-advanced plugins emitted for a
-// multi-alias model don't share mutable map state.
-func withModelAlias(targets []map[string]any, alias string) []map[string]any {
+// multi-alias model don't share mutable map state. A Gemini Interactions
+// target keeps no model_alias.
+func withModelAlias(targets []map[string]any, alias, llmFormat string) []map[string]any {
 	out := make([]map[string]any, len(targets))
 	for i, t := range targets {
+		model, _ := t["model"].(map[string]any)
+		provider, _ := model["provider"].(string)
+		routeType, _ := t["route_type"].(string)
+		if aimap.GeminiInteractions(llmFormat, provider, routeType) {
+			out[i] = t
+			continue
+		}
 		clone := make(map[string]any, len(t))
 		maps.Copy(clone, t)
-		model, _ := t["model"].(map[string]any)
 		modelClone := make(map[string]any, len(model)+1)
 		maps.Copy(modelClone, model)
 		modelClone["model_alias"] = alias
@@ -2103,4 +2122,20 @@ func pathHasNamedCapture(s, param string) bool {
 		}
 	}
 	return false
+}
+
+func setEndpointUpstreamURL(target map[string]any, section string, spec aimap.EndpointSpec, tm *aigw.TargetModel) {
+	url, ok := aimap.EndpointUpstreamURL(section, spec, tm.Config.Options)
+	if !ok {
+		return
+	}
+	model := target["model"].(map[string]any)
+	opts, _ := model["options"].(map[string]any)
+	if opts == nil {
+		opts = map[string]any{}
+		model["options"] = opts
+	}
+	if opts["upstream_url"] == nil {
+		opts["upstream_url"] = url
+	}
 }

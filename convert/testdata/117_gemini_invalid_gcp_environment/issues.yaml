@@ -1,0 +1,16 @@
+- code: CONFIG_FIELD_INVALID
+  reason: 'model "gemini-agentic" target "bad-project": gcp_environment.project_id is not a valid Google Cloud ID; the target is omitted'
+  source:
+    kind: model
+    name: gemini-agentic
+    fields:
+      - targets[0].config.gcp_environment.project_id
+  severity: WARNING
+- code: CONFIG_FIELD_INVALID
+  reason: 'model "gemini-agentic" target "bad-location": gcp_environment.location_id is not a valid Google Cloud ID; the target is omitted'
+  source:
+    kind: model
+    name: gemini-agentic
+    fields:
+      - targets[1].config.gcp_environment.location_id
+  severity: WARNING

@@ -20,6 +20,9 @@ type Target struct {
 	BatchBucketPrefix bool
 	// Llama2RawFormat is true when a llama2 target sets format to raw.
 	Llama2RawFormat bool
+	// GeminiEnterprise is true when a gemini target sets project_id and
+	// location_id.
+	GeminiEnterprise bool
 }
 
 // supportedRouteTypes copies SUPPORTED_ROUTE_TYPES of
@@ -84,10 +87,14 @@ func TargetSupports(format string, target Target, spec EndpointSpec) bool {
 			return false
 		}
 	} else if providers, ok := supportedRouteTypes[routeType]; ok && !slices.Contains(providers, provider) &&
-		!geminiInteractions(format, provider, routeType) {
+		!GeminiInteractions(format, provider, routeType) {
 		return false
 	}
 	if provider == "gemini" && routeType == RealtimeRouteType && format != "gemini" {
+		return false
+	}
+	if provider == "gemini" && isGeminiInteractions(spec) &&
+		isGeminiEnterpriseInteractions(spec) != target.GeminiEnterprise {
 		return false
 	}
 	if provider == "bedrock" && routeType == "llm/v1/batches" && !target.BatchBucketPrefix {
@@ -102,10 +109,10 @@ func TargetSupports(format string, target Target, spec EndpointSpec) bool {
 	return true
 }
 
-// geminiInteractions reports whether the pair is the Gemini Interactions API.
+// GeminiInteractions reports whether the pair is the Gemini Interactions API.
 // The 2.3 route type table has no gemini row for llm/v1/responses, but
 // FeatureGeminiAgenticCapability serves it in the gemini format.
-func geminiInteractions(format, provider, routeType string) bool {
+func GeminiInteractions(format, provider, routeType string) bool {
 	return format == "gemini" && provider == "gemini" && routeType == "llm/v1/responses"
 }
 

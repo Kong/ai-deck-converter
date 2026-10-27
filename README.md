@@ -58,11 +58,11 @@ any issue with `-strict`. The reverse direction prints `warning:` lines.
 
 Every forward conversion needs the oldest AI Gateway release that must run the
 output, as `MAJOR.MINOR`. It is the `min_runtime_version` of the Konnect AI
-Gateway. The converter supports `2.0` to `2.4`.
+Gateway. The converter supports `2.0` to `2.3`.
 
 - An empty value, a value that is not `MAJOR.MINOR` (for example `2.1.0` or
   `latest`), or a value below `2.0` fails the run.
-- A value above `2.4` gives a `WARNING` and converts for `2.4`.
+- A value above `2.3` gives a `WARNING` and converts for `2.3`.
 - A feature that needs a newer release gives an
   `UNSUPPORTED_IN_MIN_RUNTIME_VERSION` issue. The rules in
   `internal/aimap/versions.go` decide whether the field is dropped with a

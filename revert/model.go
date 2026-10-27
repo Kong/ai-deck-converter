@@ -223,6 +223,7 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 			}
 			d := defoldTarget(target, providerType)
 			tm.AllowAuthOverride = d.allowOverride
+			dropEndpointUpstreamURL(&d, section, spec)
 			tm.Config.Options = d.options
 			tm.Provider = r.providerFor(providerType, &d)
 
@@ -1062,4 +1063,28 @@ func allTargetsPassthrough(cfg map[string]any) bool {
 		}
 	}
 	return true
+}
+
+// dropEndpointUpstreamURL removes the upstream_url the forward converter
+// generated for a Gemini interactions route of this target. One target
+// serves several interactions routes, so the value may match another
+// route's URL. A per-route check splits one target in two on revert.
+func dropEndpointUpstreamURL(d *defoldedTarget, section string, spec *aimap.EndpointSpec) {
+	if spec == nil {
+		return
+	}
+	stored, ok := d.options["upstream_url"]
+	if !ok {
+		return
+	}
+	for _, ce := range aimap.SectionEndpoints(section) {
+		want, ok := aimap.EndpointUpstreamURL(section, ce.Spec, d.options)
+		if ok && stored == want {
+			delete(d.options, "upstream_url")
+			if len(d.options) == 0 {
+				d.options = nil
+			}
+			return
+		}
+	}
 }

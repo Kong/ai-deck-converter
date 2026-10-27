@@ -57,14 +57,7 @@ func TestE2E(t *testing.T) {
 		}},
 		{"wildcard_model_all_endpoints_2_3", func(t *testing.T) {
 			testWildcardModelAllEndpoints(t, license, "wildcard_model_all_endpoints_2_3", "2.3",
-				"kong/kong-ai-gateway-dev:39946325377-167b5f34f5ae4ac4be1782b22b9f250caefa76f5")
-			// TODO update the gateway image to the 2.3 image
-		}},
-		{"wildcard_model_all_endpoints_2_4", func(t *testing.T) {
-			testWildcardModelAllEndpoints(t, license, "wildcard_model_all_endpoints_2_4", "2.4",
-				"kong/kong-ai-gateway-dev:39946325377-167b5f34f5ae4ac4be1782b22b9f250caefa76f5")
-			// TODO update the gateway image so that this test passes
-			// Gemini interactions API support is planned for AI Gateway 2.4, but is not yet available
+				"kong/kong-ai-gateway-dev:2.3.0-rc.1")
 		}},
 		{"token_vault_exchange_credential_placement", func(t *testing.T) { testTokenVaultExchangeCredentialPlacement(t, license) }},
 		{"token_vault_callback_oidc_enrollment", func(t *testing.T) { testTokenVaultCallbackOIDCEnrollment(t, license) }},
@@ -81,10 +74,10 @@ func TestE2E(t *testing.T) {
 	}
 }
 
-// tokenVaultImage is an aigw-master build that carries the Token Vault
+// tokenVaultImage is a 2.3.0-rc.1 dev build that carries the Token Vault
 // plugins, which merged in kong/kong-ee#21787. A released tag can replace
 // this once one ships.
-const tokenVaultImage = "kong/kong-ai-gateway-dev:40195361547-9c956dfc8efa257e040aaf99cbb6a4c64fa8664d-ubuntu"
+const tokenVaultImage = "kong/kong-ai-gateway-dev:2.3.0-rc.1"
 
 func gatewayImage(t *testing.T, fallback string) string {
 	t.Helper()

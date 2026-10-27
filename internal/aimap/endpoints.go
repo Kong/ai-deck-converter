@@ -6,6 +6,7 @@
 package aimap
 
 import (
+	"regexp"
 	"slices"
 	"sort"
 	"strings"
@@ -709,4 +710,112 @@ var BedrockOptionKeys = map[string]bool{
 	"region": true, "embeddings_normalize": true, "video_output_s3_uri": true,
 	"batch_bucket_prefix": true, "batch_role_arn": true, "performance_config_latency": true,
 	"vpc_endpoint": true, "endpoint_type": true, "mantle_openai_path_prefix": true,
+}
+
+// GeminiEnv is the Gemini Enterprise part of a gemini target's gcp_environment.
+type GeminiEnv struct {
+	ProjectID, LocationID, APIEndpoint string
+}
+
+// GeminiEnvFromOptions reads the gcp_environment block of target options.
+func GeminiEnvFromOptions(opts map[string]any) GeminiEnv {
+	env, _ := opts["gcp_environment"].(map[string]any)
+	get := func(key string) string {
+		v, _ := env[key].(string)
+		return v
+	}
+	return GeminiEnv{
+		ProjectID: get("project_id"), LocationID: get("location_id"), APIEndpoint: get("api_endpoint"),
+	}
+}
+
+// IsEnterprise reports whether the target uses the Gemini Enterprise API.
+func (e GeminiEnv) IsEnterprise() bool {
+	return e.ProjectID != "" && e.LocationID != ""
+}
+
+var (
+	// gcpProjectIDPattern accepts the Google Cloud project ID format.
+	// The optional domain prefix is for legacy domain-scoped projects.
+	gcpProjectIDPattern = regexp.MustCompile(`^(?:[a-z][a-z0-9.-]*[a-z0-9]:)?[a-z][a-z0-9-]{4,28}[a-z0-9]$`)
+	// gcpLocationIDPattern accepts one DNS label. The location starts the
+	// Gemini Enterprise host name.
+	gcpLocationIDPattern = regexp.MustCompile(`^[a-z][a-z0-9-]*[a-z0-9]$`)
+)
+
+// InvalidField returns the gcp_environment key of e whose value cannot go in
+// a Gemini Enterprise URL. It returns "" when no set value is invalid.
+func (e GeminiEnv) InvalidField() string {
+	if e.ProjectID != "" && !gcpProjectIDPattern.MatchString(e.ProjectID) {
+		return "project_id"
+	}
+	if e.LocationID != "" && !gcpLocationIDPattern.MatchString(e.LocationID) {
+		return "location_id"
+	}
+	return ""
+}
+
+// isGeminiInteractions reports whether spec is an Interactions endpoint.
+func isGeminiInteractions(spec EndpointSpec) bool {
+	return spec.RouteType == "llm/v1/responses" && strings.HasSuffix(spec.PathSuffix, "/interactions")
+}
+
+// isGeminiEnterpriseInteractions reports whether spec is a Gemini Enterprise
+// Interactions endpoint.
+func isGeminiEnterpriseInteractions(spec EndpointSpec) bool {
+	return spec.RouteType == "llm/v1/responses" &&
+		(spec.RouteLabel == "enterprise-responses" || spec.RouteLabel == "enterprise-beta-responses")
+}
+
+// EndpointUpstreamURL returns the upstream URL that a target needs on spec
+// when the plugin cannot get it from the route. It returns false when spec
+// needs none.
+func EndpointUpstreamURL(section string, spec EndpointSpec, opts map[string]any) (string, bool) {
+	if section == "gemini" {
+		return geminiInteractionsURL(section, spec, GeminiEnvFromOptions(opts))
+	}
+	return "", false
+}
+
+// geminiInteractionsURL returns the upstream URL of the Interactions API for
+// spec and env. It returns false for any other endpoint, and for an endpoint
+// that env does not select.
+func geminiInteractionsURL(section string, spec EndpointSpec, env GeminiEnv) (string, bool) {
+	if section != "gemini" || spec.RouteType != "llm/v1/responses" {
+		return "", false
+	}
+	enterprise := env.IsEnterprise()
+	switch spec.RouteLabel {
+	case "responses":
+		if !enterprise {
+			return "https://generativelanguage.googleapis.com/v1/interactions", true
+		}
+	case "beta-responses":
+		if !enterprise {
+			return "https://generativelanguage.googleapis.com/v1beta/interactions", true
+		}
+	case "enterprise-responses":
+		if enterprise {
+			return geminiEnterpriseURL(env, "v1"), true
+		}
+	case "enterprise-beta-responses":
+		if enterprise {
+			return geminiEnterpriseURL(env, "v1beta1"), true
+		}
+	}
+	return "", false
+}
+
+func geminiEnterpriseURL(env GeminiEnv, version string) string {
+	host := "https://aiplatform.googleapis.com"
+	if env.LocationID != "global" {
+		host = "https://" + env.LocationID + "-aiplatform.googleapis.com"
+	}
+	if env.APIEndpoint != "" {
+		host = strings.TrimSuffix(env.APIEndpoint, "/")
+		if !strings.Contains(host, "://") {
+			host = "https://" + host
+		}
+	}
+	return host + "/" + version + "/projects/" + env.ProjectID + "/locations/" + env.LocationID + "/interactions"
 }

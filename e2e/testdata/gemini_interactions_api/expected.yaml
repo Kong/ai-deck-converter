@@ -90,8 +90,9 @@ plugins:
             log_payloads: false
             log_statistics: true
           model:
-            model_alias: gemini-agentic
             name: gemini-2.5-pro
+            options:
+              upstream_url: https://generativelanguage.googleapis.com/v1/interactions
             provider: gemini
           route_type: llm/v1/responses
     route:
@@ -123,8 +124,9 @@ plugins:
             log_payloads: false
             log_statistics: true
           model:
-            model_alias: gemini-agentic
             name: gemini-2.5-pro
+            options:
+              upstream_url: https://generativelanguage.googleapis.com/v1beta/interactions
             provider: gemini
           route_type: llm/v1/responses
     route:
@@ -151,13 +153,18 @@ plugins:
         - auth:
             header_name: x-goog-api-key
             header_value: e2e-fake-gemini-key
-          description: gemini-2.5-pro
+          description: gemini-2.5-pro-enterprise
           logging:
             log_payloads: false
             log_statistics: true
           model:
-            model_alias: gemini-agentic
-            name: gemini-2.5-pro
+            name: gemini-2.5-pro-enterprise
+            options:
+              gemini:
+                api_endpoint: https://us-central1-aiplatform.googleapis.com
+                location_id: us-central1
+                project_id: my-project
+              upstream_url: https://us-central1-aiplatform.googleapis.com/v1/projects/my-project/locations/us-central1/interactions
             provider: gemini
           route_type: llm/v1/responses
     route:
@@ -184,13 +191,18 @@ plugins:
         - auth:
             header_name: x-goog-api-key
             header_value: e2e-fake-gemini-key
-          description: gemini-2.5-pro
+          description: gemini-2.5-pro-enterprise
           logging:
             log_payloads: false
             log_statistics: true
           model:
-            model_alias: gemini-agentic
-            name: gemini-2.5-pro
+            name: gemini-2.5-pro-enterprise
+            options:
+              gemini:
+                api_endpoint: https://us-central1-aiplatform.googleapis.com
+                location_id: us-central1
+                project_id: my-project
+              upstream_url: https://us-central1-aiplatform.googleapis.com/v1beta1/projects/my-project/locations/us-central1/interactions
             provider: gemini
           route_type: llm/v1/responses
     route:

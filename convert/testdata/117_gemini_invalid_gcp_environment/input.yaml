@@ -1,0 +1,40 @@
+# project_id and location_id go into the Gemini Enterprise URL. A target with
+# an invalid value is absent with a warning. The valid target still converts.
+model_providers:
+  - name: gemini-prod
+    type: gemini
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://ai/gemini-token}"
+models:
+  - name: gemini-agentic
+    type: model
+    capabilities: [agentic]
+    formats: [{type: gemini}]
+    config:
+      route: {paths: [/ai]}
+    targets:
+      - name: bad-project
+        provider: gemini-prod
+        config:
+          type: gemini
+          gcp_environment:
+            project_id: my/project
+            location_id: us-central1
+      - name: bad-location
+        provider: gemini-prod
+        config:
+          type: gemini
+          gcp_environment:
+            project_id: my-project
+            location_id: evil.example.com/x
+      - name: regional
+        provider: gemini-prod
+        config:
+          type: gemini
+          gcp_environment:
+            project_id: my-project
+            location_id: us-central1

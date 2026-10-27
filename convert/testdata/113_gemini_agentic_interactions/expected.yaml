@@ -1,0 +1,82 @@
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: gemini-responses
+        paths:
+          - /ai/v1/interactions
+        methods:
+          - GET
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: gemini-beta-responses
+        paths:
+          - /ai/v1beta/interactions
+        methods:
+          - GET
+          - POST
+          - OPTIONS
+        strip_path: false
+plugins:
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: gemini-responses
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: gemini
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/gemini-token}'
+          description: gemini-2.5-pro
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: gemini-2.5-pro
+            options:
+              upstream_url: https://generativelanguage.googleapis.com/v1/interactions
+            provider: gemini
+          route_type: llm/v1/responses
+    route: gemini-responses
+    model: gemini-agentic
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: gemini-beta-responses
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: gemini
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/gemini-token}'
+          description: gemini-2.5-pro
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: gemini-2.5-pro
+            options:
+              upstream_url: https://generativelanguage.googleapis.com/v1beta/interactions
+            provider: gemini
+          route_type: llm/v1/responses
+    route: gemini-beta-responses
+    model: gemini-agentic
+ai_models:
+  - name: gemini-agentic
