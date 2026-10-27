@@ -302,10 +302,10 @@ func testGeminiInteractionsAPI(t *testing.T, license string) {
 // openai chat, responses, and files endpoints and the anthropic messages
 // endpoint.
 func testBedrockModelAllEndpoints(t *testing.T, license string) {
-	configPath := convertCase(t, "bedrock_model_all_endpoints", "2.2", nil)
+	configPath := convertCase(t, "bedrock_model_all_endpoints", "2.3", nil)
 
 	gateway := startGateway(t, GatewayOptions{
-		Image:  gatewayImage(t, "kong/kong-ai-gateway-dev:39781160847-8e8728ff5c40091224a4182628fac5a80f6b29dc"),
+		Image:  gatewayImage(t, "kong/kong-ai-gateway-dev:2.3.0-rc.1"),
 		Config: configPath,
 		Env:    []string{licenseEnv(license)},
 	})

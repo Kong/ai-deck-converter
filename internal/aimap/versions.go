@@ -77,6 +77,7 @@ const (
 	FeatureSkillsCapability           Feature = "skills-capability"
 	FeatureFailoverHTTPCodes          Feature = "failover-http-codes"
 	FeatureBedrockVPCEndpoint         Feature = "bedrock-vpc-endpoint"
+	FeatureBedrockEndpointType        Feature = "bedrock-endpoint-type"
 	FeatureMCPTokenVault              Feature = "mcp-token-vault"      //nolint:gosec // a feature name, not a credential
 	FeatureProviderTokenVault         Feature = "provider-token-vault" //nolint:gosec // a feature name, not a credential
 	FeatureMCPRateLimiting            Feature = "mcp-rate-limiting"
@@ -99,6 +100,7 @@ var featureSince = map[Feature]Version{
 	FeatureSkillsCapability:           mustVersion("2.2"),
 	FeatureFailoverHTTPCodes:          mustVersion("2.3"),
 	FeatureBedrockVPCEndpoint:         mustVersion("2.3"),
+	FeatureBedrockEndpointType:        mustVersion("2.3"),
 	FeatureMCPTokenVault:              mustVersion("2.3"),
 	FeatureProviderTokenVault:         mustVersion("2.3"),
 	FeatureMCPRateLimiting:            mustVersion("2.3"),
@@ -126,6 +128,10 @@ func Supports(f Feature, v Version) bool {
 // TargetCostListKeys are the target-config keys that FeatureTargetCostList
 // gates.
 var TargetCostListKeys = []string{"input_cost_list", "output_cost_list", "cache_read_cost_list"}
+
+// BedrockEndpointTypeKeys are the target-config keys that
+// FeatureBedrockEndpointType gates. Older data planes reject each key.
+var BedrockEndpointTypeKeys = []string{"endpoint_type", "mantle_openai_path_prefix"}
 
 // FailoverHTTPCodes are the failover_criteria values that
 // FeatureFailoverHTTPCodes gates.

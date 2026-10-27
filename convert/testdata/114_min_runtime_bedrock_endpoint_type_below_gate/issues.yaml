@@ -1,0 +1,24 @@
+- code: UNSUPPORTED_IN_MIN_RUNTIME_VERSION
+  reason: targets[0].config.endpoint_type requires minimum runtime version "2.3", but the configured minimum is "2.2"
+  source:
+    kind: model
+    name: mantle-chat
+    fields:
+      - targets[0].config.endpoint_type
+  severity: ERROR
+- code: UNSUPPORTED_IN_MIN_RUNTIME_VERSION
+  reason: targets[0].config.endpoint_type requires minimum runtime version "2.3", but the configured minimum is "2.2"
+  source:
+    kind: model
+    name: runtime-chat
+    fields:
+      - targets[0].config.endpoint_type
+  severity: ERROR
+- code: UNSUPPORTED_IN_MIN_RUNTIME_VERSION
+  reason: targets[0].config.mantle_openai_path_prefix requires minimum runtime version "2.3", but the configured minimum is "2.2"
+  source:
+    kind: model
+    name: prefix-chat
+    fields:
+      - targets[0].config.mantle_openai_path_prefix
+  severity: ERROR

@@ -476,6 +476,9 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 			field := fmt.Sprintf("targets[%d].config.vpc_endpoint", j)
 			return c.failUnsupported(src.at(field), aimap.FeatureBedrockVPCEndpoint, field)
 		}
+		if err := c.checkBedrockEndpointType(src, tm, j); err != nil {
+			return err
+		}
 		tv, err := c.providerTokenVault(src, m, j, provider)
 		if err != nil {
 			return err
@@ -1614,6 +1617,22 @@ func (c *Converter) checkModelFeatures(src ConversionIssueSource, m *aigw.Model)
 				c.reportUnsupported(src.at(field), Warning, aimap.FeatureFailoverHTTPCodes,
 					fmt.Sprintf("%s: %s", field, code))
 			}
+		}
+	}
+	return nil
+}
+
+// checkBedrockEndpointType fails the model when target j sets a key of
+// aimap.BedrockEndpointTypeKeys that the minimum runtime version lacks.
+// Without the key, traffic goes to a different Bedrock endpoint.
+func (c *Converter) checkBedrockEndpointType(src ConversionIssueSource, tm *aigw.TargetModel, j int) error {
+	if c.supports(aimap.FeatureBedrockEndpointType) {
+		return nil
+	}
+	for _, key := range aimap.BedrockEndpointTypeKeys {
+		if _, ok := tm.Config.Options[key]; ok {
+			field := fmt.Sprintf("targets[%d].config.%s", j, key)
+			return c.failUnsupported(src.at(field), aimap.FeatureBedrockEndpointType, field)
 		}
 	}
 	return nil
