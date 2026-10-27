@@ -49,6 +49,7 @@ var allFeatures = []Feature{
 	FeatureSkillsCapability,
 	FeatureFailoverHTTPCodes,
 	FeatureBedrockVPCEndpoint,
+	FeatureBedrockEndpointType,
 	FeatureMCPTokenVault,
 	FeatureProviderTokenVault,
 	FeatureMCPRateLimiting,

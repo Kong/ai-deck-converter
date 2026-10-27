@@ -1,0 +1,63 @@
+# endpoint_type and mantle_openai_path_prefix need 2.3. At 2.2 each model that
+# sets one is absent with an error. Without the field, traffic would go to the
+# runtime endpoint. The model without either field still converts.
+model_providers:
+  - name: bedrock-prod
+    type: bedrock
+    config:
+      auth:
+        type: aws
+        access_key_id: "{vault://ai/aws-access-key-id}"
+        secret_access_key: "{vault://ai/aws-secret-access-key}"
+models:
+  - name: mantle-chat
+    type: model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/mantle]}
+    targets:
+      - name: openai.gpt-oss-120b
+        provider: bedrock-prod
+        config:
+          type: bedrock
+          region: us-east-1
+          endpoint_type: mantle
+  - name: runtime-chat
+    type: model
+    capabilities: [generate]
+    formats: [{type: bedrock}]
+    config:
+      route: {paths: [/runtime]}
+    targets:
+      - name: anthropic.claude-sonnet-4-5
+        provider: bedrock-prod
+        config:
+          type: bedrock
+          region: us-east-1
+          endpoint_type: runtime
+  - name: prefix-chat
+    type: model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/prefix]}
+    targets:
+      - name: openai.gpt-oss-120b
+        provider: bedrock-prod
+        config:
+          type: bedrock
+          region: us-east-1
+          mantle_openai_path_prefix: /openai/v1
+  - name: claude-public
+    type: model
+    capabilities: [generate]
+    formats: [{type: bedrock}]
+    config:
+      route: {paths: [/public]}
+    targets:
+      - name: anthropic.claude-sonnet-4-5
+        provider: bedrock-prod
+        config:
+          type: bedrock
+          region: us-east-1

@@ -60,7 +60,7 @@ func TestE2E(t *testing.T) {
 				"kong/kong-ai-gateway-dev:39946325377-167b5f34f5ae4ac4be1782b22b9f250caefa76f5")
 			// TODO update the gateway image to the 2.3 image
 		}},
-		{"wildcard_model_all_endpoints_2_3", func(t *testing.T) {
+		{"wildcard_model_all_endpoints_2_4", func(t *testing.T) {
 			testWildcardModelAllEndpoints(t, license, "wildcard_model_all_endpoints_2_4", "2.4",
 				"kong/kong-ai-gateway-dev:39946325377-167b5f34f5ae4ac4be1782b22b9f250caefa76f5")
 			// TODO update the gateway image so that this test passes
