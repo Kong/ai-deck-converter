@@ -74,7 +74,7 @@ func TestE2E(t *testing.T) {
 	}
 }
 
-// tokenVaultImage is an aigw-master build that carries the Token Vault
+// tokenVaultImage is a 2.3.0-rc.1 dev build that carries the Token Vault
 // plugins, which merged in kong/kong-ee#21787. A released tag can replace
 // this once one ships.
 const tokenVaultImage = "kong/kong-ai-gateway-dev:2.3.0-rc.1"

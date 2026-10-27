@@ -1296,6 +1296,17 @@ func (c *Converter) checkTarget(m *aigw.Model, j int) (*aigw.Provider, string, *
 				"%s format; the target is omitted", m.Name, tm.Name, strings.Join(formats, ", ")),
 		}
 	}
+	if providerType == "gemini" {
+		env := aimap.GeminiEnvFromOptions(tm.Config.Options)
+		if key := env.InvalidField(); key != "" {
+			return nil, "", &targetProblem{
+				field: fmt.Sprintf("targets[%d].config.gcp_environment.%s", j, key),
+				code:  ConfigFieldInvalid,
+				reason: fmt.Sprintf("model %q target %q: gcp_environment.%s is not a valid Google Cloud ID; "+
+					"the target is omitted", m.Name, tm.Name, key),
+			}
+		}
+	}
 	return provider, providerType, nil
 }
 
