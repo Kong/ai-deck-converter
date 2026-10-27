@@ -36,34 +36,34 @@ func aclConfig(acls aigw.ACLs) map[string]any {
 	return config
 }
 
-// celFieldPaths returns the path of each CEL field that acls sets. Each path
-// starts with prefix.
+// aclFieldPaths returns prefix plus the name of each field that acls sets.
+func aclFieldPaths(prefix string, acls aigw.ACLs) []string {
+	return fieldPaths(prefix, acls, false)
+}
+
+// celFieldPaths returns prefix plus the name of each CEL field that acls sets.
 func celFieldPaths(prefix string, acls aigw.ACLs) []string {
+	return fieldPaths(prefix, acls, true)
+}
+
+func fieldPaths(prefix string, acls aigw.ACLs, celOnly bool) []string {
 	var paths []string
 	for _, f := range aclFields {
-		if f.cel && len(f.values(acls)) > 0 {
-			paths = append(paths, prefix+"."+f.name)
+		if (f.cel || !celOnly) && len(f.values(acls)) > 0 {
+			paths = append(paths, prefix+f.name)
 		}
 	}
 	return paths
 }
 
-// aclFieldsSet names the acl-plugin config fields an ACL populates, in schema
-// order. More than one name means the ACL has no valid single-plugin
-// representation, since the four fields are mutually exclusive.
-func aclFieldsSet(acls aigw.ACLs) []string {
-	var set []string
-	for _, f := range aclFields {
-		if len(f.values(acls)) > 0 {
-			set = append(set, f.name)
-		}
-	}
-	return set
+// mixesACLPairs reports whether acls sets a field of the allow/deny pair and
+// a field of the allow_when/deny_when pair.
+func mixesACLPairs(acls aigw.ACLs) bool {
+	return len(acls.Allow)+len(acls.Deny) > 0 && len(acls.AllowWhen)+len(acls.DenyWhen) > 0
 }
 
-// mergeACLs joins each list of base and extra, base first. The result can set
-// both field pairs, because one ai-mcp-proxy record accepts all four fields.
-// Duplicate subjects stay.
+// mergeACLs joins each list of base and extra, base first. Duplicate subjects
+// stay.
 func mergeACLs(base, extra aigw.ACLs) aigw.ACLs {
 	return aigw.ACLs{
 		Allow:     slices.Concat(base.Allow, extra.Allow),

@@ -8,7 +8,6 @@ mcp_servers:
       route: {paths: [/mcp/flights]}
     access:
       acls:
-        allow: [partners]
         deny_when:
           - "has(principal.metadata.status) && principal.metadata.status == 'suspended'"
       default_tool_acls:

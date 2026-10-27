@@ -509,7 +509,6 @@ mcp_servers:
 func TestMCPACLWhenConverts(t *testing.T) {
 	access := `    access:
       acls:
-        allow: [partners]
         allow_when: ["principal.metadata.tier == 'partner'"]
       default_tool_acls:
         deny_when: ["principal.metadata.status == 'suspended'"]`
@@ -522,7 +521,6 @@ func TestMCPACLWhenConverts(t *testing.T) {
 	require.Empty(t, result.Issues)
 	cfg := result.Output.Services[0].Routes[0].Plugins[0].Config
 	require.Equal(t, []map[string]any{{
-		"allow":      []string{"partners"},
 		"allow_when": []string{"principal.metadata.tier == 'partner'"},
 		"deny_when":  []string{"principal.metadata.status == 'suspended'"},
 	}}, cfg["default_acl"])
@@ -584,6 +582,61 @@ func TestMCPACLWhenBelowGate(t *testing.T) {
 			require.Len(t, result.Output.Services, 1, "the MCP server still converts")
 			plugin := result.Output.Services[0].Routes[0].Plugins[0]
 			require.Empty(t, plugin.Config["tools"], "the tool is left out")
+		})
+	}
+}
+
+// TestMCPACLMixedPairsAfterMerge checks that the merged server ACL uses one
+// field pair. A mix leaves out the MCP server.
+func TestMCPACLMixedPairsAfterMerge(t *testing.T) {
+	cases := []struct {
+		name   string
+		access string
+		fields []string
+	}{
+		{
+			name: "allow and deny_when in acls",
+			access: `    access:
+      acls:
+        allow: [partners]
+        deny_when: ["principal.metadata.status == 'suspended'"]`,
+			fields: []string{"access.acls.allow", "access.acls.deny_when"},
+		},
+		{
+			name: "allow and deny_when in default_tool_acls",
+			access: `    access:
+      default_tool_acls:
+        allow: [partners]
+        deny_when: ["principal.metadata.status == 'suspended'"]`,
+			fields: []string{"access.default_tool_acls.allow", "access.default_tool_acls.deny_when"},
+		},
+		{
+			name: "allow in acls and deny_when in default_tool_acls",
+			access: `    access:
+      acls:
+        allow: [partners]
+      default_tool_acls:
+        deny_when: ["principal.metadata.status == 'suspended'"]`,
+			fields: []string{"access.acls.allow", "access.default_tool_acls.deny_when"},
+		},
+		{
+			name: "mix across acls and default_tool_acls",
+			access: `    access:
+      acls:
+        deny: [interns]
+      default_tool_acls:
+        allow_when: ["principal.metadata.tier == 'gold'"]`,
+			fields: []string{"access.acls.deny", "access.default_tool_acls.allow_when"},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			result, err := Convert([]byte(fmt.Sprintf(mcpWhenACLInput, tc.access, "")), testOptions)
+			require.NoError(t, err)
+			requireIssue(t, result.Issues, Error, ConfigFieldInvalid, kindMCPServer,
+				"guarded-mcp", tc.fields...)
+			require.Empty(t, result.Output.Services, "the MCP server is left out")
 		})
 	}
 }

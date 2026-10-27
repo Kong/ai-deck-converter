@@ -115,16 +115,12 @@ func (c *Converter) scopedPlugins(src ConversionIssueSource, refs []string, acls
 		// config.allow_when, config.deny_when}; an AI Gateway acl that sets more
 		// than one is not representable as one valid plugin, so reject it rather
 		// than emit config the gateway will refuse to load.
-		if set := aclFieldsSet(acls); len(set) > 1 {
-			fields := make([]string, len(set))
-			for i, name := range set {
-				fields[i] = "access.acls." + name
-			}
-			return nil, c.fail(src.at(fields...), ConfigFieldInvalid,
+		if set := aclFieldPaths("", acls); len(set) > 1 {
+			return nil, c.fail(src.at(aclFieldPaths("access.acls.", acls)...), ConfigFieldInvalid,
 				"acl policy sets %s, but a Kong acl plugin permits exactly one of "+
 					"allow, deny, allow_when, or deny_when", strings.Join(set, " and "))
 		}
-		if fields := celFieldPaths("access.acls", acls); len(fields) > 0 && !c.supports(aimap.FeatureACLWhen) {
+		if fields := celFieldPaths("access.acls.", acls); len(fields) > 0 && !c.supports(aimap.FeatureACLWhen) {
 			return nil, c.failUnsupported(src.at(fields...), aimap.FeatureACLWhen, fields[0])
 		}
 		plugins = append(plugins, aclPlugin(acls))

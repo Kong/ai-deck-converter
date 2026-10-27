@@ -10,9 +10,7 @@ services:
           - name: ai-mcp-proxy
             config:
               default_acl:
-                - allow:
-                    - partners
-                  allow_when:
+                - allow_when:
                     - has(principal.metadata.tier) && principal.metadata.tier == 'gold'
                   deny_when:
                     - has(principal.metadata.status) && principal.metadata.status == 'suspended'

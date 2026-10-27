@@ -413,8 +413,16 @@ func (c *Converter) mcpPlugin(src ConversionIssueSource, m *aigw.MCPServer) (kon
 	setIfNotEmpty(cfg, "acl_attribute_type", m.Access.ACLAttributeType)
 	setIfNotEmpty(cfg, "access_token_claim_field", m.Access.AccessTokenClaimField)
 	serverACLs := mergeACLs(m.Access.ACLs, m.Access.DefaultToolACLs)
-	fields := slices.Concat(celFieldPaths("access.acls", m.Access.ACLs),
-		celFieldPaths("access.default_tool_acls", m.Access.DefaultToolACLs))
+	if mixesACLPairs(serverACLs) {
+		return kong.Plugin{}, c.fail(src.at(slices.Concat(
+			aclFieldPaths("access.acls.", m.Access.ACLs),
+			aclFieldPaths("access.default_tool_acls.", m.Access.DefaultToolACLs))...),
+			ConfigFieldInvalid,
+			"MCP server %q: access.acls and access.default_tool_acls together must use "+
+				"either allow and deny, or allow_when and deny_when", m.Name)
+	}
+	fields := slices.Concat(celFieldPaths("access.acls.", m.Access.ACLs),
+		celFieldPaths("access.default_tool_acls.", m.Access.DefaultToolACLs))
 	if len(fields) > 0 && !c.supports(aimap.FeatureMCPACLWhen) {
 		return kong.Plugin{}, c.failUnsupported(src.at(fields...), aimap.FeatureMCPACLWhen, fields[0])
 	}
@@ -485,7 +493,7 @@ func (c *Converter) mcpTools(src ConversionIssueSource, serverName string, tools
 		setIfNotEmptyMap(tool, "output_schema", t.OutputSchema)
 		// The tool is left out, so no client reaches it without its access
 		// control.
-		fields := celFieldPaths(fmt.Sprintf("tools[%d].access.acls", i), t.Access.ACLs)
+		fields := celFieldPaths(fmt.Sprintf("tools[%d].access.acls.", i), t.Access.ACLs)
 		if len(fields) > 0 && !c.supports(aimap.FeatureMCPACLWhen) {
 			c.reportUnsupported(src.at(fields...), Warning, aimap.FeatureMCPACLWhen, fields[0])
 			continue

@@ -26,8 +26,6 @@ mcp_servers:
               - has(principal.metadata.role) && principal.metadata.role == 'buyer'
     access:
       default_tool_acls:
-        allow:
-          - partners
         allow_when:
           - has(principal.metadata.tier) && principal.metadata.tier == 'gold'
         deny_when:
