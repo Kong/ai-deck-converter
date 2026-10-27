@@ -185,7 +185,7 @@ func (c *Converter) authStrategyTokenVaultDatastore(
 // authorization code flow, so it carries no redirect_uri.
 func (c *Converter) tvManagerOIDCConfig(
 	src ConversionIssueSource, idp *aigw.AuthStrategy,
-) (map[string]any, error) {
+) map[string]any {
 	b := c.tvOIDC(src, idp)
 	b.remove(tvManagerOIDCRemovedFields...)
 	delete(b.cfg, "redirect_uri")
@@ -197,7 +197,7 @@ func (c *Converter) tvManagerOIDCConfig(
 		"because an anonymous caller must reach the plugin login page.",
 		tvOIDCSessionMethod)
 	b.applyTokenEndpointAuthMethod()
-	return b.cfg, nil
+	return b.cfg
 }
 
 // tvManagerLoginOIDCConfig returns the openid-connect config of the Token
@@ -207,7 +207,7 @@ func (c *Converter) tvManagerOIDCConfig(
 // URI from the request, and the exchange completes on this route.
 func (c *Converter) tvManagerLoginOIDCConfig(
 	src ConversionIssueSource, idp *aigw.AuthStrategy,
-) (map[string]any, error) {
+) map[string]any {
 	b := c.tvOIDC(src, idp)
 	b.remove(tvManagerOIDCRemovedFields...)
 	b.remove("anonymous")
@@ -238,7 +238,7 @@ func (c *Converter) tvManagerLoginOIDCConfig(
 	if method, _ := b.cfg["token_endpoint_auth_method"].(string); method == tvOIDCPublicClientAuthMethod {
 		b.set("require_proof_key_for_code_exchange", true)
 	}
-	return b.cfg, nil
+	return b.cfg
 }
 
 // managerAuthorizationCookiePath returns the path that the authorization
@@ -412,7 +412,7 @@ func (b *tvOIDC) report(code ConversionIssueCode, field, format string, args ...
 // returns to this path, which is the one redirect URI that the authorization
 // server knows, and login_action then sends the browser back to the start URL
 // with the enrollment token.
-func (c *Converter) tvEnrollmentOIDCConfig(src ConversionIssueSource, idp *aigw.AuthStrategy) (map[string]any, error) {
+func (c *Converter) tvEnrollmentOIDCConfig(src ConversionIssueSource, idp *aigw.AuthStrategy) map[string]any {
 	b := c.tvOIDC(src, idp)
 	b.remove(tvEnrollmentOIDCRemovedFields...)
 	b.set("hide_credentials", false)
@@ -428,7 +428,7 @@ func (c *Converter) tvEnrollmentOIDCConfig(src ConversionIssueSource, idp *aigw.
 	b.forceAuthMethods("The enrollment start route uses [session, authorization_code], "+
 		"because the route starts the browser login.",
 		tvOIDCSessionMethod, tvOIDCAuthCodeMethod)
-	return b.cfg, nil
+	return b.cfg
 }
 
 // secureTokenVaultCallbackRoute adds the enrollment start route with its
@@ -468,14 +468,7 @@ func (c *Converter) secureTokenVaultCallbackRoute() {
 		return
 	}
 	src := issueSource(kindAuthStrategy, chosen.Name)
-	initiate, err := c.tvEnrollmentOIDCConfig(src, chosen)
-	if err != nil {
-		// The /_vault route would serve an unprotected start path.
-		c.out.Routes = slices.DeleteFunc(slices.Clone(c.out.Routes), func(r kong.Route) bool {
-			return r.Name == aimap.TokenVaultCallbackName || r.Name == aimap.TokenVaultCallbackInitiateName
-		})
-		return
-	}
+	initiate := c.tvEnrollmentOIDCConfig(src, chosen)
 	callback := c.out.Routes[i]
 	c.out.Routes = slices.Insert(slices.Clone(c.out.Routes), i+1, kong.Route{
 		Name:      aimap.TokenVaultCallbackInitiateName,
@@ -612,14 +605,8 @@ func (c *Converter) credentialManagerRoute(
 			}
 		}
 	}
-	pageConfig, err := c.tvManagerOIDCConfig(src, idp)
-	if err != nil {
-		return err
-	}
-	loginConfig, err := c.tvManagerLoginOIDCConfig(src, idp)
-	if err != nil {
-		return err
-	}
+	pageConfig := c.tvManagerOIDCConfig(src, idp)
+	loginConfig := c.tvManagerLoginOIDCConfig(src, idp)
 	config, err := aimap.ApplyTokenVaultDatastore(nil, ds)
 	if err != nil {
 		return c.fail(src.at("datastores[0].name"), ConfigFieldInvalid, "auth strategy %q: %v", idp.Name, err)
