@@ -1,7 +1,6 @@
 package convert
 
 import (
-	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -526,13 +525,6 @@ func convertTokenVaultStrategyResult(t *testing.T, extra string, enabled bool) *
 	return res
 }
 
-func stubSessionSecret(t *testing.T, fn func() (string, error)) {
-	t.Helper()
-	prev := newSessionSecret
-	t.Cleanup(func() { newSessionSecret = prev })
-	newSessionSecret = fn
-}
-
 func TestAuthStrategyTokenVaultLeavesEntityPluginUnchanged(t *testing.T) {
 	got := convertTokenVaultStrategy(t, "      hide_credentials: true", true)
 
@@ -587,7 +579,6 @@ func TestAuthStrategyTokenVaultCredentialManagerPageConfig(t *testing.T) {
 		"logout_query_arg":             "logout",
 		"auth_methods":                 []any{"session"},
 		"token_endpoint_auth_method":   "none",
-		"session_secret":               got.page["session_secret"],
 	}, got.page)
 	require.NotContains(t, got.page, "redirect_uri",
 		"the login route owns the authorization code flow")
@@ -598,12 +589,6 @@ func TestAuthStrategyTokenVaultCredentialManagerPageConfig(t *testing.T) {
 // completes on the route itself, and the default login action serves the
 // page there. A public client always uses PKCE.
 func TestAuthStrategyTokenVaultCredentialManagerLoginConfig(t *testing.T) {
-	calls := 0
-	stubSessionSecret(t, func() (string, error) {
-		calls++
-		return "generated", nil
-	})
-
 	got := convertTokenVaultStrategy(t, "", true)
 
 	require.Equal(t, map[string]any{
@@ -614,13 +599,10 @@ func TestAuthStrategyTokenVaultCredentialManagerLoginConfig(t *testing.T) {
 		"authorization_cookie_path":           "/vuc/sso",
 		"token_endpoint_auth_method":          "none",
 		"require_proof_key_for_code_exchange": true,
-		"session_secret":                      got.login["session_secret"],
 	}, got.login)
 	require.NotContains(t, got.login, "login_action")
 	require.NotContains(t, got.login, "login_redirect_uri")
 	require.Nil(t, got.callback, "the /_vault route carries no openid-connect plugin")
-	require.Equal(t, "generated", got.initiate["session_secret"])
-	require.Equal(t, 1, calls, "the secret is generated once per strategy")
 }
 
 // A strategy redirect_uri sends the exchange to its own path, so the
@@ -639,17 +621,6 @@ func TestAuthStrategyTokenVaultCredentialManagerLoginRedirectURI(t *testing.T) {
 		"the redirect must not carry the signed id token")
 	require.Equal(t, []any{"https://app.example.com/signin"}, got.login["redirect_uri"])
 	require.NotContains(t, got.page, "redirect_uri")
-}
-
-// Every route of one strategy shares one session secret, so the browser
-// session works on each of them.
-func TestAuthStrategyTokenVaultCredentialManagerSessionSecretShared(t *testing.T) {
-	res := convertTokenVaultStrategyResult(t, "      session_secret: mine", true)
-	got := tvOIDCPlugins(res)
-
-	require.Equal(t, "mine", got.page["session_secret"])
-	require.Equal(t, "mine", got.login["session_secret"])
-	require.Equal(t, "mine", got.initiate["session_secret"])
 }
 
 // A client secret means a confidential client. The plugin then picks the token
@@ -741,7 +712,6 @@ func TestAuthStrategyTokenVaultInitiateConfig(t *testing.T) {
 		"login_tokens":                 []any{},
 		"token_endpoint_auth_method":   "none",
 		"auth_methods":                 []any{"session", "authorization_code"},
-		"session_secret":               got.initiate["session_secret"],
 	}, got.initiate)
 }
 
@@ -792,24 +762,6 @@ func requireStrategyIssue(t *testing.T, issues []ConversionIssue, code Conversio
 		}
 	}
 	require.Failf(t, "issue not found", "no %s issue for %s in %v", code, field, issues)
-}
-
-func TestAuthStrategyTokenVaultSessionSecretFailure(t *testing.T) {
-	stubSessionSecret(t, func() (string, error) { return "", errors.New("no entropy") })
-
-	res, _ := Convert([]byte(fmt.Sprintf(tokenVaultStrategyDoc, "", true)), testOptions)
-
-	requireIssue(t, res.Issues, Error, InternalError, kindAuthStrategy, "sso", "config.session_secret")
-	require.Empty(t, res.Output.Services)
-}
-
-func TestGenerateSessionSecret(t *testing.T) {
-	a, err := generateSessionSecret()
-	require.NoError(t, err)
-	b, err := generateSessionSecret()
-	require.NoError(t, err)
-	require.Regexp(t, `^[0-9a-f]{32}$`, a)
-	require.NotEqual(t, a, b)
 }
 
 //nolint:gosec
@@ -960,18 +912,6 @@ mcp_servers:
 
 	requireIssue(t, res.Issues, Error, ConfigFieldInvalid, kindAuthStrategy, "sso", "datastores[0].name")
 	require.Empty(t, res.Output.Services)
-}
-
-func TestAuthStrategyTokenVaultCallbackSessionSecretFailureRemovesRoute(t *testing.T) {
-	stubSessionSecret(t, func() (string, error) { return "", errors.New("no entropy") })
-
-	res := convertTokenVaultCallback(t, `  - name: sso
-    type: openid-connect
-    datastores: [{name: tv}]
-    config: {issuer: https://idp.example.com}`, "sso")
-
-	requireIssue(t, res.Issues, Error, InternalError, kindAuthStrategy, "sso", "config.session_secret")
-	require.Empty(t, res.Output.Routes, "an unprotected callback route is not output")
 }
 
 func TestAuthStrategyTokenVaultRollbackForgetsStrategy(t *testing.T) {

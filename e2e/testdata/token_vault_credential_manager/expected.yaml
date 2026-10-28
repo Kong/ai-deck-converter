@@ -222,7 +222,6 @@ plugins:
       scopes:
         - openid
         - offline_access
-      session_secret: 0123456789abcdef0123456789abcdef
       upstream_access_token_header: authorization:bearer
     route:
       id: 385691ef-9969-5a92-9979-3082412c6860
@@ -245,7 +244,6 @@ plugins:
       scopes:
         - openid
         - offline_access
-      session_secret: 0123456789abcdef0123456789abcdef
       upstream_access_token_header: authorization:bearer
     route:
       id: 88f0e5a9-47af-594b-95f6-0c0fda35affc
@@ -307,7 +305,6 @@ plugins:
       scopes:
         - openid
         - offline_access
-      session_secret: 0123456789abcdef0123456789abcdef
       upstream_access_token_header: authorization:bearer
     route:
       id: 28b01ec6-50e9-5282-8913-ac9b136b4a17

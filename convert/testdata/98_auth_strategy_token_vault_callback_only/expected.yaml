@@ -90,6 +90,5 @@ routes:
             - authorization_code
           login_tokens: []
           preserve_query_args: true
-          session_secret: 0123456789abcdef0123456789abcdef
           token_endpoint_auth_method: none
           upstream_access_token_header: authorization:bearer

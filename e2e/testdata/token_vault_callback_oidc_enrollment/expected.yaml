@@ -202,7 +202,6 @@ plugins:
       scopes:
         - openid
         - offline_access
-      session_secret: 0123456789abcdef0123456789abcdef
       upstream_access_token_header: authorization:bearer
     route:
       id: 385691ef-9969-5a92-9979-3082412c6860
