@@ -276,6 +276,72 @@ Earlier releases differ only by `sagemaker` (2.1), `typesafe` (2.2),
 `llm/v1/skills` (2.2), and `baseten` (2.3), which existing feature gates
 cover.
 
+### Plugin providers by format and capability
+
+The table applies `TargetSupports` and the version gates to the route type
+table. It gives the plugin providers that the data plane accepts for each
+format and capability. A row has no version gate unless its conditions give
+one. The oldest supported release is 2.0.
+
+A target passes the format check in three cases:
+
+- The format is `openai`.
+- The format is the plugin provider of the target.
+- The format is `anthropic` and the route type is `llm/v1/chat`.
+
+Thus the `bedrock`, `gemini`, `cohere`, `huggingface`, and `typesafe` formats
+accept only their own provider. A mantle target uses the mantle route types
+in place of the bedrock row. These are `llm/v1/chat`, `llm/v1/responses`,
+and `llm/v1/files`. A mantle target works only in the `openai` and
+`anthropic` formats. `endpoint_type: mantle` requires 2.3.
+
+"Chat providers" are the providers of `llm/v1/chat`: `openai`, `azure`,
+`anthropic`, `cohere`, `mistral`, `llama2`, `gemini`, `bedrock`,
+`databricks`, `huggingface`, `dashscope`, `xai`, `cerebras`, `vllm`,
+`deepseek`, `ollama`, `kimi`, `vercel`, `sagemaker`, `typesafe`, `baseten`.
+
+| Format        | Capability            | Route type                      | Plugin providers                                                                                                                    | Conditions                                                                                    |
+|---------------|-----------------------|---------------------------------|-------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------|
+| `openai`      | `generate`            | `llm/v1/chat`                   | Chat providers                                                                                                                      | bedrock: mantle (≥ 2.3) or not. sagemaker ≥ 2.1. typesafe ≥ 2.2. baseten ≥ 2.3                |
+| `openai`      | `agentic`             | `llm/v1/responses`              | `openai`, `azure`, `xai`, `vercel`, `bedrock`                                                                                       | bedrock: mantle only, ≥ 2.3                                                                   |
+| `openai`      | `embeddings`          | `llm/v1/embeddings`             | `openai`, `azure`, `cohere`, `mistral`, `llama2`, `gemini`, `bedrock`, `databricks`, `huggingface`, `dashscope`, `ollama`, `vercel` | bedrock: not mantle. llama2: not `format: raw`                                                |
+| `openai`      | `image`               | `image/v1/images/generations`   | `openai`, `azure`, `bedrock`, `gemini`, `dashscope`, `xai`, `vercel`                                                                | bedrock: not mantle                                                                           |
+| `openai`      | `audio/speech`        | `audio/v1/audio/speech`         | `openai`, `azure`                                                                                                                   |                                                                                               |
+| `openai`      | `audio/transcription` | `audio/v1/audio/transcriptions` | `openai`, `azure`                                                                                                                   |                                                                                               |
+| `openai`      | `audio/translation`   | `audio/v1/audio/translations`   | `openai`, `azure`                                                                                                                   |                                                                                               |
+| `openai`      | `realtime`            | `realtime/v1/realtime`          | `openai`, `azure`                                                                                                                   | gemini realtime works only in the `gemini` format                                             |
+| `openai`      | `video`               | `video/v1/videos/generations`   | `openai`, `azure`, `bedrock`, `gemini`, `huggingface`                                                                               | bedrock: not mantle                                                                           |
+| `openai`      | `batches`             | `llm/v1/batches`                | `openai`, `azure`, `bedrock`, `anthropic`, `gemini`, `kimi`                                                                         | bedrock: not mantle, needs `batch_bucket_prefix`                                              |
+| `openai`      | `files`               | `llm/v1/files`                  | `openai`, `azure`, `kimi`, `bedrock`                                                                                                | bedrock: mantle only, ≥ 2.3                                                                   |
+| `openai`      | `skills`              | `llm/v1/skills`                 | `openai`                                                                                                                            | ≥ 2.2. Needs the provider's own format                                                        |
+| `anthropic`   | `generate`            | `llm/v1/chat`                   | Chat providers                                                                                                                      | bedrock: mantle (≥ 2.3) or not. sagemaker ≥ 2.1. typesafe ≥ 2.2. baseten ≥ 2.3                |
+| `anthropic`   | `batches`             | `llm/v1/batches`                | `anthropic`                                                                                                                         |                                                                                               |
+| `anthropic`   | `skills`              | `llm/v1/skills`                 | `anthropic`                                                                                                                         | ≥ 2.2                                                                                         |
+| `bedrock`     | `generate`            | `llm/v1/chat`                   | `bedrock`                                                                                                                           | Not mantle. Applies to the converse, invoke, `/openai/v1`, and `/anthropic/v1` routes         |
+| `bedrock`     | `agentic`             | `llm/v1/chat`                   | `bedrock`                                                                                                                           | Not mantle                                                                                    |
+| `bedrock`     | `embeddings`          | `llm/v1/embeddings`             | `bedrock`                                                                                                                           | Not mantle                                                                                    |
+| `bedrock`     | `image`               | `image/v1/images/generations`   | `bedrock`                                                                                                                           | Not mantle                                                                                    |
+| `bedrock`     | `audio/speech`        | `llm/v1/chat`                   | `bedrock`                                                                                                                           | Not mantle                                                                                    |
+| `bedrock`     | `video`               | `video/v1/videos/generations`   | `bedrock`                                                                                                                           | Not mantle                                                                                    |
+| `bedrock`     | `rerank`              | `llm/v1/chat`                   | `bedrock`                                                                                                                           | Not mantle                                                                                    |
+| `bedrock`     | `batches`             | `llm/v1/batches`                | `bedrock`                                                                                                                           | Not mantle, needs `batch_bucket_prefix`                                                       |
+| `gemini`      | `generate`            | `llm/v1/chat`                   | `gemini`                                                                                                                            |                                                                                               |
+| `gemini`      | `agentic`             | `llm/v1/responses`              | `gemini`                                                                                                                            | ≥ 2.3. Standard routes need a non-enterprise target. Enterprise routes need an enterprise one |
+| `gemini`      | `embeddings`          | `llm/v1/embeddings`             | `gemini`                                                                                                                            |                                                                                               |
+| `gemini`      | `image`               | `image/v1/images/generations`   | `gemini`                                                                                                                            |                                                                                               |
+| `gemini`      | `video`               | `video/v1/videos/generations`   | `gemini`                                                                                                                            |                                                                                               |
+| `gemini`      | `realtime`            | `realtime/v1/realtime`          | `gemini`                                                                                                                            |                                                                                               |
+| `gemini`      | `batches`             | `llm/v1/batches`                | `gemini`                                                                                                                            |                                                                                               |
+| `gemini`      | `files`               | `llm/v1/chat`                   | `gemini`                                                                                                                            |                                                                                               |
+| `gemini`      | `rerank`              | `llm/v1/chat`                   | `gemini`                                                                                                                            |                                                                                               |
+| `cohere`      | `rerank`              | `llm/v1/chat`                   | `cohere`                                                                                                                            |                                                                                               |
+| `huggingface` | `generate`            | `llm/v1/chat`                   | `huggingface`                                                                                                                       |                                                                                               |
+| `typesafe`    | `decisions`           | `llm/v1/chat`                   | `typesafe`                                                                                                                          | ≥ 2.2. The format and the capability both have this gate                                      |
+
+The table leaves out two rules of `SupportedCapabilities`. `batches` and
+`files` are only for `type: api` models. One route label serves one genai
+category.
+
 ### Statistics
 
 The table copies the union of `UNSUPPORTED_LOG_STATISTICS` in 2.0 to 2.3:
