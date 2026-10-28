@@ -42,6 +42,7 @@ func TestE2E(t *testing.T) {
 		{"model_scoped_request_termination_auth", func(t *testing.T) { testModelScopedRequestTermination(t, license) }},
 		{"gemini_model_all_capabilities", func(t *testing.T) { testGeminiModelAllCapabilities(t, license) }},
 		{"bedrock_model_all_endpoints", func(t *testing.T) { testBedrockModelAllEndpoints(t, license) }},
+		{"bedrock_mantle_vpc_endpoint", func(t *testing.T) { testBedrockMantleVPCEndpoint(t, license) }},
 		{"gemini_interactions_api", func(t *testing.T) { testGeminiInteractionsAPI(t, license) }},
 		{"reusable_toolsets_are_internal_only", func(t *testing.T) { testReusableToolsetsAreInternalOnly(t, license) }},
 		{"token_vault_gates_tools_and_enrolls", func(t *testing.T) { testTokenVaultGatesToolsAndEnrolls(t, license) }},

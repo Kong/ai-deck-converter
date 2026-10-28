@@ -1,0 +1,52 @@
+# Bedrock mantle targets that also set vpc_endpoint, on every mantle endpoint.
+model_providers:
+  - name: bedrock-prod
+    type: bedrock
+    config:
+      auth:
+        type: aws
+        access_key_id: e2e-fake-access-key-id
+        secret_access_key: e2e-fake-secret-access-key
+models:
+  - name: mantle-vpc-openai
+    type: model
+    capabilities: [ generate, agentic ]
+    formats: [ { type: openai } ]
+    config:
+      route: { paths: [ /mantle-vpc-openai ] }
+    targets:
+      - name: openai.gpt-oss-120b
+        provider: bedrock-prod
+        config:
+          type: bedrock
+          region: us-east-1
+          endpoint_type: mantle
+          vpc_endpoint: vpce-0abc123-xyz.bedrock-mantle.us-east-1.vpce.amazonaws.com
+  - name: mantle-vpc-anthropic
+    type: model
+    capabilities: [ generate ]
+    formats: [ { type: anthropic } ]
+    config:
+      route: { paths: [ /mantle-vpc-anthropic ] }
+    targets:
+      - name: anthropic.claude-sonnet-4-5
+        provider: bedrock-prod
+        config:
+          type: bedrock
+          region: us-east-1
+          endpoint_type: mantle
+          vpc_endpoint: vpce-0abc123-xyz.bedrock-mantle.us-east-1.vpce.amazonaws.com
+  - name: mantle-vpc-files
+    type: api
+    capabilities: [ files ]
+    formats: [ { type: openai } ]
+    config:
+      route: { paths: [ /mantle-vpc-files ] }
+    targets:
+      - name: openai.gpt-oss-120b
+        provider: bedrock-prod
+        config:
+          type: bedrock
+          region: us-east-1
+          endpoint_type: mantle
+          vpc_endpoint: vpce-0abc123-xyz.bedrock-mantle.us-east-1.vpce.amazonaws.com

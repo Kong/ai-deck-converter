@@ -317,6 +317,65 @@ func testBedrockModelAllEndpoints(t *testing.T, license string) {
 	t.Logf("PASS: the gateway accepted all %d bedrock and bedrock mantle routes", loaded)
 }
 
+// testBedrockMantleVPCEndpoint proves the data plane accepts a bedrock target
+// that sets endpoint_type mantle and vpc_endpoint together. The admin API
+// check confirms that the loaded targets keep both fields.
+func testBedrockMantleVPCEndpoint(t *testing.T, license string) {
+	configPath := convertCase(t, "bedrock_mantle_vpc_endpoint", "2.3", nil)
+
+	gateway := startGateway(t, GatewayOptions{
+		Image:  gatewayImage(t, "kong/kong-ai-gateway-dev:2.3.0-rc.1"),
+		Config: configPath,
+		Env:    []string{licenseEnv(license)},
+	})
+	gateway.waitReady()
+
+	loaded := requireRoutesLoaded(t, gateway, "openai-chat", "openai-responses", "anthropic-messages", "openai-files")
+
+	status, _, body := httpGet(gateway.AdminURL() + "/plugins?size=1000")
+	if status != 200 {
+		t.Fatalf("GET /plugins returned %d:\n%s", status, body)
+	}
+	var plugins struct {
+		Data []struct {
+			Name   string `json:"name"`
+			Config struct {
+				Targets []struct {
+					Model struct {
+						Options struct {
+							Bedrock struct {
+								EndpointType string `json:"endpoint_type"`
+								VPCEndpoint  string `json:"vpc_endpoint"`
+							} `json:"bedrock"`
+						} `json:"options"`
+					} `json:"model"`
+				} `json:"targets"`
+			} `json:"config"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(body), &plugins); err != nil {
+		t.Fatalf("decoding GET /plugins: %v\n%s", err, body)
+	}
+	targets := 0
+	for _, p := range plugins.Data {
+		if p.Name != "ai-proxy-advanced" {
+			continue
+		}
+		for _, target := range p.Config.Targets {
+			bedrock := target.Model.Options.Bedrock
+			if bedrock.EndpointType != "mantle" || bedrock.VPCEndpoint == "" {
+				t.Fatalf("loaded target has endpoint_type %q and vpc_endpoint %q, want mantle and a VPC endpoint",
+					bedrock.EndpointType, bedrock.VPCEndpoint)
+			}
+			targets++
+		}
+	}
+	if targets == 0 {
+		t.Fatalf("the gateway loaded no ai-proxy-advanced targets:\n%s", body)
+	}
+	t.Logf("PASS: the gateway accepted %d routes and %d mantle targets with a vpc_endpoint", loaded, targets)
+}
+
 // requireRoutesLoaded fails t unless the gateway loaded each route in names.
 // It returns the count of loaded routes.
 func requireRoutesLoaded(t *testing.T, gateway *Gateway, names ...string) int {
