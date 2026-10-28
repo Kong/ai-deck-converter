@@ -1,0 +1,218 @@
+_format_version: "3.0"
+_transform: false
+services:
+  - id: 947a4e23-b483-5a65-8165-da9aed24565b
+    name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    host: ai-gateway.upstream.local
+    port: 80
+    protocol: http
+routes:
+  - id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+    name: openai-chat
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /mantle-vpc-openai/chat/completions
+    methods:
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: 1a3f650c-2709-5e79-a792-7ffd18243fbf
+    name: openai-responses
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /mantle-vpc-openai/responses
+    methods:
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: bb559a54-dc17-5c0f-b946-b0d9c5cebd7a
+    name: anthropic-messages
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /mantle-vpc-anthropic/v1/messages
+    methods:
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: b433d478-0f40-5518-b6bb-815583936241
+    name: openai-files
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /mantle-vpc-files/files
+    methods:
+      - GET
+      - POST
+      - DELETE
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+plugins:
+  - id: 17fa8192-4b9f-5b5a-8379-20ad8bc836a7
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+  - id: f3adc007-171c-5519-8763-3a0eef79bde3
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            aws_access_key_id: e2e-fake-access-key-id
+            aws_secret_access_key: e2e-fake-secret-access-key
+          description: openai.gpt-oss-120b
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: mantle-vpc-openai
+            name: openai.gpt-oss-120b
+            options:
+              bedrock:
+                aws_region: us-east-1
+                endpoint_type: mantle
+                mantle_openai_path_prefix: /v1
+                vpc_endpoint: vpce-0abc123-xyz.bedrock-mantle.us-east-1.vpce.amazonaws.com
+            provider: bedrock
+          route_type: llm/v1/chat
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+    model:
+      id: d23a124a-8212-5dc0-8a14-621e489306e7
+  - id: dcebfb31-cc0f-5469-b6d7-9d8807a4e8d2
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route:
+      id: 1a3f650c-2709-5e79-a792-7ffd18243fbf
+  - id: 75ff22ed-6245-594b-895f-6a9fa36f4581
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            aws_access_key_id: e2e-fake-access-key-id
+            aws_secret_access_key: e2e-fake-secret-access-key
+          description: openai.gpt-oss-120b
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: mantle-vpc-openai
+            name: openai.gpt-oss-120b
+            options:
+              bedrock:
+                aws_region: us-east-1
+                endpoint_type: mantle
+                mantle_openai_path_prefix: /v1
+                vpc_endpoint: vpce-0abc123-xyz.bedrock-mantle.us-east-1.vpce.amazonaws.com
+            provider: bedrock
+          route_type: llm/v1/responses
+    route:
+      id: 1a3f650c-2709-5e79-a792-7ffd18243fbf
+    model:
+      id: d23a124a-8212-5dc0-8a14-621e489306e7
+  - id: 5477cac7-3c38-581b-899b-f9d520e9d5e4
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route:
+      id: bb559a54-dc17-5c0f-b946-b0d9c5cebd7a
+  - id: 628550fd-b362-5247-b3ba-f2f6fa95de13
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      targets:
+        - auth:
+            aws_access_key_id: e2e-fake-access-key-id
+            aws_secret_access_key: e2e-fake-secret-access-key
+          description: anthropic.claude-sonnet-4-5
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: mantle-vpc-anthropic
+            name: anthropic.claude-sonnet-4-5
+            options:
+              anthropic_version: bedrock-2023-05-31
+              bedrock:
+                aws_region: us-east-1
+                endpoint_type: mantle
+                mantle_openai_path_prefix: auto_detect
+                vpc_endpoint: vpce-0abc123-xyz.bedrock-mantle.us-east-1.vpce.amazonaws.com
+            provider: bedrock
+          route_type: llm/v1/chat
+    route:
+      id: bb559a54-dc17-5c0f-b946-b0d9c5cebd7a
+    model:
+      id: dde0aacd-0604-5ea6-8103-edb122785d20
+  - id: 693f2c49-9a06-59cc-92cf-0747f3214011
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      model_name_header: false
+      targets:
+        - auth:
+            aws_access_key_id: e2e-fake-access-key-id
+            aws_secret_access_key: e2e-fake-secret-access-key
+          description: openai.gpt-oss-120b
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: openai.gpt-oss-120b
+            options:
+              bedrock:
+                aws_region: us-east-1
+                endpoint_type: mantle
+                mantle_openai_path_prefix: /v1
+                vpc_endpoint: vpce-0abc123-xyz.bedrock-mantle.us-east-1.vpce.amazonaws.com
+            provider: bedrock
+          route_type: llm/v1/files
+    route:
+      id: b433d478-0f40-5518-b6bb-815583936241
+ai_models:
+  - id: d23a124a-8212-5dc0-8a14-621e489306e7
+    name: mantle-vpc-openai
+  - id: dde0aacd-0604-5ea6-8103-edb122785d20
+    name: mantle-vpc-anthropic
+  - id: 8dc2b8d4-6b80-5832-9ec1-10036d1f88d6
+    name: mantle-vpc-files
