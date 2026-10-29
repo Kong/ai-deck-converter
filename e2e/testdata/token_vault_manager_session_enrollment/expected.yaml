@@ -122,6 +122,7 @@ plugins:
       issuer: http://host.docker.internal:18090
       redirect_uri:
         - http://127.0.0.1:8000/callback
+      session_secret: 0123456789abcdef0123456789abcdef
     route:
       id: b828b6c6-8777-5d27-bdaf-9448c1ee687b
   - id: 1e32a355-ee78-56eb-a7ef-380420219843

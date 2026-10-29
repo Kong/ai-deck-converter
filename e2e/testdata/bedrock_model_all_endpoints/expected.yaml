@@ -151,7 +151,8 @@ routes:
     service:
       id: 947a4e23-b483-5a65-8165-da9aed24565b
     paths:
-      - /mantle-openai/chat/completions
+      - /mantle-openai/v1/chat/completions
+      - /mantle-openai/openai/v1/chat/completions
     methods:
       - POST
       - OPTIONS
@@ -164,7 +165,8 @@ routes:
     service:
       id: 947a4e23-b483-5a65-8165-da9aed24565b
     paths:
-      - /mantle-openai/responses
+      - /mantle-openai/v1/responses
+      - /mantle-openai/openai/v1/responses
     methods:
       - POST
       - OPTIONS
