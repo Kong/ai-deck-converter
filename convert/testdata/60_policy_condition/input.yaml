@@ -8,7 +8,7 @@ models:
       - name: gpt-4o
         provider: openai-main
         config: {type: openai}
-    policies: [prompt-guard]
+    policies: [prompt-guard, token-limit]
     config:
       route: {paths: [/ai]}
 model_providers:
@@ -24,10 +24,15 @@ policies:
   - type: ai-prompt-guard
     name: prompt-guard
     condition: "http.request.headers.x_tier == \"premium\""
-    expressions:
-      is_post: "http.request.method == \"POST\""
     config:
       allow_patterns: ["^safe"]
+  # Model-scoped policy that sets custom_key from an expression.
+  - type: ai-rate-limiting-advanced
+    name: token-limit
+    expressions:
+      custom_key: http.request.headers.x_tenant
+    config:
+      strategy: local
   # Global policy carrying a condition expression.
   - type: rate-limiting
     name: org-wide-limit

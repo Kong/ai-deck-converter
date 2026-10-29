@@ -18,7 +18,7 @@
   reason: expressions requires minimum runtime version "2.3", but the configured minimum is "2.0"
   source:
     kind: policy
-    name: expr-guard
+    name: token-limit
     fields:
       - expressions
   severity: ERROR

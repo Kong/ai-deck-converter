@@ -11,19 +11,19 @@ models:
       - name: gpt-4o
         provider: openai-prod
         config: {type: openai}
-    policies: [prompt-guard, expr-guard, plain-guard]
+    policies: [prompt-guard, token-limit, plain-guard]
 policies:
   - type: ai-prompt-guard
     name: prompt-guard
     condition: 'http.request.headers.x_tier == "premium"'
     config:
       allow_patterns: ["^safe"]
-  - type: ai-prompt-guard
-    name: expr-guard
+  - type: ai-rate-limiting-advanced
+    name: token-limit
     expressions:
-      is_post: 'http.request.method == "POST"'
+      custom_key: http.request.headers.x_tenant
     config:
-      allow_patterns: ["^ok"]
+      strategy: local
   - type: ai-prompt-guard
     name: plain-guard
     config:

@@ -46,11 +46,16 @@ plugins:
     model: guarded-gpt
   - name: ai-prompt-guard
     condition: http.request.headers.x_tier == "premium"
-    expressions:
-      is_post: http.request.method == "POST"
     config:
       allow_patterns:
         - ^safe
+    route: openai-chat
+    model: guarded-gpt
+  - name: ai-rate-limiting-advanced
+    expressions:
+      custom_key: http.request.headers.x_tenant
+    config:
+      strategy: local
     route: openai-chat
     model: guarded-gpt
 ai_models:
