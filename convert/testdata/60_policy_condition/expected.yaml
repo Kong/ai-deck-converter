@@ -10,6 +10,13 @@ services:
           - POST
           - OPTIONS
         strip_path: false
+      - name: openai-chat-2
+        paths:
+          - /team/chat/completions
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
 plugins:
   - name: rate-limiting
     condition: http.request.path ~ "^/ai"
@@ -44,6 +51,34 @@ plugins:
           route_type: llm/v1/chat
     route: openai-chat
     model: guarded-gpt
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-chat-2
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://env/openai-key}'
+          description: gpt-4o
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: team-gpt
+            name: gpt-4o
+            provider: openai
+          route_type: llm/v1/chat
+    route: openai-chat-2
+    model: team-gpt
   - name: ai-prompt-guard
     condition: http.request.headers.x_tier == "premium"
     config:
@@ -51,5 +86,20 @@ plugins:
         - ^safe
     route: openai-chat
     model: guarded-gpt
+  - name: ai-rate-limiting-advanced
+    expressions:
+      custom_key: http.request.headers.x_tenant
+    config:
+      strategy: local
+    route: openai-chat
+    model: guarded-gpt
+  - name: ai-rate-limiting-advanced
+    expressions:
+      custom_key: http.request.headers.x_team
+    config:
+      strategy: local
+    route: openai-chat-2
+    model: team-gpt
 ai_models:
   - name: guarded-gpt
+  - name: team-gpt

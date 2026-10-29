@@ -137,16 +137,22 @@ func (c *Converter) policyPlugin(p *aigw.Policy, tags []string, preserveID bool)
 			aimap.FeaturePolicyCondition, "condition")
 		return kong.Plugin{}, false
 	}
+	if len(p.Expressions) > 0 && !c.supports(aimap.FeaturePolicyExpressions) {
+		c.reportUnsupported(issueSource(kindPolicy, p.Name).at("expressions"), Error,
+			aimap.FeaturePolicyExpressions, "expressions")
+		return kong.Plugin{}, false
+	}
 	config, ok := c.applyDatastore(p, c.normalizeRateLimitingProviderMatches(p))
 	if !ok {
 		return kong.Plugin{}, false
 	}
 	plugin := kong.Plugin{
-		Name:      p.Type,
-		Condition: p.Condition,
-		Config:    config,
-		Tags:      tags,
-		Source:    source("policy", p.Name, "config"),
+		Name:        p.Type,
+		Condition:   p.Condition,
+		Expressions: p.Expressions,
+		Config:      config,
+		Tags:        tags,
+		Source:      source("policy", p.Name, "config"),
 	}
 	if preserveID {
 		plugin.ID = p.ID

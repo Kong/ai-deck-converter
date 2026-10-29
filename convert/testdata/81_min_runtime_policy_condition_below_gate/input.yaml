@@ -1,5 +1,5 @@
-# condition needs 2.1. At 2.0 each policy with a condition is absent with an
-# error. The model and the policy without a condition still convert.
+# condition needs 2.1 and expressions needs 2.3. At 2.0 each policy with either
+# field is absent with an error. The model and the plain policy still convert.
 models:
   - name: guarded-gpt
     type: model
@@ -11,13 +11,19 @@ models:
       - name: gpt-4o
         provider: openai-prod
         config: {type: openai}
-    policies: [prompt-guard, plain-guard]
+    policies: [prompt-guard, token-limit, plain-guard]
 policies:
   - type: ai-prompt-guard
     name: prompt-guard
     condition: 'http.request.headers.x_tier == "premium"'
     config:
       allow_patterns: ["^safe"]
+  - type: ai-rate-limiting-advanced
+    name: token-limit
+    expressions:
+      custom_key: http.request.headers.x_tenant
+    config:
+      strategy: local
   - type: ai-prompt-guard
     name: plain-guard
     config:

@@ -8,9 +8,22 @@ models:
       - name: gpt-4o
         provider: openai-main
         config: {type: openai}
-    policies: [prompt-guard]
+    policies: [prompt-guard, token-limit]
     config:
       route: {paths: [/ai]}
+  # Same policy type and config as guarded-gpt. Only expressions differ.
+  - type: model
+    display_name: Team GPT
+    name: team-gpt
+    capabilities: [generate]
+    formats: [{type: openai}]
+    targets:
+      - name: gpt-4o
+        provider: openai-main
+        config: {type: openai}
+    policies: [team-limit]
+    config:
+      route: {paths: [/team]}
 model_providers:
   - type: openai
     display_name: OpenAI Main
@@ -26,6 +39,20 @@ policies:
     condition: "http.request.headers.x_tier == \"premium\""
     config:
       allow_patterns: ["^safe"]
+  # Model-scoped policy that sets custom_key from an expression.
+  - type: ai-rate-limiting-advanced
+    name: token-limit
+    expressions:
+      custom_key: http.request.headers.x_tenant
+    config:
+      strategy: local
+  # Differs from token-limit only in expressions. Revert keeps both policies.
+  - type: ai-rate-limiting-advanced
+    name: team-limit
+    expressions:
+      custom_key: http.request.headers.x_team
+    config:
+      strategy: local
   # Global policy carrying a condition expression.
   - type: rate-limiting
     name: org-wide-limit
