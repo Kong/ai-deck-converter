@@ -5,14 +5,16 @@ services:
     routes:
       - name: openai-chat
         paths:
-          - /mantle/chat/completions
+          - /mantle/v1/chat/completions
+          - /mantle/openai/v1/chat/completions
         methods:
           - POST
           - OPTIONS
         strip_path: false
       - name: openai-responses
         paths:
-          - /mantle/responses
+          - /mantle/v1/responses
+          - /mantle/openai/v1/responses
         methods:
           - POST
           - OPTIONS

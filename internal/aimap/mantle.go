@@ -51,3 +51,31 @@ var mantleRouteTypes = map[string]bool{
 func MantleSupports(format string, spec EndpointSpec) bool {
 	return (format == "openai" || format == "anthropic") && mantleRouteTypes[spec.RouteType]
 }
+
+// MantlePathSuffixes returns the path suffixes that a mantle target serves
+// for spec. Mantle serves chat and responses under /v1 and /openai/v1.
+func MantlePathSuffixes(spec EndpointSpec) []string {
+	if spec.IsRegex {
+		return []string{spec.PathSuffix}
+	}
+	switch spec.PathSuffix {
+	case "/chat/completions", "/responses":
+		return []string{"/v1" + spec.PathSuffix, "/openai/v1" + spec.PathSuffix}
+	}
+	return []string{spec.PathSuffix}
+}
+
+// RoutePaths returns the route paths of spec under base. A mantle route has
+// one path for each mantle path suffix.
+func RoutePaths(base string, spec EndpointSpec, mantle bool) []string {
+	if !mantle {
+		return []string{RoutePath(base, spec)}
+	}
+	var paths []string
+	for _, suffix := range MantlePathSuffixes(spec) {
+		mantleSpec := spec
+		mantleSpec.PathSuffix = suffix
+		paths = append(paths, RoutePath(base, mantleSpec))
+	}
+	return paths
+}
