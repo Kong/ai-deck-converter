@@ -75,6 +75,12 @@ const (
 	// the reverse converter.
 	VideoLifecycleRouteTag = "aigw:video-lifecycle"
 
+	// ResponsesLifecycleRouteTag marks the generated companion route for the
+	// ID-addressed Responses API operations (retrieve, delete, input_items,
+	// cancel and compact). Like the video lifecycle route it is generated
+	// rather than authored, and the reverse converter ignores it.
+	ResponsesLifecycleRouteTag = "aigw:responses-lifecycle"
+
 	// GatewayWebSocketServiceName names the Service for realtime routes.
 	// Kong selects the WebSocket proxy path from the Service protocol.
 	GatewayWebSocketServiceName = "ai-gateway-websocket"
@@ -94,6 +100,22 @@ var (
 // Kong rejects methods on its routes. ai-model-selector does not run on it.
 func IsWebSocketEndpoint(spec EndpointSpec) bool {
 	return spec.RouteType == RealtimeRouteType
+}
+
+// ResponsesLifecycleRouteLabel names the generated companion endpoint serving
+// the ID-addressed Responses API operations.
+const ResponsesLifecycleRouteLabel = "responses-lifecycle"
+
+// IsLifecycleEndpoint reports whether spec is a generated companion endpoint
+// for a capability's ID-addressed operations. OpenAI addresses those by stored
+// response ID and sends no model with them: retrieve, delete and input_items
+// carry no body at all, and cancel and compact carry one with no "model" field.
+// No ai-model-selector can read a model from such a request, so — exactly as on
+// a WebSocket route — the plugin stays route-scoped and its targets alias-less,
+// keeping them in the balancer's "<default>" pool that a model-less request
+// falls back to.
+func IsLifecycleEndpoint(spec EndpointSpec) bool {
+	return spec.RouteLabel == ResponsesLifecycleRouteLabel
 }
 
 // SectionFor selects the endpoint section from the model's llm_format (the
@@ -318,6 +340,18 @@ var EndpointTable = map[string]map[string]EndpointEntry{
 			Primary: EndpointSpec{
 				"responses", "/responses", false, mPost, "llm/v1/responses", catTextGen,
 				&defaultBodyModelSelectorConfig, true,
+			},
+			// The ID-addressed operations need their own route: they use GET and
+			// DELETE as well as POST, and they carry no model for the selector on
+			// the create route to read. The regex only matches a sub-path, so
+			// "POST <base>/responses" still reaches the create route above — a
+			// regex route always outranks a prefix route of equal match weight
+			// (REGEX_URL_BIT in Kong's kong/router/transform.lua).
+			Secondary: []EndpointSpec{
+				{
+					"responses-lifecycle", "responses/.+", true, mGetPostDelete,
+					"llm/v1/responses", catTextGen, nil, true,
+				},
 			},
 		},
 		"realtime": {

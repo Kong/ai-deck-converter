@@ -217,8 +217,23 @@ func TestEndpointsForAndSectionEndpoints(t *testing.T) {
 	require.NotNil(t, responses.DefaultModelSelectorConfig, "the model travels in the body")
 
 	// A section with no secondaries returns exactly the primary specs.
-	require.Len(t, SectionEndpoints("openai"), len(EndpointTable["openai"]),
-		"openai section has no secondary endpoints")
+	require.Len(t, SectionEndpoints("anthropic"), len(EndpointTable["anthropic"]),
+		"anthropic section has no secondary endpoints")
+
+	// openai's agentic capability carries the generated lifecycle secondary that
+	// serves the ID-addressed Responses operations.
+	wantOpenAI := 0
+	for _, entry := range EndpointTable["openai"] {
+		wantOpenAI += 1 + len(entry.Secondary)
+	}
+	openAISeen := map[string]bool{}
+	for _, ce := range SectionEndpoints("openai") {
+		openAISeen[ce.Capability+"/"+ce.Spec.RouteLabel] = true
+	}
+	require.Len(t, SectionEndpoints("openai"), wantOpenAI,
+		"openai section lists every primary and secondary spec")
+	require.True(t, openAISeen["agentic/"+ResponsesLifecycleRouteLabel],
+		"SectionEndpoints includes the agentic lifecycle secondary spec")
 }
 
 func TestSkillsCapability(t *testing.T) {

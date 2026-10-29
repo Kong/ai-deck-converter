@@ -1,0 +1,37 @@
+# As 119, but the two agentic models sit on different provider accounts. The
+# lifecycle route still merges them into one route-scoped plugin — nothing in a
+# request addressed by stored response ID says which model created it — so the
+# balancer can send a retrieve to the account that never stored that ID. That
+# is the case the ROUTING_CONFLICT warning exists for.
+models:
+  - name: fast
+    type: model
+    capabilities: [agentic]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/ai]}
+    targets:
+      - name: gpt-4.1-mini
+        provider: openai-us
+  - name: smart
+    type: model
+    capabilities: [agentic]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/ai]}
+    targets:
+      - name: gpt-4.1
+        provider: openai-eu
+model_providers:
+  - name: openai-us
+    type: openai
+    config:
+      auth:
+        type: bearer
+        token: "{vault://ai/openai-us-key}"
+  - name: openai-eu
+    type: openai
+    config:
+      auth:
+        type: bearer
+        token: "{vault://ai/openai-eu-key}"

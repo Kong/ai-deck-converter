@@ -19,6 +19,18 @@ services:
           - POST
           - OPTIONS
         strip_path: false
+      - name: openai-responses-lifecycle
+        paths:
+          - ~/openai/(?<openai_model>[^:/]+)/responses/.+
+          - ~/alternative/path/(?<openai_model>[^:/]+)/responses/.+
+        methods:
+          - GET
+          - POST
+          - DELETE
+          - OPTIONS
+        strip_path: false
+        tags:
+          - aigw:responses-lifecycle
 plugins:
   - name: ai-model-selector
     config:
@@ -88,5 +100,26 @@ plugins:
           route_type: llm/v1/responses
     route: openai-responses
     model: full-model
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      max_request_body_size: 2097152
+      response_streaming: deny
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-4o
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: gpt-4o
+            provider: openai
+          route_type: llm/v1/responses
+    route: openai-responses-lifecycle
 ai_models:
   - name: full-model

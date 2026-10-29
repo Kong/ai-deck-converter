@@ -119,6 +119,15 @@ type proxyGroup struct {
 	// ai-proxy-advanced plugin is emitted per alias (see the emission loop),
 	// each with its targets' model_alias set to that alias.
 	aliases []string
+	// lifecycleProviders names, in join order, the providers whose targets a
+	// shared lifecycle plugin carries. Empty for every other plugin.
+	lifecycleProviders []string
+	// lifecycleFirstTarget and lifecycleFirstModel identify the target that put
+	// the first of those providers on the route. The divergence warning names
+	// targets and models rather than providers: revert synthesizes provider
+	// names, so only these survive a round trip identically.
+	lifecycleFirstTarget string
+	lifecycleFirstModel  string
 	// realtimeModel names the ai_models entry of a route-scoped realtime plugin.
 	// Its targets carry no model_alias. No selector presents an alias on a
 	// WebSocket route, so an aliased target is in a pool nothing selects.
@@ -558,6 +567,10 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 			// into the one capability.
 			for _, spec := range pair.specs {
 				websocket := aimap.IsWebSocketEndpoint(spec)
+				// A lifecycle endpoint serves requests that carry no model, so it
+				// gets no selector and its plugin is route-scoped with alias-less
+				// targets, exactly as a WebSocket endpoint does.
+				lifecycle := aimap.IsLifecycleEndpoint(spec)
 				if websocket && tokenVault != nil {
 					return c.fail(src.at(capabilityField(m, capability)), ConfigFieldInvalid,
 						"model %q: capability %q needs a WebSocket route, but %s does not support "+
@@ -584,7 +597,7 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 					return err
 				}
 				var selectorCfgs []map[string]any
-				if !passthrough && !websocket {
+				if !passthrough && !websocket && !lifecycle {
 					selectorCfgs = c.buildModelSelectorConfig(src, m, spec)
 				}
 				// The alias *value* is per-model and deliberately excluded from
@@ -603,10 +616,24 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 					"|" + strconv.FormatBool(mantlePaths) +
 					"|" + identityKey +
 					"|" + routeConfigKey
-				// Without a selector, a route cannot pick one model's plugin.
-				// Each model therefore gets its own WebSocket route.
+				// Without a selector, a route cannot pick one model's plugin, so
+				// each WebSocket route serves a single model: sharing one would
+				// put two route-scoped ai-proxy-advanced plugins on it, which
+				// Kong rejects. A lifecycle route is shared instead, merging the
+				// models on it into one route-scoped plugin exactly as type
+				// "api" models do (specOwnerKey below). Splitting it per model
+				// would emit routes with identical matchers, so Kong would serve
+				// every model's stored-ID requests from whichever route it picked
+				// and leave the rest unreachable.
 				if websocket {
 					key += "|" + m.Name
+				}
+				// The merged plugin is route-scoped, so its targets stay
+				// alias-less in the balancer's "<default>" pool, which is where
+				// a request carrying no model lands.
+				specOwnerKey := ownerKey
+				if lifecycle {
+					specOwnerKey = ""
 				}
 				g := st.groups[key]
 				if g == nil {
@@ -624,6 +651,9 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 					}
 					if websocket {
 						st.websocketRoutes[routeName] = g.route.Protocols
+					}
+					if lifecycle {
+						g.route.Tags = append(g.route.Tags, aimap.ResponsesLifecycleRouteTag)
 					}
 					g.route.Source = source("model", m.Name, "config.route")
 					st.groups[key] = g
@@ -653,11 +683,12 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 					c.warnStatisticsOverride(src, m, g.route.Name, statsSupported, statsWarned)
 				}
 
-				pg := g.proxyByOwner[ownerKey]
-				if pg != nil && !modelScoped {
-					// type:"api" models on one route share a single route-scoped
-					// ai-proxy-advanced, so any datastore mismatch would either drop
-					// one model's datastore or make another silently inherit it.
+				pg := g.proxyByOwner[specOwnerKey]
+				if pg != nil && specOwnerKey == "" {
+					// Models that share a route-scoped ai-proxy-advanced (type
+					// "api" models, and any models on a lifecycle route) share its
+					// config, so any datastore mismatch would either drop one
+					// model's datastore or make another silently inherit it.
 					if (ds == nil) != (pg.datastoreName == "") ||
 						(ds != nil && ds.Name != pg.datastoreName) {
 						current := "no datastore"
@@ -669,13 +700,13 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 							existing = fmt.Sprintf("datastore %q", pg.datastoreName)
 						}
 						return c.fail(src.at("datastores"), ConfigFieldInvalid,
-							"model %q cannot share route %q with another api model: shared "+
+							"model %q cannot share route %q with another model: a shared "+
 								"route-scoped ai-proxy-advanced would mix %s and %s",
 							m.Name, g.route.Name, existing, current)
 					}
 					if !reflect.DeepEqual(pg.tokenVault, tokenVault) {
 						return c.fail(src.at("targets"), ConfigFieldInvalid,
-							"model %q cannot share route %q with another api model that uses "+
+							"model %q cannot share route %q with another model that uses "+
 								"a different provider token_vault", m.Name, g.route.Name)
 					}
 				}
@@ -702,6 +733,12 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 					switch {
 					case fkScoped && websocket:
 						realtimeModel = aliases[0]
+					case fkScoped && lifecycle:
+						// No selector runs on this route, so nothing sets
+						// ctx.ai_model: a model-scoped plugin would never be
+						// selected and an aliased target would sit in a pool
+						// nothing selects. The route's tag links it back to the
+						// model instead.
 					case fkScoped:
 						pluginAliases = aliases
 					}
@@ -734,7 +771,7 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 						),
 						seen: map[string]int{},
 					}
-					g.proxyByOwner[ownerKey] = pg
+					g.proxyByOwner[specOwnerKey] = pg
 					g.proxies = append(g.proxies, pg)
 				} else if pg.genaiCategory != spec.GenaiCategory {
 					// The data plane requires every target to match the plugin's category.
@@ -745,6 +782,24 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 					continue
 				}
 				routed[capability] = true
+				if lifecycle && !slices.Contains(pg.lifecycleProviders, provider.Name) {
+					// Every target on a lifecycle route sits in the one
+					// "<default>" pool, so the balancer picks between them
+					// freely. That is correct only while they are the same
+					// upstream account: a stored ID lives where it was created.
+					if len(pg.lifecycleProviders) == 1 {
+						c.warn(src.at("config.route"), RoutingConflict,
+							"route %q serves requests addressed by a stored ID, which carry no model, so "+
+								"every target on it shares one balancer pool. Target %q of model %q and "+
+								"target %q of model %q resolve to different providers, but a stored ID "+
+								"exists only on the provider that created it, so Kong can send such a "+
+								"request to a provider that does not have it.",
+							g.route.Name, pg.lifecycleFirstTarget, pg.lifecycleFirstModel, tm.Name, m.Name)
+					} else if len(pg.lifecycleProviders) == 0 {
+						pg.lifecycleFirstTarget, pg.lifecycleFirstModel = tm.Name, m.Name
+					}
+					pg.lifecycleProviders = append(pg.lifecycleProviders, provider.Name)
+				}
 				// A target's model_alias decides which balancer pool it joins: the DP
 				// keys pools by model_alias and puts alias-less targets in the shared
 				// "<default>" pool, routing a request to an alias pool only when the
