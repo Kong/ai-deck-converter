@@ -1,6 +1,5 @@
-# "*" in capabilities with the bedrock format below 2.3. The wildcard asks only
-# for what the release serves, so the 2.3-only Responses endpoint is left out
-# without a warning.
+# "*" in capabilities with the bedrock format below 2.3. The 2.3-only
+# Responses endpoint of agentic is left out with a warning.
 model_providers:
   - name: bedrock-prod
     type: bedrock

@@ -131,13 +131,10 @@ type endpointPair struct {
 }
 
 // targetPairs returns the ordered pairs of t that aimap.TargetSupports
-// accepts. A pair whose capability has a version gate in its section is left
-// out, and so is an endpoint whose own release is above the minimum; gated
-// records the endpoints already reported, so one warning covers every target.
-// checkModelCapabilities fails the model when no other pair is left.
+// accepts. An endpoint gated above the minimum is left out with one warning.
+// A gated capability is left out silently.
 func (c *Converter) targetPairs(
 	src ConversionIssueSource, m *aigw.Model, lists modelLists, formats []string, t plannedTarget,
-	gated map[string]bool,
 ) []endpointPair {
 	var pairs []endpointPair
 	for _, format := range formats {
@@ -160,14 +157,10 @@ func (c *Converter) targetPairs(
 					continue
 				}
 				if feature, ok := aimap.EndpointFeature(section, spec.RouteLabel); ok && !c.supports(feature) {
-					key := section + "/" + capability + "/" + spec.RouteLabel
-					if !gated[key] {
-						// The field names the capability list, not one entry, so a
-						// wildcard and the same document re-converted report alike.
-						gated[key] = true
-						c.reportUnsupported(src.at("capabilities"), Warning, feature,
-							fmt.Sprintf("capabilities: %s", spec.RouteLabel))
-					}
+					// The field names the capability list, not one entry.
+					// A wildcard and the same document re-converted report alike.
+					c.reportUnsupported(src.at("capabilities"), Warning, feature,
+						fmt.Sprintf("capabilities: %s", spec.RouteLabel))
 					continue
 				}
 				if lists.capsWildcard && aimap.IsWebSocketEndpoint(spec) && !c.canProtectWebSocket(m) {
