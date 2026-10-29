@@ -635,7 +635,7 @@ func TestBedrockMantleEndpointType(t *testing.T) {
     targets:
       - {name: a, provider: b, config: {type: bedrock, region: us-east-1}}
       - {name: c, provider: b, config: {type: bedrock, region: us-east-1, endpoint_type: mantle}}`,
-			0, 5,
+			0, 6,
 		},
 		// Passthrough forwards the provider's native format, which is bedrock here.
 		"mantle with passthrough format": {
