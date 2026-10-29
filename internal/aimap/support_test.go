@@ -14,6 +14,21 @@ func spec(t *testing.T, section, capability string) EndpointSpec {
 	return s
 }
 
+// agenticSpec returns the bedrock agentic spec with the route label, primary
+// or secondary.
+func agenticSpec(t *testing.T, label string) EndpointSpec {
+	t.Helper()
+	specs, ok := EndpointsFor("bedrock", "agentic")
+	require.True(t, ok, "bedrock agentic")
+	for _, s := range specs {
+		if s.RouteLabel == label {
+			return s
+		}
+	}
+	require.FailNow(t, "no endpoint", "bedrock agentic %s", label)
+	return EndpointSpec{}
+}
+
 func TestTargetSupportsConditions(t *testing.T) {
 	openai := Target{ProviderType: "openai"}
 	azure := Target{ProviderType: "azure"}
@@ -80,6 +95,24 @@ func TestTargetSupportsConditions(t *testing.T) {
 			"llama2 raw on chat", "openai",
 			Target{ProviderType: "llama2", Llama2RawFormat: true},
 			spec(t, "openai", "generate"), true,
+		},
+		// 8. The bedrock-runtime Responses API keeps the bedrock format.
+		{
+			"bedrock runtime responses in bedrock format", "bedrock", bedrock,
+			agenticSpec(t, "responses"), true,
+		},
+		{
+			"bedrock runtime responses in openai format", "openai", bedrock,
+			agenticSpec(t, "responses"), false,
+		},
+		{
+			"bedrock runtime responses on a mantle target", "bedrock",
+			Target{ProviderType: "bedrock", Mantle: true},
+			agenticSpec(t, "responses"), false,
+		},
+		{
+			"bedrock retrieve stays on chat", "bedrock", bedrock,
+			agenticSpec(t, "retrieve"), true,
 		},
 	}
 	for _, tc := range cases {

@@ -1,5 +1,6 @@
 # Bedrock's agentic capability shipped before the gemini-only agentic gate
-# (FeatureGeminiAgenticCapability), so it stays ungated below 2.3.
+# (FeatureGeminiAgenticCapability), so the retrieve route stays ungated below 2.3.
+# The bedrock-runtime Responses endpoint is 2.3-only and is left out with a warning.
 model_providers:
   - name: bedrock-prod
     type: bedrock

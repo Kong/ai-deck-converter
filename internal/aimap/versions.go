@@ -83,6 +83,7 @@ const (
 	FeatureMCPRateLimiting            Feature = "mcp-rate-limiting"
 	FeatureMCPACLWhen                 Feature = "mcp-acl-when"
 	FeatureGeminiAgenticCapability    Feature = "gemini-agentic-capability"
+	FeatureBedrockRuntimeResponses    Feature = "bedrock-runtime-responses"
 	FeatureBaseten                    Feature = "baseten"
 	FeatureSagemaker                  Feature = "sagemaker"
 	FeatureAuthStrategyTokenVault     Feature = "auth-strategy-token-vault"
@@ -107,6 +108,7 @@ var featureSince = map[Feature]Version{
 	FeatureMCPRateLimiting:            mustVersion("2.3"),
 	FeatureMCPACLWhen:                 mustVersion("2.3"),
 	FeatureGeminiAgenticCapability:    mustVersion("2.3"),
+	FeatureBedrockRuntimeResponses:    mustVersion("2.3"),
 	FeatureBaseten:                    mustVersion("2.3"),
 	FeatureSagemaker:                  mustVersion("2.1"),
 	FeatureAuthStrategyTokenVault:     mustVersion("2.3"),
@@ -186,6 +188,19 @@ var capabilityFeatures = map[string]Feature{
 // shipped it before this feature existed.
 var geminiCapabilityFeatures = map[string]Feature{
 	"agentic": FeatureGeminiAgenticCapability,
+}
+
+// gatedEndpoints gates one endpoint of a capability that shipped later than
+// the capability itself. The key is "<section>/<route label>".
+var gatedEndpoints = map[string]Feature{
+	"bedrock/responses": FeatureBedrockRuntimeResponses,
+}
+
+// EndpointFeature returns the feature that gates one endpoint of a section.
+// An endpoint with no gate is served by every release the section is.
+func EndpointFeature(section, routeLabel string) (Feature, bool) {
+	f, ok := gatedEndpoints[section+"/"+routeLabel]
+	return f, ok
 }
 
 // CapabilityFeature returns the feature that gates the canonical capability

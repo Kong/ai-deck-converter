@@ -529,8 +529,9 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 				return err
 			}
 		}
+		gated := map[string]bool{}
 		for _, t := range targets {
-			pairsByTarget[t.index] = c.targetPairs(m, lists, formats, t)
+			pairsByTarget[t.index] = c.targetPairs(src, m, lists, formats, t, gated)
 		}
 		supportedPairs = maps.Clone(pairsByTarget)
 		keepEqualPaths(formats, pairsByTarget)
