@@ -106,9 +106,9 @@ func (r *Reverter) modelPolicyRefs(plugins []kong.Plugin) ([]string, aigw.ACLs, 
 	return r.splitAuthStrategies(plugins, func(kong.Plugin) bool { return true })
 }
 
-// registerPolicy dedupes a plugin into the policy registry: a plugin with the
-// same type, config, enabled state, and scope kind reuses the existing policy;
-// otherwise a new policy is registered under a unique name.
+// registerPolicy reuses a registered policy with equal type, scope kind,
+// enabled state, condition, expressions, and config. Otherwise it registers a
+// new policy with a unique name.
 func (r *Reverter) registerPolicy(p kong.Plugin, global bool) *aigw.Policy {
 	for i := range r.policies {
 		existing := &r.policies[i]
