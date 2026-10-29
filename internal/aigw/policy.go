@@ -14,6 +14,7 @@ type Policy struct {
 	Labels      Labels         `yaml:"labels,omitempty"`
 	Condition   string         `yaml:"condition,omitempty"`
 	Datastores  []DatastoreRef `yaml:"datastores,omitempty"`
+	Expressions map[string]any `yaml:"expressions,omitempty"`
 }
 
 // DatastoreRef references a top-level datastore by name. It is always a

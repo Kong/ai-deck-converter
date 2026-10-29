@@ -24,6 +24,8 @@ policies:
   - type: ai-prompt-guard
     name: prompt-guard
     condition: "http.request.headers.x_tier == \"premium\""
+    expressions:
+      is_post: "http.request.method == \"POST\""
     config:
       allow_patterns: ["^safe"]
   # Global policy carrying a condition expression.

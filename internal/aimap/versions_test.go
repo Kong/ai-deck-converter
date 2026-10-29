@@ -41,6 +41,7 @@ func TestVersionLess(t *testing.T) {
 var allFeatures = []Feature{
 	FeatureTargetCostList,
 	FeaturePolicyCondition,
+	FeaturePolicyExpressions,
 	FeatureMCPUpstreamProtocolVersion,
 	FeatureACLWhen,
 	FeaturePassthroughFormat,

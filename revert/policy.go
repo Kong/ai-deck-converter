@@ -124,6 +124,9 @@ func (r *Reverter) registerPolicy(p kong.Plugin, global bool) *aigw.Policy {
 		if existing.Condition != p.Condition {
 			continue
 		}
+		if !reflect.DeepEqual(existing.Expressions, p.Expressions) {
+			continue
+		}
 		if !reflect.DeepEqual(existing.Config, p.Config) {
 			continue
 		}
@@ -131,11 +134,12 @@ func (r *Reverter) registerPolicy(p kong.Plugin, global bool) *aigw.Policy {
 	}
 
 	policy := aigw.Policy{
-		Type:      p.Name,
-		Name:      r.uniquePolicyName(p.Name),
-		Enabled:   p.Enabled,
-		Condition: p.Condition,
-		Config:    p.Config,
+		Type:        p.Name,
+		Name:        r.uniquePolicyName(p.Name),
+		Enabled:     p.Enabled,
+		Condition:   p.Condition,
+		Expressions: p.Expressions,
+		Config:      p.Config,
 	}
 	if global {
 		policy.Global = boolPtr(true)

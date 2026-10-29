@@ -106,6 +106,7 @@ type DBLessPlugin struct {
 	Enabled       *bool             `yaml:"enabled,omitempty"`
 	Protocols     []string          `yaml:"protocols,omitempty"`
 	Condition     string            `yaml:"condition,omitempty"`
+	Expressions   map[string]any    `yaml:"expressions,omitempty"`
 	Config        map[string]any    `yaml:"config,omitempty"`
 	Ordering      *Ordering         `yaml:"ordering,omitempty"`
 	Service       map[string]string `yaml:"service,omitempty"`

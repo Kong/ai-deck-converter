@@ -14,3 +14,11 @@
     fields:
       - condition
   severity: ERROR
+- code: UNSUPPORTED_IN_MIN_RUNTIME_VERSION
+  reason: expressions requires minimum runtime version "2.3", but the configured minimum is "2.0"
+  source:
+    kind: policy
+    name: expr-guard
+    fields:
+      - expressions
+  severity: ERROR

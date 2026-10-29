@@ -69,6 +69,7 @@ type Feature string
 const (
 	FeatureTargetCostList             Feature = "target-cost-list"
 	FeaturePolicyCondition            Feature = "policy-condition"
+	FeaturePolicyExpressions          Feature = "policy-expressions"
 	FeatureMCPUpstreamProtocolVersion Feature = "mcp-upstream-protocol-version"
 	FeatureACLWhen                    Feature = "acl-when"
 	FeaturePassthroughFormat          Feature = "passthrough-format"
@@ -93,6 +94,7 @@ const (
 var featureSince = map[Feature]Version{
 	FeatureTargetCostList:             mustVersion("2.1"),
 	FeaturePolicyCondition:            mustVersion("2.1"),
+	FeaturePolicyExpressions:          mustVersion("2.3"),
 	FeatureMCPUpstreamProtocolVersion: mustVersion("2.1"),
 	FeatureACLWhen:                    mustVersion("2.2"),
 	FeaturePassthroughFormat:          mustVersion("2.2"),

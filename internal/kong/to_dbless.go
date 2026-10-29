@@ -236,6 +236,7 @@ func toDBLessPlugin(plugin Plugin, id string, scope scopeRef) DBLessPlugin {
 		Enabled:       plugin.Enabled,
 		Protocols:     plugin.Protocols,
 		Condition:     plugin.Condition,
+		Expressions:   plugin.Expressions,
 		Config:        plugin.Config,
 		Ordering:      plugin.Ordering,
 		Service:       toDBLessFK(scope.service),
