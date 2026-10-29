@@ -76,6 +76,21 @@ routes:
       - http
       - https
     strip_path: false
+  - id: 41282f10-4533-5f5a-bac3-cf0991d72913
+    name: bedrock-responses
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /bedrock/openai/v1/responses
+    methods:
+      - GET
+      - POST
+      - DELETE
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
   - id: 57dbc083-73ad-583e-b144-a4006f6e1721
     name: bedrock-rerank
     service:
@@ -192,7 +207,8 @@ routes:
     service:
       id: 947a4e23-b483-5a65-8165-da9aed24565b
     paths:
-      - /mantle-files/files
+      - /mantle-files/v1/files
+      - /mantle-files/openai/v1/files
     methods:
       - GET
       - POST
@@ -393,11 +409,48 @@ plugins:
     config:
       max_request_body_size: 8388608
       sources:
+        - body_path: model
+          source: body
+    route:
+      id: 41282f10-4533-5f5a-bac3-cf0991d72913
+  - id: e4b46606-e4f5-57c3-9298-949d4e990f2d
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: bedrock
+      targets:
+        - auth:
+            aws_access_key_id: e2e-fake-access-key-id
+            aws_secret_access_key: e2e-fake-secret-access-key
+          description: anthropic.claude-sonnet-4-5
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: bedrock-chat
+            name: anthropic.claude-sonnet-4-5
+            options:
+              anthropic_version: bedrock-2023-05-31
+              bedrock:
+                aws_region: us-east-1
+            provider: bedrock
+          route_type: llm/v1/responses
+    route:
+      id: 41282f10-4533-5f5a-bac3-cf0991d72913
+    model:
+      id: 45407819-61a7-5d51-a737-b63bcbab37ff
+  - id: 47b56eb4-93bb-5ba2-a7a7-1b24635b434e
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
         - path_pattern: model/([^/]+)/
           source: path
     route:
       id: 57dbc083-73ad-583e-b144-a4006f6e1721
-  - id: e4b46606-e4f5-57c3-9298-949d4e990f2d
+  - id: 1fc0cc9b-eb94-5eb9-8c69-d8361c990007
     name: ai-proxy-advanced
     config:
       balancer:
@@ -425,7 +478,7 @@ plugins:
       id: 57dbc083-73ad-583e-b144-a4006f6e1721
     model:
       id: 45407819-61a7-5d51-a737-b63bcbab37ff
-  - id: 47b56eb4-93bb-5ba2-a7a7-1b24635b434e
+  - id: b21a1b0e-3d70-5c23-84a5-d25fee046ce9
     name: ai-model-selector
     config:
       max_request_body_size: 8388608
@@ -434,7 +487,7 @@ plugins:
           source: path
     route:
       id: b6ef3b88-21e0-5e31-87a9-83d5d69a7599
-  - id: 1fc0cc9b-eb94-5eb9-8c69-d8361c990007
+  - id: cf7316be-1398-5d7d-bed6-bacd43b095b8
     name: ai-proxy-advanced
     config:
       balancer:
@@ -461,7 +514,7 @@ plugins:
       id: b6ef3b88-21e0-5e31-87a9-83d5d69a7599
     model:
       id: 8341f2ba-6b26-53ae-9c7a-7c90f348a415
-  - id: b21a1b0e-3d70-5c23-84a5-d25fee046ce9
+  - id: ea5f9246-1910-58d8-9d91-68ca8f388d7d
     name: ai-model-selector
     config:
       max_request_body_size: 8388608
@@ -470,7 +523,7 @@ plugins:
           source: path
     route:
       id: 42ad48c4-fa26-5e28-9b81-47e4b976b972
-  - id: cf7316be-1398-5d7d-bed6-bacd43b095b8
+  - id: 5f4b0e19-29d1-5ce6-b34f-3e1394bf878e
     name: ai-proxy-advanced
     config:
       balancer:
@@ -497,7 +550,7 @@ plugins:
       id: 42ad48c4-fa26-5e28-9b81-47e4b976b972
     model:
       id: 803c8bc7-8690-5271-b1a8-b52a08e5748f
-  - id: ea5f9246-1910-58d8-9d91-68ca8f388d7d
+  - id: 4c3c42b4-138d-5f50-b141-efb32541e17c
     name: ai-model-selector
     config:
       max_request_body_size: 8388608
@@ -506,7 +559,7 @@ plugins:
           source: path
     route:
       id: fd893c85-2a3a-522b-9c79-f97f8980442d
-  - id: 5f4b0e19-29d1-5ce6-b34f-3e1394bf878e
+  - id: 0f8844dd-7362-5ea0-8eeb-35ee0580b632
     name: ai-proxy-advanced
     config:
       balancer:
@@ -534,7 +587,7 @@ plugins:
       id: fd893c85-2a3a-522b-9c79-f97f8980442d
     model:
       id: 0835e469-295d-5fcc-9115-467aed1342ab
-  - id: e5d9f5b0-2145-5715-8c71-796608710480
+  - id: cccc78d9-7846-57bc-af68-12f85e625fcd
     name: ai-proxy-advanced
     config:
       balancer:
@@ -562,7 +615,7 @@ plugins:
           route_type: llm/v1/batches
     route:
       id: a65a9e4b-10b4-5de0-93ae-0173e5ae0346
-  - id: c059681f-5745-5af7-9bfa-b22fa2f982d1
+  - id: 17eaf231-63cd-5a56-a5e2-23ac294f4c9b
     name: ai-model-selector
     config:
       max_request_body_size: 8388608
@@ -571,7 +624,7 @@ plugins:
           source: body
     route:
       id: 8ae36805-da7a-55b9-b056-72bde6bb937d
-  - id: cccc78d9-7846-57bc-af68-12f85e625fcd
+  - id: dd276604-c64f-5c9f-85c3-f358cc3115c0
     name: ai-proxy-advanced
     config:
       balancer:
@@ -600,7 +653,7 @@ plugins:
       id: 8ae36805-da7a-55b9-b056-72bde6bb937d
     model:
       id: 337a0f42-f075-5ed7-85a7-069f5ba0d5a9
-  - id: 17eaf231-63cd-5a56-a5e2-23ac294f4c9b
+  - id: ad35bedc-5ff8-5182-8be6-fa58212663b8
     name: ai-model-selector
     config:
       max_request_body_size: 8388608
@@ -609,7 +662,7 @@ plugins:
           source: body
     route:
       id: 1a3f650c-2709-5e79-a792-7ffd18243fbf
-  - id: dd276604-c64f-5c9f-85c3-f358cc3115c0
+  - id: fc67fd65-983a-5b80-9bda-de44a1de9b6a
     name: ai-proxy-advanced
     config:
       balancer:
@@ -638,7 +691,7 @@ plugins:
       id: 1a3f650c-2709-5e79-a792-7ffd18243fbf
     model:
       id: 337a0f42-f075-5ed7-85a7-069f5ba0d5a9
-  - id: ad35bedc-5ff8-5182-8be6-fa58212663b8
+  - id: 7d1a0f05-fed7-51f6-83f9-f8830f85d070
     name: ai-model-selector
     config:
       max_request_body_size: 8388608
@@ -647,7 +700,7 @@ plugins:
           source: body
     route:
       id: bb559a54-dc17-5c0f-b946-b0d9c5cebd7a
-  - id: fc67fd65-983a-5b80-9bda-de44a1de9b6a
+  - id: 0f933206-16d8-5873-a1fa-6ca08ff363c2
     name: ai-proxy-advanced
     config:
       balancer:
@@ -677,7 +730,7 @@ plugins:
       id: bb559a54-dc17-5c0f-b946-b0d9c5cebd7a
     model:
       id: 670ee2da-e67b-59f4-811d-48aec0ff00d0
-  - id: f767a5a0-2605-5ec7-a54b-54b5ba91d32e
+  - id: 32c66b25-eee1-5606-ae08-3fbd6e58cfba
     name: ai-proxy-advanced
     config:
       balancer:

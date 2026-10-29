@@ -28,7 +28,8 @@ services:
         strip_path: false
       - name: openai-files
         paths:
-          - /mantle-files/files
+          - /mantle-files/v1/files
+          - /mantle-files/openai/v1/files
         methods:
           - GET
           - POST
