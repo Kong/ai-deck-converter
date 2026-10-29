@@ -51,6 +51,7 @@ auth_strategies:
       issuer: http://host.docker.internal:18090
       client_id: [e2e-client]
       redirect_uri: [http://127.0.0.1:8000/callback]
+      session_secret: 0123456789abcdef0123456789abcdef
 
 mcp_servers:
   - type: passthrough-listener

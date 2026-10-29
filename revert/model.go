@@ -187,9 +187,26 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 				capability = match.capability
 				spec = &match.spec
 				ties = match.ties
+				suffixes := []aimap.EndpointSpec{match.spec}
+				if getStr(getMap(getMap(modelMap, "options"), "bedrock"), "endpoint_type") == aimap.BedrockEndpointTypeMantle {
+					suffixes = suffixes[:0]
+					for _, suffix := range aimap.MantlePathSuffixes(match.spec) {
+						mantleSpec := match.spec
+						mantleSpec.PathSuffix = suffix
+						suffixes = append(suffixes, mantleSpec)
+					}
+					slices.SortStableFunc(suffixes, func(a, b aimap.EndpointSpec) int {
+						return len(b.PathSuffix) - len(a.PathSuffix)
+					})
+				}
 				for _, p := range rt.Paths {
-					if b, ok := basePathFor(p, match.spec); ok {
-						bases = append(bases, b)
+					for _, s := range suffixes {
+						if b, ok := basePathFor(p, s); ok {
+							if !slices.Contains(bases, b) {
+								bases = append(bases, b)
+							}
+							break
+						}
 					}
 				}
 			} else if routeType == "llm/v1/chat" {

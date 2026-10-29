@@ -597,8 +597,10 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 				if passthrough {
 					keySection = ""
 				}
+				mantlePaths := t.target.Mantle && len(aimap.MantlePathSuffixes(spec)) > 1
 				key := keySection + "|" +
 					spec.RouteLabel +
+					"|" + strconv.FormatBool(mantlePaths) +
 					"|" + identityKey +
 					"|" + routeConfigKey
 				// Without a selector, a route cannot pick one model's plugin.
@@ -608,9 +610,9 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 				}
 				g := st.groups[key]
 				if g == nil {
-					paths := make([]string, len(bases))
-					for i, b := range bases {
-						paths[i] = aimap.RoutePath(b, spec)
+					var paths []string
+					for _, b := range bases {
+						paths = append(paths, aimap.RoutePaths(b, spec, mantlePaths)...)
 					}
 					routeName := uniqueModelRouteName(sec+"-"+spec.RouteLabel, st.usedRouteNames)
 					g = &routeGroup{

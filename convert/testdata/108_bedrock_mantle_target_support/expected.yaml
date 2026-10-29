@@ -24,6 +24,22 @@ services:
           - POST
           - OPTIONS
         strip_path: false
+      - name: openai-chat-2
+        paths:
+          - /mantle-openai/v1/chat/completions
+          - /mantle-openai/openai/v1/chat/completions
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-responses-2
+        paths:
+          - /mantle-openai/v1/responses
+          - /mantle-openai/openai/v1/responses
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
       - name: anthropic-messages
         paths:
           - /mantle-anthropic/v1/messages
@@ -55,23 +71,6 @@ plugins:
             name: gpt-5.2
             provider: openai
           route_type: llm/v1/chat
-        - auth:
-            aws_access_key_id: '{vault://ai/aws-access-key-id}'
-            aws_secret_access_key: '{vault://ai/aws-secret-access-key}'
-          description: openai.gpt-oss-120b
-          logging:
-            log_payloads: false
-            log_statistics: true
-          model:
-            model_alias: mantle-openai
-            name: openai.gpt-oss-120b
-            options:
-              bedrock:
-                aws_region: us-east-1
-                endpoint_type: mantle
-                mantle_openai_path_prefix: /v1
-            provider: bedrock
-          route_type: llm/v1/chat
     route: openai-chat
     model: mantle-openai
   - name: ai-model-selector
@@ -96,23 +95,6 @@ plugins:
             model_alias: mantle-openai
             name: gpt-5.2
             provider: openai
-          route_type: llm/v1/responses
-        - auth:
-            aws_access_key_id: '{vault://ai/aws-access-key-id}'
-            aws_secret_access_key: '{vault://ai/aws-secret-access-key}'
-          description: openai.gpt-oss-120b
-          logging:
-            log_payloads: false
-            log_statistics: true
-          model:
-            model_alias: mantle-openai
-            name: openai.gpt-oss-120b
-            options:
-              bedrock:
-                aws_region: us-east-1
-                endpoint_type: mantle
-                mantle_openai_path_prefix: /v1
-            provider: bedrock
           route_type: llm/v1/responses
     route: openai-responses
     model: mantle-openai
@@ -140,6 +122,72 @@ plugins:
             provider: openai
           route_type: llm/v1/embeddings
     route: openai-embeddings
+    model: mantle-openai
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-chat-2
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            aws_access_key_id: '{vault://ai/aws-access-key-id}'
+            aws_secret_access_key: '{vault://ai/aws-secret-access-key}'
+          description: openai.gpt-oss-120b
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: mantle-openai
+            name: openai.gpt-oss-120b
+            options:
+              bedrock:
+                aws_region: us-east-1
+                endpoint_type: mantle
+                mantle_openai_path_prefix: /v1
+            provider: bedrock
+          route_type: llm/v1/chat
+    route: openai-chat-2
+    model: mantle-openai
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-responses-2
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            aws_access_key_id: '{vault://ai/aws-access-key-id}'
+            aws_secret_access_key: '{vault://ai/aws-secret-access-key}'
+          description: openai.gpt-oss-120b
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: mantle-openai
+            name: openai.gpt-oss-120b
+            options:
+              bedrock:
+                aws_region: us-east-1
+                endpoint_type: mantle
+                mantle_openai_path_prefix: /v1
+            provider: bedrock
+          route_type: llm/v1/responses
+    route: openai-responses-2
     model: mantle-openai
   - name: ai-model-selector
     config:

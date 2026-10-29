@@ -382,6 +382,34 @@ routes:
       - http
       - https
     strip_path: false
+  - id: 2384fe9d-eacc-5ac2-ae4c-4752cc597f81
+    name: openai-chat-2
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /ai/v1/chat/completions
+      - /ai/openai/v1/chat/completions
+    methods:
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: d42385f3-0b4d-574b-8090-3625031103eb
+    name: openai-responses-2
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /ai/v1/responses
+      - /ai/openai/v1/responses
+    methods:
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
   - id: a5fe20b2-fe87-59f3-a7bf-b47efa1d5e4e
     name: huggingface-generate
     service:
@@ -648,23 +676,6 @@ plugins:
                 aws_region: us-east-1
             provider: bedrock
           route_type: llm/v1/chat
-        - auth:
-            aws_access_key_id: e2e-fake-access-key-id
-            aws_secret_access_key: e2e-fake-secret-access-key
-          description: openai.gpt-oss-120b
-          logging:
-            log_payloads: false
-            log_statistics: true
-          model:
-            model_alias: every-endpoint
-            name: openai.gpt-oss-120b
-            options:
-              bedrock:
-                aws_region: us-east-1
-                endpoint_type: mantle
-                mantle_openai_path_prefix: /v1
-            provider: bedrock
-          route_type: llm/v1/chat
         - description: hf-zephyr
           logging:
             log_payloads: false
@@ -838,23 +849,6 @@ plugins:
               azure_deployment_id: gpt-5-4
               azure_instance: kong-e2e
             provider: azure
-          route_type: llm/v1/responses
-        - auth:
-            aws_access_key_id: e2e-fake-access-key-id
-            aws_secret_access_key: e2e-fake-secret-access-key
-          description: openai.gpt-oss-120b
-          logging:
-            log_payloads: false
-            log_statistics: true
-          model:
-            model_alias: every-endpoint
-            name: openai.gpt-oss-120b
-            options:
-              bedrock:
-                aws_region: us-east-1
-                endpoint_type: mantle
-                mantle_openai_path_prefix: /v1
-            provider: bedrock
           route_type: llm/v1/responses
         - description: grok-4
           logging:
@@ -2246,8 +2240,84 @@ plugins:
         - body_path: model
           source: body
     route:
-      id: a5fe20b2-fe87-59f3-a7bf-b47efa1d5e4e
+      id: 2384fe9d-eacc-5ac2-ae4c-4752cc597f81
   - id: 7073101d-5250-5977-aad1-d75fd14e094f
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            aws_access_key_id: e2e-fake-access-key-id
+            aws_secret_access_key: e2e-fake-secret-access-key
+          description: openai.gpt-oss-120b
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: openai.gpt-oss-120b
+            options:
+              bedrock:
+                aws_region: us-east-1
+                endpoint_type: mantle
+                mantle_openai_path_prefix: /v1
+            provider: bedrock
+          route_type: llm/v1/chat
+    route:
+      id: 2384fe9d-eacc-5ac2-ae4c-4752cc597f81
+    model:
+      id: 290b3237-5b60-5df0-bfbe-912660aef648
+  - id: 3d4fc098-afc1-5067-9f42-43a96ab01234
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route:
+      id: d42385f3-0b4d-574b-8090-3625031103eb
+  - id: 965942ab-85d1-599d-85fc-6954d4a6342a
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            aws_access_key_id: e2e-fake-access-key-id
+            aws_secret_access_key: e2e-fake-secret-access-key
+          description: openai.gpt-oss-120b
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: openai.gpt-oss-120b
+            options:
+              bedrock:
+                aws_region: us-east-1
+                endpoint_type: mantle
+                mantle_openai_path_prefix: /v1
+            provider: bedrock
+          route_type: llm/v1/responses
+    route:
+      id: d42385f3-0b4d-574b-8090-3625031103eb
+    model:
+      id: 290b3237-5b60-5df0-bfbe-912660aef648
+  - id: efa430a3-22be-5417-acec-467f7f38b3ec
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route:
+      id: a5fe20b2-fe87-59f3-a7bf-b47efa1d5e4e
+  - id: 8e474d28-ca33-5b25-a416-310d74344864
     name: ai-proxy-advanced
     config:
       balancer:
@@ -2268,7 +2338,7 @@ plugins:
       id: a5fe20b2-fe87-59f3-a7bf-b47efa1d5e4e
     model:
       id: 290b3237-5b60-5df0-bfbe-912660aef648
-  - id: 3d4fc098-afc1-5067-9f42-43a96ab01234
+  - id: 88738618-3195-58b3-a9ac-49c2d6fdcdb1
     name: ai-model-selector
     config:
       max_request_body_size: 8388608
@@ -2277,7 +2347,7 @@ plugins:
           source: body
     route:
       id: 96cb42a8-d9be-53d5-afe8-bad2af2d17f0
-  - id: 965942ab-85d1-599d-85fc-6954d4a6342a
+  - id: 580986cd-e17d-5d2e-8aaf-266efedf2791
     name: ai-proxy-advanced
     config:
       balancer:
@@ -2298,7 +2368,7 @@ plugins:
       id: 96cb42a8-d9be-53d5-afe8-bad2af2d17f0
     model:
       id: 290b3237-5b60-5df0-bfbe-912660aef648
-  - id: d5f89a84-f2f8-5804-bac5-ff97745f5927
+  - id: da1139e5-35db-5ca6-a75e-8851baa45a1f
     name: ai-proxy-advanced
     config:
       balancer:
@@ -2379,7 +2449,7 @@ plugins:
           route_type: llm/v1/batches
     route:
       id: cbac5221-6bcd-5bfa-9575-4519bea13df0
-  - id: 8e474d28-ca33-5b25-a416-310d74344864
+  - id: 96a19cab-084f-51da-b067-814d72560eda
     name: ai-proxy-advanced
     config:
       balancer:
@@ -2421,7 +2491,7 @@ plugins:
           route_type: llm/v1/files
     route:
       id: b433d478-0f40-5518-b6bb-815583936241
-  - id: d789edc0-987b-548b-b941-d929c461cf69
+  - id: 098e7779-9500-5d64-a5b0-910b43964321
     name: ai-proxy-advanced
     config:
       balancer:
@@ -2445,7 +2515,7 @@ plugins:
           route_type: llm/v1/batches
     route:
       id: da59badf-6dcb-5328-8c6c-3784d8e14dd3
-  - id: 580986cd-e17d-5d2e-8aaf-266efedf2791
+  - id: 4690ef5a-a3fa-5f28-99e0-cc8cf9e1c439
     name: ai-proxy-advanced
     config:
       balancer:
@@ -2467,7 +2537,7 @@ plugins:
           route_type: llm/v1/batches
     route:
       id: 0b3d41ee-cd0b-51a2-ba17-192fbf50cad8
-  - id: da1139e5-35db-5ca6-a75e-8851baa45a1f
+  - id: eba6af44-82a5-5c6f-a764-90fb3ee050b0
     name: ai-proxy-advanced
     config:
       balancer:
@@ -2489,7 +2559,7 @@ plugins:
           route_type: llm/v1/batches
     route:
       id: a77dd8e9-17ff-5236-b291-761e4874b365
-  - id: 96a19cab-084f-51da-b067-814d72560eda
+  - id: 4c3f0a74-5f78-552b-8b01-4094cb876734
     name: ai-proxy-advanced
     config:
       balancer:
@@ -2510,7 +2580,7 @@ plugins:
           route_type: llm/v1/chat
     route:
       id: cf8371c0-4886-5860-aba0-ddbf24d941a6
-  - id: 098e7779-9500-5d64-a5b0-910b43964321
+  - id: 2c7c958f-aa48-580a-9610-de404a7e7892
     name: ai-proxy-advanced
     config:
       balancer:
@@ -2536,7 +2606,7 @@ plugins:
           route_type: llm/v1/batches
     route:
       id: a65a9e4b-10b4-5de0-93ae-0173e5ae0346
-  - id: 4690ef5a-a3fa-5f28-99e0-cc8cf9e1c439
+  - id: bacca35c-e603-5a2c-95e9-986629589785
     name: ai-proxy-advanced
     config:
       balancer:
