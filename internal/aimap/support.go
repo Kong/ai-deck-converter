@@ -87,7 +87,8 @@ func TargetSupports(format string, target Target, spec EndpointSpec) bool {
 			return false
 		}
 	} else if providers, ok := supportedRouteTypes[routeType]; ok && !slices.Contains(providers, provider) &&
-		!GeminiInteractions(format, provider, routeType) {
+		!GeminiInteractions(format, provider, routeType) &&
+		!BedrockRuntimeResponses(format, provider, routeType) {
 		return false
 	}
 	if provider == "gemini" && routeType == RealtimeRouteType && format != "gemini" {
@@ -114,6 +115,13 @@ func TargetSupports(format string, target Target, spec EndpointSpec) bool {
 // FeatureGeminiAgenticCapability serves it in the gemini format.
 func GeminiInteractions(format, provider, routeType string) bool {
 	return format == "gemini" && provider == "gemini" && routeType == "llm/v1/responses"
+}
+
+// BedrockRuntimeResponses reports whether the pair is the bedrock-runtime
+// OpenAI-compatible Responses API. The route type table has no bedrock row, but
+// the /openai/v1/responses path serves it in the bedrock format.
+func BedrockRuntimeResponses(format, provider, routeType string) bool {
+	return format == "bedrock" && provider == "bedrock" && routeType == "llm/v1/responses"
 }
 
 // LogStatisticsSupported reports whether the data plane accepts

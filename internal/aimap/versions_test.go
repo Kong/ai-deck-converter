@@ -57,6 +57,7 @@ var allFeatures = []Feature{
 	FeatureMCPACLWhen,
 	FeatureBaseten,
 	FeatureGeminiAgenticCapability,
+	FeatureBedrockRuntimeResponses,
 	FeatureSagemaker,
 	FeatureAuthStrategyTokenVault,
 }
@@ -72,6 +73,20 @@ func TestFeatureTable(t *testing.T) {
 		require.False(t, Supports(f, Version{since.Major, since.Minor - 1}), f)
 	}
 	require.Panics(t, func() { Since("unknown") })
+}
+
+func TestEndpointFeature(t *testing.T) {
+	f, ok := EndpointFeature("bedrock", "responses")
+	require.True(t, ok)
+	require.Equal(t, FeatureBedrockRuntimeResponses, f)
+
+	// The retrieve endpoint of the same capability shipped earlier, so it
+	// carries no gate of its own.
+	_, ok = EndpointFeature("bedrock", "retrieve")
+	require.False(t, ok)
+	// The openai section serves responses on every release.
+	_, ok = EndpointFeature("openai", "responses")
+	require.False(t, ok)
 }
 
 func TestFeatureLookups(t *testing.T) {

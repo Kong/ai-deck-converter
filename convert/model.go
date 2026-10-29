@@ -530,7 +530,7 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 			}
 		}
 		for _, t := range targets {
-			pairsByTarget[t.index] = c.targetPairs(m, lists, formats, t)
+			pairsByTarget[t.index] = c.targetPairs(src, m, lists, formats, t)
 		}
 		supportedPairs = maps.Clone(pairsByTarget)
 		keepEqualPaths(formats, pairsByTarget)

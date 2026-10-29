@@ -201,11 +201,20 @@ func TestEndpointsForAndSectionEndpoints(t *testing.T) {
 		seen[ce.Capability+"/"+ce.Spec.RouteLabel] = true
 	}
 	for _, labelled := range []string{
-		"generate/invoke", "generate/chat", "generate/messages",
+		"generate/invoke", "generate/chat", "generate/messages", "agentic/responses",
 	} {
 		require.True(t, seen[labelled], "SectionEndpoints includes the %s secondary spec", labelled)
 	}
-	require.False(t, seen["agentic/responses"], "the bedrock format has no responses endpoint")
+	require.False(t, seen["agentic/chat"], "agentic has no chat endpoint")
+
+	// The bedrock-runtime Responses API is a secondary endpoint of agentic.
+	responses := agenticSpec(t, "responses")
+	require.Equal(t, "llm/v1/responses", responses.RouteType)
+	require.Equal(t, "/openai/v1/responses", responses.PathSuffix)
+	require.Equal(t, mGetPostDelete, responses.Methods)
+	require.False(t, responses.IsRegex, "the responses path is a plain prefix route")
+	require.Equal(t, catTextGen, responses.GenaiCategory)
+	require.NotNil(t, responses.DefaultModelSelectorConfig, "the model travels in the body")
 
 	// A section with no secondaries returns exactly the primary specs.
 	require.Len(t, SectionEndpoints("openai"), len(EndpointTable["openai"]),
