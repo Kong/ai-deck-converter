@@ -107,13 +107,9 @@ func IsWebSocketEndpoint(spec EndpointSpec) bool {
 const ResponsesLifecycleRouteLabel = "responses-lifecycle"
 
 // IsLifecycleEndpoint reports whether spec is a generated companion endpoint
-// for a capability's ID-addressed operations. OpenAI addresses those by stored
-// response ID and sends no model with them: retrieve, delete and input_items
-// carry no body at all, and cancel and compact carry one with no "model" field.
-// No ai-model-selector can read a model from such a request, so — exactly as on
-// a WebSocket route — the plugin stays route-scoped and its targets alias-less,
-// keeping them in the balancer's "<default>" pool that a model-less request
-// falls back to.
+// for a capability's ID-addressed operations. Those requests carry no model
+// for a selector to read. The plugin therefore stays route-scoped with
+// alias-less targets in the balancer's "<default>" pool.
 func IsLifecycleEndpoint(spec EndpointSpec) bool {
 	return spec.RouteLabel == ResponsesLifecycleRouteLabel
 }
@@ -341,12 +337,10 @@ var EndpointTable = map[string]map[string]EndpointEntry{
 				"responses", "/responses", false, mPost, "llm/v1/responses", catTextGen,
 				&defaultBodyModelSelectorConfig, true,
 			},
-			// The ID-addressed operations need their own route: they use GET and
-			// DELETE as well as POST, and they carry no model for the selector on
-			// the create route to read. The regex only matches a sub-path, so
-			// "POST <base>/responses" still reaches the create route above — a
-			// regex route always outranks a prefix route of equal match weight
-			// (REGEX_URL_BIT in Kong's kong/router/transform.lua).
+			// The regex matches a sub-path only. The create route above still
+			// serves "POST <base>/responses". Kong ranks a regex route above a
+			// prefix route of equal weight per REGEX_URL_BIT in
+			// kong/router/transform.lua.
 			Secondary: []EndpointSpec{
 				{
 					"responses-lifecycle", "responses/.+", true, mGetPostDelete,

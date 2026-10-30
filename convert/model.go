@@ -190,6 +190,10 @@ type modelPass struct {
 	// requestTerminations holds, per route, the model-scoped request-termination
 	// policies that the selector ordering stops from running.
 	requestTerminations map[string][]modelPolicyRef
+	// lifecycleGuards holds, per lifecycle route, the policy and ACL set the
+	// first model on it contributed. A lifecycle route has no selector, so its
+	// guards are route-scoped and the route can carry only one set.
+	lifecycleGuards map[string]lifecycleGuardSet
 	// aliasOwners maps each ai_models name to the model that uses it.
 	aliasOwners map[string]string
 	// selectorConflicts holds the model pairs with a reported selector conflict.
@@ -235,6 +239,7 @@ func (c *Converter) convertModelsPass(skipped map[int][]ConversionIssue) bool {
 		selectorBefore:      map[string][]string{},
 		selectorAfter:       map[string][]string{},
 		requestTerminations: map[string][]modelPolicyRef{},
+		lifecycleGuards:     map[string]lifecycleGuardSet{},
 		aliasOwners:         map[string]string{},
 		selectorConflicts:   map[string]bool{},
 		skipped:             skipped,
@@ -467,6 +472,10 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 
 	var routeNames []string
 	routeSeen := map[string]bool{}
+	// lifecycleRouteNames holds the subset of routeNames that serve requests
+	// addressed by a stored ID. Those routes carry no ai-model-selector, so the
+	// model's policies must be scoped to them differently.
+	lifecycleRouteNames := map[string]bool{}
 	statsWarned := map[string]bool{}
 	// The plugin's llm_format comes from the first target, and passthrough forwards
 	// the body unchanged, so every target must speak the same client format.
@@ -616,15 +625,10 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 					"|" + strconv.FormatBool(mantlePaths) +
 					"|" + identityKey +
 					"|" + routeConfigKey
-				// Without a selector, a route cannot pick one model's plugin, so
-				// each WebSocket route serves a single model: sharing one would
-				// put two route-scoped ai-proxy-advanced plugins on it, which
-				// Kong rejects. A lifecycle route is shared instead, merging the
-				// models on it into one route-scoped plugin exactly as type
-				// "api" models do (specOwnerKey below). Splitting it per model
-				// would emit routes with identical matchers, so Kong would serve
-				// every model's stored-ID requests from whichever route it picked
-				// and leave the rest unreachable.
+				// Without a selector, a route cannot pick one model's plugin.
+				// Each WebSocket route therefore serves one model.
+				// A lifecycle route instead merges its models into one plugin,
+				// as type "api" models do.
 				if websocket {
 					key += "|" + m.Name
 				}
@@ -655,6 +659,7 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 					if lifecycle {
 						g.route.Tags = append(g.route.Tags, aimap.ResponsesLifecycleRouteTag)
 					}
+
 					g.route.Source = source("model", m.Name, "config.route")
 					st.groups[key] = g
 					st.order = append(st.order, key)
@@ -666,6 +671,9 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 				if !slices.Contains(g.models, m.Name) {
 					g.models = append(g.models, m.Name)
 					c.checkSelectorConflict(st, src, g, m.Name, selectorCfgs)
+				}
+				if lifecycle {
+					lifecycleRouteNames[g.route.Name] = true
 				}
 				if !routeSeen[g.route.Name] {
 					routeSeen[g.route.Name] = true
@@ -916,6 +924,10 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 	}
 	plugins = sourceScopedPlugins(plugins, "model", m.Name)
 	for _, routeName := range routeNames {
+		if lifecycleRouteNames[routeName] {
+			c.attachLifecycleGuards(st, src, m, routeName, plugins)
+			continue
+		}
 		for k := range plugins {
 			p := plugins[k]
 			p.Route = kong.NewStringRef(routeName)
@@ -1033,6 +1045,71 @@ func (c *Converter) selectorOrdering(st *modelPass, routeName string) *kong.Orde
 		}
 	}
 	return ordering
+}
+
+// lifecycleGuardSet records the policy and ACL plugins the first model on a
+// lifecycle route contributed, so a later model's differing set is reported
+// instead of stacked on top of them.
+type lifecycleGuardSet struct {
+	fingerprint string
+	model       string
+}
+
+// guardSetFingerprint identifies a policy/ACL set by what Kong would enforce,
+// independent of which model authored it: provenance, scope and authoring order
+// all differ between models that configure the same policies.
+func guardSetFingerprint(plugins []kong.Plugin) string {
+	parts := make([]string, 0, len(plugins))
+	for k := range plugins {
+		p := plugins[k]
+		p.Route, p.Service, p.Model = nil, nil, nil
+		p.Source, p.TargetSources = nil, nil
+		b, err := json.Marshal(p)
+		if err != nil {
+			// Unreachable in practice: every field is exported and the config
+			// comes from decoded YAML. The rendered struct still tells two
+			// differing sets apart, which is all the fingerprint is used for.
+			b = []byte(fmt.Sprintf("%+v", p))
+		}
+		parts = append(parts, string(b))
+	}
+	slices.Sort(parts)
+	return strings.Join(parts, "\x00")
+}
+
+// attachLifecycleGuards scopes model m's policy and ACL plugins to its lifecycle
+// route. No ai-model-selector runs there, so nothing sets ctx.ai_model and a
+// model-scoped copy would never be selected: scoping these to the route is what
+// keeps a rate-limiting or ACL policy enforcing on retrieve, delete, cancel and
+// compact. Route scope is also why one route can carry only one set — two
+// route-scoped plugins of the same name on a route collide on Kong's plugin
+// uniqueness key — so models sharing a lifecycle route have to agree on their
+// policies, just as they do on the ai-proxy-advanced config they merge into.
+func (c *Converter) attachLifecycleGuards(
+	st *modelPass, src ConversionIssueSource, m *aigw.Model,
+	routeName string, plugins []kong.Plugin,
+) {
+	set := lifecycleGuardSet{fingerprint: guardSetFingerprint(plugins), model: m.Name}
+	if first, ok := st.lifecycleGuards[routeName]; ok {
+		if first.fingerprint != set.fingerprint {
+			enforced := fmt.Sprintf("only model %q's policies are enforced there", first.model)
+			if first.fingerprint == "" {
+				enforced = fmt.Sprintf("model %q has none, so no policy is enforced there", first.model)
+			}
+			c.warn(src.at("policies"), BehaviorMayDiffer,
+				"model %q shares route %q with model %q, which has different policies. That route "+
+					"serves requests addressed by a stored ID, which carry no model, so its policies "+
+					"cannot be scoped per model: %s.",
+				m.Name, routeName, first.model, enforced)
+		}
+		return
+	}
+	st.lifecycleGuards[routeName] = set
+	for k := range plugins {
+		p := plugins[k]
+		p.Route = kong.NewStringRef(routeName)
+		st.guardPlugins = append(st.guardPlugins, p)
+	}
 }
 
 // warnModelScopedRequestTermination warns once per policy reference in refs.
