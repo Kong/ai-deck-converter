@@ -280,7 +280,7 @@ func testGeminiInteractionsAPI(t *testing.T, license string) {
 	configPath := convertCase(t, "gemini_interactions_api", "2.3", nil)
 
 	gateway := startGateway(t, GatewayOptions{
-		Image:  gatewayImage(t, "kong/kong-ai-gateway-dev:2.3.0-rc.1"),
+		Image:  gatewayImage(t, "kong/kong-ai-gateway:2.3.0"),
 		Config: configPath,
 		Env:    []string{licenseEnv(license)},
 	})
@@ -301,7 +301,7 @@ func testBedrockModelAllEndpoints(t *testing.T, license string) {
 	configPath := convertCase(t, "bedrock_model_all_endpoints", "2.3", nil)
 
 	gateway := startGateway(t, GatewayOptions{
-		Image:  gatewayImage(t, "kong/kong-ai-gateway-dev:2.3.0-rc.1"),
+		Image:  gatewayImage(t, "kong/kong-ai-gateway:2.3.0"),
 		Config: configPath,
 		Env:    []string{licenseEnv(license)},
 	})
@@ -324,7 +324,7 @@ func testBedrockMantleVPCEndpoint(t *testing.T, license string) {
 	configPath := convertCase(t, "bedrock_mantle_vpc_endpoint", "2.3", nil)
 
 	gateway := startGateway(t, GatewayOptions{
-		Image:  gatewayImage(t, "kong/kong-ai-gateway-dev:2.3.0-rc.1"),
+		Image:  gatewayImage(t, "kong/kong-ai-gateway:2.3.0"),
 		Config: configPath,
 		Env:    []string{licenseEnv(license)},
 	})
