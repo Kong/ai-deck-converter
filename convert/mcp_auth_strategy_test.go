@@ -388,6 +388,10 @@ func TestMCPMetadataDropsTokenExchange(t *testing.T) {
 // access.metadata. ai-mcp-oauth2 must keep the caller's bearer token, or the
 // Token Vault exchange has no subject token.
 const tokenVaultMCPWithMetadata = `
+datastores:
+  - name: tv
+    type: token-vault
+    config: {directory: d}
 auth_strategies:
   - name: okta-oidc
     type: openid-connect
@@ -400,6 +404,7 @@ mcp_servers:
     config:
       route:
         paths: [/mcp/vaulted]
+    datastores: [{name: tv}]
     token_vault:
       provider: github
       credential:
@@ -425,7 +430,7 @@ mcp_servers:
 func TestMCPOAuth2PassthroughForTokenVault(t *testing.T) {
 	out, warnings, err := convertYAML([]byte(tokenVaultMCPWithMetadata))
 	require.NoError(t, err)
-	require.Len(t, warnings, 1, "token_vault without a datastore warns")
+	require.Empty(t, warnings)
 	s := string(out)
 	require.Contains(t, s, "passthrough_credentials: true")
 }

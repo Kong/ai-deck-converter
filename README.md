@@ -374,9 +374,8 @@ and `formats` beyond the first.
   the plugin default `Bearer ` does not apply. `token_vault` and
   `config.upstream.auth` are mutually exclusive (both lower to the same plugin
   auth record) — declaring both is a hard error.
-  A `token_vault` takes one `token-vault` datastore, referenced by
-  `datastores: [{name: ...}]`. Without a reference, the server converts with a
-  warning and gets no callback route. An unknown reference leaves out the
+  A `token_vault` also needs exactly one `token-vault` datastore, referenced
+  by `datastores: [{name: ...}]`. A missing or unknown reference leaves out the
   server with an error. The datastore's `config.directory` becomes
   `auth.token_vault.directory`; a `directory` set on the server's
   `token_vault` is ignored with a warning when the datastore supplies one.
