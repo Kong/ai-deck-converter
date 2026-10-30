@@ -2,7 +2,6 @@ package convert
 
 import (
 	"fmt"
-	"slices"
 	"testing"
 
 	"github.com/Kong/ai-deck-converter/internal/aimap"
@@ -762,8 +761,17 @@ mcp_servers:`+server("a")+server("b")+"\n"), false)
 	require.True(t, dbPlugin, "db-less metadata records the callback plugin")
 }
 
-func TestTokenVaultUnknownDatastoreFailsServer(t *testing.T) {
-	_, _, err := convertDoc([]byte(`
+func TestTokenVaultRequiresTokenVaultDatastore(t *testing.T) {
+	for _, tt := range []struct {
+		name    string
+		refs    string
+		wantErr string
+	}{
+		{name: "no reference", refs: "", wantErr: `token_vault requires a "token-vault" datastore`},
+		{name: "unknown name", refs: "    datastores: [{name: nope}]\n", wantErr: `unknown datastore "nope"`},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			_, _, err := convertDoc([]byte(`
 datastores:
   - name: tv
     type: token-vault
@@ -772,38 +780,14 @@ mcp_servers:
   - type: passthrough-listener
     name: vaulted
     upstream_url: https://mcp.internal
-    datastores: [{name: nope}]
-    token_vault: {provider: github}
+`+tt.refs+`    token_vault: {provider: github}
     tools:
       - {name: report, description: Get a report}
 `), false)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), `unknown datastore "nope"`)
-}
-
-func TestTokenVaultWithoutDatastoreKeepsServer(t *testing.T) {
-	result, err := Convert([]byte(`
-mcp_servers:
-  - type: passthrough-listener
-    name: vaulted
-    upstream_url: https://mcp.internal
-    token_vault: {directory: default, provider: github}
-    tools:
-      - {name: report, description: Get a report}
-`), testOptions)
-	require.NoError(t, err)
-	require.Len(t, result.Issues, 1)
-	requireIssue(t, result.Issues, Warning, MissingRequiredConfigField, kindMCPServer, "vaulted", "datastores")
-	require.Empty(t, result.Output.Routes, "no Token Vault callback route")
-	require.Len(t, result.Output.Services, 1)
-	require.Len(t, result.Output.Services[0].Routes, 1)
-	plugins := result.Output.Services[0].Routes[0].Plugins
-	i := slices.IndexFunc(plugins, func(p kong.Plugin) bool { return p.Name == "ai-mcp-proxy" })
-	require.GreaterOrEqual(t, i, 0)
-	require.Equal(t, map[string]any{
-		"provider":    "token_vault",
-		"token_vault": map[string]any{"directory": "default", "provider": "github"},
-	}, plugins[i].Config["auth"])
+			require.Error(t, err)
+			require.Contains(t, err.Error(), tt.wantErr)
+		})
+	}
 }
 
 func TestTokenVaultCallbackRoutePrunedWithUnexposedServer(t *testing.T) {
