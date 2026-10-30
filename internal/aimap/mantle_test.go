@@ -37,6 +37,7 @@ func TestMantleSupports(t *testing.T) {
 		}
 	}
 	require.ElementsMatch(t, []string{
-		"openai-chat", "openai-responses", "openai-files", "anthropic-messages",
+		"openai-chat", "openai-responses", "openai-responses-lifecycle",
+		"openai-files", "anthropic-messages",
 	}, served)
 }

@@ -1,0 +1,38 @@
+# AG-2140. A model's policies and ACLs have to keep enforcing on the Responses
+# lifecycle route. That route carries no ai-model-selector, so nothing sets
+# ctx.ai_model and a model-scoped copy would never be selected; its copies are
+# scoped to the route instead. The create route keeps the per-alias
+# model-scoped copies, which the selector activates.
+models:
+  - name: guarded
+    type: model
+    capabilities: [generate, agentic]
+    formats: [{type: openai}]
+    policies: [prompt-guard, tenant-limit]
+    access:
+      acls:
+        allow: [premium-users]
+    config:
+      route: {paths: [/ai]}
+    targets:
+      - name: gpt-4.1-mini
+        provider: openai-prod
+model_providers:
+  - name: openai-prod
+    type: openai
+    config:
+      auth:
+        type: bearer
+        token: "{vault://ai/openai-key}"
+policies:
+  - type: ai-prompt-guard
+    name: prompt-guard
+    config:
+      allow_patterns: ["^safe"]
+  - type: rate-limiting
+    name: tenant-limit
+    config:
+      minute: 10
+      policy: local
+consumer_groups:
+  - name: premium-users

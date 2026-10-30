@@ -1,0 +1,23 @@
+# An authored selector source applies to the create route only. The lifecycle
+# route serves requests that carry no model in any source, so it gets no
+# ai-model-selector even when the model asks for one.
+models:
+  - name: gpt
+    type: model
+    capabilities: [agentic]
+    formats: [{type: openai}]
+    config:
+      route:
+        paths: [/ai]
+        model:
+          header: {header_param: x-model-name}
+    targets:
+      - name: gpt-4.1-mini
+        provider: openai-prod
+model_providers:
+  - name: openai-prod
+    type: openai
+    config:
+      auth:
+        type: bearer
+        token: "{vault://ai/openai-key}"

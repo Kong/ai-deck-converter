@@ -75,6 +75,12 @@ const (
 	// the reverse converter.
 	VideoLifecycleRouteTag = "aigw:video-lifecycle"
 
+	// ResponsesLifecycleRouteTag marks the generated companion route for the
+	// ID-addressed Responses API operations (retrieve, delete, input_items,
+	// cancel and compact). Like the video lifecycle route it is generated
+	// rather than authored, and the reverse converter ignores it.
+	ResponsesLifecycleRouteTag = "aigw:responses-lifecycle"
+
 	// GatewayWebSocketServiceName names the Service for realtime routes.
 	// Kong selects the WebSocket proxy path from the Service protocol.
 	GatewayWebSocketServiceName = "ai-gateway-websocket"
@@ -94,6 +100,18 @@ var (
 // Kong rejects methods on its routes. ai-model-selector does not run on it.
 func IsWebSocketEndpoint(spec EndpointSpec) bool {
 	return spec.RouteType == RealtimeRouteType
+}
+
+// ResponsesLifecycleRouteLabel names the generated companion endpoint serving
+// the ID-addressed Responses API operations.
+const ResponsesLifecycleRouteLabel = "responses-lifecycle"
+
+// IsLifecycleEndpoint reports whether spec is a generated companion endpoint
+// for a capability's ID-addressed operations. Those requests carry no model
+// for a selector to read. The plugin therefore stays route-scoped with
+// alias-less targets in the balancer's "<default>" pool.
+func IsLifecycleEndpoint(spec EndpointSpec) bool {
+	return spec.RouteLabel == ResponsesLifecycleRouteLabel
 }
 
 // SectionFor selects the endpoint section from the model's llm_format (the
@@ -318,6 +336,16 @@ var EndpointTable = map[string]map[string]EndpointEntry{
 			Primary: EndpointSpec{
 				"responses", "/responses", false, mPost, "llm/v1/responses", catTextGen,
 				&defaultBodyModelSelectorConfig, true,
+			},
+			// The regex matches a sub-path only. The create route above still
+			// serves "POST <base>/responses". Kong ranks a regex route above a
+			// prefix route of equal weight per REGEX_URL_BIT in
+			// kong/router/transform.lua.
+			Secondary: []EndpointSpec{
+				{
+					"responses-lifecycle", "responses/.+", true, mGetPostDelete,
+					"llm/v1/responses", catTextGen, nil, true,
+				},
 			},
 		},
 		"realtime": {

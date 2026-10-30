@@ -17,6 +17,17 @@ services:
           - POST
           - OPTIONS
         strip_path: false
+      - name: openai-responses-lifecycle
+        paths:
+          - ~/two/responses/.+
+        methods:
+          - GET
+          - POST
+          - DELETE
+          - OPTIONS
+        strip_path: false
+        tags:
+          - aigw:responses-lifecycle
       - name: openai-audio-speech
         paths:
           - /two/audio/speech
@@ -82,6 +93,17 @@ services:
           - POST
           - OPTIONS
         strip_path: false
+      - name: openai-responses-lifecycle-2
+        paths:
+          - ~/one/responses/.+
+        methods:
+          - GET
+          - POST
+          - DELETE
+          - OPTIONS
+        strip_path: false
+        tags:
+          - aigw:responses-lifecycle
       - name: openai-audio-speech-2
         paths:
           - /one/audio/speech
@@ -221,6 +243,22 @@ plugins:
           route_type: llm/v1/responses
     route: openai-responses
     model: two-strategies
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: gpt-5.4
+            provider: openai
+          route_type: llm/v1/responses
+    route: openai-responses-lifecycle
   - name: ai-model-selector
     config:
       max_request_body_size: 8388608
@@ -440,6 +478,22 @@ plugins:
           route_type: llm/v1/responses
     route: openai-responses-2
     model: one-strategy
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: gpt-5.4
+            provider: openai
+          route_type: llm/v1/responses
+    route: openai-responses-lifecycle-2
   - name: ai-model-selector
     config:
       max_request_body_size: 8388608
@@ -705,6 +759,17 @@ plugins:
     config:
       anonymous: anonymous
       issuer: https://dev-123456.okta.com/oauth2/default
+    route: openai-responses-lifecycle
+  - name: key-auth
+    config:
+      anonymous: anonymous
+      key_names:
+        - x-api-key
+    route: openai-responses-lifecycle
+  - name: openid-connect
+    config:
+      anonymous: anonymous
+      issuer: https://dev-123456.okta.com/oauth2/default
     route: openai-audio-speech
   - name: key-auth
     config:
@@ -786,6 +851,10 @@ plugins:
     config:
       issuer: https://dev-123456.okta.com/oauth2/default
     route: openai-responses-2
+  - name: openid-connect
+    config:
+      issuer: https://dev-123456.okta.com/oauth2/default
+    route: openai-responses-lifecycle-2
   - name: openid-connect
     config:
       issuer: https://dev-123456.okta.com/oauth2/default

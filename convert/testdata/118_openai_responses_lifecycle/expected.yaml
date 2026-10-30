@@ -1,0 +1,99 @@
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: openai-chat
+        paths:
+          - /ai/chat/completions
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-responses
+        paths:
+          - /ai/responses
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-responses-lifecycle
+        paths:
+          - ~/ai/responses/.+
+        methods:
+          - GET
+          - POST
+          - DELETE
+          - OPTIONS
+        strip_path: false
+        tags:
+          - aigw:responses-lifecycle
+plugins:
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-chat
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - description: gpt-4.1-mini
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: gpt
+            name: gpt-4.1-mini
+            provider: openai
+          route_type: llm/v1/chat
+    route: openai-chat
+    model: gpt
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-responses
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - description: gpt-4.1-mini
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: gpt
+            name: gpt-4.1-mini
+            provider: openai
+          route_type: llm/v1/responses
+    route: openai-responses
+    model: gpt
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - description: gpt-4.1-mini
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: gpt-4.1-mini
+            provider: openai
+          route_type: llm/v1/responses
+    route: openai-responses-lifecycle
+ai_models:
+  - name: gpt
