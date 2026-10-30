@@ -54,7 +54,8 @@ routes:
     service:
       id: 947a4e23-b483-5a65-8165-da9aed24565b
     paths:
-      - /mantle-vpc-files/files
+      - /mantle-vpc-files/v1/files
+      - /mantle-vpc-files/openai/v1/files
     methods:
       - GET
       - POST

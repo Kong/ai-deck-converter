@@ -52,27 +52,38 @@ func MantleSupports(format string, spec EndpointSpec) bool {
 	return (format == "openai" || format == "anthropic") && mantleRouteTypes[spec.RouteType]
 }
 
+// MantlePathPrefixes are the path prefixes that a mantle target serves in the
+// openai format. Each prefix gives one path on the route.
+var MantlePathPrefixes = []string{"/v1", "/openai/v1"}
+
+// MantleMultiPath reports whether a mantle target serves spec in format under
+// every prefix of MantlePathPrefixes.
+func MantleMultiPath(format string, spec EndpointSpec) bool {
+	return format == "openai" && !spec.IsRegex && spec.PathSuffix != "" &&
+		spec.RouteType != PassthroughRouteType
+}
+
 // MantlePathSuffixes returns the path suffixes that a mantle target serves
-// for spec. Mantle serves chat and responses under /v1 and /openai/v1.
-func MantlePathSuffixes(spec EndpointSpec) []string {
-	if spec.IsRegex {
+// for spec in format.
+func MantlePathSuffixes(format string, spec EndpointSpec) []string {
+	if !MantleMultiPath(format, spec) {
 		return []string{spec.PathSuffix}
 	}
-	switch spec.PathSuffix {
-	case "/chat/completions", "/responses":
-		return []string{"/v1" + spec.PathSuffix, "/openai/v1" + spec.PathSuffix}
+	suffixes := make([]string, len(MantlePathPrefixes))
+	for i, prefix := range MantlePathPrefixes {
+		suffixes[i] = prefix + spec.PathSuffix
 	}
-	return []string{spec.PathSuffix}
+	return suffixes
 }
 
 // RoutePaths returns the route paths of spec under base. A mantle route has
 // one path for each mantle path suffix.
-func RoutePaths(base string, spec EndpointSpec, mantle bool) []string {
+func RoutePaths(base string, spec EndpointSpec, format string, mantle bool) []string {
 	if !mantle {
 		return []string{RoutePath(base, spec)}
 	}
 	var paths []string
-	for _, suffix := range MantlePathSuffixes(spec) {
+	for _, suffix := range MantlePathSuffixes(format, spec) {
 		mantleSpec := spec
 		mantleSpec.PathSuffix = suffix
 		paths = append(paths, RoutePath(base, mantleSpec))

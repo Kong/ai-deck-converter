@@ -597,7 +597,7 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 				if passthrough {
 					keySection = ""
 				}
-				mantlePaths := t.target.Mantle && len(aimap.MantlePathSuffixes(spec)) > 1
+				mantlePaths := t.target.Mantle && aimap.MantleMultiPath(format, spec)
 				key := keySection + "|" +
 					spec.RouteLabel +
 					"|" + strconv.FormatBool(mantlePaths) +
@@ -612,7 +612,7 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 				if g == nil {
 					var paths []string
 					for _, b := range bases {
-						paths = append(paths, aimap.RoutePaths(b, spec, mantlePaths)...)
+						paths = append(paths, aimap.RoutePaths(b, spec, format, mantlePaths)...)
 					}
 					routeName := uniqueModelRouteName(sec+"-"+spec.RouteLabel, st.usedRouteNames)
 					g = &routeGroup{

@@ -190,7 +190,7 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 				suffixes := []aimap.EndpointSpec{match.spec}
 				if getStr(getMap(getMap(modelMap, "options"), "bedrock"), "endpoint_type") == aimap.BedrockEndpointTypeMantle {
 					suffixes = suffixes[:0]
-					for _, suffix := range aimap.MantlePathSuffixes(match.spec) {
+					for _, suffix := range aimap.MantlePathSuffixes(llmFormat, match.spec) {
 						mantleSpec := match.spec
 						mantleSpec.PathSuffix = suffix
 						suffixes = append(suffixes, mantleSpec)
