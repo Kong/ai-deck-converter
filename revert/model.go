@@ -187,6 +187,16 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 				capability = match.capability
 				spec = &match.spec
 				ties = match.ties
+				if len(ties) > 0 && len(r.src.AIModels) == 0 {
+					alts := append(append([]string{}, match.capability), ties...)
+					slices.Sort(alts)
+					if err := r.warn(
+						"route %q: capability %q was chosen among tied endpoints %v; "+
+							"verify intent for hand-written or edited decK",
+						rt.Name, capability, alts); err != nil {
+						return err
+					}
+				}
 				suffixes := []aimap.EndpointSpec{match.spec}
 				if getStr(getMap(getMap(modelMap, "options"), "bedrock"), "endpoint_type") == aimap.BedrockEndpointTypeMantle {
 					suffixes = suffixes[:0]

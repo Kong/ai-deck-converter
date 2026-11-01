@@ -51,8 +51,10 @@ cat input.yaml | ./ai-deck-converter -min-runtime-version 2.1 -
 
 Conversion issues are printed to stderr, one per line, as
 `SEVERITY CODE kind "name" [fields]: reason`. The converted config always goes
-to stdout/`-o`. The exit code is 1 when an issue has the `ERROR` severity, or on
-any issue with `-strict`. The reverse direction prints `warning:` lines.
+to stdout/`-o`. The exit code is 1 when deployment is not safe: any `ERROR`
+issue, any `ROUTING_CONFLICT` issue, or any issue with `-strict`. Use
+`ConversionResult.SafeToDeploy()` or `IssuesSafeToDeploy()` in library code.
+The reverse direction prints `warning:` lines.
 
 ## Minimum runtime version
 

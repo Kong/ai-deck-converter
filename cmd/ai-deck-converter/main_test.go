@@ -3,6 +3,7 @@ package main
 import (
 	"testing"
 
+	"github.com/Kong/ai-deck-converter/convert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -21,6 +22,23 @@ func TestDetectDirection(t *testing.T) {
 	}
 	_, err := detectDirection([]byte(":\tnot yaml"))
 	require.Error(t, err, "invalid yaml: want error")
+}
+
+func TestConversionRunFailed(t *testing.T) {
+	require.False(t, conversionRunFailed(nil, false))
+	require.False(t, conversionRunFailed([]convert.ConversionIssue{}, false))
+	require.True(t, conversionRunFailed([]convert.ConversionIssue{
+		{Severity: convert.Error, Code: convert.UndefinedReference},
+	}, false))
+	require.True(t, conversionRunFailed([]convert.ConversionIssue{
+		{Severity: convert.Warning, Code: convert.RoutingConflict},
+	}, false))
+	require.False(t, conversionRunFailed([]convert.ConversionIssue{
+		{Severity: convert.Warning, Code: convert.BehaviorMayDiffer},
+	}, false))
+	require.True(t, conversionRunFailed([]convert.ConversionIssue{
+		{Severity: convert.Warning, Code: convert.BehaviorMayDiffer},
+	}, true))
 }
 
 func TestCheckMinRuntimeVersion(t *testing.T) {

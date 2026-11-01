@@ -77,8 +77,8 @@ func run() error {
 		}
 		for _, issue := range issues {
 			fmt.Fprintln(os.Stderr, issue)
-			failed = failed || *strict || issue.Severity == convert.Error
 		}
+		failed = failed || conversionRunFailed(issues, *strict)
 	case "from-deck":
 		var warnings []string
 		out, warnings, err = revert.Revert(in, revert.Options{
@@ -151,6 +151,16 @@ func detectDirection(in []byte) (string, error) {
 		return "from-deck", nil
 	}
 	return "to-deck", nil
+}
+
+// conversionRunFailed decides whether the CLI run fails after issues are
+// printed. Strict fails on any issue. The default fails when deployment is not
+// safe: any ERROR or any ROUTING_CONFLICT.
+func conversionRunFailed(issues []convert.ConversionIssue, strict bool) bool {
+	if strict {
+		return len(issues) > 0
+	}
+	return !convert.IssuesSafeToDeploy(issues)
 }
 
 func readInput(path string) ([]byte, error) {

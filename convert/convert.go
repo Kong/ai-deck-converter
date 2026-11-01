@@ -129,11 +129,13 @@ func newConverter(doc *aigw.Document, opts Options) *Converter {
 func (c *Converter) result() *ConversionResult {
 	metadata := *c.out.Metadata()
 	metadata.MinRuntimeVersion = c.minRuntimeVersion.String()
-	return &ConversionResult{
+	result := &ConversionResult{
 		Output:   c.out,
 		Metadata: metadata,
 		Issues:   c.issues,
 	}
+	result.Metadata.SafeToDeploy = result.SafeToDeploy()
+	return result
 }
 
 func (c *Converter) run() {

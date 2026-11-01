@@ -379,6 +379,30 @@ services:
 	require.Contains(t, err.Error(), "no routes", "strict: want a no-routes error")
 }
 
+func TestRevertTiedEndpointCapabilityWarning(t *testing.T) {
+	in := []byte(`
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: bedrock-invoke
+        paths: ['~/ai/model/(?<model_name>[^/]+)/invoke(?:-with-response-stream)?']
+        plugins:
+          - name: ai-proxy-advanced
+            config:
+              llm_format: bedrock
+              genai_category: text/generation
+              targets:
+                - route_type: llm/v1/chat
+                  model: {provider: bedrock, name: claude, model_alias: claude}
+`)
+	_, warnings, err := revertYAML(t, in, Options{})
+	require.NoError(t, err, "revert")
+	require.Contains(t, strings.Join(warnings, "\n"), "tied endpoints",
+		"want an ambiguous tied-endpoint warning for hand-written decK")
+}
+
 func TestUnresolvableCapabilityDefaultsToGenerate(t *testing.T) {
 	in := []byte(`
 _format_version: "3.0"

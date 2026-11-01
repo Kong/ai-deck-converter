@@ -17,6 +17,10 @@ type ConversionMetadata struct {
 	// MinRuntimeVersion is the minimum runtime version that the conversion
 	// used, in the form MAJOR.MINOR.
 	MinRuntimeVersion string
+	// SafeToDeploy is false when IssuesSafeToDeploy would reject the issue
+	// list. It is sidecar metadata and is never included in the emitted Kong
+	// configuration.
+	SafeToDeploy bool
 }
 
 // PluginTargetSource identifies one target in the converted plugin list and
