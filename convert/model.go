@@ -190,6 +190,7 @@ type modelPass struct {
 	// tokenVaults holds the token-vault-exchange config of each model.
 	tokenVaults      map[*aigw.Model]map[string]any
 	directorySources map[string][]string
+	usedPluginIDs    map[string]bool
 }
 
 // convertModels groups all (model, target, capability) tuples into routes under
@@ -232,6 +233,7 @@ func (c *Converter) convertModelsPass(skipped map[int][]ConversionIssue) bool {
 		skipped:             skipped,
 		tokenVaults:         map[*aigw.Model]map[string]any{},
 		directorySources:    map[string][]string{},
+		usedPluginIDs:       map[string]bool{},
 	}
 	c.modelRouteModels = map[string][]string{}
 	lifecycleCandidates := c.videoLifecycleCandidates(skipped)
@@ -281,14 +283,17 @@ func (c *Converter) convertModelsPass(skipped map[int][]ConversionIssue) bool {
 				if pg.realtimeModel != "" {
 					tags = []string{aimap.EncodeRealtimeModel(pg.realtimeModel)}
 				}
-				id := modelPluginID(pg.routeName, pg.proxyConfig())
-				st.addDirectorySource(pg.source.EntityName, id)
+				proxyCfg := pg.proxyConfig()
+				id := c.nextModelPluginID(st, pg.routeName, proxyCfg)
+				for _, owner := range g.models {
+					st.addDirectorySource(owner, id)
+				}
 				c.out.Plugins = append(c.out.Plugins, kong.Plugin{
 					ID:            id,
 					Name:          "ai-proxy-advanced",
 					Protocols:     protocols,
 					Route:         kong.NewStringRef(pg.routeName),
-					Config:        pg.proxyConfig(),
+					Config:        proxyCfg,
 					Tags:          tags,
 					TargetSources: pg.targetSources,
 					Source:        pg.source,
@@ -303,7 +308,7 @@ func (c *Converter) convertModelsPass(skipped map[int][]ConversionIssue) bool {
 			for _, alias := range pg.aliases {
 				cfg := pg.proxyConfig()
 				cfg["targets"] = withModelAlias(pg.targets, alias, pg.llmFormat)
-				id := modelPluginID(pg.routeName, cfg)
+				id := c.nextModelPluginID(st, pg.routeName, cfg)
 				st.addDirectorySource(pg.source.EntityName, id)
 				c.out.Plugins = append(c.out.Plugins, kong.Plugin{
 					ID:            id,

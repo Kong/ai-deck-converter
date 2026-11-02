@@ -330,6 +330,10 @@ plugins:
 - The list route carries the auth strategies of the models it covers, with the
   same anonymous consumer and `request-termination` fallback as the model
   routes, so an unidentified caller gets a 401.
+- A list route matches on its path only; hosts, SNIs and headers of the model
+  routes do not narrow it.
+- Two models that share one `type: api` instance share one access rule. When
+  their rules differ, the instance is left out of every list with a warning.
 - The lists need AI Gateway 2.3 (`aimap.FeatureModelDirectory`). Below the
   gate they are left out, with one `UNSUPPORTED_IN_MIN_RUNTIME_VERSION`
   warning.

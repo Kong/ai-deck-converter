@@ -218,6 +218,105 @@ routes:
       - http
       - https
     strip_path: false
+  - id: aeea4f5f-1d07-59ad-98b1-be41cf62b11c
+    name: models
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /v1/models
+    methods:
+      - GET
+    protocols:
+      - http
+      - https
+  - id: 1f8c5271-c01d-518b-ab1d-d90691672cf6
+    name: models-bedrock-batches
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /bedrock-batches/v1/models
+    methods:
+      - GET
+    protocols:
+      - http
+      - https
+  - id: 0befcc98-f50d-538b-bb73-23aa6fce6db3
+    name: models-bedrock-embeddings
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /bedrock-embeddings/v1/models
+    methods:
+      - GET
+    protocols:
+      - http
+      - https
+  - id: 29e57fd4-3053-51d4-b88d-f92c1d73c2b6
+    name: models-bedrock-image
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /bedrock-image/v1/models
+    methods:
+      - GET
+    protocols:
+      - http
+      - https
+  - id: b1abc5f7-58bd-5657-8272-a7876f47baab
+    name: models-bedrock-video
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /bedrock-video/v1/models
+    methods:
+      - GET
+    protocols:
+      - http
+      - https
+  - id: cf0c669f-4bcb-57e5-891c-5a63cb3c8482
+    name: models-bedrock
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /bedrock/v1/models
+    methods:
+      - GET
+    protocols:
+      - http
+      - https
+  - id: bf1f8ba0-6c2a-5b98-b3ee-3208c5bc4a27
+    name: models-mantle-anthropic
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /mantle-anthropic/v1/models
+    methods:
+      - GET
+    protocols:
+      - http
+      - https
+  - id: 90c44639-43ff-5b15-b06a-19f7b2b453fb
+    name: models-mantle-files
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /mantle-files/v1/models
+    methods:
+      - GET
+    protocols:
+      - http
+      - https
+  - id: d4a709cd-9b37-5531-885e-94ba45a393ed
+    name: models-mantle-openai
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /mantle-openai/v1/models
+    methods:
+      - GET
+    protocols:
+      - http
+      - https
 plugins:
   - id: 17fa8192-4b9f-5b5a-8379-20ad8bc836a7
     name: ai-model-selector
@@ -228,7 +327,7 @@ plugins:
           source: path
     route:
       id: 934cbaf7-d722-5a54-ae50-48c0b63343dd
-  - id: f3adc007-171c-5519-8763-3a0eef79bde3
+  - id: f7371f3e-d4c5-5d58-9942-7d88d6c43ac0
     name: ai-proxy-advanced
     config:
       balancer:
@@ -265,7 +364,7 @@ plugins:
           source: path
     route:
       id: df12ed34-44b5-5c3d-9c3d-908ece02fb32
-  - id: 75ff22ed-6245-594b-895f-6a9fa36f4581
+  - id: 750da8d8-6df4-5885-902d-7da9f58fd603
     name: ai-proxy-advanced
     config:
       balancer:
@@ -302,7 +401,7 @@ plugins:
           source: body
     route:
       id: 3e5bbe5f-d382-52f7-837e-2701814528e5
-  - id: 628550fd-b362-5247-b3ba-f2f6fa95de13
+  - id: 8e1727cf-e6c9-576c-a496-bb89f43af4f6
     name: ai-proxy-advanced
     config:
       balancer:
@@ -339,7 +438,7 @@ plugins:
           source: body
     route:
       id: f389aa8d-e597-5c0f-8678-04572278e83e
-  - id: ccc68bd9-2622-5864-b026-137e5c06c755
+  - id: c5d14b25-2f8f-53c4-a3df-5ad601986a73
     name: ai-proxy-advanced
     config:
       balancer:
@@ -376,7 +475,7 @@ plugins:
           source: path
     route:
       id: 78397398-a48f-503c-ba71-7ac2ea7b5883
-  - id: d7038ac4-55db-505a-824e-d2a548ec7424
+  - id: 12d51a8c-4740-5e6c-bc08-c78cf6842565
     name: ai-proxy-advanced
     config:
       balancer:
@@ -413,7 +512,7 @@ plugins:
           source: body
     route:
       id: 41282f10-4533-5f5a-bac3-cf0991d72913
-  - id: e4b46606-e4f5-57c3-9298-949d4e990f2d
+  - id: 0251aed6-98ae-583f-80ef-9fbb90456d68
     name: ai-proxy-advanced
     config:
       balancer:
@@ -450,7 +549,7 @@ plugins:
           source: path
     route:
       id: 57dbc083-73ad-583e-b144-a4006f6e1721
-  - id: 1fc0cc9b-eb94-5eb9-8c69-d8361c990007
+  - id: e0886886-51e1-578c-84ed-9e3d74e43768
     name: ai-proxy-advanced
     config:
       balancer:
@@ -487,7 +586,7 @@ plugins:
           source: path
     route:
       id: b6ef3b88-21e0-5e31-87a9-83d5d69a7599
-  - id: cf7316be-1398-5d7d-bed6-bacd43b095b8
+  - id: 562f0010-008f-5971-b6e0-5a737ae7d226
     name: ai-proxy-advanced
     config:
       balancer:
@@ -523,7 +622,7 @@ plugins:
           source: path
     route:
       id: 42ad48c4-fa26-5e28-9b81-47e4b976b972
-  - id: 5f4b0e19-29d1-5ce6-b34f-3e1394bf878e
+  - id: ee2c995c-a0fd-5b90-9529-fa913ec3f7ac
     name: ai-proxy-advanced
     config:
       balancer:
@@ -559,7 +658,7 @@ plugins:
           source: path
     route:
       id: fd893c85-2a3a-522b-9c79-f97f8980442d
-  - id: 0f8844dd-7362-5ea0-8eeb-35ee0580b632
+  - id: 619d75c2-60ee-5c0a-b8c0-b1bd5a4d25e3
     name: ai-proxy-advanced
     config:
       balancer:
@@ -587,7 +686,7 @@ plugins:
       id: fd893c85-2a3a-522b-9c79-f97f8980442d
     model:
       id: 0835e469-295d-5fcc-9115-467aed1342ab
-  - id: cccc78d9-7846-57bc-af68-12f85e625fcd
+  - id: e239a8a3-055c-5161-9cb0-b725b99f238c
     name: ai-proxy-advanced
     config:
       balancer:
@@ -624,7 +723,7 @@ plugins:
           source: body
     route:
       id: 8ae36805-da7a-55b9-b056-72bde6bb937d
-  - id: dd276604-c64f-5c9f-85c3-f358cc3115c0
+  - id: c1431e38-2ff4-5fb6-95f8-7443965068bf
     name: ai-proxy-advanced
     config:
       balancer:
@@ -662,7 +761,7 @@ plugins:
           source: body
     route:
       id: 1a3f650c-2709-5e79-a792-7ffd18243fbf
-  - id: fc67fd65-983a-5b80-9bda-de44a1de9b6a
+  - id: 73c2305b-7788-5b6f-81df-bade765dd879
     name: ai-proxy-advanced
     config:
       balancer:
@@ -700,7 +799,7 @@ plugins:
           source: body
     route:
       id: bb559a54-dc17-5c0f-b946-b0d9c5cebd7a
-  - id: 0f933206-16d8-5873-a1fa-6ca08ff363c2
+  - id: c75b77e3-2e37-50bc-92d3-13e521416c67
     name: ai-proxy-advanced
     config:
       balancer:
@@ -730,7 +829,7 @@ plugins:
       id: bb559a54-dc17-5c0f-b946-b0d9c5cebd7a
     model:
       id: 670ee2da-e67b-59f4-811d-48aec0ff00d0
-  - id: 32c66b25-eee1-5606-ae08-3fbd6e58cfba
+  - id: 87499c75-8e12-5302-8dfb-ca7315098269
     name: ai-proxy-advanced
     config:
       balancer:
@@ -757,6 +856,108 @@ plugins:
           route_type: llm/v1/files
     route:
       id: b433d478-0f40-5518-b6bb-815583936241
+  - id: df451b5d-1af4-57b8-8ced-85dc15c61fe8
+    name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: f7371f3e-d4c5-5d58-9942-7d88d6c43ac0
+          - plugin_id: 750da8d8-6df4-5885-902d-7da9f58fd603
+          - plugin_id: 8e1727cf-e6c9-576c-a496-bb89f43af4f6
+          - plugin_id: c5d14b25-2f8f-53c4-a3df-5ad601986a73
+          - plugin_id: 12d51a8c-4740-5e6c-bc08-c78cf6842565
+          - plugin_id: 0251aed6-98ae-583f-80ef-9fbb90456d68
+          - plugin_id: e0886886-51e1-578c-84ed-9e3d74e43768
+          - plugin_id: 562f0010-008f-5971-b6e0-5a737ae7d226
+          - plugin_id: ee2c995c-a0fd-5b90-9529-fa913ec3f7ac
+          - plugin_id: 619d75c2-60ee-5c0a-b8c0-b1bd5a4d25e3
+          - plugin_id: e239a8a3-055c-5161-9cb0-b725b99f238c
+          - plugin_id: c1431e38-2ff4-5fb6-95f8-7443965068bf
+          - plugin_id: 73c2305b-7788-5b6f-81df-bade765dd879
+          - plugin_id: c75b77e3-2e37-50bc-92d3-13e521416c67
+          - plugin_id: 87499c75-8e12-5302-8dfb-ca7315098269
+      route_type: llm/v1/models
+    route:
+      id: aeea4f5f-1d07-59ad-98b1-be41cf62b11c
+  - id: d70f9948-2d3c-5912-bf94-c6895cbb0563
+    name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: e239a8a3-055c-5161-9cb0-b725b99f238c
+      route_type: llm/v1/models
+    route:
+      id: 1f8c5271-c01d-518b-ab1d-d90691672cf6
+  - id: f792d94c-ef6e-508b-8827-fb8893e1fe80
+    name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 562f0010-008f-5971-b6e0-5a737ae7d226
+      route_type: llm/v1/models
+    route:
+      id: 0befcc98-f50d-538b-bb73-23aa6fce6db3
+  - id: 21ffbeb8-dfe5-5e97-b16d-19a479b6367c
+    name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: ee2c995c-a0fd-5b90-9529-fa913ec3f7ac
+      route_type: llm/v1/models
+    route:
+      id: 29e57fd4-3053-51d4-b88d-f92c1d73c2b6
+  - id: bb2d381a-8b20-5590-ab40-4c32b2d19ab3
+    name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 619d75c2-60ee-5c0a-b8c0-b1bd5a4d25e3
+      route_type: llm/v1/models
+    route:
+      id: b1abc5f7-58bd-5657-8272-a7876f47baab
+  - id: 0e90067c-b01d-519b-8c7a-d2571143396f
+    name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: f7371f3e-d4c5-5d58-9942-7d88d6c43ac0
+          - plugin_id: 750da8d8-6df4-5885-902d-7da9f58fd603
+          - plugin_id: 8e1727cf-e6c9-576c-a496-bb89f43af4f6
+          - plugin_id: c5d14b25-2f8f-53c4-a3df-5ad601986a73
+          - plugin_id: 12d51a8c-4740-5e6c-bc08-c78cf6842565
+          - plugin_id: 0251aed6-98ae-583f-80ef-9fbb90456d68
+          - plugin_id: e0886886-51e1-578c-84ed-9e3d74e43768
+      route_type: llm/v1/models
+    route:
+      id: cf0c669f-4bcb-57e5-891c-5a63cb3c8482
+  - id: fc66f557-89a5-5aae-9e65-b2e29552ce83
+    name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: c75b77e3-2e37-50bc-92d3-13e521416c67
+      route_type: llm/v1/models
+    route:
+      id: bf1f8ba0-6c2a-5b98-b3ee-3208c5bc4a27
+  - id: 872f937c-ac5f-5057-8276-82da6badc516
+    name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 87499c75-8e12-5302-8dfb-ca7315098269
+      route_type: llm/v1/models
+    route:
+      id: 90c44639-43ff-5b15-b06a-19f7b2b453fb
+  - id: 0bf3e851-2bd5-55a9-a251-5b67f915f8e1
+    name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: c1431e38-2ff4-5fb6-95f8-7443965068bf
+          - plugin_id: 73c2305b-7788-5b6f-81df-bade765dd879
+      route_type: llm/v1/models
+    route:
+      id: d4a709cd-9b37-5531-885e-94ba45a393ed
 ai_models:
   - id: 45407819-61a7-5d51-a737-b63bcbab37ff
     name: bedrock-chat

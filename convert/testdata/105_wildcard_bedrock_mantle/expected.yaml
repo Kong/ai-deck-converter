@@ -44,17 +44,17 @@ services:
         protocols:
           - http
           - https
-      - name: models-mantle
+      - name: models-mantle-files
         paths:
-          - /mantle/v1/models
+          - /mantle-files/v1/models
         methods:
           - GET
         protocols:
           - http
           - https
-      - name: models-mantle-files
+      - name: models-mantle
         paths:
-          - /mantle-files/v1/models
+          - /mantle/v1/models
         methods:
           - GET
         protocols:
@@ -203,18 +203,18 @@ plugins:
     config:
       models:
         sources:
+          - plugin_id: ad258040-0677-5c8c-892f-4c69acca6305
+      route_type: llm/v1/models
+    route: models-mantle-files
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
           - plugin_id: d5c80b48-5f02-5dca-bef0-513c34f37b77
           - plugin_id: b203783d-5b68-5c91-9d46-de8a4f2e936f
           - plugin_id: 1fa06e58-c803-5807-b42f-9aa0f32c1422
       route_type: llm/v1/models
     route: models-mantle
-  - name: ai-proxy-advanced
-    config:
-      models:
-        sources:
-          - plugin_id: ad258040-0677-5c8c-892f-4c69acca6305
-      route_type: llm/v1/models
-    route: models-mantle-files
 ai_models:
   - name: mantle
   - name: mantle-files

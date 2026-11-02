@@ -34,6 +34,39 @@ routes:
       - http
       - https
     strip_path: false
+  - id: aeea4f5f-1d07-59ad-98b1-be41cf62b11c
+    name: models
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /v1/models
+    methods:
+      - GET
+    protocols:
+      - http
+      - https
+  - id: bc237ca9-8145-515b-9a0a-7d25b5e7b619
+    name: models-defaults
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /defaults/v1/models
+    methods:
+      - GET
+    protocols:
+      - http
+      - https
+  - id: 9980e741-6a62-5eea-abce-d4bf92c2995e
+    name: models-explicit
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /explicit/v1/models
+    methods:
+      - GET
+    protocols:
+      - http
+      - https
   - id: 00761a8d-f6bf-5691-bad3-e67da4a21bbf
     name: token-vault-callback-handler
     paths:
@@ -90,7 +123,7 @@ plugins:
           source: body
     route:
       id: bb559a54-dc17-5c0f-b946-b0d9c5cebd7a
-  - id: f3adc007-171c-5519-8763-3a0eef79bde3
+  - id: 58507262-f4ae-58ed-ac0f-591f2f42f752
     name: ai-proxy-advanced
     config:
       balancer:
@@ -174,7 +207,7 @@ plugins:
           source: body
     route:
       id: 8ae36805-da7a-55b9-b056-72bde6bb937d
-  - id: 12106a5c-cbd2-5942-8432-ef9bc4adca1b
+  - id: 3be1c7a6-b293-573b-b1f5-fc30e6a733ff
     name: ai-proxy-advanced
     config:
       balancer:
@@ -237,6 +270,34 @@ plugins:
       id: 8ae36805-da7a-55b9-b056-72bde6bb937d
     model:
       id: fb0cdd7a-7f38-5e67-82ce-26906ba42574
+  - id: 693f2c49-9a06-59cc-92cf-0747f3214011
+    name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 58507262-f4ae-58ed-ac0f-591f2f42f752
+          - plugin_id: 3be1c7a6-b293-573b-b1f5-fc30e6a733ff
+      route_type: llm/v1/models
+    route:
+      id: aeea4f5f-1d07-59ad-98b1-be41cf62b11c
+  - id: ccc68bd9-2622-5864-b026-137e5c06c755
+    name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 3be1c7a6-b293-573b-b1f5-fc30e6a733ff
+      route_type: llm/v1/models
+    route:
+      id: bc237ca9-8145-515b-9a0a-7d25b5e7b619
+  - id: bcefe664-4bf5-5e5a-8fd0-386c330b967f
+    name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 58507262-f4ae-58ed-ac0f-591f2f42f752
+      route_type: llm/v1/models
+    route:
+      id: 9980e741-6a62-5eea-abce-d4bf92c2995e
 ai_models:
   - id: 0a6904fa-4d19-5e62-aa3c-ab58139fcc54
     name: claude

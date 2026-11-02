@@ -41,7 +41,7 @@ plugins:
           - key-auth
     route:
       id: 8ae36805-da7a-55b9-b056-72bde6bb937d
-  - id: f3adc007-171c-5519-8763-3a0eef79bde3
+  - id: 4f61b82e-52e6-534e-949b-ca6844e23170
     name: ai-proxy-advanced
     config:
       balancer:

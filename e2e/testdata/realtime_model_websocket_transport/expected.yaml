@@ -58,7 +58,7 @@ plugins:
           source: body
     route:
       id: 8ae36805-da7a-55b9-b056-72bde6bb937d
-  - id: f3adc007-171c-5519-8763-3a0eef79bde3
+  - id: 9c1a5509-d91b-5b15-bfd7-3b6c2c93c976
     name: ai-proxy-advanced
     config:
       balancer:
@@ -82,7 +82,7 @@ plugins:
       id: 8ae36805-da7a-55b9-b056-72bde6bb937d
     model:
       id: e8317b57-812f-5942-a706-9673d239ea50
-  - id: fe4129f3-2075-5492-8b59-90def2cf73ab
+  - id: fa8783d8-28c1-5aa1-af66-80591b31710c
     name: ai-proxy-advanced
     protocols:
       - ws

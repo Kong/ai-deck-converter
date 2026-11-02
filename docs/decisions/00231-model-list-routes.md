@@ -94,6 +94,19 @@ A model whose `access.acls` sets more than one of `allow`, `deny`,
 `allow_when` and `deny_when` never reaches this step: its acl plugin fails, so
 the model fails first.
 
+A list route matches on its path only. A model route also matches on hosts,
+SNIs and headers, so a caller those rules exclude can still read the list.
+The list is a discovery surface, not an inference surface.
+
+Two models that share one `type: api` instance share one `ai-proxy-advanced`
+plugin, which carries one access rule. When their rules differ, the instance
+is left out of every list with a warning, so the list never shows a model to a
+caller its rule excludes.
+
+The video lifecycle route of a video model has its own `ai-proxy-advanced`
+instance and is not advertised: it serves a lifecycle operation rather than a
+model a client selects.
+
 Below the 2.3 gate no list route is made, and one
 `UNSUPPORTED_IN_MIN_RUNTIME_VERSION` warning names the conversion option.
 

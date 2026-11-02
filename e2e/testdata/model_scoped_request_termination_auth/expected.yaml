@@ -41,7 +41,7 @@ plugins:
           - key-auth
     route:
       id: 8ae36805-da7a-55b9-b056-72bde6bb937d
-  - id: f3adc007-171c-5519-8763-3a0eef79bde3
+  - id: 8fcc97c8-2b27-5f65-a04c-8ec0eaf781fd
     name: ai-proxy-advanced
     config:
       balancer:
@@ -65,7 +65,7 @@ plugins:
       id: 8ae36805-da7a-55b9-b056-72bde6bb937d
     model:
       id: 8197186c-03a6-5c46-9c3f-00a77a68efbb
-  - id: fe4129f3-2075-5492-8b59-90def2cf73ab
+  - id: a12a23e0-96f0-5e97-bbc0-e03a10648f12
     name: ai-proxy-advanced
     config:
       balancer:
@@ -89,7 +89,7 @@ plugins:
       id: 8ae36805-da7a-55b9-b056-72bde6bb937d
     model:
       id: 892265eb-8b09-5604-829d-7a40a7f1b845
-  - id: 75ff22ed-6245-594b-895f-6a9fa36f4581
+  - id: e0870830-8795-5520-bdee-199c4b971168
     name: ai-proxy-advanced
     config:
       balancer:

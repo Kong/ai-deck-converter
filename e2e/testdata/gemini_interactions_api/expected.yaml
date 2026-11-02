@@ -64,6 +64,28 @@ routes:
       - http
       - https
     strip_path: false
+  - id: aeea4f5f-1d07-59ad-98b1-be41cf62b11c
+    name: models
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /v1/models
+    methods:
+      - GET
+    protocols:
+      - http
+      - https
+  - id: fff967a8-311f-5516-9d8e-b30ff67b4993
+    name: models-gemini
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /gemini/v1/models
+    methods:
+      - GET
+    protocols:
+      - http
+      - https
 plugins:
   - id: 17fa8192-4b9f-5b5a-8379-20ad8bc836a7
     name: ai-model-selector
@@ -74,7 +96,7 @@ plugins:
           source: body
     route:
       id: d13c1734-7773-5150-a0c3-4e7816185423
-  - id: f3adc007-171c-5519-8763-3a0eef79bde3
+  - id: 1e80d997-3f0a-58ae-83c3-6b17fa35263a
     name: ai-proxy-advanced
     config:
       balancer:
@@ -108,7 +130,7 @@ plugins:
           source: body
     route:
       id: c1264434-e7f1-576d-ba87-6d40613b3401
-  - id: 75ff22ed-6245-594b-895f-6a9fa36f4581
+  - id: f922b2e5-1480-5f81-b41e-d08e57dbac37
     name: ai-proxy-advanced
     config:
       balancer:
@@ -142,7 +164,7 @@ plugins:
           source: body
     route:
       id: d9a05919-b5fa-5cc5-bd04-e46b5ddc0cc5
-  - id: 628550fd-b362-5247-b3ba-f2f6fa95de13
+  - id: 9d77175d-3ff6-513f-9a03-0d7db368dbe6
     name: ai-proxy-advanced
     config:
       balancer:
@@ -180,7 +202,7 @@ plugins:
           source: body
     route:
       id: 724a665f-6f8b-5076-8ab1-a438d7025c2e
-  - id: ccc68bd9-2622-5864-b026-137e5c06c755
+  - id: 784c7704-39e4-5514-812c-00e6934c5fff
     name: ai-proxy-advanced
     config:
       balancer:
@@ -209,6 +231,30 @@ plugins:
       id: 724a665f-6f8b-5076-8ab1-a438d7025c2e
     model:
       id: 815c3d7c-8c34-505f-91fe-2445144dc2e8
+  - id: bcefe664-4bf5-5e5a-8fd0-386c330b967f
+    name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 1e80d997-3f0a-58ae-83c3-6b17fa35263a
+          - plugin_id: f922b2e5-1480-5f81-b41e-d08e57dbac37
+          - plugin_id: 9d77175d-3ff6-513f-9a03-0d7db368dbe6
+          - plugin_id: 784c7704-39e4-5514-812c-00e6934c5fff
+      route_type: llm/v1/models
+    route:
+      id: aeea4f5f-1d07-59ad-98b1-be41cf62b11c
+  - id: d7038ac4-55db-505a-824e-d2a548ec7424
+    name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 1e80d997-3f0a-58ae-83c3-6b17fa35263a
+          - plugin_id: f922b2e5-1480-5f81-b41e-d08e57dbac37
+          - plugin_id: 9d77175d-3ff6-513f-9a03-0d7db368dbe6
+          - plugin_id: 784c7704-39e4-5514-812c-00e6934c5fff
+      route_type: llm/v1/models
+    route:
+      id: fff967a8-311f-5516-9d8e-b30ff67b4993
 ai_models:
   - id: 815c3d7c-8c34-505f-91fe-2445144dc2e8
     name: gemini-agentic

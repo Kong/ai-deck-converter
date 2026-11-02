@@ -2,7 +2,9 @@ package convert
 
 import (
 	"encoding/json"
+	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/Kong/ai-deck-converter/internal/aigw"
@@ -13,7 +15,8 @@ import (
 // directoryGroup accumulates one model list route: the ai-proxy-advanced
 // instances it advertises and the auth strategies that protect the route.
 type directoryGroup struct {
-	base       string
+	nameBase   string
+	path       string
 	route      kong.Route
 	models     []string
 	sources    []map[string]any
@@ -21,11 +24,12 @@ type directoryGroup struct {
 	strategies []string
 }
 
-func newDirectoryGroup(base string) *directoryGroup {
+func newDirectoryGroup(nameBase, path string) *directoryGroup {
 	return &directoryGroup{
-		base: base,
+		nameBase: nameBase,
+		path:     path,
 		route: kong.Route{
-			Paths:     []string{aimap.RoutePath(base, aimap.ModelDirectorySpec)},
+			Paths:     []string{path},
 			Methods:   aimap.ModelDirectorySpec.Methods,
 			Protocols: []string{"http", "https"},
 		},
@@ -73,9 +77,12 @@ func (c *Converter) convertModelDirectories(st *modelPass, service *kong.Service
 
 	groups, order := c.directoryGroups(st)
 
-	for _, base := range order {
-		g := groups[base]
-		routeName := uniqueModelRouteName(directoryRouteName(g.base), st.usedRouteNames)
+	for _, key := range order {
+		g := groups[key]
+		if len(g.sources) == 0 {
+			continue
+		}
+		routeName := uniqueModelRouteName(directoryRouteName(g.nameBase), st.usedRouteNames)
 		g.route.Name = routeName
 		g.route.Source = source("model", g.models[0], "config.route.paths")
 		service.Routes = append(service.Routes, g.route)
@@ -94,20 +101,39 @@ func (c *Converter) convertModelDirectories(st *modelPass, service *kong.Service
 	}
 }
 
-// directoryGroups groups the instances of every model by base path. The root
+// directoryGroups groups the instances of every model by list path. The root
 // list covers every model; a base path list covers the models declared on it.
 func (c *Converter) directoryGroups(st *modelPass) (map[string]*directoryGroup, []string) {
 	groups := map[string]*directoryGroup{}
 	var order []string
 
-	add := func(base string, m *aigw.Model, ids []string, access map[string]any) {
-		g := groups[base]
-		if g == nil {
-			g = newDirectoryGroup(base)
-			groups[base] = g
-			order = append(order, base)
+	access := map[string]map[string]any{}
+	modelsByID := map[string][]string{}
+	for i := range c.src.Models {
+		m := &c.src.Models[i]
+		for _, id := range st.directorySources[m.Name] {
+			modelsByID[id] = append(modelsByID[id], m.Name)
+			access[m.Name] = directoryAccess(m.Access.ACLs)
 		}
-		g.add(m, ids, access)
+	}
+
+	conflicted := c.conflictingDirectoryIDs(modelsByID, access)
+
+	add := func(base string, m *aigw.Model, ids []string) {
+		path := aimap.RoutePath(base, aimap.ModelDirectorySpec)
+		g := groups[path]
+		if g == nil {
+			g = newDirectoryGroup(base, path)
+			groups[path] = g
+			order = append(order, path)
+		}
+		kept := make([]string, 0, len(ids))
+		for _, id := range ids {
+			if !conflicted[id] {
+				kept = append(kept, id)
+			}
+		}
+		g.add(m, kept, access[m.Name])
 	}
 
 	for i := range c.src.Models {
@@ -117,24 +143,56 @@ func (c *Converter) directoryGroups(st *modelPass) (map[string]*directoryGroup, 
 			continue
 		}
 
-		access := directoryAccess(m.Access.ACLs)
 		bases := append([]string{aimap.DefaultBasePath}, basePaths(m)...)
 		for _, base := range bases {
-			add(base, m, ids, access)
+			add(base, m, ids)
 		}
 	}
 
+	root := aimap.RoutePath(aimap.DefaultBasePath, aimap.ModelDirectorySpec)
 	sort.Slice(order, func(i, j int) bool {
-		if order[i] == aimap.DefaultBasePath {
+		if order[i] == root {
 			return true
 		}
-		if order[j] == aimap.DefaultBasePath {
+		if order[j] == root {
 			return false
 		}
 		return order[i] < order[j]
 	})
 
 	return groups, order
+}
+
+// conflictingDirectoryIDs reports the instances that two models share with
+// different access rules. A list carries one rule per source, so such an
+// instance cannot be advertised without hiding or showing a model wrongly.
+func (c *Converter) conflictingDirectoryIDs(
+	modelsByID map[string][]string, access map[string]map[string]any,
+) map[string]bool {
+	conflicted := map[string]bool{}
+
+	var ids []string
+	for id := range modelsByID {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+
+	for _, id := range ids {
+		models := modelsByID[id]
+		for _, other := range models[1:] {
+			if reflect.DeepEqual(access[models[0]], access[other]) {
+				continue
+			}
+			conflicted[id] = true
+			c.warn(issueSource(kindModel, other).at("access.acls"), BehaviorMayDiffer,
+				"models %q and %q share one ai-proxy-advanced instance but set different access rules. "+
+					"The model list leaves that instance out, so neither model is advertised from it.",
+				models[0], other)
+			break
+		}
+	}
+
+	return conflicted
 }
 
 // directoryAccess returns the access block of a list source. A model carries
@@ -229,14 +287,29 @@ func directoryRouteName(base string) string {
 
 // modelPluginID returns the id of an ai-proxy-advanced instance, so a list
 // route can reference it. The id depends on the route and the rendered plugin
-// config only, which keeps a forward-revert-forward cycle byte-identical.
-func modelPluginID(routeName string, cfg map[string]any) string {
-	payload, err := json.Marshal(cfg)
-	if err != nil {
-		return kong.StableUUID("ai-proxy-advanced:" + routeName)
+// config only, which keeps a forward-revert-forward cycle byte-identical. A
+// second instance with the same route and config takes the next occurrence.
+func modelPluginID(routeName string, cfg map[string]any, occurrence int) string {
+	key := "ai-proxy-advanced:" + routeName
+	if payload, err := json.Marshal(cfg); err == nil {
+		key += ":" + string(payload)
+	}
+	if occurrence > 1 {
+		key += ":" + strconv.Itoa(occurrence)
 	}
 
-	return kong.StableUUID("ai-proxy-advanced:" + routeName + ":" + string(payload))
+	return kong.StableUUID(key)
+}
+
+// nextModelPluginID returns an id that no other instance of this pass has.
+func (c *Converter) nextModelPluginID(st *modelPass, routeName string, cfg map[string]any) string {
+	for occurrence := 1; ; occurrence++ {
+		id := modelPluginID(routeName, cfg, occurrence)
+		if !st.usedPluginIDs[id] {
+			st.usedPluginIDs[id] = true
+			return id
+		}
+	}
 }
 
 func containsString(list []string, want string) bool {
