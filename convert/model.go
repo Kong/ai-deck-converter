@@ -188,7 +188,8 @@ type modelPass struct {
 	// skipped holds the issues of each model index that a pass left out.
 	skipped map[int][]ConversionIssue
 	// tokenVaults holds the token-vault-exchange config of each model.
-	tokenVaults map[*aigw.Model]map[string]any
+	tokenVaults      map[*aigw.Model]map[string]any
+	directorySources map[string][]string
 }
 
 // convertModels groups all (model, target, capability) tuples into routes under
@@ -230,6 +231,7 @@ func (c *Converter) convertModelsPass(skipped map[int][]ConversionIssue) bool {
 		selectorConflicts:   map[string]bool{},
 		skipped:             skipped,
 		tokenVaults:         map[*aigw.Model]map[string]any{},
+		directorySources:    map[string][]string{},
 	}
 	c.modelRouteModels = map[string][]string{}
 	lifecycleCandidates := c.videoLifecycleCandidates(skipped)
@@ -279,7 +281,10 @@ func (c *Converter) convertModelsPass(skipped map[int][]ConversionIssue) bool {
 				if pg.realtimeModel != "" {
 					tags = []string{aimap.EncodeRealtimeModel(pg.realtimeModel)}
 				}
+				id := modelPluginID(pg.routeName, pg.proxyConfig())
+				st.addDirectorySource(pg.source.EntityName, id)
 				c.out.Plugins = append(c.out.Plugins, kong.Plugin{
+					ID:            id,
 					Name:          "ai-proxy-advanced",
 					Protocols:     protocols,
 					Route:         kong.NewStringRef(pg.routeName),
@@ -298,7 +303,10 @@ func (c *Converter) convertModelsPass(skipped map[int][]ConversionIssue) bool {
 			for _, alias := range pg.aliases {
 				cfg := pg.proxyConfig()
 				cfg["targets"] = withModelAlias(pg.targets, alias, pg.llmFormat)
+				id := modelPluginID(pg.routeName, cfg)
+				st.addDirectorySource(pg.source.EntityName, id)
 				c.out.Plugins = append(c.out.Plugins, kong.Plugin{
+					ID:            id,
 					Name:          "ai-proxy-advanced",
 					Route:         kong.NewStringRef(pg.routeName),
 					Config:        cfg,
@@ -310,6 +318,7 @@ func (c *Converter) convertModelsPass(skipped map[int][]ConversionIssue) bool {
 			}
 		}
 	}
+	c.convertModelDirectories(st, &service)
 	for _, candidate := range lifecycleCandidates {
 		if !c.convertModelOnce(st, candidate.index, func() error {
 			return c.convertVideoLifecycle(st, candidate, &service)

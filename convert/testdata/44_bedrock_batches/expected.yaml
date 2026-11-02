@@ -11,8 +11,25 @@ services:
           - POST
           - OPTIONS
         strip_path: false
+      - name: models
+        paths:
+          - /v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-ai
+        paths:
+          - /ai/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
 plugins:
-  - name: ai-proxy-advanced
+  - id: 876332a9-76ab-5968-bf67-d30599478472
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -37,6 +54,20 @@ plugins:
             provider: bedrock
           route_type: llm/v1/batches
     route: bedrock-batches
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 876332a9-76ab-5968-bf67-d30599478472
+      route_type: llm/v1/models
+    route: models
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 876332a9-76ab-5968-bf67-d30599478472
+      route_type: llm/v1/models
+    route: models-ai
 ai_models:
   - id: 5b3e8cba-2cb7-4fd4-888e-20a6727230f2
     name: bedrock-batch-api

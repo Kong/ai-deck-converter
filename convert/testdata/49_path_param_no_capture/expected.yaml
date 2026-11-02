@@ -19,6 +19,30 @@ services:
           - POST
           - OPTIONS
         strip_path: false
+      - name: models
+        paths:
+          - /v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-v1-chat-completions
+        paths:
+          - /v1/chat/completions/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-v1-embeddings
+        paths:
+          - /v1/embeddings/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
 plugins:
   - name: ai-model-selector
     config:
@@ -27,7 +51,8 @@ plugins:
         - body_path: model
           source: body
     route: openai-chat
-  - name: ai-proxy-advanced
+  - id: f7363f34-c785-5d5f-9d9e-a0272f4aaca6
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -56,7 +81,8 @@ plugins:
         - body_path: model
           source: body
     route: openai-embeddings
-  - name: ai-proxy-advanced
+  - id: c3811699-ae94-5631-b55d-5295cbc8f7be
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -78,5 +104,29 @@ plugins:
           route_type: llm/v1/embeddings
     route: openai-embeddings
     model: my-model-alias
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: f7363f34-c785-5d5f-9d9e-a0272f4aaca6
+          - plugin_id: c3811699-ae94-5631-b55d-5295cbc8f7be
+      route_type: llm/v1/models
+    route: models
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: f7363f34-c785-5d5f-9d9e-a0272f4aaca6
+          - plugin_id: c3811699-ae94-5631-b55d-5295cbc8f7be
+      route_type: llm/v1/models
+    route: models-v1-chat-completions
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: f7363f34-c785-5d5f-9d9e-a0272f4aaca6
+          - plugin_id: c3811699-ae94-5631-b55d-5295cbc8f7be
+      route_type: llm/v1/models
+    route: models-v1-embeddings
 ai_models:
   - name: my-model-alias

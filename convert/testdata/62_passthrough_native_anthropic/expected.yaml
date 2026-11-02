@@ -7,8 +7,25 @@ services:
         paths:
           - /ai
         strip_path: false
+      - name: models
+        paths:
+          - /v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-ai
+        paths:
+          - /ai/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
 plugins:
-  - name: ai-proxy-advanced
+  - id: 73027a98-50f9-5f1d-bf6e-e8c20ee46968
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -27,5 +44,19 @@ plugins:
             provider: anthropic
           route_type: passthrough
     route: anthropic-passthrough
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 73027a98-50f9-5f1d-bf6e-e8c20ee46968
+      route_type: llm/v1/models
+    route: models
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 73027a98-50f9-5f1d-bf6e-e8c20ee46968
+      route_type: llm/v1/models
+    route: models-ai
 ai_models:
   - name: claude-native

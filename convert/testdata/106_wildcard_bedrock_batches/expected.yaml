@@ -36,8 +36,41 @@ services:
           - POST
           - OPTIONS
         strip_path: false
+      - name: models
+        paths:
+          - /v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-explicit
+        paths:
+          - /explicit/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-with-prefix
+        paths:
+          - /with-prefix/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-without-prefix
+        paths:
+          - /without-prefix/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
 plugins:
-  - name: ai-proxy-advanced
+  - id: a68490bd-48d5-5bde-9990-c89554b37bbf
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -61,7 +94,8 @@ plugins:
             provider: bedrock
           route_type: llm/v1/batches
     route: bedrock-batches
-  - name: ai-proxy-advanced
+  - id: 0bd6f0d8-5869-5957-a257-a6987c2b4aa8
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -78,7 +112,8 @@ plugins:
             provider: openai
           route_type: llm/v1/batches
     route: openai-batches
-  - name: ai-proxy-advanced
+  - id: 44c3bb4a-6076-5149-88a3-36203518bb20
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -95,7 +130,8 @@ plugins:
             provider: openai
           route_type: llm/v1/files
     route: openai-files
-  - name: ai-proxy-advanced
+  - id: 1e7a9113-b2a2-51a4-8f5d-a12653f0c0b0
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -112,6 +148,38 @@ plugins:
             provider: openai
           route_type: llm/v1/batches
     route: openai-batches-2
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: a68490bd-48d5-5bde-9990-c89554b37bbf
+          - plugin_id: 0bd6f0d8-5869-5957-a257-a6987c2b4aa8
+          - plugin_id: 44c3bb4a-6076-5149-88a3-36203518bb20
+          - plugin_id: 1e7a9113-b2a2-51a4-8f5d-a12653f0c0b0
+      route_type: llm/v1/models
+    route: models
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 1e7a9113-b2a2-51a4-8f5d-a12653f0c0b0
+      route_type: llm/v1/models
+    route: models-explicit
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: a68490bd-48d5-5bde-9990-c89554b37bbf
+      route_type: llm/v1/models
+    route: models-with-prefix
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 0bd6f0d8-5869-5957-a257-a6987c2b4aa8
+          - plugin_id: 44c3bb4a-6076-5149-88a3-36203518bb20
+      route_type: llm/v1/models
+    route: models-without-prefix
 ai_models:
   - name: with-prefix
   - name: without-prefix

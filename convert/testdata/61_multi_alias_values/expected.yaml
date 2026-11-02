@@ -10,6 +10,22 @@ services:
           - POST
           - OPTIONS
         strip_path: false
+      - name: models
+        paths:
+          - /v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-ai
+        paths:
+          - /ai/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
 plugins:
   - name: ai-model-selector
     config:
@@ -18,7 +34,8 @@ plugins:
         - body_path: model
           source: body
     route: openai-chat
-  - name: ai-proxy-advanced
+  - id: 54cf58c1-d63f-500a-882f-7fd69f541128
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -36,7 +53,8 @@ plugins:
           route_type: llm/v1/chat
     route: openai-chat
     model: '@kong/openai'
-  - name: ai-proxy-advanced
+  - id: a75b02d2-678c-5380-8758-526c599726f1
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -54,7 +72,8 @@ plugins:
           route_type: llm/v1/chat
     route: openai-chat
     model: '@kong/the-openai-model'
-  - name: ai-proxy-advanced
+  - id: 2915bafc-7a41-5499-bc3c-bad1a748816f
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -72,7 +91,8 @@ plugins:
           route_type: llm/v1/chat
     route: openai-chat
     model: '@kong/openai-model'
-  - name: ai-proxy-advanced
+  - id: cc9a9af5-f234-5a23-886a-5ddb77e1fdf2
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -90,6 +110,26 @@ plugins:
           route_type: llm/v1/chat
     route: openai-chat
     model: '@kong/chat-gpt'
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 54cf58c1-d63f-500a-882f-7fd69f541128
+          - plugin_id: a75b02d2-678c-5380-8758-526c599726f1
+          - plugin_id: 2915bafc-7a41-5499-bc3c-bad1a748816f
+          - plugin_id: cc9a9af5-f234-5a23-886a-5ddb77e1fdf2
+      route_type: llm/v1/models
+    route: models
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 54cf58c1-d63f-500a-882f-7fd69f541128
+          - plugin_id: a75b02d2-678c-5380-8758-526c599726f1
+          - plugin_id: 2915bafc-7a41-5499-bc3c-bad1a748816f
+          - plugin_id: cc9a9af5-f234-5a23-886a-5ddb77e1fdf2
+      route_type: llm/v1/models
+    route: models-ai
 ai_models:
   - name: '@kong/openai'
     tags:

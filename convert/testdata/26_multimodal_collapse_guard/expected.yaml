@@ -41,6 +41,30 @@ services:
           - POST
           - OPTIONS
         strip_path: false
+      - name: models
+        paths:
+          - /v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-ai
+        paths:
+          - /ai/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-chat
+        paths:
+          - /chat/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
 plugins:
   - name: ai-model-selector
     config:
@@ -49,7 +73,8 @@ plugins:
         - path_pattern: model/([^/]+)/
           source: path
     route: bedrock-invoke
-  - name: ai-proxy-advanced
+  - id: c1112046-3c9d-5a1b-9621-e24590c2825d
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -80,7 +105,8 @@ plugins:
         - path_pattern: model/([^/]+)/
           source: path
     route: bedrock-converse
-  - name: ai-proxy-advanced
+  - id: e618e5d4-45cd-5099-b8bc-ba7ef903968f
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -111,7 +137,8 @@ plugins:
         - path_pattern: model/([^/]+)/
           source: path
     route: bedrock-invoke-2
-  - name: ai-proxy-advanced
+  - id: 7b39b25e-62fa-5152-b943-d1d1300f7e50
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -142,7 +169,8 @@ plugins:
         - body_path: model
           source: body
     route: bedrock-chat
-  - name: ai-proxy-advanced
+  - id: fb4d1dc7-67e9-5eb9-958f-c5808bb96372
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -173,7 +201,8 @@ plugins:
         - body_path: model
           source: body
     route: bedrock-messages
-  - name: ai-proxy-advanced
+  - id: 737c8901-c02e-5377-ac75-20f8c34d0a90
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -197,6 +226,34 @@ plugins:
           route_type: llm/v1/chat
     route: bedrock-messages
     model: nova-chat
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: c1112046-3c9d-5a1b-9621-e24590c2825d
+          - plugin_id: e618e5d4-45cd-5099-b8bc-ba7ef903968f
+          - plugin_id: 7b39b25e-62fa-5152-b943-d1d1300f7e50
+          - plugin_id: fb4d1dc7-67e9-5eb9-958f-c5808bb96372
+          - plugin_id: 737c8901-c02e-5377-ac75-20f8c34d0a90
+      route_type: llm/v1/models
+    route: models
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: c1112046-3c9d-5a1b-9621-e24590c2825d
+      route_type: llm/v1/models
+    route: models-ai
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: e618e5d4-45cd-5099-b8bc-ba7ef903968f
+          - plugin_id: 7b39b25e-62fa-5152-b943-d1d1300f7e50
+          - plugin_id: fb4d1dc7-67e9-5eb9-958f-c5808bb96372
+          - plugin_id: 737c8901-c02e-5377-ac75-20f8c34d0a90
+      route_type: llm/v1/models
+    route: models-chat
 ai_models:
   - name: '@bedrock/nova-omni'
   - name: nova-chat

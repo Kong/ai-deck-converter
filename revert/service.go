@@ -34,6 +34,9 @@ func (r *Reverter) revertServices() error {
 		for j := range svc.Routes {
 			rt := &svc.Routes[j]
 			plugins := inheritPlugins(r.routePlugins(rt), svcAIPlugins)
+			if isModelDirectory(plugins) {
+				continue
+			}
 			switch {
 			case hasPlugin(plugins, "ai-proxy-advanced"):
 				if err := r.accumulateModelRoute(acc, rt, plugins); err != nil {

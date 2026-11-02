@@ -10,6 +10,22 @@ services:
           - POST
           - OPTIONS
         strip_path: false
+      - name: models
+        paths:
+          - /v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-cohere
+        paths:
+          - /cohere/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
 plugins:
   - name: ai-model-selector
     config:
@@ -18,7 +34,8 @@ plugins:
         - body_path: model
           source: body
     route: cohere-rerank
-  - name: ai-proxy-advanced
+  - id: 87baa315-8a7c-54dd-af7d-5eced1f79f86
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -44,5 +61,19 @@ plugins:
           route_type: llm/v1/chat
     route: cohere-rerank
     model: cohere
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 87baa315-8a7c-54dd-af7d-5eced1f79f86
+      route_type: llm/v1/models
+    route: models
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 87baa315-8a7c-54dd-af7d-5eced1f79f86
+      route_type: llm/v1/models
+    route: models-cohere
 ai_models:
   - name: cohere

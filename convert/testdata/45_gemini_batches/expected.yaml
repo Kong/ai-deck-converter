@@ -35,8 +35,33 @@ services:
           - POST
           - OPTIONS
         strip_path: false
+      - name: models
+        paths:
+          - /v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-gm
+        paths:
+          - /gm/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-gm2
+        paths:
+          - /gm2/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
 plugins:
-  - name: ai-proxy-advanced
+  - id: 2f02d5c7-5d88-55a0-91c2-43023c2fadfd
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -53,7 +78,8 @@ plugins:
             provider: gemini
           route_type: llm/v1/batches
     route: gemini-batches
-  - name: ai-proxy-advanced
+  - id: 0aa0cf08-ba3a-578b-b74c-b6380350194d
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -70,7 +96,8 @@ plugins:
             provider: gemini
           route_type: llm/v1/batches
     route: gemini-enterprise-batches
-  - name: ai-proxy-advanced
+  - id: 4a2caab4-f1c4-5a02-97cb-1c469599a177
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -90,7 +117,8 @@ plugins:
             provider: gemini
           route_type: llm/v1/batches
     route: gemini-batches-2
-  - name: ai-proxy-advanced
+  - id: 2cfe906d-e7c1-5e62-a267-2361660f34d9
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -110,6 +138,32 @@ plugins:
             provider: gemini
           route_type: llm/v1/batches
     route: gemini-enterprise-batches-2
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 2f02d5c7-5d88-55a0-91c2-43023c2fadfd
+          - plugin_id: 0aa0cf08-ba3a-578b-b74c-b6380350194d
+          - plugin_id: 4a2caab4-f1c4-5a02-97cb-1c469599a177
+          - plugin_id: 2cfe906d-e7c1-5e62-a267-2361660f34d9
+      route_type: llm/v1/models
+    route: models
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 2f02d5c7-5d88-55a0-91c2-43023c2fadfd
+          - plugin_id: 0aa0cf08-ba3a-578b-b74c-b6380350194d
+      route_type: llm/v1/models
+    route: models-gm
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 4a2caab4-f1c4-5a02-97cb-1c469599a177
+          - plugin_id: 2cfe906d-e7c1-5e62-a267-2361660f34d9
+      route_type: llm/v1/models
+    route: models-gm2
 ai_models:
   - name: gemini-batches
   - name: gemini-batches-2

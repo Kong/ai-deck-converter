@@ -301,6 +301,43 @@ selected per target by `ai-proxy-advanced` at runtime.
 
 ---
 
+## 8. Add a model list for each base path and the gateway root
+
+`convertModelDirectories` runs after the model routes are built. Every model
+contributes its `ai-proxy-advanced` instance ids to the root list
+(`aimap.DefaultBasePath`, served at `/v1/models`) and to one list per base path
+(`/claude-code` is served at `/claude-code/v1/models`).
+
+Each list is one route plus one route-scoped `ai-proxy-advanced`:
+
+```yaml
+plugins:
+  - name: ai-proxy-advanced
+    route: models-team-a
+    config:
+      route_type: llm/v1/models
+      models:
+        sources:
+          - plugin_id: c32e7c3e-b43c-56b9-bf90-d660df5cd572
+            access: {deny: [contractors]}
+```
+
+- The source `plugin_id` is the `id` of the model's instance. The converter
+  derives that id from the route name and the rendered plugin config, so a
+  forward-revert-forward cycle reproduces it.
+- `access` is the model's `access.acls`. The model's ACLs already lower to one
+  acl rule, so the source carries one rule.
+- The list route carries the auth strategies of the models it covers, with the
+  same anonymous consumer and `request-termination` fallback as the model
+  routes, so an unidentified caller gets a 401.
+- The lists need AI Gateway 2.3 (`aimap.FeatureModelDirectory`). Below the
+  gate they are left out, with one `UNSUPPORTED_IN_MIN_RUNTIME_VERSION`
+  warning.
+- Revert drops a route whose plugins carry `route_type: llm/v1/models`: a list
+  route has no AI Gateway entity.
+
+---
+
 ## End-to-end example
 
 Source (`convert/testdata/01_single_model/input.yaml`):

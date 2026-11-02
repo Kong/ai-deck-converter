@@ -35,6 +35,22 @@ services:
           - POST
           - OPTIONS
         strip_path: false
+      - name: models
+        paths:
+          - /v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-ai
+        paths:
+          - /ai/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
 plugins:
   - name: ai-model-selector
     config:
@@ -43,7 +59,8 @@ plugins:
         - path_pattern: 'models/([%w%.%-]+):'
           source: path
     route: gemini-generate
-  - name: ai-proxy-advanced
+  - id: 7a212af1-8101-5325-b2b3-2d42b77b2a4b
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -93,7 +110,8 @@ plugins:
         - path_pattern: 'models/([%w%.%-]+):'
           source: path
     route: gemini-enterprise-generate
-  - name: ai-proxy-advanced
+  - id: e33209e0-672a-5ea7-9c79-a23f48e33e9b
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -143,7 +161,8 @@ plugins:
         - path_pattern: 'models/([%w%.%-]+):'
           source: path
     route: gemini-embeddings
-  - name: ai-proxy-advanced
+  - id: f42de82c-6842-56ea-9f67-151534e86322
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -189,7 +208,8 @@ plugins:
         - path_pattern: 'models/([%w%.%-]+):'
           source: path
     route: gemini-enterprise-embeddings
-  - name: ai-proxy-advanced
+  - id: 92700071-01fe-57e0-8f2d-d7dae1b34daa
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -228,6 +248,26 @@ plugins:
           route_type: llm/v1/embeddings
     route: gemini-enterprise-embeddings
     model: text-embedding-005
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 7a212af1-8101-5325-b2b3-2d42b77b2a4b
+          - plugin_id: e33209e0-672a-5ea7-9c79-a23f48e33e9b
+          - plugin_id: f42de82c-6842-56ea-9f67-151534e86322
+          - plugin_id: 92700071-01fe-57e0-8f2d-d7dae1b34daa
+      route_type: llm/v1/models
+    route: models
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 7a212af1-8101-5325-b2b3-2d42b77b2a4b
+          - plugin_id: e33209e0-672a-5ea7-9c79-a23f48e33e9b
+          - plugin_id: f42de82c-6842-56ea-9f67-151534e86322
+          - plugin_id: 92700071-01fe-57e0-8f2d-d7dae1b34daa
+      route_type: llm/v1/models
+    route: models-ai
 ai_models:
   - name: gemini-2-5-pro
   - name: text-embedding-005

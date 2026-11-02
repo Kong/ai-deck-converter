@@ -21,8 +21,33 @@ services:
           - DELETE
           - OPTIONS
         strip_path: false
+      - name: models
+        paths:
+          - /v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-ai
+        paths:
+          - /ai/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-claude
+        paths:
+          - /claude/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
 plugins:
-  - name: ai-proxy-advanced
+  - id: a76ed5d9-e50b-5837-a84f-a1880091c94a
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -44,7 +69,8 @@ plugins:
             provider: openai
           route_type: llm/v1/skills
     route: openai-skills
-  - name: ai-proxy-advanced
+  - id: beea26c9-10c9-5253-913a-06cafeb03f56
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -68,6 +94,28 @@ plugins:
             provider: anthropic
           route_type: llm/v1/skills
     route: anthropic-skills
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: a76ed5d9-e50b-5837-a84f-a1880091c94a
+          - plugin_id: beea26c9-10c9-5253-913a-06cafeb03f56
+      route_type: llm/v1/models
+    route: models
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: a76ed5d9-e50b-5837-a84f-a1880091c94a
+      route_type: llm/v1/models
+    route: models-ai
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: beea26c9-10c9-5253-913a-06cafeb03f56
+      route_type: llm/v1/models
+    route: models-claude
 ai_models:
   - name: openai-skills-api
   - name: anthropic-skills-api

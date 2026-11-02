@@ -21,6 +21,17 @@ routes:
       - http
       - https
     strip_path: false
+  - id: aeea4f5f-1d07-59ad-98b1-be41cf62b11c
+    name: models
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /v1/models
+    methods:
+      - GET
+    protocols:
+      - http
+      - https
 plugins:
   - id: 17fa8192-4b9f-5b5a-8379-20ad8bc836a7
     name: ai-model-selector
@@ -31,7 +42,7 @@ plugins:
           source: body
     route:
       id: 8ae36805-da7a-55b9-b056-72bde6bb937d
-  - id: f3adc007-171c-5519-8763-3a0eef79bde3
+  - id: a7c1ab55-a97e-5888-87f3-dffdc67fbe83
     name: ai-proxy-advanced
     config:
       balancer:
@@ -52,6 +63,15 @@ plugins:
       id: 8ae36805-da7a-55b9-b056-72bde6bb937d
     model:
       id: 7b1cfd1c-89d1-5291-8bac-5a9998310a53
+  - id: fe4129f3-2075-5492-8b59-90def2cf73ab
+    name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: a7c1ab55-a97e-5888-87f3-dffdc67fbe83
+      route_type: llm/v1/models
+    route:
+      id: aeea4f5f-1d07-59ad-98b1-be41cf62b11c
 certificates:
   - id: c090fb7f-2394-51b4-979f-0ffe4cfd8d14
     cert: |

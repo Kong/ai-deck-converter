@@ -26,6 +26,30 @@ services:
           - DELETE
           - OPTIONS
         strip_path: false
+      - name: models
+        paths:
+          - /v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-embeddings
+        paths:
+          - /embeddings/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-skills
+        paths:
+          - /skills/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
 plugins:
   - name: ai-model-selector
     config:
@@ -34,7 +58,8 @@ plugins:
         - body_path: model
           source: body
     route: openai-chat
-  - name: ai-proxy-advanced
+  - id: 9ffd3fba-597f-56ef-9f44-76016596c155
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -82,7 +107,8 @@ plugins:
         - body_path: model
           source: body
     route: openai-embeddings
-  - name: ai-proxy-advanced
+  - id: 9d52e068-0110-5d4a-acf4-e8d5a8edac7f
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -100,7 +126,8 @@ plugins:
           route_type: llm/v1/embeddings
     route: openai-embeddings
     model: embeddings
-  - name: ai-proxy-advanced
+  - id: 53df3c43-84be-5d5e-bf8d-623373be2d59
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -117,6 +144,30 @@ plugins:
             provider: openai
           route_type: llm/v1/skills
     route: openai-skills
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 9ffd3fba-597f-56ef-9f44-76016596c155
+          - plugin_id: 9d52e068-0110-5d4a-acf4-e8d5a8edac7f
+          - plugin_id: 53df3c43-84be-5d5e-bf8d-623373be2d59
+      route_type: llm/v1/models
+    route: models
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 9ffd3fba-597f-56ef-9f44-76016596c155
+          - plugin_id: 9d52e068-0110-5d4a-acf4-e8d5a8edac7f
+      route_type: llm/v1/models
+    route: models-embeddings
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 53df3c43-84be-5d5e-bf8d-623373be2d59
+      route_type: llm/v1/models
+    route: models-skills
 ai_models:
   - name: embeddings
   - name: skills

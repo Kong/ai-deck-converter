@@ -27,7 +27,8 @@ plugins:
         - path_pattern: 'models/([%w%.%-]+):'
           source: path
     route: gemini-generate
-  - name: ai-proxy-advanced
+  - id: e34f9547-c174-5f75-bdea-11a5d554a85d
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -55,7 +56,8 @@ plugins:
         - path_pattern: 'models/([%w%.%-]+):'
           source: path
     route: gemini-enterprise-generate
-  - name: ai-proxy-advanced
+  - id: 5b74f80a-b170-5d9b-acc9-9c2e73a4362e
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin

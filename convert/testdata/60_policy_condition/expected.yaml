@@ -17,6 +17,30 @@ services:
           - POST
           - OPTIONS
         strip_path: false
+      - name: models
+        paths:
+          - /v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-ai
+        paths:
+          - /ai/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-team
+        paths:
+          - /team/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
 plugins:
   - name: rate-limiting
     condition: http.request.path ~ "^/ai"
@@ -30,7 +54,8 @@ plugins:
         - body_path: model
           source: body
     route: openai-chat
-  - name: ai-proxy-advanced
+  - id: 5d587cb8-26e8-59db-a6e9-e995ee3e4199
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -58,7 +83,8 @@ plugins:
         - body_path: model
           source: body
     route: openai-chat-2
-  - name: ai-proxy-advanced
+  - id: 4510e3df-d7ea-5ede-8e9d-d82a51609c2b
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -79,6 +105,28 @@ plugins:
           route_type: llm/v1/chat
     route: openai-chat-2
     model: team-gpt
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 5d587cb8-26e8-59db-a6e9-e995ee3e4199
+          - plugin_id: 4510e3df-d7ea-5ede-8e9d-d82a51609c2b
+      route_type: llm/v1/models
+    route: models
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 5d587cb8-26e8-59db-a6e9-e995ee3e4199
+      route_type: llm/v1/models
+    route: models-ai
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 4510e3df-d7ea-5ede-8e9d-d82a51609c2b
+      route_type: llm/v1/models
+    route: models-team
   - name: ai-prompt-guard
     condition: http.request.headers.x_tier == "premium"
     config:

@@ -10,6 +10,22 @@ services:
           - POST
           - OPTIONS
         strip_path: false
+      - name: models
+        paths:
+          - /v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-ai
+        paths:
+          - /ai/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
 plugins:
   - name: ai-model-selector
     config:
@@ -18,7 +34,8 @@ plugins:
         - body_path: model
           source: body
     route: openai-chat
-  - name: ai-proxy-advanced
+  - id: d52ed48d-56e7-5763-aa71-c6ea1501945f
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: semantic
@@ -51,7 +68,8 @@ plugins:
         threshold: 0.7
     route: openai-chat
     model: semantic-a
-  - name: ai-proxy-advanced
+  - id: a2ca2601-5bd6-553b-91f1-4f516550c693
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: semantic
@@ -84,6 +102,22 @@ plugins:
         threshold: 0.8
     route: openai-chat
     model: semantic-b
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: d52ed48d-56e7-5763-aa71-c6ea1501945f
+          - plugin_id: a2ca2601-5bd6-553b-91f1-4f516550c693
+      route_type: llm/v1/models
+    route: models
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: d52ed48d-56e7-5763-aa71-c6ea1501945f
+          - plugin_id: a2ca2601-5bd6-553b-91f1-4f516550c693
+      route_type: llm/v1/models
+    route: models-ai
 ai_models:
   - name: semantic-a
   - name: semantic-b

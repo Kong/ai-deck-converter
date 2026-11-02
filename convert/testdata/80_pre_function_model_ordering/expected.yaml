@@ -10,6 +10,22 @@ services:
           - POST
           - OPTIONS
         strip_path: false
+      - name: models
+        paths:
+          - /v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-ai
+        paths:
+          - /ai/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
 plugins:
   - name: ai-model-selector
     config:
@@ -23,7 +39,8 @@ plugins:
           - pre-function
           - request-validator
     route: openai-chat
-  - name: ai-proxy-advanced
+  - id: 4b5a9080-64b3-5090-a636-a8c4f8d6f6b7
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -44,7 +61,8 @@ plugins:
           route_type: llm/v1/chat
     route: openai-chat
     model: '@kong/gpt-4o'
-  - name: ai-proxy-advanced
+  - id: 5739013c-7e15-5e4c-a8e7-e09e39decc08
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -65,6 +83,22 @@ plugins:
           route_type: llm/v1/chat
     route: openai-chat
     model: '@kong/gpt-4o-alias'
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 4b5a9080-64b3-5090-a636-a8c4f8d6f6b7
+          - plugin_id: 5739013c-7e15-5e4c-a8e7-e09e39decc08
+      route_type: llm/v1/models
+    route: models
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 4b5a9080-64b3-5090-a636-a8c4f8d6f6b7
+          - plugin_id: 5739013c-7e15-5e4c-a8e7-e09e39decc08
+      route_type: llm/v1/models
+    route: models-ai
   - name: pre-function
     config:
       access:

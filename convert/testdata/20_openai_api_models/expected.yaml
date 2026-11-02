@@ -20,8 +20,25 @@ services:
           - DELETE
           - OPTIONS
         strip_path: false
+      - name: models
+        paths:
+          - /v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-ai
+        paths:
+          - /ai/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
 plugins:
-  - name: ai-proxy-advanced
+  - id: 69bb641c-2b97-5944-bb79-b775b5e2a797
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -42,7 +59,8 @@ plugins:
             provider: openai
           route_type: llm/v1/batches
     route: openai-batches
-  - name: ai-proxy-advanced
+  - id: 5c7bebfe-d8cd-5892-9576-3573a7dd3fb5
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -64,6 +82,22 @@ plugins:
             provider: openai
           route_type: llm/v1/files
     route: openai-files
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 69bb641c-2b97-5944-bb79-b775b5e2a797
+          - plugin_id: 5c7bebfe-d8cd-5892-9576-3573a7dd3fb5
+      route_type: llm/v1/models
+    route: models
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 69bb641c-2b97-5944-bb79-b775b5e2a797
+          - plugin_id: 5c7bebfe-d8cd-5892-9576-3573a7dd3fb5
+      route_type: llm/v1/models
+    route: models-ai
 ai_models:
   - name: openai-batch-api
   - name: openai-files-api

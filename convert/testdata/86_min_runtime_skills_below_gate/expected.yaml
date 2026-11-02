@@ -13,7 +13,8 @@ services:
           - OPTIONS
         strip_path: false
 plugins:
-  - name: ai-proxy-advanced
+  - id: 5cd102e7-3ff7-5e45-8aac-2442352e3605
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin

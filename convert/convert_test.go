@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/Kong/ai-deck-converter/internal/aigw"
+	"github.com/Kong/ai-deck-converter/internal/aimap"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 )
@@ -882,15 +883,28 @@ auth_strategies:
 
 	var doc struct {
 		Plugins []struct {
-			Name  string `yaml:"name"`
-			Route string `yaml:"route"`
-			Model string `yaml:"model"`
+			Name   string `yaml:"name"`
+			Route  string `yaml:"route"`
+			Model  string `yaml:"model"`
+			Config struct {
+				RouteType string `yaml:"route_type"`
+			} `yaml:"config"`
 		} `yaml:"plugins"`
 	}
 	require.NoError(t, yaml.Unmarshal(out, &doc), "parse output")
 
+	directories := map[string]bool{}
+	for _, plugin := range doc.Plugins {
+		if plugin.Config.RouteType == aimap.ModelDirectoryRouteType {
+			directories[plugin.Route] = true
+		}
+	}
+
 	var oidcRoute, publicRoute, protectedRoute string
 	for _, plugin := range doc.Plugins {
+		if directories[plugin.Route] {
+			continue
+		}
 		if plugin.Name == "openid-connect" {
 			require.Empty(t, plugin.Model, "OIDC must be enforced at route scope")
 			oidcRoute = plugin.Route
@@ -945,15 +959,28 @@ auth_strategies:
 
 	var doc struct {
 		Plugins []struct {
-			Name  string `yaml:"name"`
-			Route string `yaml:"route"`
-			Model string `yaml:"model"`
+			Name   string `yaml:"name"`
+			Route  string `yaml:"route"`
+			Model  string `yaml:"model"`
+			Config struct {
+				RouteType string `yaml:"route_type"`
+			} `yaml:"config"`
 		} `yaml:"plugins"`
 	}
 	require.NoError(t, yaml.Unmarshal(out, &doc), "parse output")
 
+	directories := map[string]bool{}
+	for _, plugin := range doc.Plugins {
+		if plugin.Config.RouteType == aimap.ModelDirectoryRouteType {
+			directories[plugin.Route] = true
+		}
+	}
+
 	var count int
 	for _, plugin := range doc.Plugins {
+		if directories[plugin.Route] {
+			continue
+		}
 		if plugin.Name == "openid-connect" {
 			count++
 			require.Equal(t, "openai-chat", plugin.Route)
@@ -2228,25 +2255,32 @@ models:
 	var got struct {
 		Services []struct {
 			Routes []struct {
-				Name  string   `yaml:"name"`
-				Paths []string `yaml:"paths"`
+				Name   string   `yaml:"name"`
+				Paths  []string `yaml:"paths"`
+				Method []string `yaml:"methods"`
 			} `yaml:"routes"`
 		} `yaml:"services"`
 		Plugins []struct {
-			Name  string `yaml:"name"`
-			Route string `yaml:"route"`
-			Model string `yaml:"model"`
+			Name   string `yaml:"name"`
+			Route  string `yaml:"route"`
+			Model  string `yaml:"model"`
+			Config struct {
+				RouteType string `yaml:"route_type"`
+			} `yaml:"config"`
 		} `yaml:"plugins"`
 	}
 	require.NoError(t, yaml.Unmarshal(out, &got), "unmarshal output")
 	require.Len(t, got.Services, 1)
-	require.Len(t, got.Services[0].Routes, 2)
 
 	routeByPath := map[string]string{}
 	for _, route := range got.Services[0].Routes {
+		if strings.HasSuffix(route.Paths[0], aimap.ModelDirectorySpec.PathSuffix) {
+			continue
+		}
 		require.Len(t, route.Paths, 1)
 		routeByPath[route.Paths[0]] = route.Name
 	}
+	require.Len(t, routeByPath, 2)
 	require.Equal(t, "openai-chat", routeByPath["/xai-chat/chat/completions"])
 	require.Equal(t, "openai-chat-2", routeByPath["/openai-chat/chat/completions"])
 
@@ -2416,6 +2450,8 @@ model_providers:
 
 	var got struct {
 		Routes []struct {
+			Name      string              `yaml:"name"`
+			Paths     []string            `yaml:"paths"`
 			Hosts     []string            `yaml:"hosts"`
 			Methods   []string            `yaml:"methods"`
 			Protocols []string            `yaml:"protocols"`
@@ -2439,6 +2475,14 @@ model_providers:
 		} `yaml:"routes"`
 	}
 	require.NoError(t, yaml.Unmarshal(out, &got), "unmarshal output")
+	kept := got.Routes[:0]
+	for _, route := range got.Routes {
+		if strings.HasSuffix(route.Paths[0], aimap.ModelDirectorySpec.PathSuffix) {
+			continue
+		}
+		kept = append(kept, route)
+	}
+	got.Routes = kept
 	require.Len(t, got.Routes, 1, "expected 1 route: %s", out)
 	route := got.Routes[0]
 	require.Equal(t, []string{"ai.example.com"}, route.Hosts, "unexpected hosts")

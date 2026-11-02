@@ -17,6 +17,38 @@ services:
           - POST
           - OPTIONS
         strip_path: false
+      - name: models
+        paths:
+          - /v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-cohere
+        paths:
+          - /cohere/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-gemini-only
+        paths:
+          - /gemini-only/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-mixed
+        paths:
+          - /mixed/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
   - name: ai-gateway-websocket
     url: ws://ai-gateway.upstream.local
     routes:
@@ -35,7 +67,8 @@ services:
           - wss
         strip_path: false
 plugins:
-  - name: ai-proxy-advanced
+  - id: eb745df6-95cd-5dea-9dfc-8513f8c1e48d
+    name: ai-proxy-advanced
     protocols:
       - ws
       - wss
@@ -56,7 +89,8 @@ plugins:
     route: openai-realtime
     tags:
       - ai-gateway-realtime-model:mixed
-  - name: ai-proxy-advanced
+  - id: 61c1814c-7f17-52d7-b05c-73853962749b
+    name: ai-proxy-advanced
     protocols:
       - ws
       - wss
@@ -87,7 +121,8 @@ plugins:
         - body_path: model
           source: body
     route: openai-chat
-  - name: ai-proxy-advanced
+  - id: 7698c1ac-9002-5281-a2f7-02f0cb7cd47c
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -121,7 +156,8 @@ plugins:
         - body_path: model
           source: body
     route: cohere-rerank
-  - name: ai-proxy-advanced
+  - id: e86c8a74-9101-5847-b2fc-02291ec2e147
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -139,6 +175,38 @@ plugins:
           route_type: llm/v1/chat
     route: cohere-rerank
     model: cohere-and-openai
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: eb745df6-95cd-5dea-9dfc-8513f8c1e48d
+          - plugin_id: 61c1814c-7f17-52d7-b05c-73853962749b
+          - plugin_id: 7698c1ac-9002-5281-a2f7-02f0cb7cd47c
+          - plugin_id: e86c8a74-9101-5847-b2fc-02291ec2e147
+      route_type: llm/v1/models
+    route: models
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 7698c1ac-9002-5281-a2f7-02f0cb7cd47c
+          - plugin_id: e86c8a74-9101-5847-b2fc-02291ec2e147
+      route_type: llm/v1/models
+    route: models-cohere
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 61c1814c-7f17-52d7-b05c-73853962749b
+      route_type: llm/v1/models
+    route: models-gemini-only
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: eb745df6-95cd-5dea-9dfc-8513f8c1e48d
+      route_type: llm/v1/models
+    route: models-mixed
 ai_models:
   - name: mixed
   - name: gemini-only

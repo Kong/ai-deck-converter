@@ -10,6 +10,22 @@ services:
           - POST
           - OPTIONS
         strip_path: false
+      - name: models
+        paths:
+          - /v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-working
+        paths:
+          - /working/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
 plugins:
   - name: ai-model-selector
     config:
@@ -18,7 +34,8 @@ plugins:
         - body_path: model
           source: body
     route: openai-chat
-  - name: ai-proxy-advanced
+  - id: 17f5c4b9-9fd8-5eb3-9576-9781ed0822c0
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -36,5 +53,19 @@ plugins:
           route_type: llm/v1/chat
     route: openai-chat
     model: working
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 17f5c4b9-9fd8-5eb3-9576-9781ed0822c0
+      route_type: llm/v1/models
+    route: models
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 17f5c4b9-9fd8-5eb3-9576-9781ed0822c0
+      route_type: llm/v1/models
+    route: models-working
 ai_models:
   - name: working

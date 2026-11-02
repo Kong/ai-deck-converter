@@ -24,6 +24,30 @@ services:
           - POST
           - OPTIONS
         strip_path: false
+      - name: models
+        paths:
+          - /v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-selector
+        paths:
+          - /selector/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-split
+        paths:
+          - /split/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
   - name: flights-mcp
     url: https://flights-mcp.example.com/mcp
     routes:
@@ -88,7 +112,8 @@ plugins:
         - header_name: x-model
           source: header
     route: openai-chat
-  - name: ai-proxy-advanced
+  - id: b8553190-2d8c-50bc-8ffb-98fe18f3540d
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -106,7 +131,8 @@ plugins:
           route_type: llm/v1/chat
     route: openai-chat
     model: selector-body
-  - name: ai-proxy-advanced
+  - id: 7bca52b1-b1fc-55ec-8fff-881642bebd0d
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -131,7 +157,8 @@ plugins:
         - body_path: model
           source: body
     route: openai-chat-2
-  - name: ai-proxy-advanced
+  - id: 248661d5-cbd2-58ea-a396-a9fbb264e282
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -156,7 +183,8 @@ plugins:
         - body_path: model
           source: body
     route: openai-chat-3
-  - name: ai-proxy-advanced
+  - id: ecaa0732-39c4-566e-a54d-09ba4941cd40
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -174,7 +202,8 @@ plugins:
           route_type: llm/v1/chat
     route: openai-chat-3
     model: split-secured-a
-  - name: ai-proxy-advanced
+  - id: fabad051-e3cc-54b9-b869-463c2cb55e23
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -192,11 +221,49 @@ plugins:
           route_type: llm/v1/chat
     route: openai-chat-3
     model: split-secured-b
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: b8553190-2d8c-50bc-8ffb-98fe18f3540d
+          - plugin_id: 7bca52b1-b1fc-55ec-8fff-881642bebd0d
+          - plugin_id: 248661d5-cbd2-58ea-a396-a9fbb264e282
+          - plugin_id: ecaa0732-39c4-566e-a54d-09ba4941cd40
+          - plugin_id: fabad051-e3cc-54b9-b869-463c2cb55e23
+      route_type: llm/v1/models
+    route: models
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: b8553190-2d8c-50bc-8ffb-98fe18f3540d
+          - plugin_id: 7bca52b1-b1fc-55ec-8fff-881642bebd0d
+      route_type: llm/v1/models
+    route: models-selector
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 248661d5-cbd2-58ea-a396-a9fbb264e282
+          - plugin_id: ecaa0732-39c4-566e-a54d-09ba4941cd40
+          - plugin_id: fabad051-e3cc-54b9-b869-463c2cb55e23
+      route_type: llm/v1/models
+    route: models-split
   - name: key-auth
     config:
       key_names:
         - x-api-key
     route: openai-chat-3
+  - name: key-auth
+    config:
+      key_names:
+        - x-api-key
+    route: models
+  - name: key-auth
+    config:
+      key_names:
+        - x-api-key
+    route: models-split
 ai_models:
   - name: selector-body
   - name: selector-header

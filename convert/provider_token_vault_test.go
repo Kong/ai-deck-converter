@@ -78,7 +78,7 @@ func TestProviderTokenVaultScopedLikeProxy(t *testing.T) {
 	require.Empty(t, result.Issues)
 
 	exchanges := pluginsNamed(result.Output, tokenVaultExchangePlugin)
-	proxies := pluginsNamed(result.Output, "ai-proxy-advanced")
+	proxies := inferenceProxies(result.Output)
 	require.Len(t, exchanges, 1)
 	require.Len(t, proxies, 1)
 	require.Equal(t, proxies[0].Route, exchanges[0].Route)
@@ -449,7 +449,7 @@ model_providers:
 `
 	result, err := Convert([]byte(src), testOptions)
 	require.NoError(t, err)
-	proxies := pluginsNamed(result.Output, "ai-proxy-advanced")
+	proxies := inferenceProxies(result.Output)
 	exchanges := pluginsNamed(result.Output, tokenVaultExchangePlugin)
 	require.Len(t, exchanges, len(proxies))
 	for i := range proxies {

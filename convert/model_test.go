@@ -145,19 +145,22 @@ func TestPassthroughSharedPathIsRoutingConflict(t *testing.T) {
 // would otherwise add routes of their own.
 func TestPassthroughIgnoresCapabilities(t *testing.T) {
 	for _, caps := range []string{"[]", "[generate, video, realtime]"} {
-		out, warnings, err := convertYAML([]byte(`
+		src := []byte(`
 models:
   - name: pt
     capabilities: ` + caps + `
     formats: [{type: passthrough}]
     config: {route: {paths: [/ai]}}
     targets: [{name: a, provider: p, config: {type: openai}}]
-` + passthroughProviders))
+` + passthroughProviders)
+		result, err := Convert(src, testOptions)
 		require.NoError(t, err, caps)
-		require.Empty(t, warnings, caps)
+		require.Empty(t, result.Issues, caps)
+		out, err := result.Output.ToYAML()
+		require.NoError(t, err, caps)
 		doc := string(out)
 		require.Contains(t, doc, "name: openai-passthrough\n        paths:\n          - /ai\n        strip_path: false", caps)
-		require.Equal(t, 1, strings.Count(doc, "name: ai-proxy-advanced"), caps)
+		require.Len(t, inferenceProxies(result.Output), 1, caps)
 		require.NotContains(t, doc, "lifecycle", caps)
 	}
 }
@@ -446,9 +449,16 @@ func TestRealtimeRoutesAreNotSharedBetweenModels(t *testing.T) {
 `+overrideProvider)
 	require.Len(t, warnings, 1)
 	require.Contains(t, warnings[0], `route "openai-realtime-2" of model "b" can match the same requests`)
-	require.Len(t, doc.Services, 1, "no HTTP Service without HTTP routes")
-	require.Equal(t, aimap.GatewayWebSocketServiceName, doc.Services[0].Name)
-	require.Len(t, doc.Services[0].Routes, 2)
+	require.Len(t, doc.Services, 2, "the model list service joins the WebSocket service")
+	var websocketRoutes int
+	for _, svc := range doc.Services {
+		if svc.Name == aimap.GatewayWebSocketServiceName {
+			websocketRoutes = len(svc.Routes)
+			continue
+		}
+		require.Empty(t, modelRoutesFor(svc), "no HTTP Service without HTTP routes")
+	}
+	require.Equal(t, 2, websocketRoutes)
 }
 
 func TestRealtimeRouteAuthStrategyHasNoAnonymousFallback(t *testing.T) {
@@ -701,10 +711,7 @@ func TestBedrockMantleEndpointType(t *testing.T) {
 			// A model whose targets are all omitted emits no routes. A
 			// surviving bedrock-format target reaches four routes: Converse,
 			// InvokeModel, /chat/completions, and /v1/messages.
-			routes := 0
-			for _, svc := range doc.Services {
-				routes += len(svc.Routes)
-			}
+			routes := len(modelRoutes(doc))
 			require.Equal(t, tc.routes, routes)
 		})
 	}

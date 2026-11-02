@@ -41,7 +41,8 @@ plugins:
         - path_pattern: model/([^/]+)/
           source: path
     route: bedrock-converse
-  - name: ai-proxy-advanced
+  - id: 0640c843-2b07-52c5-a0ee-cd12d24c8365
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -73,7 +74,8 @@ plugins:
         - path_pattern: model/([^/]+)/
           source: path
     route: bedrock-invoke
-  - name: ai-proxy-advanced
+  - id: 2ddd5ad5-8356-5501-80ef-33f65515e0a4
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -105,7 +107,8 @@ plugins:
         - body_path: model
           source: body
     route: bedrock-chat
-  - name: ai-proxy-advanced
+  - id: 151e1285-3e82-55b5-870a-abedd74bf965
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -137,7 +140,8 @@ plugins:
         - body_path: model
           source: body
     route: bedrock-messages
-  - name: ai-proxy-advanced
+  - id: 9ae08089-090d-5c42-b696-9f815469618a
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin

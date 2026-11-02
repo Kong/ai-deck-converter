@@ -172,6 +172,105 @@ routes:
       - http
       - https
     strip_path: false
+  - id: aeea4f5f-1d07-59ad-98b1-be41cf62b11c
+    name: models
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /v1/models
+    methods:
+      - GET
+    protocols:
+      - http
+      - https
+  - id: 24792c72-3b5d-5c55-8f8d-7bb63dfade4d
+    name: models-gemini-default-alias
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /gemini-default-alias/v1/models
+    methods:
+      - GET
+    protocols:
+      - http
+      - https
+  - id: dca96f34-fa6c-5736-b8e2-589a49297d3c
+    name: models-gemini-default-name
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /gemini-default-name/v1/models
+    methods:
+      - GET
+    protocols:
+      - http
+      - https
+  - id: fe27a0f1-aee3-5c11-9ff2-ae44ea87ec82
+    name: models-gemini-path-alias
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /gemini-path-alias/v1/models
+    methods:
+      - GET
+    protocols:
+      - http
+      - https
+  - id: 4ed4f24b-5eb4-54e9-9b8f-7fa8896e2582
+    name: models-gemini-path-name
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /gemini-path-name/v1/models
+    methods:
+      - GET
+    protocols:
+      - http
+      - https
+  - id: ff71a9be-296a-5abf-b0bf-7410a2ab64c5
+    name: models-openai-custom-body
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /openai-custom-body/v1/models
+    methods:
+      - GET
+    protocols:
+      - http
+      - https
+  - id: 7e9c60f4-e9ad-5379-947c-2f7af162af03
+    name: models-openai-custom-header
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /openai-custom-header/v1/models
+    methods:
+      - GET
+    protocols:
+      - http
+      - https
+  - id: fae9d206-6fcd-5e72-b255-c6faf97ccc3e
+    name: models-openai-default-alias
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /openai-default-alias/v1/models
+    methods:
+      - GET
+    protocols:
+      - http
+      - https
+  - id: d65ff210-ce5f-5750-8198-b6548f79c1b3
+    name: models-openai-default-name
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /openai-default-name/v1/models
+    methods:
+      - GET
+    protocols:
+      - http
+      - https
 plugins:
   - id: 17fa8192-4b9f-5b5a-8379-20ad8bc836a7
     name: ai-model-selector
@@ -182,7 +281,7 @@ plugins:
           source: body
     route:
       id: 8ae36805-da7a-55b9-b056-72bde6bb937d
-  - id: f3adc007-171c-5519-8763-3a0eef79bde3
+  - id: b77d22dd-e94a-5ee5-88d6-1d02f579adb5
     name: ai-proxy-advanced
     config:
       balancer:
@@ -212,7 +311,7 @@ plugins:
           source: body
     route:
       id: 2384fe9d-eacc-5ac2-ae4c-4752cc597f81
-  - id: 75ff22ed-6245-594b-895f-6a9fa36f4581
+  - id: ae1b4ccd-9bfa-5b1d-9166-b0eeabff2bcd
     name: ai-proxy-advanced
     config:
       balancer:
@@ -242,7 +341,7 @@ plugins:
           source: body
     route:
       id: 10bf6bcb-e990-5997-afc1-265030165eed
-  - id: 628550fd-b362-5247-b3ba-f2f6fa95de13
+  - id: 7d8c8ba5-ccbb-5aec-ab84-c9961487177a
     name: ai-proxy-advanced
     config:
       balancer:
@@ -271,7 +370,7 @@ plugins:
           source: header
     route:
       id: ef4e4a2f-dd25-5098-9807-b856c5ab0b97
-  - id: ccc68bd9-2622-5864-b026-137e5c06c755
+  - id: 39cafd93-a25d-51d1-9cce-39672ae90ba3
     name: ai-proxy-advanced
     config:
       balancer:
@@ -301,7 +400,7 @@ plugins:
           source: path
     route:
       id: b4a57e40-147c-502b-a080-e3102a5c3273
-  - id: d7038ac4-55db-505a-824e-d2a548ec7424
+  - id: f13570b5-e05a-5ab8-af53-5b948eb587db
     name: ai-proxy-advanced
     config:
       balancer:
@@ -331,7 +430,7 @@ plugins:
           source: path
     route:
       id: 090ce054-21c9-5fd3-a8f0-e0733e5dcc43
-  - id: e4b46606-e4f5-57c3-9298-949d4e990f2d
+  - id: 7ddf3e55-4af9-5edf-a1a8-fbf79895bc83
     name: ai-proxy-advanced
     config:
       balancer:
@@ -361,7 +460,7 @@ plugins:
           source: path
     route:
       id: 7ddc17d8-fad0-5f2f-9988-d25560595484
-  - id: 1fc0cc9b-eb94-5eb9-8c69-d8361c990007
+  - id: 42ec4557-d178-524f-9702-8a5a9f7155c3
     name: ai-proxy-advanced
     config:
       balancer:
@@ -391,7 +490,7 @@ plugins:
           source: path
     route:
       id: 0c6b2a42-9783-5417-b9b4-d2515dc7daaf
-  - id: cf7316be-1398-5d7d-bed6-bacd43b095b8
+  - id: c162cf31-7a38-5dd2-8a45-6d83636a5b59
     name: ai-proxy-advanced
     config:
       balancer:
@@ -421,7 +520,7 @@ plugins:
           source: path
     route:
       id: 61808011-06ae-5208-8ea7-6454b413c8c1
-  - id: 5f4b0e19-29d1-5ce6-b34f-3e1394bf878e
+  - id: 2f00db89-d14f-543b-adee-a06d06b9fa2e
     name: ai-proxy-advanced
     config:
       balancer:
@@ -451,7 +550,7 @@ plugins:
           source: path
     route:
       id: dc130716-b3ce-5c36-85bf-e0ab90c69fb4
-  - id: 0f8844dd-7362-5ea0-8eeb-35ee0580b632
+  - id: a77f004c-28f0-51b7-b96a-5ff10441620f
     name: ai-proxy-advanced
     config:
       balancer:
@@ -481,7 +580,7 @@ plugins:
           source: path
     route:
       id: 1c7e3f8d-03b4-5e58-aca8-585308f7a935
-  - id: 74150451-efc7-5a74-9754-5c27da9e52ac
+  - id: 11300a33-8db4-526f-8a06-7cdfdd4a46dd
     name: ai-proxy-advanced
     config:
       balancer:
@@ -511,7 +610,7 @@ plugins:
           source: path
     route:
       id: 0682218c-cc1e-5985-9b28-191595ab4364
-  - id: 732a022e-4d91-596a-9c3c-60772ba24ae0
+  - id: a80b2317-16b8-594b-b03d-0c9a13bae5fa
     name: ai-proxy-advanced
     config:
       balancer:
@@ -532,6 +631,102 @@ plugins:
       id: 0682218c-cc1e-5985-9b28-191595ab4364
     model:
       id: c7915821-8736-59a2-9d78-df6e12ddfe3a
+  - id: fc67fd65-983a-5b80-9bda-de44a1de9b6a
+    name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: b77d22dd-e94a-5ee5-88d6-1d02f579adb5
+          - plugin_id: ae1b4ccd-9bfa-5b1d-9166-b0eeabff2bcd
+          - plugin_id: 7d8c8ba5-ccbb-5aec-ab84-c9961487177a
+          - plugin_id: 39cafd93-a25d-51d1-9cce-39672ae90ba3
+          - plugin_id: f13570b5-e05a-5ab8-af53-5b948eb587db
+          - plugin_id: 7ddf3e55-4af9-5edf-a1a8-fbf79895bc83
+          - plugin_id: 42ec4557-d178-524f-9702-8a5a9f7155c3
+          - plugin_id: c162cf31-7a38-5dd2-8a45-6d83636a5b59
+          - plugin_id: 2f00db89-d14f-543b-adee-a06d06b9fa2e
+          - plugin_id: a77f004c-28f0-51b7-b96a-5ff10441620f
+          - plugin_id: 11300a33-8db4-526f-8a06-7cdfdd4a46dd
+          - plugin_id: a80b2317-16b8-594b-b03d-0c9a13bae5fa
+      route_type: llm/v1/models
+    route:
+      id: aeea4f5f-1d07-59ad-98b1-be41cf62b11c
+  - id: f767a5a0-2605-5ec7-a54b-54b5ba91d32e
+    name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 42ec4557-d178-524f-9702-8a5a9f7155c3
+          - plugin_id: c162cf31-7a38-5dd2-8a45-6d83636a5b59
+      route_type: llm/v1/models
+    route:
+      id: 24792c72-3b5d-5c55-8f8d-7bb63dfade4d
+  - id: 0f933206-16d8-5873-a1fa-6ca08ff363c2
+    name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: f13570b5-e05a-5ab8-af53-5b948eb587db
+          - plugin_id: 7ddf3e55-4af9-5edf-a1a8-fbf79895bc83
+      route_type: llm/v1/models
+    route:
+      id: dca96f34-fa6c-5736-b8e2-589a49297d3c
+  - id: 32c66b25-eee1-5606-ae08-3fbd6e58cfba
+    name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 11300a33-8db4-526f-8a06-7cdfdd4a46dd
+          - plugin_id: a80b2317-16b8-594b-b03d-0c9a13bae5fa
+      route_type: llm/v1/models
+    route:
+      id: fe27a0f1-aee3-5c11-9ff2-ae44ea87ec82
+  - id: df451b5d-1af4-57b8-8ced-85dc15c61fe8
+    name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 2f00db89-d14f-543b-adee-a06d06b9fa2e
+          - plugin_id: a77f004c-28f0-51b7-b96a-5ff10441620f
+      route_type: llm/v1/models
+    route:
+      id: 4ed4f24b-5eb4-54e9-9b8f-7fa8896e2582
+  - id: d70f9948-2d3c-5912-bf94-c6895cbb0563
+    name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 7d8c8ba5-ccbb-5aec-ab84-c9961487177a
+      route_type: llm/v1/models
+    route:
+      id: ff71a9be-296a-5abf-b0bf-7410a2ab64c5
+  - id: f792d94c-ef6e-508b-8827-fb8893e1fe80
+    name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 39cafd93-a25d-51d1-9cce-39672ae90ba3
+      route_type: llm/v1/models
+    route:
+      id: 7e9c60f4-e9ad-5379-947c-2f7af162af03
+  - id: 21ffbeb8-dfe5-5e97-b16d-19a479b6367c
+    name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: ae1b4ccd-9bfa-5b1d-9166-b0eeabff2bcd
+      route_type: llm/v1/models
+    route:
+      id: fae9d206-6fcd-5e72-b255-c6faf97ccc3e
+  - id: bb2d381a-8b20-5590-ab40-4c32b2d19ab3
+    name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: b77d22dd-e94a-5ee5-88d6-1d02f579adb5
+      route_type: llm/v1/models
+    route:
+      id: d65ff210-ce5f-5750-8198-b6548f79c1b3
 ai_models:
   - id: 8b5f4e44-2fb5-5ff7-a13c-155be254be31
     name: openai-default-name

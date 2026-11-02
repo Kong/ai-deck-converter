@@ -75,6 +75,22 @@ services:
           - POST
           - OPTIONS
         strip_path: false
+      - name: models
+        paths:
+          - /v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-ignored
+        paths:
+          - /ignored/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
       - name: openai-videos-lifecycle
         paths:
           - /ignored/videos
@@ -102,7 +118,8 @@ plugins:
         - body_path: model
           source: body
     route: openai-chat
-  - name: ai-proxy-advanced
+  - id: 3d893dc9-4715-5ed1-a148-5fec1142644e
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -127,7 +144,8 @@ plugins:
         - body_path: model
           source: body
     route: openai-responses
-  - name: ai-proxy-advanced
+  - id: 5a87101f-adfe-5b5d-8661-7efda1e0cd3e
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -152,7 +170,8 @@ plugins:
         - body_path: model
           source: body
     route: openai-audio-speech
-  - name: ai-proxy-advanced
+  - id: b774d52a-3e0c-5bb7-87ca-dd3520186526
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -177,7 +196,8 @@ plugins:
         - body_path: model
           source: body
     route: openai-audio-transcribe
-  - name: ai-proxy-advanced
+  - id: a9b49130-baa0-5afb-b9c0-61ab9faf7d79
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -202,7 +222,8 @@ plugins:
         - body_path: model
           source: body
     route: openai-audio-translate
-  - name: ai-proxy-advanced
+  - id: c5dc476d-43bb-59ed-9484-3d49611910dd
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -227,7 +248,8 @@ plugins:
         - body_path: model
           source: body
     route: openai-embeddings
-  - name: ai-proxy-advanced
+  - id: 89a29fa6-f099-5808-87ba-827ec6b13779
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -252,7 +274,8 @@ plugins:
         - body_path: model
           source: body
     route: openai-images
-  - name: ai-proxy-advanced
+  - id: 74067928-53b7-576c-8a4a-8fca6d1e3982
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -270,7 +293,8 @@ plugins:
           route_type: image/v1/images/generations
     route: openai-images
     model: ignored-next-to-wildcard
-  - name: ai-proxy-advanced
+  - id: 5efdbf89-e743-587c-a226-980ff4446fa8
+    name: ai-proxy-advanced
     protocols:
       - ws
       - wss
@@ -291,7 +315,8 @@ plugins:
     route: openai-realtime
     tags:
       - ai-gateway-realtime-model:ignored-next-to-wildcard
-  - name: ai-proxy-advanced
+  - id: 79dc98ab-0004-5f1c-9056-3b0965bc7238
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -317,7 +342,8 @@ plugins:
         - body_path: model
           source: body
     route: openai-videos
-  - name: ai-proxy-advanced
+  - id: 8aa49aa9-1ca6-5461-845e-01bc9bfb48c1
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -342,7 +368,8 @@ plugins:
         - body_path: model
           source: body
     route: anthropic-messages
-  - name: ai-proxy-advanced
+  - id: 9f89aefe-6eb1-5a12-82a9-52149d450163
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -360,6 +387,40 @@ plugins:
           route_type: llm/v1/chat
     route: anthropic-messages
     model: ignored-next-to-wildcard
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 3d893dc9-4715-5ed1-a148-5fec1142644e
+          - plugin_id: 5a87101f-adfe-5b5d-8661-7efda1e0cd3e
+          - plugin_id: b774d52a-3e0c-5bb7-87ca-dd3520186526
+          - plugin_id: a9b49130-baa0-5afb-b9c0-61ab9faf7d79
+          - plugin_id: c5dc476d-43bb-59ed-9484-3d49611910dd
+          - plugin_id: 89a29fa6-f099-5808-87ba-827ec6b13779
+          - plugin_id: 74067928-53b7-576c-8a4a-8fca6d1e3982
+          - plugin_id: 5efdbf89-e743-587c-a226-980ff4446fa8
+          - plugin_id: 79dc98ab-0004-5f1c-9056-3b0965bc7238
+          - plugin_id: 8aa49aa9-1ca6-5461-845e-01bc9bfb48c1
+          - plugin_id: 9f89aefe-6eb1-5a12-82a9-52149d450163
+      route_type: llm/v1/models
+    route: models
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 3d893dc9-4715-5ed1-a148-5fec1142644e
+          - plugin_id: 5a87101f-adfe-5b5d-8661-7efda1e0cd3e
+          - plugin_id: b774d52a-3e0c-5bb7-87ca-dd3520186526
+          - plugin_id: a9b49130-baa0-5afb-b9c0-61ab9faf7d79
+          - plugin_id: c5dc476d-43bb-59ed-9484-3d49611910dd
+          - plugin_id: 89a29fa6-f099-5808-87ba-827ec6b13779
+          - plugin_id: 74067928-53b7-576c-8a4a-8fca6d1e3982
+          - plugin_id: 5efdbf89-e743-587c-a226-980ff4446fa8
+          - plugin_id: 79dc98ab-0004-5f1c-9056-3b0965bc7238
+          - plugin_id: 8aa49aa9-1ca6-5461-845e-01bc9bfb48c1
+          - plugin_id: 9f89aefe-6eb1-5a12-82a9-52149d450163
+      route_type: llm/v1/models
+    route: models-ignored
   - name: ai-proxy-advanced
     config:
       balancer:

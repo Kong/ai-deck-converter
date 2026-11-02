@@ -21,6 +21,28 @@ routes:
       - http
       - https
     strip_path: false
+  - id: aeea4f5f-1d07-59ad-98b1-be41cf62b11c
+    name: models
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /v1/models
+    methods:
+      - GET
+    protocols:
+      - http
+      - https
+  - id: 894112b2-5d36-58ad-9910-f9a4f598af7f
+    name: models-ai
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /ai/v1/models
+    methods:
+      - GET
+    protocols:
+      - http
+      - https
 plugins:
   - id: 17fa8192-4b9f-5b5a-8379-20ad8bc836a7
     name: ai-model-selector
@@ -31,7 +53,7 @@ plugins:
           source: body
     route:
       id: 8ae36805-da7a-55b9-b056-72bde6bb937d
-  - id: f3adc007-171c-5519-8763-3a0eef79bde3
+  - id: 54cf58c1-d63f-500a-882f-7fd69f541128
     name: ai-proxy-advanced
     config:
       balancer:
@@ -52,7 +74,7 @@ plugins:
       id: 8ae36805-da7a-55b9-b056-72bde6bb937d
     model:
       id: eb93e1da-5536-57b6-b50b-9a2e9d679164
-  - id: fe4129f3-2075-5492-8b59-90def2cf73ab
+  - id: a75b02d2-678c-5380-8758-526c599726f1
     name: ai-proxy-advanced
     config:
       balancer:
@@ -73,6 +95,26 @@ plugins:
       id: 8ae36805-da7a-55b9-b056-72bde6bb937d
     model:
       id: a01edd44-3e04-5fa8-9dc5-1f6ce66eb9be
+  - id: 75ff22ed-6245-594b-895f-6a9fa36f4581
+    name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 54cf58c1-d63f-500a-882f-7fd69f541128
+          - plugin_id: a75b02d2-678c-5380-8758-526c599726f1
+      route_type: llm/v1/models
+    route:
+      id: aeea4f5f-1d07-59ad-98b1-be41cf62b11c
+  - id: 12106a5c-cbd2-5942-8432-ef9bc4adca1b
+    name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 54cf58c1-d63f-500a-882f-7fd69f541128
+          - plugin_id: a75b02d2-678c-5380-8758-526c599726f1
+      route_type: llm/v1/models
+    route:
+      id: 894112b2-5d36-58ad-9910-f9a4f598af7f
 ai_models:
   - id: eb93e1da-5536-57b6-b50b-9a2e9d679164
     name: '@kong/openai'

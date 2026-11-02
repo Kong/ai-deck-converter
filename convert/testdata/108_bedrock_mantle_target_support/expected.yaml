@@ -47,6 +47,30 @@ services:
           - POST
           - OPTIONS
         strip_path: false
+      - name: models
+        paths:
+          - /v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-mantle-anthropic
+        paths:
+          - /mantle-anthropic/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-mantle-openai
+        paths:
+          - /mantle-openai/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
 plugins:
   - name: ai-model-selector
     config:
@@ -55,7 +79,8 @@ plugins:
         - body_path: model
           source: body
     route: openai-chat
-  - name: ai-proxy-advanced
+  - id: 70ef45fa-98b8-57e5-8453-10b31bb78455
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -80,7 +105,8 @@ plugins:
         - body_path: model
           source: body
     route: openai-responses
-  - name: ai-proxy-advanced
+  - id: f137f4d4-b7b6-5cf9-b998-2224e9d2b34b
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -105,7 +131,8 @@ plugins:
         - body_path: model
           source: body
     route: openai-embeddings
-  - name: ai-proxy-advanced
+  - id: 0da04dcc-7f29-5a06-b4f2-3652e4ffaf85
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -130,7 +157,8 @@ plugins:
         - body_path: model
           source: body
     route: openai-chat-2
-  - name: ai-proxy-advanced
+  - id: a7a6a454-18bf-5eaf-96be-5afe6dfdd5a8
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -163,7 +191,8 @@ plugins:
         - body_path: model
           source: body
     route: openai-responses-2
-  - name: ai-proxy-advanced
+  - id: 5cd03ac2-c690-51fc-83b4-b43043776f09
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -196,7 +225,8 @@ plugins:
         - body_path: model
           source: body
     route: anthropic-messages
-  - name: ai-proxy-advanced
+  - id: 4fb1dc5c-31c4-53a6-8990-46cc8a8470fe
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -223,6 +253,36 @@ plugins:
           route_type: llm/v1/chat
     route: anthropic-messages
     model: mantle-anthropic
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 70ef45fa-98b8-57e5-8453-10b31bb78455
+          - plugin_id: f137f4d4-b7b6-5cf9-b998-2224e9d2b34b
+          - plugin_id: 0da04dcc-7f29-5a06-b4f2-3652e4ffaf85
+          - plugin_id: a7a6a454-18bf-5eaf-96be-5afe6dfdd5a8
+          - plugin_id: 5cd03ac2-c690-51fc-83b4-b43043776f09
+          - plugin_id: 4fb1dc5c-31c4-53a6-8990-46cc8a8470fe
+      route_type: llm/v1/models
+    route: models
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 4fb1dc5c-31c4-53a6-8990-46cc8a8470fe
+      route_type: llm/v1/models
+    route: models-mantle-anthropic
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 70ef45fa-98b8-57e5-8453-10b31bb78455
+          - plugin_id: f137f4d4-b7b6-5cf9-b998-2224e9d2b34b
+          - plugin_id: 0da04dcc-7f29-5a06-b4f2-3652e4ffaf85
+          - plugin_id: a7a6a454-18bf-5eaf-96be-5afe6dfdd5a8
+          - plugin_id: 5cd03ac2-c690-51fc-83b4-b43043776f09
+      route_type: llm/v1/models
+    route: models-mantle-openai
 ai_models:
   - name: mantle-openai
   - name: mantle-anthropic

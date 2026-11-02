@@ -18,7 +18,8 @@ plugins:
         - body_path: model
           source: body
     route: openai-chat
-  - name: ai-proxy-advanced
+  - id: c02f29b9-2e9b-523b-b1e4-eac970d0333a
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
