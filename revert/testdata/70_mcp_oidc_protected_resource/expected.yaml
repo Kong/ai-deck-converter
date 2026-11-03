@@ -1,0 +1,76 @@
+mcp_servers:
+  - type: passthrough-listener
+    name: flights-mcp
+    config:
+      route:
+        paths:
+          - /mcp/flights
+      logging:
+        payloads: false
+        statistics: true
+        audits: false
+    tools:
+      - name: searchFlights
+        description: Search available flights
+        method: GET
+        path: /flights
+        scheme: https
+        host: flights.internal
+    access:
+      auth_strategies:
+        - openid-connect-1
+      metadata:
+        endpoint: /mcp/flights/.well-known/oauth-protected-resource
+        authorization_servers:
+          - https://dev-123456.okta.com/oauth2/default
+        resource: https://api.example.com/mcp/flights
+        scopes_supported:
+          - openid
+          - flights:read
+    upstream_url: https://vendor.example.com/mcp
+  - type: listener
+    name: plain-oidc-mcp
+    config:
+      route:
+        paths:
+          - /mcp/plain-oidc
+      logging:
+        payloads: false
+        statistics: true
+        audits: false
+    tools:
+      - name: ping
+        description: Ping the server
+        method: GET
+        path: /ping
+        scheme: https
+        host: keyed.internal
+    access:
+      auth_strategies:
+        - openid-connect-2
+auth_strategies:
+  - type: openid-connect
+    name: openid-connect-1
+    config:
+      cache_tokens_salt: pepper
+      client_id: mcp-client
+      client_secret: '{vault://ai-vault/okta-client-secret}'
+      hide_credentials: true
+      issuer: https://dev-123456.okta.com/oauth2/default
+      principals:
+        directory: my-directory
+        enabled: true
+        error_on_miss: true
+        jit:
+          all_claims: true
+        principal_claim:
+          - sub
+      scopes:
+        - openid
+        - profile
+  - type: openid-connect
+    name: openid-connect-2
+    config:
+      auth_methods:
+        - bearer
+      issuer: https://dev-123456.okta.com/oauth2/default

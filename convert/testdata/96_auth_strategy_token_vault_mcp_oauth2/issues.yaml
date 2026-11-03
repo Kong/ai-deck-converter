@@ -6,3 +6,11 @@
     fields:
       - config.auth_methods
   severity: WARNING
+- code: CONFIG_FIELD_OVERRIDDEN
+  reason: MCP server "secure-flights-mcp" auth strategy "okta-ai-se" sets auth_methods beyond bearer. This will be overridden to [bearer] because MCP routes validate bearer tokens only (matching ai-mcp-oauth2); interactive flows would break the MCP authorization challenge.
+  source:
+    kind: mcp_server
+    name: secure-flights-mcp
+    fields:
+      - access.auth_strategies[0]
+  severity: WARNING

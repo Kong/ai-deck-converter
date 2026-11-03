@@ -98,3 +98,11 @@ var OIDCToMCPOAuth2Fields = []OAuth2FieldMap{
 //     from the metadata resource (its RFC 8707 audience) when the flag is
 //     false; the concrete audience list is lossy but re-converts to the same
 //     flag.
+//
+// The 2.3 openid-connect MCP lowering (convert's mcpOIDCPlugin) adds a third
+// mirrored derivation: the plugin's auth_methods is force-written to
+// ["bearer"] (ai-mcp-oauth2 is bearer-only and MCP routes must keep answering
+// unauthenticated requests with the RFC 9728 challenge, not a login redirect).
+// The reverse omits exactly ["bearer"] from the reconstructed strategy — it
+// was converter-generated, not source data — and lifts any other list
+// verbatim (a hand-authored deck).

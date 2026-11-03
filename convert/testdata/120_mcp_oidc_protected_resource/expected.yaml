@@ -1,0 +1,54 @@
+_format_version: "3.0"
+services:
+  - name: flights-mcp
+    url: https://vendor.example.com/mcp
+    routes:
+      - name: flights-mcp-route
+        paths:
+          - /mcp/flights
+          - /mcp/flights/.well-known/oauth-protected-resource
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              include_consumer_groups: true
+              logging:
+                log_audits: false
+                log_payloads: false
+                log_statistics: true
+              mode: passthrough-listener
+              tools:
+                - description: Search available flights
+                  host: flights.internal
+                  method: GET
+                  name: searchFlights
+                  path: /flights
+                  scheme: https
+          - name: openid-connect
+            config:
+              auth_methods:
+                - bearer
+              cache_tokens_salt: pepper
+              client_id:
+                - mcp-client
+              client_secret:
+                - '{vault://ai-vault/okta-client-secret}'
+              issuer: https://dev-123456.okta.com/oauth2/default
+              principals:
+                directory: my-directory
+                enabled: true
+                error_on_miss: true
+                jit:
+                  all_claims: true
+                principal_claim:
+                  - sub
+              protected_resource_metadata:
+                authorization_servers:
+                  - https://dev-123456.okta.com/oauth2/default
+                metadata_endpoint: /mcp/flights/.well-known/oauth-protected-resource
+                resource: https://api.example.com/mcp/flights
+                scopes_supported:
+                  - openid
+                  - flights:read
+              scopes:
+                - openid
+                - profile
