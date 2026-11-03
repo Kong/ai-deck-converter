@@ -16,6 +16,9 @@ models:
       route:
         paths:
           - /ai
+        methods:
+          - GET
+          - POST
         model:
           values:
             - '@bedrock/claude-3-5-sonnet'

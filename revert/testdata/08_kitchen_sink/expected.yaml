@@ -28,6 +28,8 @@ models:
       route:
         paths:
           - /ai
+        methods:
+          - POST
         model:
           values:
             - '@prod/prod-chat'

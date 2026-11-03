@@ -12,7 +12,7 @@ import (
 // Agents. Classification is per-route so hand-written configs that mix kinds
 // on one service still convert.
 func (r *Reverter) revertServices() error {
-	acc := &modelAcc{groups: map[string]*modelGroup{}}
+	acc := &modelAcc{groups: map[string]*modelGroup{}, splits: map[string][]string{}}
 	routesSeen := map[string]bool{}
 
 	for i := range r.src.Services {

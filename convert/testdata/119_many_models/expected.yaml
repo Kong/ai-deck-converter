@@ -1,0 +1,2309 @@
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: anthropic-messages
+        paths:
+          - /v1/messages
+        methods:
+          - POST
+          - OPTIONS
+        protocols:
+          - http
+          - https
+        strip_path: true
+        preserve_host: false
+        https_redirect_status_code: 426
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+      - name: anthropic-messages-2
+        paths:
+          - /v1/messages
+        methods:
+          - POST
+          - OPTIONS
+        protocols:
+          - http
+          - https
+        headers:
+          X-Client:
+            - internal
+        strip_path: true
+        preserve_host: false
+        https_redirect_status_code: 426
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+      - name: openai-chat
+        paths:
+          - /chat/completions
+        methods:
+          - POST
+          - OPTIONS
+        protocols:
+          - http
+          - https
+        strip_path: true
+        preserve_host: false
+        https_redirect_status_code: 426
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+      - name: openai-responses
+        paths:
+          - /responses
+        methods:
+          - POST
+          - OPTIONS
+        protocols:
+          - http
+          - https
+        strip_path: true
+        preserve_host: false
+        https_redirect_status_code: 426
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+      - name: anthropic-messages-3
+        paths:
+          - /team-b/v1/messages
+        methods:
+          - POST
+          - OPTIONS
+        protocols:
+          - http
+          - https
+        strip_path: true
+        preserve_host: false
+        https_redirect_status_code: 426
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+      - name: typesafe-decisions
+        paths:
+          - ~/v1/systemone
+        methods:
+          - POST
+          - OPTIONS
+        protocols:
+          - http
+          - https
+        strip_path: true
+        preserve_host: false
+        https_redirect_status_code: 426
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+      - name: anthropic-messages-4
+        paths:
+          - /compat/v1/messages
+        methods:
+          - POST
+          - OPTIONS
+        protocols:
+          - http
+          - https
+        strip_path: true
+        preserve_host: false
+        https_redirect_status_code: 426
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+      - name: anthropic-messages-5
+        paths:
+          - /model/m1/v1/messages
+        methods:
+          - POST
+          - OPTIONS
+        protocols:
+          - http
+          - https
+        strip_path: true
+        preserve_host: false
+        https_redirect_status_code: 426
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+      - name: typesafe-decisions-2
+        paths:
+          - ~/v1/systemone
+        methods:
+          - POST
+          - OPTIONS
+        protocols:
+          - http
+          - https
+        headers:
+          X-Client:
+            - internal
+        strip_path: true
+        preserve_host: false
+        https_redirect_status_code: 426
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+      - name: openai-chat-2
+        paths:
+          - /compat/chat/completions
+        methods:
+          - POST
+          - OPTIONS
+        protocols:
+          - http
+          - https
+        strip_path: true
+        preserve_host: false
+        https_redirect_status_code: 426
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+      - name: openai-responses-2
+        paths:
+          - /compat/responses
+        methods:
+          - POST
+          - OPTIONS
+        protocols:
+          - http
+          - https
+        strip_path: true
+        preserve_host: false
+        https_redirect_status_code: 426
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+      - name: openai-batches
+        paths:
+          - /health/check/batches
+        methods:
+          - GET
+          - POST
+          - OPTIONS
+        protocols:
+          - http
+          - https
+        strip_path: true
+        preserve_host: false
+        https_redirect_status_code: 426
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+      - name: openai-files
+        paths:
+          - /health/check/files
+        methods:
+          - GET
+          - POST
+          - DELETE
+          - OPTIONS
+        protocols:
+          - http
+          - https
+        strip_path: true
+        preserve_host: false
+        https_redirect_status_code: 426
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+consumers:
+  - username: anonymous
+    custom_id: anonymous
+    plugins:
+      - name: request-termination
+        enabled: true
+        config:
+          message: Unauthorized
+          status_code: 401
+plugins:
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: anthropic-messages
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      max_request_body_size: 8388608
+      model_name_header: true
+      response_streaming: allow
+      targets:
+        - auth:
+            allow_override: false
+            header_name: Authorization
+            header_value: Bearer {vault://ai/provider-a-token}
+          description: model-02
+          logging:
+            log_payloads: true
+            log_statistics: true
+          model:
+            model_alias: model-02
+            name: model-02
+            options:
+              anthropic_version: "2023-06-01"
+            provider: anthropic
+          route_type: llm/v1/chat
+          weight: 100
+    route: anthropic-messages
+    model: model-02
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      max_request_body_size: 8388608
+      model_name_header: true
+      response_streaming: allow
+      targets:
+        - auth:
+            allow_override: false
+            header_name: Authorization
+            header_value: Bearer {vault://ai/provider-b-token}
+          description: org/model-04
+          logging:
+            log_payloads: true
+            log_statistics: true
+          model:
+            model_alias: org/model-04
+            name: org/model-04
+            options:
+              anthropic_version: "2023-06-01"
+              cache_read_cost: 2
+              input_cost: 8.5
+              output_cost: 11
+              upstream_url: https://llm.example.com
+            provider: anthropic
+          route_type: llm/v1/chat
+          weight: 100
+    route: anthropic-messages
+    model: org/model-04
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      max_request_body_size: 8388608
+      model_name_header: true
+      response_streaming: allow
+      targets:
+        - auth:
+            allow_override: false
+            header_name: Authorization
+            header_value: Bearer {vault://ai/provider-a-token}
+          description: model-11
+          logging:
+            log_payloads: true
+            log_statistics: true
+          model:
+            model_alias: model-11
+            name: model-11
+            options:
+              anthropic_version: "2023-06-01"
+              cache_read_cost: 7.5
+              cache_write_cost: 0
+              cache_write_cost_list:
+                - cost: 15.5
+                  ttl: 1h
+                - cost: 14
+                  ttl: 5m
+              input_cost: 13
+              output_cost: 18.5
+            provider: anthropic
+          route_type: llm/v1/chat
+          weight: 100
+    route: anthropic-messages
+    model: model-11
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      max_request_body_size: 8388608
+      model_name_header: true
+      response_streaming: allow
+      targets:
+        - auth:
+            allow_override: false
+            header_name: Authorization
+            header_value: Bearer {vault://ai/provider-b-token}
+          description: org/model-17
+          logging:
+            log_payloads: true
+            log_statistics: true
+          model:
+            model_alias: org/model-17
+            name: org/model-17
+            options:
+              anthropic_version: "2023-06-01"
+              cache_read_cost: 5
+              input_cost: 12
+              output_cost: 16.5
+              upstream_url: https://llm.example.com
+            provider: anthropic
+          route_type: llm/v1/chat
+          weight: 100
+    route: anthropic-messages
+    model: org/model-17
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      max_request_body_size: 8388608
+      model_name_header: true
+      response_streaming: allow
+      targets:
+        - auth:
+            allow_override: false
+            header_name: Authorization
+            header_value: Bearer {vault://ai/provider-b-token}
+          description: org/model-08
+          logging:
+            log_payloads: true
+            log_statistics: true
+          model:
+            model_alias: org/model-08
+            name: org/model-08
+            options:
+              anthropic_version: "2023-06-01"
+              cache_read_cost: 6.5
+              input_cost: 10
+              output_cost: 15.5
+              upstream_url: https://llm.example.com
+            provider: anthropic
+          route_type: llm/v1/chat
+          weight: 100
+    route: anthropic-messages
+    model: org/model-08
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      max_request_body_size: 8388608
+      model_name_header: true
+      response_streaming: allow
+      targets:
+        - auth:
+            allow_override: false
+            header_name: Authorization
+            header_value: Bearer {vault://ai/provider-a-token}
+          description: model-28
+          logging:
+            log_payloads: true
+            log_statistics: true
+          model:
+            model_alias: model-28
+            name: model-28
+            options:
+              anthropic_version: "2023-06-01"
+              cache_write_cost_list:
+                - cost: 13
+                  ttl: 1h
+                - cost: 11.5
+                  ttl: 5m
+              input_cost: 10.5
+              output_cost: 17
+            provider: anthropic
+          route_type: llm/v1/chat
+          weight: 100
+    route: anthropic-messages
+    model: model-28
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      max_request_body_size: 8388608
+      model_name_header: true
+      response_streaming: allow
+      targets:
+        - auth:
+            allow_override: false
+            header_name: Authorization
+            header_value: Bearer {vault://ai/provider-a-token}
+          description: model-28
+          logging:
+            log_payloads: true
+            log_statistics: true
+          model:
+            model_alias: model-29
+            name: model-28
+            options:
+              anthropic_version: "2023-06-01"
+              cache_read_cost: 3
+              cache_write_cost: 0
+              cache_write_cost_list:
+                - cost: 11.5
+                  ttl: 5m
+                - cost: 13
+                  ttl: 1h
+              input_cost: 10.5
+              output_cost: 17
+            provider: anthropic
+          route_type: llm/v1/chat
+          weight: 100
+    route: anthropic-messages
+    model: model-29
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+        connect_timeout: 60000
+        fail_timeout: 10000
+        failover_criteria:
+          - error
+          - timeout
+        max_fails: 0
+        read_timeout: 60000
+        retries: 5
+        slots: 10000
+        write_timeout: 60000
+      genai_category: text/generation
+      llm_format: anthropic
+      max_request_body_size: 8388608
+      model_name_header: true
+      response_streaming: allow
+      targets:
+        - auth:
+            allow_override: false
+            header_name: Authorization
+            header_value: Bearer {vault://ai/provider-g-token}
+          description: model-31
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: model-31
+            name: model-31
+            provider: xai
+          route_type: llm/v1/chat
+          weight: 100
+    route: anthropic-messages
+    model: model-31
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      max_request_body_size: 8388608
+      model_name_header: true
+      response_streaming: allow
+      targets:
+        - auth:
+            allow_override: false
+            header_name: Authorization
+            header_value: Bearer {vault://ai/provider-a-token}
+          description: model-33
+          logging:
+            log_payloads: true
+            log_statistics: true
+          model:
+            model_alias: model-33
+            name: model-33
+            options:
+              anthropic_version: "2023-06-01"
+              cache_read_cost: 3
+              cache_write_cost: 0
+              cache_write_cost_list:
+                - cost: 15.5
+                  ttl: 1h
+                - cost: 14
+                  ttl: 5m
+              input_cost: 13
+              output_cost: 18.5
+            provider: anthropic
+          route_type: llm/v1/chat
+          weight: 100
+    route: anthropic-messages
+    model: model-33
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      max_request_body_size: 8388608
+      model_name_header: true
+      response_streaming: allow
+      targets:
+        - auth:
+            allow_override: false
+            header_name: Authorization
+            header_value: Bearer {vault://ai/provider-b-token}
+          description: org/model-35
+          logging:
+            log_payloads: true
+            log_statistics: true
+          model:
+            model_alias: org/model-35
+            name: org/model-35
+            options:
+              anthropic_version: "2023-06-01"
+              cache_read_cost: 8.5
+              input_cost: 14.5
+              output_cost: 19
+              upstream_url: https://llm.example.com
+            provider: anthropic
+          route_type: llm/v1/chat
+          weight: 100
+    route: anthropic-messages
+    model: org/model-35
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      max_request_body_size: 8388608
+      model_name_header: true
+      response_streaming: allow
+      targets:
+        - auth:
+            allow_override: false
+            header_name: Authorization
+            header_value: Bearer {vault://ai/provider-b-token}
+          description: org/model-48
+          logging:
+            log_payloads: true
+            log_statistics: true
+          model:
+            model_alias: org/model-48
+            name: org/model-48
+            options:
+              anthropic_version: "2023-06-01"
+              cache_read_cost: 1.5
+              input_cost: 4.5
+              output_cost: 8
+              upstream_url: https://llm.example.com
+            provider: anthropic
+          route_type: llm/v1/chat
+          weight: 100
+    route: anthropic-messages
+    model: org/model-48
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      max_request_body_size: 8388608
+      model_name_header: true
+      response_streaming: allow
+      targets:
+        - auth:
+            allow_override: false
+            header_name: Authorization
+            header_value: Bearer {vault://ai/provider-b-token}
+          description: org/model-23
+          logging:
+            log_payloads: true
+            log_statistics: true
+          model:
+            model_alias: org/model-23
+            name: org/model-23
+            options:
+              anthropic_version: "2023-06-01"
+              cache_read_cost: 5.5
+              input_cost: 12.5
+              output_cost: 15
+              upstream_url: https://llm.example.com
+            provider: anthropic
+          route_type: llm/v1/chat
+          weight: 100
+    route: anthropic-messages
+    model: org/model-23
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      max_request_body_size: 8388608
+      model_name_header: true
+      response_streaming: allow
+      targets:
+        - auth:
+            allow_override: false
+            header_name: Authorization
+            header_value: Bearer {vault://ai/provider-a-token}
+          description: model-43
+          logging:
+            log_payloads: true
+            log_statistics: true
+          model:
+            model_alias: model-43
+            name: model-43
+            options:
+              anthropic_version: "2023-06-01"
+              cache_read_cost: 1
+              cache_write_cost: 0
+              cache_write_cost_list:
+                - cost: 7.5
+                  ttl: 1h
+                - cost: 4
+                  ttl: 5m
+              input_cost: 3
+              output_cost: 9
+            provider: anthropic
+          route_type: llm/v1/chat
+          weight: 100
+    route: anthropic-messages
+    model: model-43
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      max_request_body_size: 8388608
+      model_name_header: true
+      response_streaming: allow
+      targets:
+        - auth:
+            allow_override: false
+            header_name: Authorization
+            header_value: Bearer {vault://ai/provider-b-token}
+          description: org/model-19
+          logging:
+            log_payloads: true
+            log_statistics: true
+          model:
+            model_alias: org/model-19
+            name: org/model-19
+            options:
+              anthropic_version: "2023-06-01"
+              cache_read_cost: 3.5
+              input_cost: 9.5
+              output_cost: 13.5
+              upstream_url: https://llm.example.com
+            provider: anthropic
+          route_type: llm/v1/chat
+          weight: 100
+    route: anthropic-messages
+    model: org/model-19
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      max_request_body_size: 8388608
+      model_name_header: true
+      response_streaming: allow
+      targets:
+        - auth:
+            allow_override: false
+            header_name: Authorization
+            header_value: Bearer {vault://ai/provider-b-token}
+          description: org/model-58
+          logging:
+            log_payloads: true
+            log_statistics: true
+          model:
+            model_alias: org/model-58
+            name: org/model-58
+            options:
+              anthropic_version: "2023-06-01"
+              cache_read_cost: 0.5
+              input_cost: 8.5
+              output_cost: 11
+              upstream_url: https://llm.example.com
+            provider: anthropic
+          route_type: llm/v1/chat
+          weight: 100
+    route: anthropic-messages
+    model: org/model-58
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      max_request_body_size: 8388608
+      model_name_header: true
+      response_streaming: allow
+      targets:
+        - auth:
+            allow_override: false
+            header_name: Authorization
+            header_value: Bearer {vault://ai/provider-a-token}
+          description: model-64
+          logging:
+            log_payloads: true
+            log_statistics: true
+          model:
+            model_alias: model-64
+            name: model-64
+            options:
+              anthropic_version: "2023-06-01"
+              cache_read_cost: 7.5
+              cache_write_cost: 0
+              cache_write_cost_list:
+                - cost: 17
+                  ttl: 5m
+                - cost: 18
+                  ttl: 1h
+              input_cost: 15.5
+              output_cost: 19.5
+            provider: anthropic
+          route_type: llm/v1/chat
+          weight: 100
+    route: anthropic-messages
+    model: model-64
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      max_request_body_size: 8388608
+      model_name_header: true
+      response_streaming: allow
+      targets:
+        - auth:
+            allow_override: false
+            header_name: Authorization
+            header_value: Bearer {vault://ai/provider-b-token}
+          description: org/model-60
+          logging:
+            log_payloads: true
+            log_statistics: true
+          model:
+            model_alias: org/model-60
+            name: org/model-60
+            options:
+              anthropic_version: "2023-06-01"
+              cache_read_cost: 7
+              input_cost: 10.5
+              output_cost: 16
+              upstream_url: https://llm.example.com
+            provider: anthropic
+          route_type: llm/v1/chat
+          weight: 100
+    route: anthropic-messages
+    model: org/model-60
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      max_request_body_size: 8388608
+      model_name_header: true
+      response_streaming: allow
+      targets:
+        - auth:
+            allow_override: false
+            header_name: Authorization
+            header_value: Bearer {vault://ai/provider-b-token}
+          description: org/model-71
+          logging:
+            log_payloads: true
+            log_statistics: true
+          model:
+            model_alias: org/model-71
+            name: org/model-71
+            options:
+              anthropic_version: "2023-06-01"
+              input_cost: 3
+              output_cost: 9
+              upstream_url: https://llm.example.com
+            provider: anthropic
+          route_type: llm/v1/chat
+          weight: 100
+    route: anthropic-messages
+    model: org/model-71
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      max_request_body_size: 8388608
+      model_name_header: true
+      response_streaming: allow
+      targets:
+        - auth:
+            allow_override: false
+            header_name: Authorization
+            header_value: Bearer {vault://ai/provider-b-token}
+          description: org/model-06
+          logging:
+            log_payloads: true
+            log_statistics: true
+          model:
+            model_alias: org/model-06
+            name: org/model-06
+            options:
+              anthropic_version: "2023-06-01"
+              cache_read_cost: 2
+              input_cost: 6
+              output_cost: 9
+              upstream_url: https://llm.example.com
+            provider: anthropic
+          route_type: llm/v1/chat
+          weight: 100
+    route: anthropic-messages
+    model: org/model-06
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 0
+      sources:
+        - body_path: model
+          source: body
+    route: anthropic-messages-2
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      max_request_body_size: 8388608
+      model_name_header: true
+      response_streaming: allow
+      targets:
+        - auth:
+            allow_override: false
+            header_name: Authorization
+            header_value: Bearer {vault://ai/provider-b-token}
+          description: org/model-06
+          logging:
+            log_payloads: true
+            log_statistics: true
+          model:
+            model_alias: org/model-06
+            name: org/model-06
+            options:
+              anthropic_version: "2023-06-01"
+              cache_read_cost: 2
+              input_cost: 6
+              output_cost: 9
+              upstream_url: https://llm.example.com
+            provider: anthropic
+          route_type: llm/v1/chat
+          weight: 100
+    route: anthropic-messages-2
+    model: org/model-06
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      max_request_body_size: 8388608
+      model_name_header: true
+      response_streaming: allow
+      targets:
+        - auth:
+            allow_override: false
+            header_name: Authorization
+            header_value: Bearer {vault://ai/provider-b-token}
+          description: org/model-08
+          logging:
+            log_payloads: true
+            log_statistics: true
+          model:
+            model_alias: org/model-08
+            name: org/model-08
+            options:
+              anthropic_version: "2023-06-01"
+              cache_read_cost: 6.5
+              input_cost: 10
+              output_cost: 15.5
+              upstream_url: https://llm.example.com
+            provider: anthropic
+          route_type: llm/v1/chat
+          weight: 100
+    route: anthropic-messages-2
+    model: org/model-08
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      max_request_body_size: 8388608
+      model_name_header: true
+      response_streaming: allow
+      targets:
+        - auth:
+            allow_override: false
+            header_name: Authorization
+            header_value: Bearer {vault://ai/provider-a-token}
+          description: model-02
+          logging:
+            log_payloads: true
+            log_statistics: true
+          model:
+            model_alias: model-02
+            name: model-02
+            options:
+              anthropic_version: "2023-06-01"
+              cache_read_cost: 9
+              cache_write_cost: 0
+              cache_write_cost_list:
+                - cost: 17.5
+                  ttl: 5m
+                - cost: 18.5
+                  ttl: 1h
+              input_cost: 17
+              output_cost: 20
+            provider: anthropic
+          route_type: llm/v1/chat
+          weight: 100
+    route: anthropic-messages-2
+    model: model-02
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      max_request_body_size: 8388608
+      model_name_header: true
+      response_streaming: allow
+      targets:
+        - auth:
+            allow_override: false
+            header_name: Authorization
+            header_value: Bearer {vault://ai/provider-b-token}
+          description: org/model-19
+          logging:
+            log_payloads: true
+            log_statistics: true
+          model:
+            model_alias: org/model-19
+            name: org/model-19
+            options:
+              anthropic_version: "2023-06-01"
+              cache_read_cost: 3.5
+              input_cost: 9.5
+              output_cost: 13.5
+              upstream_url: https://llm.example.com
+            provider: anthropic
+          route_type: llm/v1/chat
+          weight: 100
+    route: anthropic-messages-2
+    model: org/model-19
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      max_request_body_size: 8388608
+      model_name_header: true
+      response_streaming: allow
+      targets:
+        - auth:
+            allow_override: false
+            header_name: Authorization
+            header_value: Bearer {vault://ai/provider-a-token}
+          description: model-28
+          logging:
+            log_payloads: true
+            log_statistics: true
+          model:
+            model_alias: model-28
+            name: model-28
+            options:
+              anthropic_version: "2023-06-01"
+              cache_write_cost_list:
+                - cost: 13
+                  ttl: 1h
+                - cost: 11.5
+                  ttl: 5m
+              input_cost: 10.5
+              output_cost: 17
+            provider: anthropic
+          route_type: llm/v1/chat
+          weight: 100
+    route: anthropic-messages-2
+    model: model-28
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      max_request_body_size: 8388608
+      model_name_header: true
+      response_streaming: allow
+      targets:
+        - auth:
+            allow_override: false
+            header_name: Authorization
+            header_value: Bearer {vault://ai/provider-b-token}
+          description: org/model-04
+          logging:
+            log_payloads: true
+            log_statistics: true
+          model:
+            model_alias: org/model-04
+            name: org/model-04
+            options:
+              anthropic_version: "2023-06-01"
+              cache_read_cost: 2
+              input_cost: 8.5
+              output_cost: 11
+              upstream_url: https://llm.example.com
+            provider: anthropic
+          route_type: llm/v1/chat
+          weight: 100
+    route: anthropic-messages-2
+    model: org/model-04
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      max_request_body_size: 0
+      model_name_header: true
+      response_streaming: allow
+      targets:
+        - auth:
+            allow_override: false
+            header_name: Authorization
+            header_value: Bearer {vault://ai/provider-a-token}
+          description: model-43
+          logging:
+            log_payloads: true
+            log_statistics: true
+          model:
+            model_alias: model-43
+            name: model-43
+            options:
+              anthropic_version: "2023-06-01"
+              cache_read_cost: 1
+              cache_write_cost: 0
+              cache_write_cost_list:
+                - cost: 7.5
+                  ttl: 1h
+                - cost: 4
+                  ttl: 5m
+              input_cost: 3
+              output_cost: 9
+            provider: anthropic
+          route_type: llm/v1/chat
+          weight: 100
+    route: anthropic-messages-2
+    model: model-43
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      max_request_body_size: 0
+      model_name_header: true
+      response_streaming: allow
+      targets:
+        - auth:
+            allow_override: false
+            header_name: Authorization
+            header_value: Bearer {vault://ai/provider-a-token}
+          description: model-33
+          logging:
+            log_payloads: true
+            log_statistics: true
+          model:
+            model_alias: model-33
+            name: model-33
+            options:
+              anthropic_version: "2023-06-01"
+              cache_read_cost: 3
+              cache_write_cost: 0
+              cache_write_cost_list:
+                - cost: 15.5
+                  ttl: 1h
+                - cost: 14
+                  ttl: 5m
+              input_cost: 13
+              output_cost: 18.5
+            provider: anthropic
+          route_type: llm/v1/chat
+          weight: 100
+    route: anthropic-messages-2
+    model: model-33
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      max_request_body_size: 8388608
+      model_name_header: true
+      response_streaming: allow
+      targets:
+        - auth:
+            allow_override: false
+            header_name: Authorization
+            header_value: Bearer {vault://ai/provider-b-token}
+          description: org/model-48
+          logging:
+            log_payloads: true
+            log_statistics: true
+          model:
+            model_alias: org/model-48
+            name: org/model-48
+            options:
+              anthropic_version: "2023-06-01"
+              cache_read_cost: 1.5
+              input_cost: 4.5
+              output_cost: 8
+              upstream_url: https://llm.example.com
+            provider: anthropic
+          route_type: llm/v1/chat
+          weight: 100
+    route: anthropic-messages-2
+    model: org/model-48
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      max_request_body_size: 8388608
+      model_name_header: true
+      response_streaming: allow
+      targets:
+        - auth:
+            allow_override: false
+            header_name: Authorization
+            header_value: Bearer {vault://ai/provider-a-token}
+          description: model-11
+          logging:
+            log_payloads: true
+            log_statistics: true
+          model:
+            model_alias: model-11
+            name: model-11
+            options:
+              anthropic_version: "2023-06-01"
+              cache_read_cost: 7.5
+              cache_write_cost: 0
+              cache_write_cost_list:
+                - cost: 15.5
+                  ttl: 1h
+                - cost: 14
+                  ttl: 5m
+              input_cost: 13
+              output_cost: 18.5
+            provider: anthropic
+          route_type: llm/v1/chat
+          weight: 100
+    route: anthropic-messages-2
+    model: model-11
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      max_request_body_size: 8388608
+      model_name_header: true
+      response_streaming: allow
+      targets:
+        - auth:
+            allow_override: false
+            header_name: Authorization
+            header_value: Bearer {vault://ai/provider-b-token}
+          description: org/model-60
+          logging:
+            log_payloads: true
+            log_statistics: true
+          model:
+            model_alias: org/model-60
+            name: org/model-60
+            options:
+              anthropic_version: "2023-06-01"
+              cache_read_cost: 7
+              input_cost: 10.5
+              output_cost: 16
+              upstream_url: https://llm.example.com
+            provider: anthropic
+          route_type: llm/v1/chat
+          weight: 100
+    route: anthropic-messages-2
+    model: org/model-60
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      max_request_body_size: 8388608
+      model_name_header: true
+      response_streaming: allow
+      targets:
+        - auth:
+            allow_override: false
+            header_name: Authorization
+            header_value: Bearer {vault://ai/provider-b-token}
+          description: org/model-23
+          logging:
+            log_payloads: true
+            log_statistics: true
+          model:
+            model_alias: org/model-23
+            name: org/model-23
+            options:
+              anthropic_version: "2023-06-01"
+              cache_read_cost: 5.5
+              input_cost: 12.5
+              output_cost: 15
+              upstream_url: https://llm.example.com
+            provider: anthropic
+          route_type: llm/v1/chat
+          weight: 100
+    route: anthropic-messages-2
+    model: org/model-23
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      max_request_body_size: 8388608
+      model_name_header: true
+      response_streaming: allow
+      targets:
+        - auth:
+            allow_override: false
+            header_name: Authorization
+            header_value: Bearer {vault://ai/provider-b-token}
+          description: org/model-17
+          logging:
+            log_payloads: true
+            log_statistics: true
+          model:
+            model_alias: org/model-17
+            name: org/model-17
+            options:
+              anthropic_version: "2023-06-01"
+              cache_read_cost: 5
+              input_cost: 12
+              output_cost: 16.5
+              upstream_url: https://llm.example.com
+            provider: anthropic
+          route_type: llm/v1/chat
+          weight: 100
+    route: anthropic-messages-2
+    model: org/model-17
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      max_request_body_size: 8388608
+      model_name_header: true
+      response_streaming: allow
+      targets:
+        - auth:
+            allow_override: false
+            header_name: Authorization
+            header_value: Bearer {vault://ai/provider-a-token}
+          description: model-64
+          logging:
+            log_payloads: true
+            log_statistics: true
+          model:
+            model_alias: model-64
+            name: model-64
+            options:
+              anthropic_version: "2023-06-01"
+              cache_read_cost: 7.5
+              cache_write_cost: 0
+              cache_write_cost_list:
+                - cost: 17
+                  ttl: 5m
+                - cost: 18
+                  ttl: 1h
+              input_cost: 15.5
+              output_cost: 19.5
+            provider: anthropic
+          route_type: llm/v1/chat
+          weight: 100
+    route: anthropic-messages-2
+    model: model-64
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      max_request_body_size: 8388608
+      model_name_header: true
+      response_streaming: allow
+      targets:
+        - auth:
+            allow_override: false
+            header_name: Authorization
+            header_value: Bearer {vault://ai/provider-b-token}
+          description: org/model-35
+          logging:
+            log_payloads: true
+            log_statistics: true
+          model:
+            model_alias: org/model-35
+            name: org/model-35
+            options:
+              anthropic_version: "2023-06-01"
+              cache_read_cost: 8.5
+              input_cost: 14.5
+              output_cost: 19
+              upstream_url: https://llm.example.com
+            provider: anthropic
+          route_type: llm/v1/chat
+          weight: 100
+    route: anthropic-messages-2
+    model: org/model-35
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-chat
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      max_request_body_size: 8388608
+      model_name_header: true
+      response_streaming: allow
+      targets:
+        - auth:
+            allow_override: false
+            header_name: Authorization
+            header_value: Bearer {vault://ai/provider-c-token}
+          description: model-13
+          logging:
+            log_payloads: true
+            log_statistics: true
+          model:
+            model_alias: model-13
+            name: model-13
+            provider: openai
+          route_type: llm/v1/chat
+          weight: 100
+    route: openai-chat
+    model: model-13
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-responses
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      max_request_body_size: 8388608
+      model_name_header: true
+      response_streaming: allow
+      targets:
+        - auth:
+            allow_override: false
+            header_name: Authorization
+            header_value: Bearer {vault://ai/provider-c-token}
+          description: model-13
+          logging:
+            log_payloads: true
+            log_statistics: true
+          model:
+            model_alias: model-13
+            name: model-13
+            provider: openai
+          route_type: llm/v1/responses
+          weight: 100
+    route: openai-responses
+    model: model-13
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    ordering:
+      before:
+        access:
+          - pre-function
+      after:
+        access:
+          - openid-connect
+    route: anthropic-messages-3
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      max_request_body_size: 8388608
+      model_name_header: true
+      response_streaming: allow
+      targets:
+        - auth:
+            allow_override: false
+            header_name: Authorization
+            header_value: Bearer {vault://ai/provider-b-token}
+          description: org/model-04
+          logging:
+            log_payloads: true
+            log_statistics: true
+          model:
+            model_alias: org/model-04
+            name: org/model-04
+            options:
+              anthropic_version: "2023-06-01"
+              cache_read_cost: 2
+              input_cost: 8.5
+              output_cost: 11
+              upstream_url: https://llm.example.com
+            provider: anthropic
+          route_type: llm/v1/chat
+          weight: 100
+    route: anthropic-messages-3
+    model: org/model-04
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      max_request_body_size: 8388608
+      model_name_header: true
+      response_streaming: allow
+      targets:
+        - auth:
+            allow_override: false
+            header_name: Authorization
+            header_value: Bearer {vault://ai/provider-b-token}
+          description: org/model-06
+          logging:
+            log_payloads: true
+            log_statistics: true
+          model:
+            model_alias: org/model-06
+            name: org/model-06
+            options:
+              anthropic_version: "2023-06-01"
+              cache_read_cost: 2
+              input_cost: 6
+              output_cost: 9
+              upstream_url: https://llm.example.com
+            provider: anthropic
+          route_type: llm/v1/chat
+          weight: 100
+    route: anthropic-messages-3
+    model: org/model-06
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      max_request_body_size: 8388608
+      model_name_header: true
+      response_streaming: allow
+      targets:
+        - auth:
+            allow_override: false
+            header_name: Authorization
+            header_value: Bearer {vault://ai/provider-b-token}
+          description: org/model-35
+          logging:
+            log_payloads: true
+            log_statistics: true
+          model:
+            model_alias: org/model-35
+            name: org/model-35
+            options:
+              anthropic_version: "2023-06-01"
+              cache_read_cost: 8.5
+              input_cost: 14.5
+              output_cost: 19
+              upstream_url: https://llm.example.com
+            provider: anthropic
+          route_type: llm/v1/chat
+          weight: 100
+    route: anthropic-messages-3
+    model: org/model-35
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      max_request_body_size: 8388608
+      model_name_header: true
+      response_streaming: allow
+      targets:
+        - auth:
+            allow_override: false
+            header_name: Authorization
+            header_value: Bearer {vault://ai/provider-b-token}
+          description: org/model-17
+          logging:
+            log_payloads: true
+            log_statistics: true
+          model:
+            model_alias: org/model-17
+            name: org/model-17
+            options:
+              anthropic_version: "2023-06-01"
+              cache_read_cost: 5
+              input_cost: 12
+              output_cost: 16.5
+              upstream_url: https://llm.example.com
+            provider: anthropic
+          route_type: llm/v1/chat
+          weight: 100
+    route: anthropic-messages-3
+    model: org/model-17
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: typesafe-decisions
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+        connect_timeout: 60000
+        fail_timeout: 10000
+        failover_criteria:
+          - error
+          - timeout
+        max_fails: 0
+        read_timeout: 60000
+        retries: 5
+        slots: 10000
+        write_timeout: 60000
+      genai_category: text/generation
+      llm_format: typesafe
+      max_request_body_size: 8388608
+      model_name_header: true
+      response_streaming: allow
+      targets:
+        - auth:
+            allow_override: false
+            header_name: Authorization
+            header_value: Bearer {vault://ai/provider-d-token}
+          description: org/model-21
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: org/model-21
+            name: org/model-21
+            options:
+              upstream_url: https://llm.example.com/v1/custom
+            provider: typesafe
+          route_type: llm/v1/chat
+          weight: 100
+    route: typesafe-decisions
+    model: org/model-21
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+        connect_timeout: 60000
+        fail_timeout: 10000
+        failover_criteria:
+          - error
+          - timeout
+        max_fails: 0
+        read_timeout: 60000
+        retries: 5
+        slots: 10000
+        write_timeout: 60000
+      genai_category: text/generation
+      llm_format: typesafe
+      max_request_body_size: 8388608
+      model_name_header: true
+      response_streaming: allow
+      targets:
+        - auth:
+            allow_override: false
+            header_name: Authorization
+            header_value: Bearer {vault://ai/provider-f-token}
+          description: model-25
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: model-26
+            name: model-25
+            options:
+              input_cost: 2.5
+              output_cost: 0
+            provider: typesafe
+          route_type: llm/v1/chat
+          weight: 100
+    route: typesafe-decisions
+    model: model-26
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+        connect_timeout: 60000
+        fail_timeout: 10000
+        failover_criteria:
+          - error
+          - timeout
+        max_fails: 0
+        read_timeout: 60000
+        retries: 5
+        slots: 10000
+        write_timeout: 60000
+      genai_category: text/generation
+      llm_format: typesafe
+      max_request_body_size: 8388608
+      model_name_header: true
+      response_streaming: allow
+      targets:
+        - auth:
+            allow_override: false
+            header_name: Authorization
+            header_value: Bearer {vault://ai/provider-d-token}
+          description: org/model-62
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: org/model-62
+            name: org/model-62
+            options:
+              upstream_url: https://llm.example.com/v1/custom
+            provider: typesafe
+          route_type: llm/v1/chat
+          weight: 100
+    route: typesafe-decisions
+    model: org/model-62
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: anthropic-messages-4
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      max_request_body_size: 8388608
+      model_name_header: true
+      response_streaming: allow
+      targets:
+        - auth:
+            allow_override: false
+            header_name: Authorization
+            header_value: Bearer {vault://ai/provider-e-token}
+          description: org/model-23
+          logging:
+            log_payloads: true
+            log_statistics: true
+          model:
+            model_alias: org/model-23
+            name: org/model-23
+            options:
+              cache_read_cost: 5.5
+              input_cost: 12.5
+              output_cost: 15
+              upstream_url: https://llm.example.com/v1/chat/completions
+            provider: openai
+          route_type: llm/v1/chat
+          weight: 100
+    route: anthropic-messages-4
+    model: org/model-23
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      max_request_body_size: 8388608
+      model_name_header: true
+      response_streaming: allow
+      targets:
+        - auth:
+            allow_override: false
+            header_name: Authorization
+            header_value: Bearer {vault://ai/provider-e-token}
+          description: org/model-35
+          logging:
+            log_payloads: true
+            log_statistics: true
+          model:
+            model_alias: org/model-35
+            name: org/model-35
+            options:
+              cache_read_cost: 8.5
+              input_cost: 14.5
+              output_cost: 19
+              upstream_url: https://llm.example.com/v1/chat/completions
+            provider: openai
+          route_type: llm/v1/chat
+          weight: 100
+    route: anthropic-messages-4
+    model: org/model-35
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      max_request_body_size: 8388608
+      model_name_header: true
+      response_streaming: allow
+      targets:
+        - auth:
+            allow_override: false
+            header_name: Authorization
+            header_value: Bearer {vault://ai/provider-e-token}
+          description: org/model-04
+          logging:
+            log_payloads: true
+            log_statistics: true
+          model:
+            model_alias: org/model-04
+            name: org/model-04
+            options:
+              cache_read_cost: 2
+              input_cost: 8.5
+              output_cost: 11
+              upstream_url: https://llm.example.com/v1/chat/completions
+            provider: openai
+          route_type: llm/v1/chat
+          weight: 100
+    route: anthropic-messages-4
+    model: org/model-04
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      max_request_body_size: 8388608
+      model_name_header: true
+      response_streaming: allow
+      targets:
+        - auth:
+            allow_override: false
+            header_name: Authorization
+            header_value: Bearer {vault://ai/provider-e-token}
+          description: org/model-08
+          logging:
+            log_payloads: true
+            log_statistics: true
+          model:
+            model_alias: org/model-08
+            name: org/model-08
+            options:
+              cache_read_cost: 6.5
+              input_cost: 10
+              output_cost: 15.5
+              upstream_url: https://llm.example.com/v1/chat/completions
+            provider: openai
+          route_type: llm/v1/chat
+          weight: 100
+    route: anthropic-messages-4
+    model: org/model-08
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      max_request_body_size: 8388608
+      model_name_header: true
+      response_streaming: allow
+      targets:
+        - auth:
+            allow_override: false
+            header_name: Authorization
+            header_value: Bearer {vault://ai/provider-e-token}
+          description: org/model-06
+          logging:
+            log_payloads: true
+            log_statistics: true
+          model:
+            model_alias: org/model-06
+            name: org/model-06
+            options:
+              cache_read_cost: 2
+              input_cost: 6
+              output_cost: 9
+              upstream_url: https://llm.example.com/v1/chat/completions
+            provider: openai
+          route_type: llm/v1/chat
+          weight: 100
+    route: anthropic-messages-4
+    model: org/model-06
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      max_request_body_size: 8388608
+      model_name_header: true
+      response_streaming: allow
+      targets:
+        - auth:
+            allow_override: false
+            header_name: Authorization
+            header_value: Bearer {vault://ai/provider-e-token}
+          description: org/model-17
+          logging:
+            log_payloads: true
+            log_statistics: true
+          model:
+            model_alias: org/model-17
+            name: org/model-17
+            options:
+              cache_read_cost: 5
+              input_cost: 12
+              output_cost: 16.5
+              upstream_url: https://llm.example.com/v1/chat/completions
+            provider: openai
+          route_type: llm/v1/chat
+          weight: 100
+    route: anthropic-messages-4
+    model: org/model-17
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      max_request_body_size: 8388608
+      model_name_header: true
+      response_streaming: allow
+      targets:
+        - auth:
+            allow_override: false
+            header_name: Authorization
+            header_value: Bearer {vault://ai/provider-e-token}
+          description: org/model-48
+          logging:
+            log_payloads: true
+            log_statistics: true
+          model:
+            model_alias: org/model-48
+            name: org/model-48
+            options:
+              cache_read_cost: 1.5
+              input_cost: 4.5
+              output_cost: 8
+              upstream_url: https://llm.example.com/v1/chat/completions
+            provider: openai
+          route_type: llm/v1/chat
+          weight: 100
+    route: anthropic-messages-4
+    model: org/model-48
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: anthropic-messages-5
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+        connect_timeout: 60000
+        fail_timeout: 10000
+        failover_criteria:
+          - error
+          - timeout
+        max_fails: 0
+        read_timeout: 60000
+        retries: 5
+        slots: 10000
+        write_timeout: 60000
+      genai_category: text/generation
+      llm_format: anthropic
+      max_request_body_size: 8388608
+      model_name_header: true
+      response_streaming: allow
+      targets:
+        - auth:
+            allow_override: false
+            header_name: Authorization
+            header_value: Bearer {vault://ai/provider-h-token}
+          description: model-38
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: model-38
+            name: model-38
+            options:
+              anthropic_version: "2023-06-01"
+            provider: anthropic
+          route_type: llm/v1/chat
+          weight: 100
+    route: anthropic-messages-5
+    model: model-38
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: typesafe-decisions-2
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+        connect_timeout: 60000
+        fail_timeout: 10000
+        failover_criteria:
+          - error
+          - timeout
+        max_fails: 0
+        read_timeout: 60000
+        retries: 5
+        slots: 10000
+        write_timeout: 60000
+      genai_category: text/generation
+      llm_format: typesafe
+      max_request_body_size: 8388608
+      model_name_header: true
+      response_streaming: allow
+      targets:
+        - auth:
+            allow_override: false
+            header_name: Authorization
+            header_value: Bearer {vault://ai/provider-f-token}
+          description: model-25
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: model-26
+            name: model-25
+            options:
+              input_cost: 2.5
+            provider: typesafe
+          route_type: llm/v1/chat
+          weight: 100
+    route: typesafe-decisions-2
+    model: model-26
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-chat-2
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+        connect_timeout: 60000
+        fail_timeout: 10000
+        failover_criteria:
+          - error
+          - timeout
+        max_fails: 0
+        read_timeout: 60000
+        retries: 5
+        slots: 10000
+        write_timeout: 60000
+      genai_category: text/generation
+      llm_format: openai
+      max_request_body_size: 8388608
+      model_name_header: true
+      response_streaming: allow
+      targets:
+        - auth:
+            allow_override: false
+            header_name: Authorization
+            header_value: Bearer {vault://ai/provider-g-token}
+          description: model-31
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: model-31
+            name: model-31
+            options:
+              input_cost: 14.5
+              output_cost: 19
+            provider: xai
+          route_type: llm/v1/chat
+          weight: 100
+    route: openai-chat-2
+    model: model-31
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-responses-2
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+        connect_timeout: 60000
+        fail_timeout: 10000
+        failover_criteria:
+          - error
+          - timeout
+        max_fails: 0
+        read_timeout: 60000
+        retries: 5
+        slots: 10000
+        write_timeout: 60000
+      genai_category: text/generation
+      llm_format: openai
+      max_request_body_size: 8388608
+      model_name_header: true
+      response_streaming: allow
+      targets:
+        - auth:
+            allow_override: false
+            header_name: Authorization
+            header_value: Bearer {vault://ai/provider-g-token}
+          description: model-31
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: model-31
+            name: model-31
+            options:
+              input_cost: 14.5
+              output_cost: 19
+            provider: xai
+          route_type: llm/v1/responses
+          weight: 100
+    route: openai-responses-2
+    model: model-31
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      max_request_body_size: 8388608
+      model_name_header: false
+      response_streaming: allow
+      targets:
+        - auth:
+            allow_override: false
+            header_name: Authorization
+            header_value: Bearer {vault://ai/provider-c-token}
+          description: model-68
+          logging:
+            log_payloads: true
+            log_statistics: false
+          model:
+            name: model-68
+            provider: openai
+          route_type: llm/v1/batches
+          weight: 100
+    route: openai-batches
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      max_request_body_size: 8388608
+      model_name_header: false
+      response_streaming: allow
+      targets:
+        - auth:
+            allow_override: false
+            header_name: Authorization
+            header_value: Bearer {vault://ai/provider-c-token}
+          description: model-68
+          logging:
+            log_payloads: true
+            log_statistics: true
+          model:
+            name: model-68
+            provider: openai
+          route_type: llm/v1/files
+          weight: 100
+    route: openai-files
+  - name: key-auth
+    config:
+      anonymous: anonymous
+      key_names:
+        - x-api-key
+    route: anthropic-messages
+  - name: openid-connect
+    config:
+      anonymous: anonymous
+      issuer: https://sso.example.com/oauth2/default
+    route: anthropic-messages
+  - name: openid-connect
+    config:
+      issuer: https://ci.example.com
+    route: anthropic-messages-2
+  - name: key-auth
+    config:
+      anonymous: anonymous
+      key_names:
+        - x-api-key
+    route: openai-chat
+  - name: openid-connect
+    config:
+      anonymous: anonymous
+      issuer: https://sso.example.com/oauth2/default
+    route: openai-chat
+  - name: key-auth
+    config:
+      anonymous: anonymous
+      key_names:
+        - x-api-key
+    route: openai-responses
+  - name: openid-connect
+    config:
+      anonymous: anonymous
+      issuer: https://sso.example.com/oauth2/default
+    route: openai-responses
+  - name: pre-function
+    config:
+      access:
+        - kong.log.info('model-auth')
+    route: anthropic-messages-3
+    model: org/model-04
+  - name: openid-connect
+    config:
+      issuer: https://sso.example.com/oauth2/default
+    route: anthropic-messages-3
+  - name: pre-function
+    config:
+      access:
+        - kong.log.info('model-auth')
+    route: anthropic-messages-3
+    model: org/model-06
+  - name: key-auth
+    config:
+      anonymous: anonymous
+      key_names:
+        - x-api-key
+    route: typesafe-decisions
+  - name: openid-connect
+    config:
+      anonymous: anonymous
+      issuer: https://sso.example.com/oauth2/default
+    route: typesafe-decisions
+  - name: key-auth
+    config:
+      anonymous: anonymous
+      key_names:
+        - x-api-key
+    route: anthropic-messages-4
+  - name: openid-connect
+    config:
+      anonymous: anonymous
+      issuer: https://sso.example.com/oauth2/default
+    route: anthropic-messages-4
+  - name: pre-function
+    config:
+      access:
+        - kong.log.info('model-auth')
+    route: anthropic-messages-3
+    model: org/model-35
+  - name: pre-function
+    config:
+      access:
+        - kong.log.info('model-auth')
+    route: anthropic-messages-3
+    model: org/model-17
+  - name: openid-connect
+    config:
+      issuer: https://ci.example.com
+    route: typesafe-decisions-2
+  - name: key-auth
+    config:
+      anonymous: anonymous
+      key_names:
+        - x-api-key
+    route: openai-chat-2
+  - name: openid-connect
+    config:
+      anonymous: anonymous
+      issuer: https://sso.example.com/oauth2/default
+    route: openai-chat-2
+  - name: key-auth
+    config:
+      anonymous: anonymous
+      key_names:
+        - x-api-key
+    route: openai-responses-2
+  - name: openid-connect
+    config:
+      anonymous: anonymous
+      issuer: https://sso.example.com/oauth2/default
+    route: openai-responses-2
+  - name: request-termination
+    config:
+      message: ok
+      status_code: 200
+    route: openai-batches
+  - name: request-termination
+    config:
+      message: ok
+      status_code: 200
+    route: openai-files
+ai_models:
+  - name: model-02
+  - name: org/model-04
+  - name: org/model-06
+  - name: org/model-08
+  - name: model-11
+  - name: model-13
+  - name: org/model-17
+  - name: org/model-19
+  - name: org/model-21
+  - name: org/model-23
+  - name: model-26
+  - name: model-28
+  - name: model-29
+  - name: model-31
+  - name: model-33
+  - name: org/model-35
+  - name: model-38
+  - name: model-43
+  - name: org/model-48
+  - name: org/model-58
+  - name: org/model-60
+  - name: org/model-62
+  - name: model-64
+  - name: model-67
+  - name: org/model-71

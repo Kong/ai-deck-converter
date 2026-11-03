@@ -1,0 +1,2640 @@
+# Many models on shared and header-split routes. They once gave false
+# ROUTING_CONFLICT warnings. All names, hosts, and costs are placeholders.
+model_providers:
+  - name: provider-a
+    type: anthropic
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: Bearer {vault://ai/provider-a-token}
+  - name: provider-b
+    type: anthropic
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: Bearer {vault://ai/provider-b-token}
+  - name: provider-c
+    type: openai
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: Bearer {vault://ai/provider-c-token}
+  - name: provider-d
+    type: typesafe
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: Bearer {vault://ai/provider-d-token}
+  - name: provider-e
+    type: openai
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: Bearer {vault://ai/provider-e-token}
+  - name: provider-f
+    type: typesafe
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: Bearer {vault://ai/provider-f-token}
+  - name: provider-g
+    type: xai
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: Bearer {vault://ai/provider-g-token}
+  - name: provider-h
+    type: anthropic
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: Bearer {vault://ai/provider-h-token}
+auth_strategies:
+  - name: api-key-auth
+    type: key-auth
+    config:
+      key_names:
+        - x-api-key
+  - name: ci-oidc
+    type: openid-connect
+    config:
+      issuer: https://ci.example.com
+  - name: corp-sso
+    type: openid-connect
+    config:
+      issuer: https://sso.example.com/oauth2/default
+policies:
+  - name: model-log
+    type: pre-function
+    config:
+      access:
+        - kong.log.info('model-auth')
+  - name: health-check
+    type: request-termination
+    config:
+      status_code: 200
+      message: ok
+models:
+  - name: model-01
+    display_name: model-01
+    type: model
+    enabled: true
+    capabilities:
+      - generate
+    formats:
+      - type: anthropic
+    targets:
+      - name: model-02
+        provider: provider-a
+        weight: 100
+        allow_auth_override: false
+        config:
+          type: anthropic
+          version: "2023-06-01"
+    access:
+      auth_strategies:
+        - api-key-auth
+        - corp-sso
+    config:
+      logging:
+        payloads: true
+      max_request_body_size: 8388608
+      model:
+        name_header: true
+      response_streaming: allow
+      route:
+        https_redirect_status_code: 426
+        model:
+          body_param: model
+          values:
+            - model-02
+        paths:
+          - /
+        preserve_host: false
+        protocols:
+          - http
+          - https
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+        strip_path: true
+  - name: model-03
+    display_name: model-03
+    type: model
+    enabled: true
+    capabilities:
+      - generate
+    formats:
+      - type: anthropic
+    targets:
+      - name: org/model-04
+        provider: provider-b
+        weight: 100
+        allow_auth_override: false
+        config:
+          cache_read_cost: 2
+          input_cost: 8.5
+          output_cost: 11
+          type: anthropic
+          upstream_url: https://llm.example.com
+          version: "2023-06-01"
+    access:
+      auth_strategies:
+        - api-key-auth
+        - corp-sso
+    config:
+      logging:
+        payloads: true
+      max_request_body_size: 8388608
+      model:
+        name_header: true
+      response_streaming: allow
+      route:
+        https_redirect_status_code: 426
+        model:
+          values:
+            - org/model-04
+        paths:
+          - /
+        preserve_host: false
+        protocols:
+          - http
+          - https
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+        strip_path: true
+  - name: model-05
+    display_name: model-05
+    type: model
+    enabled: true
+    capabilities:
+      - generate
+    formats:
+      - type: anthropic
+    targets:
+      - name: org/model-06
+        provider: provider-b
+        weight: 100
+        allow_auth_override: false
+        config:
+          cache_read_cost: 2
+          input_cost: 6
+          output_cost: 9
+          type: anthropic
+          upstream_url: https://llm.example.com
+          version: "2023-06-01"
+    access:
+      auth_strategies:
+        - ci-oidc
+    config:
+      logging:
+        payloads: true
+      max_request_body_size: 8388608
+      model:
+        name_header: true
+      response_streaming: allow
+      route:
+        headers:
+          X-Client:
+            - internal
+        https_redirect_status_code: 426
+        model:
+          values:
+            - org/model-06
+        paths:
+          - /
+        preserve_host: false
+        protocols:
+          - http
+          - https
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+        strip_path: true
+  - name: model-07
+    display_name: model-07
+    type: model
+    enabled: true
+    capabilities:
+      - generate
+    formats:
+      - type: anthropic
+    targets:
+      - name: org/model-08
+        provider: provider-b
+        weight: 100
+        allow_auth_override: false
+        config:
+          cache_read_cost: 6.5
+          input_cost: 10
+          output_cost: 15.5
+          type: anthropic
+          upstream_url: https://llm.example.com
+          version: "2023-06-01"
+    access:
+      auth_strategies:
+        - ci-oidc
+    config:
+      logging:
+        payloads: true
+      max_request_body_size: 8388608
+      model:
+        name_header: true
+      response_streaming: allow
+      route:
+        headers:
+          X-Client:
+            - internal
+        https_redirect_status_code: 426
+        model:
+          values:
+            - org/model-08
+        paths:
+          - /
+        preserve_host: false
+        protocols:
+          - http
+          - https
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+        strip_path: true
+  - name: model-09
+    display_name: model-09
+    type: model
+    enabled: true
+    capabilities:
+      - generate
+    formats:
+      - type: anthropic
+    targets:
+      - name: model-02
+        provider: provider-a
+        weight: 100
+        allow_auth_override: false
+        config:
+          cache_read_cost: 9
+          cache_write_cost: 0
+          cache_write_cost_list:
+            - cost: 17.5
+              ttl: 5m
+            - cost: 18.5
+              ttl: 1h
+          input_cost: 17
+          output_cost: 20
+          type: anthropic
+          version: "2023-06-01"
+    access:
+      auth_strategies:
+        - ci-oidc
+    config:
+      logging:
+        payloads: true
+      max_request_body_size: 8388608
+      model:
+        name_header: true
+      response_streaming: allow
+      route:
+        headers:
+          X-Client:
+            - internal
+        https_redirect_status_code: 426
+        model:
+          values:
+            - model-02
+        paths:
+          - /
+        preserve_host: false
+        protocols:
+          - http
+          - https
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+        strip_path: true
+  - name: model-10
+    display_name: model-10
+    type: model
+    enabled: true
+    capabilities:
+      - generate
+    formats:
+      - type: anthropic
+    targets:
+      - name: model-11
+        provider: provider-a
+        weight: 100
+        allow_auth_override: false
+        config:
+          cache_read_cost: 7.5
+          cache_write_cost: 0
+          cache_write_cost_list:
+            - cost: 15.5
+              ttl: 1h
+            - cost: 14
+              ttl: 5m
+          input_cost: 13
+          output_cost: 18.5
+          type: anthropic
+          version: "2023-06-01"
+    access:
+      auth_strategies:
+        - api-key-auth
+        - corp-sso
+    config:
+      logging:
+        payloads: true
+      max_request_body_size: 8388608
+      model:
+        name_header: true
+      response_streaming: allow
+      route:
+        https_redirect_status_code: 426
+        model:
+          body_param: model
+          values:
+            - model-11
+        paths:
+          - /
+        preserve_host: false
+        protocols:
+          - http
+          - https
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+        strip_path: true
+  - name: model-12
+    display_name: model-12
+    type: model
+    enabled: true
+    capabilities:
+      - agentic
+      - generate
+    formats:
+      - type: openai
+    targets:
+      - name: model-13
+        provider: provider-c
+        weight: 100
+        allow_auth_override: false
+        config:
+          type: openai
+    access:
+      auth_strategies:
+        - api-key-auth
+        - corp-sso
+    config:
+      logging:
+        payloads: true
+      max_request_body_size: 8388608
+      model:
+        name_header: true
+      response_streaming: allow
+      route:
+        https_redirect_status_code: 426
+        model:
+          body_param: model
+          values:
+            - model-13
+        paths:
+          - /
+        preserve_host: false
+        protocols:
+          - http
+          - https
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+        strip_path: true
+  - name: model-14
+    display_name: model-14
+    type: model
+    enabled: true
+    capabilities:
+      - generate
+    formats:
+      - type: anthropic
+    targets:
+      - name: org/model-04
+        provider: provider-b
+        weight: 100
+        allow_auth_override: false
+        config:
+          cache_read_cost: 2
+          input_cost: 8.5
+          output_cost: 11
+          type: anthropic
+          upstream_url: https://llm.example.com
+          version: "2023-06-01"
+    policies:
+      - model-log
+    access:
+      auth_strategies:
+        - corp-sso
+    config:
+      logging:
+        payloads: true
+      max_request_body_size: 8388608
+      model:
+        name_header: true
+      response_streaming: allow
+      route:
+        https_redirect_status_code: 426
+        model:
+          values:
+            - org/model-04
+        paths:
+          - /team-b
+        preserve_host: false
+        protocols:
+          - http
+          - https
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+        strip_path: true
+  - name: model-15
+    display_name: model-15
+    type: model
+    enabled: true
+    capabilities:
+      - generate
+    formats:
+      - type: anthropic
+    targets:
+      - name: org/model-06
+        provider: provider-b
+        weight: 100
+        allow_auth_override: false
+        config:
+          cache_read_cost: 2
+          input_cost: 6
+          output_cost: 9
+          type: anthropic
+          upstream_url: https://llm.example.com
+          version: "2023-06-01"
+    policies:
+      - model-log
+    access:
+      auth_strategies:
+        - corp-sso
+    config:
+      logging:
+        payloads: true
+      max_request_body_size: 8388608
+      model:
+        name_header: true
+      response_streaming: allow
+      route:
+        https_redirect_status_code: 426
+        model:
+          values:
+            - org/model-06
+        paths:
+          - /team-b
+        preserve_host: false
+        protocols:
+          - http
+          - https
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+        strip_path: true
+  - name: model-16
+    display_name: model-16
+    type: model
+    enabled: true
+    capabilities:
+      - generate
+    formats:
+      - type: anthropic
+    targets:
+      - name: org/model-17
+        provider: provider-b
+        weight: 100
+        allow_auth_override: false
+        config:
+          cache_read_cost: 5
+          input_cost: 12
+          output_cost: 16.5
+          type: anthropic
+          upstream_url: https://llm.example.com
+          version: "2023-06-01"
+    access:
+      auth_strategies:
+        - api-key-auth
+        - corp-sso
+    config:
+      logging:
+        payloads: true
+      max_request_body_size: 8388608
+      model:
+        name_header: true
+      response_streaming: allow
+      route:
+        https_redirect_status_code: 426
+        model:
+          values:
+            - org/model-17
+        paths:
+          - /
+        preserve_host: false
+        protocols:
+          - http
+          - https
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+        strip_path: true
+  - name: model-18
+    display_name: model-18
+    type: model
+    enabled: true
+    capabilities:
+      - generate
+    formats:
+      - type: anthropic
+    targets:
+      - name: org/model-19
+        provider: provider-b
+        weight: 100
+        allow_auth_override: false
+        config:
+          cache_read_cost: 3.5
+          input_cost: 9.5
+          output_cost: 13.5
+          type: anthropic
+          upstream_url: https://llm.example.com
+          version: "2023-06-01"
+    access:
+      auth_strategies:
+        - ci-oidc
+    config:
+      logging:
+        payloads: true
+      max_request_body_size: 8388608
+      model:
+        name_header: true
+      response_streaming: allow
+      route:
+        headers:
+          X-Client:
+            - internal
+        https_redirect_status_code: 426
+        model:
+          values:
+            - org/model-19
+        paths:
+          - /
+        preserve_host: false
+        protocols:
+          - http
+          - https
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+        strip_path: true
+  - name: model-20
+    display_name: model-20
+    type: model
+    enabled: true
+    capabilities:
+      - decisions
+    formats:
+      - type: typesafe
+    targets:
+      - name: org/model-21
+        provider: provider-d
+        weight: 100
+        allow_auth_override: false
+        config:
+          type: typesafe
+          upstream_url: https://llm.example.com/v1/custom
+    access:
+      auth_strategies:
+        - api-key-auth
+        - corp-sso
+    config:
+      balancer:
+        algorithm: round-robin
+        connect_timeout: 60000
+        fail_timeout: 10000
+        failover_criteria:
+          - error
+          - timeout
+        max_fails: 0
+        read_timeout: 60000
+        retries: 5
+        slots: 10000
+        write_timeout: 60000
+      max_request_body_size: 8388608
+      model:
+        name_header: true
+      response_streaming: allow
+      route:
+        https_redirect_status_code: 426
+        model:
+          values:
+            - org/model-21
+        paths:
+          - /
+        preserve_host: false
+        protocols:
+          - http
+          - https
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+        strip_path: true
+  - name: model-22
+    display_name: model-22
+    type: model
+    enabled: true
+    capabilities:
+      - generate
+    formats:
+      - type: anthropic
+    targets:
+      - name: org/model-23
+        provider: provider-e
+        weight: 100
+        allow_auth_override: false
+        config:
+          cache_read_cost: 5.5
+          input_cost: 12.5
+          output_cost: 15
+          type: openai
+          upstream_url: https://llm.example.com/v1/chat/completions
+    access:
+      auth_strategies:
+        - api-key-auth
+        - corp-sso
+    config:
+      logging:
+        payloads: true
+      max_request_body_size: 8388608
+      model:
+        name_header: true
+      response_streaming: allow
+      route:
+        https_redirect_status_code: 426
+        model:
+          values:
+            - org/model-23
+        paths:
+          - /compat
+        preserve_host: false
+        protocols:
+          - http
+          - https
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+        strip_path: true
+  - name: model-24
+    display_name: model-24
+    type: model
+    enabled: true
+    capabilities:
+      - decisions
+    formats:
+      - type: typesafe
+    targets:
+      - name: model-25
+        provider: provider-f
+        weight: 100
+        allow_auth_override: false
+        config:
+          input_cost: 2.5
+          output_cost: 0
+          type: typesafe
+    access:
+      auth_strategies:
+        - api-key-auth
+        - corp-sso
+    config:
+      balancer:
+        algorithm: round-robin
+        connect_timeout: 60000
+        fail_timeout: 10000
+        failover_criteria:
+          - error
+          - timeout
+        max_fails: 0
+        read_timeout: 60000
+        retries: 5
+        slots: 10000
+        write_timeout: 60000
+      max_request_body_size: 8388608
+      model:
+        name_header: true
+      response_streaming: allow
+      route:
+        https_redirect_status_code: 426
+        model:
+          values:
+            - model-26
+        paths:
+          - /
+        preserve_host: false
+        protocols:
+          - http
+          - https
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+        strip_path: true
+  - name: model-27
+    display_name: model-27
+    type: model
+    enabled: true
+    capabilities:
+      - generate
+    formats:
+      - type: anthropic
+    targets:
+      - name: org/model-08
+        provider: provider-b
+        weight: 100
+        allow_auth_override: false
+        config:
+          cache_read_cost: 6.5
+          input_cost: 10
+          output_cost: 15.5
+          type: anthropic
+          upstream_url: https://llm.example.com
+          version: "2023-06-01"
+    access:
+      auth_strategies:
+        - api-key-auth
+        - corp-sso
+    config:
+      logging:
+        payloads: true
+      max_request_body_size: 8388608
+      model:
+        name_header: true
+      response_streaming: allow
+      route:
+        https_redirect_status_code: 426
+        model:
+          values:
+            - org/model-08
+        paths:
+          - /
+        preserve_host: false
+        protocols:
+          - http
+          - https
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+        strip_path: true
+  - name: model-28
+    display_name: model-28
+    type: model
+    enabled: true
+    capabilities:
+      - generate
+    formats:
+      - type: anthropic
+    targets:
+      - name: model-28
+        provider: provider-a
+        weight: 100
+        allow_auth_override: false
+        config:
+          cache_write_cost_list:
+            - cost: 13
+              ttl: 1h
+            - cost: 11.5
+              ttl: 5m
+          input_cost: 10.5
+          output_cost: 17
+          type: anthropic
+          version: "2023-06-01"
+    access:
+      auth_strategies:
+        - api-key-auth
+        - corp-sso
+    config:
+      logging:
+        payloads: true
+      max_request_body_size: 8388608
+      model:
+        name_header: true
+      response_streaming: allow
+      route:
+        https_redirect_status_code: 426
+        model:
+          body_param: model
+          values:
+            - model-28
+        paths:
+          - /
+        preserve_host: false
+        protocols:
+          - http
+          - https
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+        strip_path: true
+  - name: model-29
+    display_name: model-29
+    type: model
+    enabled: true
+    capabilities:
+      - generate
+    formats:
+      - type: anthropic
+    targets:
+      - name: model-28
+        provider: provider-a
+        weight: 100
+        allow_auth_override: false
+        config:
+          cache_read_cost: 3
+          cache_write_cost: 0
+          cache_write_cost_list:
+            - cost: 11.5
+              ttl: 5m
+            - cost: 13
+              ttl: 1h
+          input_cost: 10.5
+          output_cost: 17
+          type: anthropic
+          version: "2023-06-01"
+    access:
+      auth_strategies:
+        - api-key-auth
+        - corp-sso
+    config:
+      logging:
+        payloads: true
+      max_request_body_size: 8388608
+      model:
+        name_header: true
+      response_streaming: allow
+      route:
+        https_redirect_status_code: 426
+        model:
+          values:
+            - model-29
+        paths:
+          - /
+        preserve_host: false
+        protocols:
+          - http
+          - https
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+        strip_path: true
+  - name: model-30
+    display_name: model-30
+    type: model
+    enabled: true
+    capabilities:
+      - generate
+    formats:
+      - type: anthropic
+    targets:
+      - name: model-31
+        provider: provider-g
+        weight: 100
+        allow_auth_override: false
+        config:
+          type: xai
+    access:
+      auth_strategies:
+        - api-key-auth
+        - corp-sso
+    config:
+      balancer:
+        algorithm: round-robin
+        connect_timeout: 60000
+        fail_timeout: 10000
+        failover_criteria:
+          - error
+          - timeout
+        max_fails: 0
+        read_timeout: 60000
+        retries: 5
+        slots: 10000
+        write_timeout: 60000
+      max_request_body_size: 8388608
+      model:
+        name_header: true
+      response_streaming: allow
+      route:
+        https_redirect_status_code: 426
+        model:
+          values:
+            - model-31
+        paths:
+          - /
+        preserve_host: false
+        protocols:
+          - http
+          - https
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+        strip_path: true
+  - name: model-32
+    display_name: model-32
+    type: model
+    enabled: true
+    capabilities:
+      - generate
+    formats:
+      - type: anthropic
+    targets:
+      - name: model-33
+        provider: provider-a
+        weight: 100
+        allow_auth_override: false
+        config:
+          cache_read_cost: 3
+          cache_write_cost: 0
+          cache_write_cost_list:
+            - cost: 15.5
+              ttl: 1h
+            - cost: 14
+              ttl: 5m
+          input_cost: 13
+          output_cost: 18.5
+          type: anthropic
+          version: "2023-06-01"
+    access:
+      auth_strategies:
+        - api-key-auth
+        - corp-sso
+    config:
+      logging:
+        payloads: true
+      max_request_body_size: 8388608
+      model:
+        name_header: true
+      response_streaming: allow
+      route:
+        https_redirect_status_code: 426
+        model:
+          body_param: model
+          values:
+            - model-33
+        paths:
+          - /
+        preserve_host: false
+        protocols:
+          - http
+          - https
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+        strip_path: true
+  - name: model-34
+    display_name: model-34
+    type: model
+    enabled: true
+    capabilities:
+      - generate
+    formats:
+      - type: anthropic
+    targets:
+      - name: org/model-35
+        provider: provider-e
+        weight: 100
+        allow_auth_override: false
+        config:
+          cache_read_cost: 8.5
+          input_cost: 14.5
+          output_cost: 19
+          type: openai
+          upstream_url: https://llm.example.com/v1/chat/completions
+    access:
+      auth_strategies:
+        - api-key-auth
+        - corp-sso
+    config:
+      logging:
+        payloads: true
+      max_request_body_size: 8388608
+      model:
+        name_header: true
+      response_streaming: allow
+      route:
+        https_redirect_status_code: 426
+        model:
+          values:
+            - org/model-35
+        paths:
+          - /compat
+        preserve_host: false
+        protocols:
+          - http
+          - https
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+        strip_path: true
+  - name: model-36
+    display_name: model-36
+    type: model
+    enabled: true
+    capabilities:
+      - generate
+    formats:
+      - type: anthropic
+    targets:
+      - name: model-28
+        provider: provider-a
+        weight: 100
+        allow_auth_override: false
+        config:
+          cache_write_cost_list:
+            - cost: 13
+              ttl: 1h
+            - cost: 11.5
+              ttl: 5m
+          input_cost: 10.5
+          output_cost: 17
+          type: anthropic
+          version: "2023-06-01"
+    access:
+      auth_strategies:
+        - ci-oidc
+    config:
+      logging:
+        payloads: true
+      max_request_body_size: 8388608
+      model:
+        name_header: true
+      response_streaming: allow
+      route:
+        headers:
+          X-Client:
+            - internal
+        https_redirect_status_code: 426
+        model:
+          values:
+            - model-28
+        paths:
+          - /
+        preserve_host: false
+        protocols:
+          - http
+          - https
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+        strip_path: true
+  - name: model-37
+    display_name: model-37
+    type: model
+    enabled: true
+    capabilities:
+      - generate
+    formats:
+      - type: anthropic
+    targets:
+      - name: org/model-04
+        provider: provider-e
+        weight: 100
+        allow_auth_override: false
+        config:
+          cache_read_cost: 2
+          input_cost: 8.5
+          output_cost: 11
+          type: openai
+          upstream_url: https://llm.example.com/v1/chat/completions
+    access:
+      auth_strategies:
+        - api-key-auth
+        - corp-sso
+    config:
+      logging:
+        payloads: true
+      max_request_body_size: 8388608
+      model:
+        name_header: true
+      response_streaming: allow
+      route:
+        https_redirect_status_code: 426
+        model:
+          values:
+            - org/model-04
+        paths:
+          - /compat
+        preserve_host: false
+        protocols:
+          - http
+          - https
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+        strip_path: true
+  - name: model-38
+    display_name: model-38
+    type: model
+    enabled: true
+    capabilities:
+      - generate
+    formats:
+      - type: anthropic
+    targets:
+      - name: model-38
+        provider: provider-h
+        weight: 100
+        allow_auth_override: false
+        config:
+          type: anthropic
+          version: "2023-06-01"
+    config:
+      balancer:
+        algorithm: round-robin
+        connect_timeout: 60000
+        fail_timeout: 10000
+        failover_criteria:
+          - error
+          - timeout
+        max_fails: 0
+        read_timeout: 60000
+        retries: 5
+        slots: 10000
+        write_timeout: 60000
+      max_request_body_size: 8388608
+      model:
+        name_header: true
+      response_streaming: allow
+      route:
+        https_redirect_status_code: 426
+        paths:
+          - /model/m1
+        preserve_host: false
+        protocols:
+          - http
+          - https
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+        strip_path: true
+  - name: model-39
+    display_name: model-39
+    type: model
+    enabled: true
+    capabilities:
+      - generate
+    formats:
+      - type: anthropic
+    targets:
+      - name: org/model-08
+        provider: provider-e
+        weight: 100
+        allow_auth_override: false
+        config:
+          cache_read_cost: 6.5
+          input_cost: 10
+          output_cost: 15.5
+          type: openai
+          upstream_url: https://llm.example.com/v1/chat/completions
+    access:
+      auth_strategies:
+        - api-key-auth
+        - corp-sso
+    config:
+      logging:
+        payloads: true
+      max_request_body_size: 8388608
+      model:
+        name_header: true
+      response_streaming: allow
+      route:
+        https_redirect_status_code: 426
+        model:
+          values:
+            - org/model-08
+        paths:
+          - /compat
+        preserve_host: false
+        protocols:
+          - http
+          - https
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+        strip_path: true
+  - name: model-40
+    display_name: model-40
+    type: model
+    enabled: true
+    capabilities:
+      - generate
+    formats:
+      - type: anthropic
+    targets:
+      - name: org/model-35
+        provider: provider-b
+        weight: 100
+        allow_auth_override: false
+        config:
+          cache_read_cost: 8.5
+          input_cost: 14.5
+          output_cost: 19
+          type: anthropic
+          upstream_url: https://llm.example.com
+          version: "2023-06-01"
+    access:
+      auth_strategies:
+        - api-key-auth
+        - corp-sso
+    config:
+      logging:
+        payloads: true
+      max_request_body_size: 8388608
+      model:
+        name_header: true
+      response_streaming: allow
+      route:
+        https_redirect_status_code: 426
+        model:
+          values:
+            - org/model-35
+        paths:
+          - /
+        preserve_host: false
+        protocols:
+          - http
+          - https
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+        strip_path: true
+  - name: model-41
+    display_name: model-41
+    type: model
+    enabled: true
+    capabilities:
+      - generate
+    formats:
+      - type: anthropic
+    targets:
+      - name: org/model-04
+        provider: provider-b
+        weight: 100
+        allow_auth_override: false
+        config:
+          cache_read_cost: 2
+          input_cost: 8.5
+          output_cost: 11
+          type: anthropic
+          upstream_url: https://llm.example.com
+          version: "2023-06-01"
+    access:
+      auth_strategies:
+        - ci-oidc
+    config:
+      logging:
+        payloads: true
+      max_request_body_size: 8388608
+      model:
+        name_header: true
+      response_streaming: allow
+      route:
+        headers:
+          X-Client:
+            - internal
+        https_redirect_status_code: 426
+        model:
+          values:
+            - org/model-04
+        paths:
+          - /
+        preserve_host: false
+        protocols:
+          - http
+          - https
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+        strip_path: true
+  - name: model-42
+    display_name: model-42
+    type: model
+    enabled: true
+    capabilities:
+      - generate
+    formats:
+      - type: anthropic
+    targets:
+      - name: model-43
+        provider: provider-a
+        weight: 100
+        allow_auth_override: false
+        config:
+          cache_read_cost: 1
+          cache_write_cost: 0
+          cache_write_cost_list:
+            - cost: 7.5
+              ttl: 1h
+            - cost: 4
+              ttl: 5m
+          input_cost: 3
+          output_cost: 9
+          type: anthropic
+          version: "2023-06-01"
+    access:
+      auth_strategies:
+        - ci-oidc
+    config:
+      logging:
+        payloads: true
+      max_request_body_size: 0
+      model:
+        name_header: true
+      response_streaming: allow
+      route:
+        headers:
+          X-Client:
+            - internal
+        https_redirect_status_code: 426
+        model:
+          values:
+            - model-43
+        paths:
+          - /
+        preserve_host: false
+        protocols:
+          - http
+          - https
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+        strip_path: true
+  - name: model-44
+    display_name: model-44
+    type: model
+    enabled: true
+    capabilities:
+      - generate
+    formats:
+      - type: anthropic
+    targets:
+      - name: org/model-06
+        provider: provider-e
+        weight: 100
+        allow_auth_override: false
+        config:
+          cache_read_cost: 2
+          input_cost: 6
+          output_cost: 9
+          type: openai
+          upstream_url: https://llm.example.com/v1/chat/completions
+    access:
+      auth_strategies:
+        - api-key-auth
+        - corp-sso
+    config:
+      logging:
+        payloads: true
+      max_request_body_size: 8388608
+      model:
+        name_header: true
+      response_streaming: allow
+      route:
+        https_redirect_status_code: 426
+        model:
+          values:
+            - org/model-06
+        paths:
+          - /compat
+        preserve_host: false
+        protocols:
+          - http
+          - https
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+        strip_path: true
+  - name: model-45
+    display_name: model-45
+    type: model
+    enabled: true
+    capabilities:
+      - generate
+    formats:
+      - type: anthropic
+    targets:
+      - name: org/model-17
+        provider: provider-e
+        weight: 100
+        allow_auth_override: false
+        config:
+          cache_read_cost: 5
+          input_cost: 12
+          output_cost: 16.5
+          type: openai
+          upstream_url: https://llm.example.com/v1/chat/completions
+    access:
+      auth_strategies:
+        - api-key-auth
+        - corp-sso
+    config:
+      logging:
+        payloads: true
+      max_request_body_size: 8388608
+      model:
+        name_header: true
+      response_streaming: allow
+      route:
+        https_redirect_status_code: 426
+        model:
+          values:
+            - org/model-17
+        paths:
+          - /compat
+        preserve_host: false
+        protocols:
+          - http
+          - https
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+        strip_path: true
+  - name: model-46
+    display_name: model-46
+    type: model
+    enabled: true
+    capabilities:
+      - generate
+    formats:
+      - type: anthropic
+    targets:
+      - name: model-33
+        provider: provider-a
+        weight: 100
+        allow_auth_override: false
+        config:
+          cache_read_cost: 3
+          cache_write_cost: 0
+          cache_write_cost_list:
+            - cost: 15.5
+              ttl: 1h
+            - cost: 14
+              ttl: 5m
+          input_cost: 13
+          output_cost: 18.5
+          type: anthropic
+          version: "2023-06-01"
+    access:
+      auth_strategies:
+        - ci-oidc
+    config:
+      logging:
+        payloads: true
+      max_request_body_size: 0
+      model:
+        name_header: true
+      response_streaming: allow
+      route:
+        headers:
+          X-Client:
+            - internal
+        https_redirect_status_code: 426
+        model:
+          values:
+            - model-33
+        paths:
+          - /
+        preserve_host: false
+        protocols:
+          - http
+          - https
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+        strip_path: true
+  - name: model-47
+    display_name: model-47
+    type: model
+    enabled: true
+    capabilities:
+      - generate
+    formats:
+      - type: anthropic
+    targets:
+      - name: org/model-48
+        provider: provider-b
+        weight: 100
+        allow_auth_override: false
+        config:
+          cache_read_cost: 1.5
+          input_cost: 4.5
+          output_cost: 8
+          type: anthropic
+          upstream_url: https://llm.example.com
+          version: "2023-06-01"
+    access:
+      auth_strategies:
+        - ci-oidc
+    config:
+      logging:
+        payloads: true
+      max_request_body_size: 8388608
+      model:
+        name_header: true
+      response_streaming: allow
+      route:
+        headers:
+          X-Client:
+            - internal
+        https_redirect_status_code: 426
+        model:
+          values:
+            - org/model-48
+        paths:
+          - /
+        preserve_host: false
+        protocols:
+          - http
+          - https
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+        strip_path: true
+  - name: model-49
+    display_name: model-49
+    type: model
+    enabled: true
+    capabilities:
+      - generate
+    formats:
+      - type: anthropic
+    targets:
+      - name: org/model-35
+        provider: provider-b
+        weight: 100
+        allow_auth_override: false
+        config:
+          cache_read_cost: 8.5
+          input_cost: 14.5
+          output_cost: 19
+          type: anthropic
+          upstream_url: https://llm.example.com
+          version: "2023-06-01"
+    policies:
+      - model-log
+    access:
+      auth_strategies:
+        - corp-sso
+    config:
+      logging:
+        payloads: true
+      max_request_body_size: 8388608
+      model:
+        name_header: true
+      response_streaming: allow
+      route:
+        https_redirect_status_code: 426
+        model:
+          values:
+            - org/model-35
+        paths:
+          - /team-b
+        preserve_host: false
+        protocols:
+          - http
+          - https
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+        strip_path: true
+  - name: model-50
+    display_name: model-50
+    type: model
+    enabled: true
+    capabilities:
+      - generate
+    formats:
+      - type: anthropic
+    targets:
+      - name: org/model-17
+        provider: provider-b
+        weight: 100
+        allow_auth_override: false
+        config:
+          cache_read_cost: 5
+          input_cost: 12
+          output_cost: 16.5
+          type: anthropic
+          upstream_url: https://llm.example.com
+          version: "2023-06-01"
+    policies:
+      - model-log
+    access:
+      auth_strategies:
+        - corp-sso
+    config:
+      logging:
+        payloads: true
+      max_request_body_size: 8388608
+      model:
+        name_header: true
+      response_streaming: allow
+      route:
+        https_redirect_status_code: 426
+        model:
+          values:
+            - org/model-17
+        paths:
+          - /team-b
+        preserve_host: false
+        protocols:
+          - http
+          - https
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+        strip_path: true
+  - name: model-51
+    display_name: model-51
+    type: model
+    enabled: true
+    capabilities:
+      - generate
+    formats:
+      - type: anthropic
+    targets:
+      - name: model-11
+        provider: provider-a
+        weight: 100
+        allow_auth_override: false
+        config:
+          cache_read_cost: 7.5
+          cache_write_cost: 0
+          cache_write_cost_list:
+            - cost: 15.5
+              ttl: 1h
+            - cost: 14
+              ttl: 5m
+          input_cost: 13
+          output_cost: 18.5
+          type: anthropic
+          version: "2023-06-01"
+    access:
+      auth_strategies:
+        - ci-oidc
+    config:
+      logging:
+        payloads: true
+      max_request_body_size: 8388608
+      model:
+        name_header: true
+      response_streaming: allow
+      route:
+        headers:
+          X-Client:
+            - internal
+        https_redirect_status_code: 426
+        model:
+          values:
+            - model-11
+        paths:
+          - /
+        preserve_host: false
+        protocols:
+          - http
+          - https
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+        strip_path: true
+  - name: model-52
+    display_name: model-52
+    type: model
+    enabled: true
+    capabilities:
+      - generate
+    formats:
+      - type: anthropic
+    targets:
+      - name: org/model-48
+        provider: provider-b
+        weight: 100
+        allow_auth_override: false
+        config:
+          cache_read_cost: 1.5
+          input_cost: 4.5
+          output_cost: 8
+          type: anthropic
+          upstream_url: https://llm.example.com
+          version: "2023-06-01"
+    access:
+      auth_strategies:
+        - api-key-auth
+        - corp-sso
+    config:
+      logging:
+        payloads: true
+      max_request_body_size: 8388608
+      model:
+        name_header: true
+      response_streaming: allow
+      route:
+        https_redirect_status_code: 426
+        model:
+          values:
+            - org/model-48
+        paths:
+          - /
+        preserve_host: false
+        protocols:
+          - http
+          - https
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+        strip_path: true
+  - name: model-53
+    display_name: model-53
+    type: model
+    enabled: true
+    capabilities:
+      - generate
+    formats:
+      - type: anthropic
+    targets:
+      - name: org/model-23
+        provider: provider-b
+        weight: 100
+        allow_auth_override: false
+        config:
+          cache_read_cost: 5.5
+          input_cost: 12.5
+          output_cost: 15
+          type: anthropic
+          upstream_url: https://llm.example.com
+          version: "2023-06-01"
+    access:
+      auth_strategies:
+        - api-key-auth
+        - corp-sso
+    config:
+      logging:
+        payloads: true
+      max_request_body_size: 8388608
+      model:
+        name_header: true
+      response_streaming: allow
+      route:
+        https_redirect_status_code: 426
+        model:
+          values:
+            - org/model-23
+        paths:
+          - /
+        preserve_host: false
+        protocols:
+          - http
+          - https
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+        strip_path: true
+  - name: model-54
+    display_name: model-54
+    type: model
+    enabled: true
+    capabilities:
+      - generate
+    formats:
+      - type: anthropic
+    targets:
+      - name: org/model-48
+        provider: provider-e
+        weight: 100
+        allow_auth_override: false
+        config:
+          cache_read_cost: 1.5
+          input_cost: 4.5
+          output_cost: 8
+          type: openai
+          upstream_url: https://llm.example.com/v1/chat/completions
+    access:
+      auth_strategies:
+        - api-key-auth
+        - corp-sso
+    config:
+      logging:
+        payloads: true
+      max_request_body_size: 8388608
+      model:
+        name_header: true
+      response_streaming: allow
+      route:
+        https_redirect_status_code: 426
+        model:
+          values:
+            - org/model-48
+        paths:
+          - /compat
+        preserve_host: false
+        protocols:
+          - http
+          - https
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+        strip_path: true
+  - name: model-43
+    display_name: model-43
+    type: model
+    enabled: true
+    capabilities:
+      - generate
+    formats:
+      - type: anthropic
+    targets:
+      - name: model-43
+        provider: provider-a
+        weight: 100
+        allow_auth_override: false
+        config:
+          cache_read_cost: 1
+          cache_write_cost: 0
+          cache_write_cost_list:
+            - cost: 7.5
+              ttl: 1h
+            - cost: 4
+              ttl: 5m
+          input_cost: 3
+          output_cost: 9
+          type: anthropic
+          version: "2023-06-01"
+    access:
+      auth_strategies:
+        - api-key-auth
+        - corp-sso
+    config:
+      logging:
+        payloads: true
+      max_request_body_size: 8388608
+      model:
+        name_header: true
+      response_streaming: allow
+      route:
+        https_redirect_status_code: 426
+        model:
+          body_param: model
+          values:
+            - model-43
+        paths:
+          - /
+        preserve_host: false
+        protocols:
+          - http
+          - https
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+        strip_path: true
+  - name: model-55
+    display_name: model-55
+    type: model
+    enabled: true
+    capabilities:
+      - generate
+    formats:
+      - type: anthropic
+    targets:
+      - name: org/model-19
+        provider: provider-b
+        weight: 100
+        allow_auth_override: false
+        config:
+          cache_read_cost: 3.5
+          input_cost: 9.5
+          output_cost: 13.5
+          type: anthropic
+          upstream_url: https://llm.example.com
+          version: "2023-06-01"
+    access:
+      auth_strategies:
+        - api-key-auth
+        - corp-sso
+    config:
+      logging:
+        payloads: true
+      max_request_body_size: 8388608
+      model:
+        name_header: true
+      response_streaming: allow
+      route:
+        https_redirect_status_code: 426
+        model:
+          values:
+            - org/model-19
+        paths:
+          - /
+        preserve_host: false
+        protocols:
+          - http
+          - https
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+        strip_path: true
+  - name: model-56
+    display_name: model-56
+    type: model
+    enabled: true
+    capabilities:
+      - decisions
+    formats:
+      - type: typesafe
+    targets:
+      - name: model-25
+        provider: provider-f
+        weight: 100
+        allow_auth_override: false
+        config:
+          input_cost: 2.5
+          type: typesafe
+    access:
+      auth_strategies:
+        - ci-oidc
+    config:
+      balancer:
+        algorithm: round-robin
+        connect_timeout: 60000
+        fail_timeout: 10000
+        failover_criteria:
+          - error
+          - timeout
+        max_fails: 0
+        read_timeout: 60000
+        retries: 5
+        slots: 10000
+        write_timeout: 60000
+      max_request_body_size: 8388608
+      model:
+        name_header: true
+      response_streaming: allow
+      route:
+        headers:
+          X-Client:
+            - internal
+        https_redirect_status_code: 426
+        model:
+          values:
+            - model-26
+        paths:
+          - /
+        preserve_host: false
+        protocols:
+          - http
+          - https
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+        strip_path: true
+  - name: model-57
+    display_name: model-57
+    type: model
+    enabled: true
+    capabilities:
+      - generate
+    formats:
+      - type: anthropic
+    targets:
+      - name: org/model-58
+        provider: provider-b
+        weight: 100
+        allow_auth_override: false
+        config:
+          cache_read_cost: 0.5
+          input_cost: 8.5
+          output_cost: 11
+          type: anthropic
+          upstream_url: https://llm.example.com
+          version: "2023-06-01"
+    access:
+      auth_strategies:
+        - api-key-auth
+        - corp-sso
+    config:
+      logging:
+        payloads: true
+      max_request_body_size: 8388608
+      model:
+        name_header: true
+      response_streaming: allow
+      route:
+        https_redirect_status_code: 426
+        model:
+          values:
+            - org/model-58
+        paths:
+          - /
+        preserve_host: false
+        protocols:
+          - http
+          - https
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+        strip_path: true
+  - name: model-31
+    display_name: model-31
+    type: model
+    enabled: true
+    capabilities:
+      - agentic
+      - generate
+    formats:
+      - type: openai
+    targets:
+      - name: model-31
+        provider: provider-g
+        weight: 100
+        allow_auth_override: false
+        config:
+          input_cost: 14.5
+          output_cost: 19
+          type: xai
+    access:
+      auth_strategies:
+        - api-key-auth
+        - corp-sso
+    config:
+      balancer:
+        algorithm: round-robin
+        connect_timeout: 60000
+        fail_timeout: 10000
+        failover_criteria:
+          - error
+          - timeout
+        max_fails: 0
+        read_timeout: 60000
+        retries: 5
+        slots: 10000
+        write_timeout: 60000
+      max_request_body_size: 8388608
+      model:
+        name_header: true
+      response_streaming: allow
+      route:
+        https_redirect_status_code: 426
+        model:
+          values:
+            - model-31
+        paths:
+          - /compat
+        preserve_host: false
+        protocols:
+          - http
+          - https
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+        strip_path: true
+  - name: model-59
+    display_name: model-59
+    type: model
+    enabled: true
+    capabilities:
+      - generate
+    formats:
+      - type: anthropic
+    targets:
+      - name: org/model-60
+        provider: provider-b
+        weight: 100
+        allow_auth_override: false
+        config:
+          cache_read_cost: 7
+          input_cost: 10.5
+          output_cost: 16
+          type: anthropic
+          upstream_url: https://llm.example.com
+          version: "2023-06-01"
+    access:
+      auth_strategies:
+        - ci-oidc
+    config:
+      logging:
+        payloads: true
+      max_request_body_size: 8388608
+      model:
+        name_header: true
+      response_streaming: allow
+      route:
+        headers:
+          X-Client:
+            - internal
+        https_redirect_status_code: 426
+        model:
+          values:
+            - org/model-60
+        paths:
+          - /
+        preserve_host: false
+        protocols:
+          - http
+          - https
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+        strip_path: true
+  - name: model-61
+    display_name: model-61
+    type: model
+    enabled: true
+    capabilities:
+      - decisions
+    formats:
+      - type: typesafe
+    targets:
+      - name: org/model-62
+        provider: provider-d
+        weight: 100
+        allow_auth_override: false
+        config:
+          type: typesafe
+          upstream_url: https://llm.example.com/v1/custom
+    access:
+      auth_strategies:
+        - api-key-auth
+        - corp-sso
+    config:
+      balancer:
+        algorithm: round-robin
+        connect_timeout: 60000
+        fail_timeout: 10000
+        failover_criteria:
+          - error
+          - timeout
+        max_fails: 0
+        read_timeout: 60000
+        retries: 5
+        slots: 10000
+        write_timeout: 60000
+      max_request_body_size: 8388608
+      model:
+        name_header: true
+      response_streaming: allow
+      route:
+        https_redirect_status_code: 426
+        model:
+          values:
+            - org/model-62
+        paths:
+          - /
+        preserve_host: false
+        protocols:
+          - http
+          - https
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+        strip_path: true
+  - name: model-63
+    display_name: model-63
+    type: model
+    enabled: true
+    capabilities:
+      - generate
+    formats:
+      - type: anthropic
+    targets:
+      - name: model-64
+        provider: provider-a
+        weight: 100
+        allow_auth_override: false
+        config:
+          cache_read_cost: 7.5
+          cache_write_cost: 0
+          cache_write_cost_list:
+            - cost: 17
+              ttl: 5m
+            - cost: 18
+              ttl: 1h
+          input_cost: 15.5
+          output_cost: 19.5
+          type: anthropic
+          version: "2023-06-01"
+    access:
+      auth_strategies:
+        - api-key-auth
+        - corp-sso
+    config:
+      logging:
+        payloads: true
+      max_request_body_size: 8388608
+      model:
+        name_header: true
+      response_streaming: allow
+      route:
+        https_redirect_status_code: 426
+        model:
+          body_param: model
+          values:
+            - model-64
+        paths:
+          - /
+        preserve_host: false
+        protocols:
+          - http
+          - https
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+        strip_path: true
+  - name: model-65
+    display_name: model-65
+    type: model
+    enabled: true
+    capabilities:
+      - generate
+    formats:
+      - type: anthropic
+    targets:
+      - name: org/model-23
+        provider: provider-b
+        weight: 100
+        allow_auth_override: false
+        config:
+          cache_read_cost: 5.5
+          input_cost: 12.5
+          output_cost: 15
+          type: anthropic
+          upstream_url: https://llm.example.com
+          version: "2023-06-01"
+    access:
+      auth_strategies:
+        - ci-oidc
+    config:
+      logging:
+        payloads: true
+      max_request_body_size: 8388608
+      model:
+        name_header: true
+      response_streaming: allow
+      route:
+        headers:
+          X-Client:
+            - internal
+        https_redirect_status_code: 426
+        model:
+          values:
+            - org/model-23
+        paths:
+          - /
+        preserve_host: false
+        protocols:
+          - http
+          - https
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+        strip_path: true
+  - name: model-66
+    display_name: model-66
+    type: model
+    enabled: true
+    capabilities:
+      - generate
+    formats:
+      - type: anthropic
+    targets:
+      - name: org/model-60
+        provider: provider-b
+        weight: 100
+        allow_auth_override: false
+        config:
+          cache_read_cost: 7
+          input_cost: 10.5
+          output_cost: 16
+          type: anthropic
+          upstream_url: https://llm.example.com
+          version: "2023-06-01"
+    access:
+      auth_strategies:
+        - api-key-auth
+        - corp-sso
+    config:
+      logging:
+        payloads: true
+      max_request_body_size: 8388608
+      model:
+        name_header: true
+      response_streaming: allow
+      route:
+        https_redirect_status_code: 426
+        model:
+          values:
+            - org/model-60
+        paths:
+          - /
+        preserve_host: false
+        protocols:
+          - http
+          - https
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+        strip_path: true
+  - name: model-67
+    display_name: model-67
+    type: api
+    enabled: true
+    capabilities:
+      - batches
+      - files
+    formats:
+      - type: openai
+    targets:
+      - name: model-68
+        provider: provider-c
+        weight: 100
+        allow_auth_override: false
+        config:
+          type: openai
+    policies:
+      - health-check
+    config:
+      logging:
+        payloads: true
+      max_request_body_size: 8388608
+      response_streaming: allow
+      route:
+        https_redirect_status_code: 426
+        paths:
+          - /health/check
+        preserve_host: false
+        protocols:
+          - http
+          - https
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+        strip_path: true
+  - name: model-69
+    display_name: model-69
+    type: model
+    enabled: true
+    capabilities:
+      - generate
+    formats:
+      - type: anthropic
+    targets:
+      - name: org/model-17
+        provider: provider-b
+        weight: 100
+        allow_auth_override: false
+        config:
+          cache_read_cost: 5
+          input_cost: 12
+          output_cost: 16.5
+          type: anthropic
+          upstream_url: https://llm.example.com
+          version: "2023-06-01"
+    access:
+      auth_strategies:
+        - ci-oidc
+    config:
+      logging:
+        payloads: true
+      max_request_body_size: 8388608
+      model:
+        name_header: true
+      response_streaming: allow
+      route:
+        headers:
+          X-Client:
+            - internal
+        https_redirect_status_code: 426
+        model:
+          values:
+            - org/model-17
+        paths:
+          - /
+        preserve_host: false
+        protocols:
+          - http
+          - https
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+        strip_path: true
+  - name: model-70
+    display_name: model-70
+    type: model
+    enabled: true
+    capabilities:
+      - generate
+    formats:
+      - type: anthropic
+    targets:
+      - name: org/model-71
+        provider: provider-b
+        weight: 100
+        allow_auth_override: false
+        config:
+          input_cost: 3
+          output_cost: 9
+          type: anthropic
+          upstream_url: https://llm.example.com
+          version: "2023-06-01"
+    access:
+      auth_strategies:
+        - api-key-auth
+        - corp-sso
+    config:
+      logging:
+        payloads: true
+      max_request_body_size: 8388608
+      model:
+        name_header: true
+      response_streaming: allow
+      route:
+        https_redirect_status_code: 426
+        model:
+          values:
+            - org/model-71
+        paths:
+          - /
+        preserve_host: false
+        protocols:
+          - http
+          - https
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+        strip_path: true
+  - name: model-72
+    display_name: model-72
+    type: model
+    enabled: true
+    capabilities:
+      - generate
+    formats:
+      - type: anthropic
+    targets:
+      - name: model-64
+        provider: provider-a
+        weight: 100
+        allow_auth_override: false
+        config:
+          cache_read_cost: 7.5
+          cache_write_cost: 0
+          cache_write_cost_list:
+            - cost: 17
+              ttl: 5m
+            - cost: 18
+              ttl: 1h
+          input_cost: 15.5
+          output_cost: 19.5
+          type: anthropic
+          version: "2023-06-01"
+    access:
+      auth_strategies:
+        - ci-oidc
+    config:
+      logging:
+        payloads: true
+      max_request_body_size: 8388608
+      model:
+        name_header: true
+      response_streaming: allow
+      route:
+        headers:
+          X-Client:
+            - internal
+        https_redirect_status_code: 426
+        model:
+          values:
+            - model-64
+        paths:
+          - /
+        preserve_host: false
+        protocols:
+          - http
+          - https
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+        strip_path: true
+  - name: model-73
+    display_name: model-73
+    type: model
+    enabled: true
+    capabilities:
+      - generate
+    formats:
+      - type: anthropic
+    targets:
+      - name: org/model-35
+        provider: provider-b
+        weight: 100
+        allow_auth_override: false
+        config:
+          cache_read_cost: 8.5
+          input_cost: 14.5
+          output_cost: 19
+          type: anthropic
+          upstream_url: https://llm.example.com
+          version: "2023-06-01"
+    access:
+      auth_strategies:
+        - ci-oidc
+    config:
+      logging:
+        payloads: true
+      max_request_body_size: 8388608
+      model:
+        name_header: true
+      response_streaming: allow
+      route:
+        headers:
+          X-Client:
+            - internal
+        https_redirect_status_code: 426
+        model:
+          values:
+            - org/model-35
+        paths:
+          - /
+        preserve_host: false
+        protocols:
+          - http
+          - https
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+        strip_path: true
+  - name: model-74
+    display_name: model-74
+    type: model
+    enabled: true
+    capabilities:
+      - generate
+    formats:
+      - type: anthropic
+    targets:
+      - name: org/model-06
+        provider: provider-b
+        weight: 100
+        allow_auth_override: false
+        config:
+          cache_read_cost: 2
+          input_cost: 6
+          output_cost: 9
+          type: anthropic
+          upstream_url: https://llm.example.com
+          version: "2023-06-01"
+    access:
+      auth_strategies:
+        - api-key-auth
+        - corp-sso
+    config:
+      logging:
+        payloads: true
+      max_request_body_size: 8388608
+      model:
+        name_header: true
+      response_streaming: allow
+      route:
+        https_redirect_status_code: 426
+        model:
+          values:
+            - org/model-06
+        paths:
+          - /
+        preserve_host: false
+        protocols:
+          - http
+          - https
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+        strip_path: true
