@@ -21,9 +21,8 @@ const mcpConversionOnly = "conversion-only"
 // convertMCPServers translates AI Gateway MCP Servers into a Gateway Service +
 // Route with an ai-mcp-proxy plugin (config.mode = the source type, one of
 // conversion-only | conversion-listener | listener | passthrough-listener |
-// upstream-server). MCP ACLs live inside the plugin config (default_acl /
-// tools[].acl), not as Kong acl plugins, because ai-mcp-proxy does not support
-// consumer scoping.
+// upstream-server). Server access.acls become a Kong acl plugin on the route.
+// Tool ACLs stay in the plugin config as default_acl and tools[].acl.
 func (c *Converter) convertMCPServers() {
 	// Which entries of c.out.Services belong to a conversion-only server, held
 	// by index, not by name, so pruning can never remove a service that merely
@@ -79,7 +78,7 @@ func (c *Converter) convertMCPServer(
 		kong.FieldMapping{GeneratedPrefix: "config.auth", SourcePrefix: "config.upstream.auth"},
 		kong.FieldMapping{GeneratedPrefix: "config.auth.token_vault", SourcePrefix: "token_vault"},
 		kong.FieldMapping{GeneratedPrefix: "config.rate_limiting", SourcePrefix: "rate_limiting"},
-		kong.FieldMapping{GeneratedPrefix: "config.default_acl", SourcePrefix: "access"},
+		kong.FieldMapping{GeneratedPrefix: "config.default_acl", SourcePrefix: "access.default_tool_acls"},
 		kong.FieldMapping{GeneratedPrefix: "config.acl_attribute_type", SourcePrefix: "access.acl_attribute_type"},
 		kong.FieldMapping{
 			GeneratedPrefix: "config.access_token_claim_field",
@@ -89,9 +88,13 @@ func (c *Converter) convertMCPServer(
 	)
 	route.Plugins = append(route.Plugins, plugin)
 
-	// Non-ACL policy plugins still apply at the route; ACLs are folded into
-	// the ai-mcp-proxy plugin above.
-	guard, err := c.scopedPlugins(src, m.Policies, aigw.ACLs{})
+	if !m.Access.ACLs.IsEmpty() && !aimap.MCPAccessAllowed(m.Type) {
+		return kong.Service{}, c.fail(src.at("access.acls"), ConfigFieldInvalid,
+			"MCP server %q has type %q; access.acls is only "+
+				"supported for listener, conversion-listener, and passthrough-listener",
+			m.Name, m.Type)
+	}
+	guard, err := c.scopedPlugins(src, m.Policies, m.Access.ACLs)
 	if err != nil {
 		return kong.Service{}, err
 	}
@@ -407,26 +410,20 @@ func (c *Converter) mcpPlugin(src ConversionIssueSource, m *aigw.MCPServer) (kon
 	if m.Config.ToolsCacheTTLSeconds != nil {
 		cfg["tools_cache_ttl_seconds"] = *m.Config.ToolsCacheTTLSeconds
 	}
-	// Access: emit the ACL attribute config and default_acl. Merges the
-	// server-wide acls with default_tool_acls (acls first) so both apply rather
-	// than one shadowing the other.
 	setIfNotEmpty(cfg, "acl_attribute_type", m.Access.ACLAttributeType)
 	setIfNotEmpty(cfg, "access_token_claim_field", m.Access.AccessTokenClaimField)
-	serverACLs := mergeACLs(m.Access.ACLs, m.Access.DefaultToolACLs)
-	if mixesACLPairs(serverACLs) {
-		return kong.Plugin{}, c.fail(src.at(slices.Concat(
-			aclFieldPaths("access.acls.", m.Access.ACLs),
-			aclFieldPaths("access.default_tool_acls.", m.Access.DefaultToolACLs))...),
+	toolACLs := m.Access.DefaultToolACLs
+	if mixesACLPairs(toolACLs) {
+		return kong.Plugin{}, c.fail(src.at(aclFieldPaths("access.default_tool_acls.", toolACLs)...),
 			ConfigFieldInvalid,
-			"MCP server %q: access.acls and access.default_tool_acls together must use "+
+			"MCP server %q: access.default_tool_acls must use "+
 				"either allow and deny, or allow_when and deny_when", m.Name)
 	}
-	fields := slices.Concat(celFieldPaths("access.acls.", m.Access.ACLs),
-		celFieldPaths("access.default_tool_acls.", m.Access.DefaultToolACLs))
+	fields := celFieldPaths("access.default_tool_acls.", toolACLs)
 	if len(fields) > 0 && !c.supports(aimap.FeatureMCPACLWhen) {
 		return kong.Plugin{}, c.failUnsupported(src.at(fields...), aimap.FeatureMCPACLWhen, fields[0])
 	}
-	if acl := defaultACLBlock(serverACLs); acl != nil {
+	if acl := defaultACLBlock(toolACLs); acl != nil {
 		cfg["default_acl"] = acl
 	}
 	// include_consumer_groups is set by default, mirroring aclPlugin() in convert/acl.go: AI Gateway's

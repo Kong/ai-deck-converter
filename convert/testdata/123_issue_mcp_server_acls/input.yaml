@@ -1,0 +1,40 @@
+mcp_servers:
+  # A Kong acl plugin permits one field. The server is left out.
+  - type: conversion-listener
+    name: two-fields-mcp
+    upstream_url: https://flights.internal.kongair.com
+    config:
+      route: {paths: [/mcp/two-fields]}
+    access:
+      acls:
+        allow: [partners]
+        deny: [interns]
+    tools:
+      - name: search_flights
+        description: Search flights
+        method: GET
+        path: /flights
+  # Only listener types accept access.acls. The server is left out.
+  - type: upstream-server
+    name: source-mcp
+    upstream_url: https://source.internal.kongair.com/mcp
+    config:
+      route: {paths: [/mcp/source]}
+      tools_cache_ttl_seconds: 60
+    access:
+      acls:
+        allow: [partners]
+  # This server converts.
+  - type: conversion-listener
+    name: valid-mcp
+    upstream_url: https://flights.internal.kongair.com
+    config:
+      route: {paths: [/mcp/valid]}
+    access:
+      acls:
+        deny: [interns]
+    tools:
+      - name: search_flights
+        description: Search flights
+        method: GET
+        path: /flights
