@@ -4,8 +4,23 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/Kong/ai-deck-converter/internal/aimap"
 	"github.com/stretchr/testify/require"
 )
+
+// convertYAMLBelow23 converts with min_runtime_version 2.2: the
+// ai-mcp-oauth2 MCP lowering's gate (from 2.3 an attached openid-connect
+// strategy lowers to the openid-connect plugin instead).
+func convertYAMLBelow23(src []byte) ([]byte, []string, error) {
+	opts := testOptions
+	opts.MinRuntimeVersion = aimap.Version{Major: 2, Minor: 2}.String()
+	result, err := Convert(src, opts)
+	if err != nil {
+		return nil, nil, err
+	}
+	data, err := result.Output.ToYAML()
+	return data, reasons(result.Issues), err
+}
 
 // keyAuthWithMetadata references a key-auth auth strategy together with
 // access.metadata, which is unsupported (OAuth Protected Resource Metadata
@@ -110,7 +125,7 @@ mcp_servers:
 `
 
 func TestMCPOAuth2FallsBackToIssuerForAuthServers(t *testing.T) {
-	out, warnings, err := convertYAML([]byte(oidcMetadataWithoutAuthServers))
+	out, warnings, err := convertYAMLBelow23([]byte(oidcMetadataWithoutAuthServers))
 	require.NoError(t, err)
 	require.Empty(t, warnings)
 	s := string(out)
@@ -167,7 +182,7 @@ mcp_servers:
 `
 
 func TestMCPOAuth2MapsAuthStrategyFields(t *testing.T) {
-	out, warnings, err := convertYAML([]byte(oidcWithMappedFields))
+	out, warnings, err := convertYAMLBelow23([]byte(oidcWithMappedFields))
 	require.NoError(t, err)
 	require.Empty(t, warnings)
 	s := string(out)
@@ -305,7 +320,7 @@ mcp_servers:
 `
 
 func TestMCPOAuth2DerivesAudienceAndPassthrough(t *testing.T) {
-	out, warnings, err := convertYAML([]byte(oidcWithAudienceAndPassthrough))
+	out, warnings, err := convertYAMLBelow23([]byte(oidcWithAudienceAndPassthrough))
 	require.NoError(t, err)
 	require.Empty(t, warnings)
 	s := string(out)
@@ -364,23 +379,30 @@ mcp_servers:
         host: httpbin.internal
 `
 
-// TestMCPMetadataDropsTokenExchange pins the security invariant: lowering an
-// openid-connect strategy that configures token_exchange into an ai-mcp-oauth2
-// plugin (triggered by access.metadata) must not silently drop the exchange.
-// ai-mcp-oauth2 cannot represent token_exchange, so rather than emit a plugin
-// that quietly omits it the conversion fails hard — in every mode.
+// TestMCPMetadataDropsTokenExchange pins the security invariant: below 2.3 an
+// openid-connect strategy with token_exchange + access.metadata lowers to
+// ai-mcp-oauth2, which cannot represent token_exchange, so the conversion
+// fails rather than silently dropping the control. From 2.3 the strategy
+// lowers to the openid-connect plugin, where token_exchange is a real field
+// and rides along verbatim.
 func TestMCPMetadataDropsTokenExchange(t *testing.T) {
-	t.Run("fails by default", func(t *testing.T) {
-		_, _, err := convertDoc([]byte(mcpTokenExchangeDropInput), false)
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "token_exchange")
-		require.Contains(t, err.Error(), "mcp-with-metadata")
+	t.Run("fails below 2.3 (ai-mcp-oauth2 cannot represent it)", func(t *testing.T) {
+		opts := testOptions
+		opts.MinRuntimeVersion = aimap.Version{Major: 2, Minor: 2}.String()
+		result, err := Convert([]byte(mcpTokenExchangeDropInput), opts)
+		require.NoError(t, err)
+		issue := requireIssue(t, result.Issues, Error, ConfigFieldInvalid,
+			kindMCPServer, "mcp-with-metadata", "access.auth_strategies[0]")
+		require.Contains(t, issue.Reason, "token_exchange")
 	})
 
-	t.Run("fails under strict", func(t *testing.T) {
-		_, _, err := convertDoc([]byte(mcpTokenExchangeDropInput), true)
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "token_exchange")
+	t.Run("carries verbatim from 2.3 (openid-connect represents it)", func(t *testing.T) {
+		result, err := Convert([]byte(mcpTokenExchangeDropInput), testOptions)
+		require.NoError(t, err)
+		s, err := result.Output.ToYAML()
+		require.NoError(t, err)
+		require.Contains(t, string(s), "name: openid-connect")
+		require.Contains(t, string(s), "token_exchange:")
 	})
 }
 
@@ -422,15 +444,37 @@ mcp_servers:
         host: tools.example.com
 `
 
+// tokenVaultMCPMetadataOnly drops the auth strategy from
+// tokenVaultMCPWithMetadata: from 2.3 this is the only shape still lowered to
+// ai-mcp-oauth2 (an attached strategy lowers to the openid-connect plugin),
+// and it is where the vault's passthrough_credentials forcing stays live.
+var tokenVaultMCPMetadataOnly = func() string {
+	const strategyRef = "      auth_strategies: [okta-oidc]\n"
+	const strategyBlock = `auth_strategies:
+  - name: okta-oidc
+    type: openid-connect
+    config:
+      issuer: https://issuer.example.com/oauth2
+`
+	s := strings.Replace(tokenVaultMCPWithMetadata, "    access:\n"+strategyRef, "    access:\n", 1)
+	return strings.Replace(s, strategyBlock, "", 1)
+}()
+
 func TestMCPOAuth2PassthroughForTokenVault(t *testing.T) {
-	out, warnings, err := convertYAML([]byte(tokenVaultMCPWithMetadata))
+	// Metadata-only vault servers keep ai-mcp-oauth2 (it serves discovery and
+	// validates tokens without a strategy); the vault needs passthrough_credentials.
+	out, warnings, err := convertYAML([]byte(tokenVaultMCPMetadataOnly))
 	require.NoError(t, err)
 	require.Len(t, warnings, 1, "token_vault without a datastore warns")
 	s := string(out)
 	require.Contains(t, s, "passthrough_credentials: true")
+	require.Contains(t, s, "name: ai-mcp-oauth2")
 }
 
-func TestMCPOAuth2PassthroughForTokenVaultOverridesHideCredentials(t *testing.T) {
+// TestMCPOIDCTokenVaultForcesHideCredentials checks the 2.3 openid-connect
+// lowering: the Token Vault needs the caller's bearer token, so hide_credentials
+// is forced to false (the ai-mcp-oauth2 lowering's passthrough_credentials: true).
+func TestMCPOIDCTokenVaultForcesHideCredentials(t *testing.T) {
 	src := strings.Replace(tokenVaultMCPWithMetadata,
 		"      issuer: https://issuer.example.com/oauth2\n",
 		"      issuer: https://issuer.example.com/oauth2\n      hide_credentials: true\n", 1)
@@ -438,8 +482,12 @@ func TestMCPOAuth2PassthroughForTokenVaultOverridesHideCredentials(t *testing.T)
 	require.NoError(t, err)
 	issue := requireIssue(t, result.Issues, Warning, ConfigFieldOverridden,
 		kindMCPServer, "vaulted-mcp", "access.auth_strategies[0]")
-	require.Contains(t, issue.Reason, "passthrough_credentials will be set to true")
+	require.Contains(t, issue.Reason, "hide_credentials will be overridden to false")
 	s, err := result.Output.ToYAML()
 	require.NoError(t, err)
-	require.Contains(t, string(s), "passthrough_credentials: true")
+	out := string(s)
+	require.Contains(t, out, "name: openid-connect")
+	require.Contains(t, out, "hide_credentials: false")
+	require.Contains(t, out, "protected_resource_metadata:")
+	require.NotContains(t, out, "ai-mcp-oauth2")
 }
