@@ -134,10 +134,10 @@ func (c *Converter) mcpAuthStrategyPlugins(
 	// alone (nothing to bind the subjects to; see case 08's golden).
 	if m.Access.ACLAttributeType == "oauth_access_token" && plugins[0].Name != "ai-mcp-oauth2" {
 		return nil, c.fail(src.at("access.acl_attribute_type"), ConfigFieldInvalid,
-			"MCP server %q sets acl_attribute_type oauth_access_token, which requires the ai-mcp-oauth2 "+
-				"plugin, but the route's auth plugin is %q. Use a consumer acl_attribute_type, or configure "+
-				"access so the server lowers to ai-mcp-oauth2 (add access.metadata, or pin min_runtime_version "+
-				"below 2.3).", m.Name, plugins[0].Name)
+			"MCP server %q sets acl_attribute_type oauth_access_token, but the route's auth plugin is %q. "+
+				"oauth_access_token ACLs require the ai-mcp-oauth2 plugin: pair access.metadata with an "+
+				"openid-connect strategy at min_runtime_version below 2.3. Otherwise use a consumer "+
+				"acl_attribute_type.", m.Name, plugins[0].Name)
 	}
 	return plugins, nil
 }
