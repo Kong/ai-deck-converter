@@ -23,6 +23,8 @@ models:
       route:
         paths:
           - /ai
+        methods:
+          - POST
         model:
           values:
             - '@openai/guarded-gpt'

@@ -41,6 +41,8 @@ type routeGroup struct {
 	models []string
 	// selectorShapes holds the selector shape keys of each model on the route.
 	selectorShapes map[string][]string
+	// aliasOwners maps each alias on the route to the first model that uses it.
+	aliasOwners map[string]string
 }
 
 // addSelector folds one model's desired ai-model-selector shape into the
@@ -181,10 +183,14 @@ type modelPass struct {
 	// requestTerminations holds, per route, the model-scoped request-termination
 	// policies that the selector ordering stops from running.
 	requestTerminations map[string][]modelPolicyRef
-	// aliasOwners maps each ai_models name to the model that uses it.
-	aliasOwners map[string]string
+	// aiModelRows maps each ai_models name of the pass to the model that made
+	// the entry.
+	aiModelRows map[string]aiModelRow
 	// selectorConflicts holds the model pairs with a reported selector conflict.
 	selectorConflicts map[string]bool
+	// aliasConflicts holds the model and alias pairs with a reported alias
+	// conflict.
+	aliasConflicts map[string]bool
 	// skipped holds the issues of each model index that a pass left out.
 	skipped map[int][]ConversionIssue
 	// tokenVaults holds the token-vault-exchange config of each model.
@@ -226,8 +232,9 @@ func (c *Converter) convertModelsPass(skipped map[int][]ConversionIssue) bool {
 		selectorBefore:      map[string][]string{},
 		selectorAfter:       map[string][]string{},
 		requestTerminations: map[string][]modelPolicyRef{},
-		aliasOwners:         map[string]string{},
+		aiModelRows:         map[string]aiModelRow{},
 		selectorConflicts:   map[string]bool{},
+		aliasConflicts:      map[string]bool{},
 		skipped:             skipped,
 		tokenVaults:         map[*aigw.Model]map[string]any{},
 	}
@@ -376,7 +383,6 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 	// ai-model-selector can only match a request to one ai-models row at a
 	// time.
 	aliases := c.extractModelAliases(src, m)
-	c.claimModelAliases(st, src, m, aliases)
 
 	// ownerKey groups targets into ai-proxy-advanced plugins: per source model
 	// for type "model" (each carries its own ai-model FK), shared for type
@@ -634,6 +640,10 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 					g.addSelector(selector)
 				}
 				if !slices.Contains(g.models, m.Name) {
+					// Only plugins with an ai_models scope can clash on an alias.
+					if fkScoped {
+						c.claimRouteAliases(st, src, g, m, aliases)
+					}
 					g.models = append(g.models, m.Name)
 					c.checkSelectorConflict(st, src, g, m.Name, selectorCfgs)
 				}
@@ -809,38 +819,7 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 
 	st.tokenVaults[m] = tokenVault
 
-	// ai-models entries (one per alias, so ai-model-selector can match a
-	// request against any of them). note: name is set to alias and alias is
-	// intentionally unset to be compatible with the AI Gateway 2.0.0
-	// dataplane behavior. By setting name to alias, the AI Gateway will route
-	// requests to the alias that is set in the Model's config.route.model.*
-	// properties. If config.route.model.* properties are not set then the
-	// single alias defaults to the model name. m.ID can only identify one of
-	// the N rows a multi-alias model produces, so it's kept on the first.
-	// A multi-alias model's N rows are otherwise indistinguishable on the
-	// wire from N independently-authored models that happen to be
-	// config-identical, so they carry a shared marker tag identifying their
-	// common source model; revert only merges rows carrying it. The marker
-	// is keyed by the first alias, not m.Name: m.Name never round-trips
-	// (revert has no field to recover it into and stands in the first
-	// alias for it), so keying by it would make the marker re-encode
-	// differently after a round trip. The first alias is exactly what
-	// revert reconstructs the merged model's name as, so this is stable.
-	for idx, alias := range aliases {
-		id := ""
-		if idx == 0 {
-			id = m.ID
-		}
-		tags := c.labelsToTags(m.Labels)
-		if len(aliases) > 1 {
-			tags = append(tags, aimap.EncodeModelAliasGroup(aliases[0]))
-		}
-		c.out.AIModels = append(c.out.AIModels, kong.AIModel{
-			ID:   id,
-			Name: alias,
-			Tags: tags,
-		})
-	}
+	c.writeAIModels(st, src, m, aliases)
 
 	// Model policy and ACL plugins scope to each route the model produces, plus
 	// the ai-model entity for type "model".
@@ -1802,25 +1781,118 @@ func basePaths(m *aigw.Model) []string {
 // isDisabled reports whether m sets enabled to false.
 func isDisabled(m *aigw.Model) bool { return m.Enabled != nil && !*m.Enabled }
 
-// claimModelAliases records aliases as the ai_models names of m. It warns
-// when another model already uses one of them. ToDBLess gives equal names one
-// ID, so the data plane loads them as one ai_models entry.
-func (c *Converter) claimModelAliases(
-	st *modelPass, src ConversionIssueSource, m *aigw.Model, aliases []string,
+// claimRouteAliases records the aliases of m on the route of g. It warns when
+// another model on the route already uses one of them. The two models then
+// make plugins with the same name, route, and ai_models scope.
+// The data plane accepts this config, so both models stay.
+func (c *Converter) claimRouteAliases(
+	st *modelPass, src ConversionIssueSource, g *routeGroup, m *aigw.Model, aliases []string,
 ) {
 	field := "name"
 	if len(m.Config.Route.Model.Values) > 0 {
 		field = "config.route.model.values"
 	}
+	if g.aliasOwners == nil {
+		g.aliasOwners = map[string]string{}
+	}
 	for _, alias := range aliases {
-		if other, ok := st.aliasOwners[alias]; ok {
-			c.warn(src.at(field), RoutingConflict,
-				"model %q uses the alias %q, but model %q already uses it. "+
-					"Both models share one ai_models entry.",
-				m.Name, alias, other)
+		if other, ok := g.aliasOwners[alias]; ok {
+			if key := m.Name + "\x00" + alias; !st.aliasConflicts[key] {
+				st.aliasConflicts[key] = true
+				c.warn(src.at(field), RoutingConflict,
+					"model %q uses the alias %q on the route %q, but model %q already uses it there. "+
+						"Both models make plugins with the same route and ai_models scope.",
+					m.Name, alias, g.route.Name, other)
+			}
 			continue
 		}
-		st.aliasOwners[alias] = m.Name
+		g.aliasOwners[alias] = m.Name
+	}
+}
+
+// writeAIModels writes one ai_models entry for each alias of m. The entry
+// name is the alias. The entry alias stays unset for AI Gateway 2.0.0 data
+// planes.
+//
+// Models on different routes can share an alias. The data plane rejects two
+// entries with one name. A shared entry therefore keeps the values of the
+// model that made it.
+func (c *Converter) writeAIModels(st *modelPass, src ConversionIssueSource, m *aigw.Model, aliases []string) {
+	var owned []string
+	for _, alias := range aliases {
+		if _, ok := st.aiModelRows[alias]; !ok {
+			owned = append(owned, alias)
+		}
+	}
+	// Revert merges only the entries with one group marker. It names the
+	// merged model after the marker. m.Name does not round-trip.
+	groupTag := ""
+	if len(owned) > 1 {
+		groupTag = aimap.EncodeModelAliasGroup(owned[0])
+	}
+	labelTags := c.labelsToTags(m.Labels)
+	for _, alias := range aliases {
+		if existing, ok := st.aiModelRows[alias]; ok {
+			c.warnSharedAIModel(src, m, alias, labelTags, existing)
+			continue
+		}
+		row := aiModelRow{owner: m.Name, labelTags: labelTags, index: len(c.out.AIModels)}
+		if alias == owned[0] {
+			row.id = m.ID
+		}
+		st.aiModelRows[alias] = row
+		tags := slices.Clone(labelTags)
+		if groupTag != "" {
+			tags = append(tags, groupTag)
+		}
+		c.out.AIModels = append(c.out.AIModels, kong.AIModel{ID: row.id, Name: alias, Tags: tags})
+	}
+	if m.ID != "" && len(owned) == 0 {
+		c.placeSharedID(st, src, m, aliases)
+	}
+}
+
+// placeSharedID gives m.ID to the first shared entry of aliases without an
+// ID. It warns when every entry already has an ID.
+func (c *Converter) placeSharedID(st *modelPass, src ConversionIssueSource, m *aigw.Model, aliases []string) {
+	for _, alias := range aliases {
+		if row := st.aiModelRows[alias]; row.id == "" {
+			row.id = m.ID
+			st.aiModelRows[alias] = row
+			c.out.AIModels[row.index].ID = m.ID
+			return
+		}
+	}
+	row := st.aiModelRows[aliases[0]]
+	c.warn(src.at("id"), ConfigFieldDropped,
+		"model %q shares the ai_models entry %q with model %q. The entry keeps the ID of model %q.",
+		m.Name, aliases[0], row.owner, row.owner)
+}
+
+// aiModelRow holds what one model writes to an ai_models entry.
+type aiModelRow struct {
+	owner     string
+	id        string
+	labelTags []string
+	// index is the position of the entry in c.out.AIModels.
+	index int
+}
+
+// warnSharedAIModel warns for each value of m that the ai_models entry of
+// alias cannot keep.
+func (c *Converter) warnSharedAIModel(
+	src ConversionIssueSource, m *aigw.Model, alias string, labelTags []string, got aiModelRow,
+) {
+	if len(labelTags) > 0 && !slices.Equal(labelTags, got.labelTags) {
+		c.warn(src.at("labels"), ConfigFieldDropped,
+			"model %q shares the ai_models entry %q with model %q. The entry keeps the labels of model %q.",
+			m.Name, alias, got.owner, got.owner)
+	}
+	if len(m.Config.Route.Model.Values) > 1 {
+		c.warn(src.at("config.route.model.values"), ConfigFieldDropped,
+			"model %q shares the ai_models entry %q with model %q. "+
+				"A revert gives %q its own model and does not restore the alias list of model %q.",
+			m.Name, alias, got.owner, alias, m.Name)
 	}
 }
 

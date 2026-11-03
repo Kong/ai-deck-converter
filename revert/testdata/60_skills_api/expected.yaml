@@ -14,6 +14,10 @@ models:
       route:
         paths:
           - /ai
+        methods:
+          - GET
+          - POST
+          - DELETE
       logging:
         payloads: false
       response_streaming: deny
@@ -33,6 +37,10 @@ models:
       route:
         paths:
           - /claude
+        methods:
+          - GET
+          - POST
+          - DELETE
       logging:
         payloads: false
       response_streaming: deny
