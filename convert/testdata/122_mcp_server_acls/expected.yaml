@@ -1,0 +1,63 @@
+_format_version: "3.0"
+services:
+  - name: flights-mcp
+    url: https://flights.internal.kongair.com
+    routes:
+      - name: flights-mcp-route
+        paths:
+          - /mcp/flights
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              acl_attribute_type: consumer
+              default_acl:
+                - deny:
+                    - interns
+              include_consumer_groups: true
+              logging:
+                log_audits: false
+                log_payloads: false
+                log_statistics: true
+              mode: conversion-listener
+              tools:
+                - description: Search flights
+                  method: GET
+                  name: search_flights
+                  path: /flights
+                - acl:
+                    allow:
+                      - buyers
+                  description: Book a flight
+                  method: POST
+                  name: book_flight
+                  path: /bookings
+          - name: acl
+            config:
+              allow:
+                - partners
+              include_consumer_groups: true
+  - name: vendor-mcp
+    url: https://vendor.example.com/mcp
+    routes:
+      - name: vendor-mcp-route
+        paths:
+          - /mcp/vendor
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              access_token_claim_field: .user.email
+              acl_attribute_type: oauth_access_token
+              default_acl:
+                - allow:
+                    - ops@kongair.com
+              logging:
+                log_audits: false
+                log_payloads: false
+                log_statistics: true
+              mode: passthrough-listener
+              tools: []
+          - name: acl
+            config:
+              deny_when:
+                - has(principal.metadata.status) && principal.metadata.status == 'suspended'
+              include_consumer_groups: true

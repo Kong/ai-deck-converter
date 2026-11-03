@@ -1,0 +1,17 @@
+mcp_servers:
+  # allow and deny convert on every 2.x runtime.
+  - type: conversion-listener
+    name: flights-mcp
+    upstream_url: https://flights.internal.kongair.com
+    config:
+      route: {paths: [/mcp/flights]}
+    access:
+      acls:
+        allow: [partners]
+      default_tool_acls:
+        deny: [interns]
+    tools:
+      - name: search_flights
+        description: Search flights
+        method: GET
+        path: /flights

@@ -12,8 +12,6 @@ services:
               default_acl:
                 - allow_when:
                     - has(principal.metadata.tier) && principal.metadata.tier == 'gold'
-                  deny_when:
-                    - has(principal.metadata.status) && principal.metadata.status == 'suspended'
               include_consumer_groups: true
               logging:
                 log_audits: false
@@ -34,3 +32,8 @@ services:
                   method: POST
                   name: book_flight
                   path: /bookings
+          - name: acl
+            config:
+              deny_when:
+                - has(principal.metadata.status) && principal.metadata.status == 'suspended'
+              include_consumer_groups: true

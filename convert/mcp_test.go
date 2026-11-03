@@ -504,8 +504,8 @@ mcp_servers:
 %s
 `
 
-// TestMCPACLWhenConverts checks that CEL expressions reach default_acl and
-// tools[].acl. access.acls and default_tool_acls merge into one entry.
+// TestMCPACLWhenConverts checks that server acls become a Kong acl plugin.
+// default_tool_acls reach default_acl, and tool ACLs reach tools[].acl.
 func TestMCPACLWhenConverts(t *testing.T) {
 	access := `    access:
       acls:
@@ -519,16 +519,36 @@ func TestMCPACLWhenConverts(t *testing.T) {
 	result, err := Convert([]byte(fmt.Sprintf(mcpWhenACLInput, access, tool)), testOptions)
 	require.NoError(t, err)
 	require.Empty(t, result.Issues)
-	cfg := result.Output.Services[0].Routes[0].Plugins[0].Config
+	plugins := routePlugins(t, result.Output, "guarded-mcp")
+	cfg := mcpProxyConfig(t, plugins)
 	require.Equal(t, []map[string]any{{
-		"allow_when": []string{"principal.metadata.tier == 'partner'"},
-		"deny_when":  []string{"principal.metadata.status == 'suspended'"},
+		"deny_when": []string{"principal.metadata.status == 'suspended'"},
 	}}, cfg["default_acl"])
 	tools := cfg["tools"].([]map[string]any)
 	require.Equal(t, map[string]any{
 		"deny":       []string{"interns"},
 		"allow_when": []string{"principal.metadata.admin == 'true'"},
 	}, tools[0]["acl"])
+	require.Equal(t, map[string]any{
+		"allow_when":              []string{"principal.metadata.tier == 'partner'"},
+		"include_consumer_groups": true,
+	}, aclPluginConfig(t, plugins))
+}
+
+// mcpProxyConfig returns the config of the ai-mcp-proxy plugin in plugins.
+func mcpProxyConfig(t *testing.T, plugins []kong.Plugin) map[string]any {
+	t.Helper()
+	i := slices.IndexFunc(plugins, func(p kong.Plugin) bool { return p.Name == "ai-mcp-proxy" })
+	require.GreaterOrEqual(t, i, 0, "no ai-mcp-proxy plugin")
+	return plugins[i].Config
+}
+
+// aclPluginConfig returns the config of the acl plugin in plugins.
+func aclPluginConfig(t *testing.T, plugins []kong.Plugin) map[string]any {
+	t.Helper()
+	i := slices.IndexFunc(plugins, func(p kong.Plugin) bool { return p.Name == "acl" })
+	require.GreaterOrEqual(t, i, 0, "no acl plugin")
+	return plugins[i].Config
 }
 
 // TestMCPACLWhenBelowGate checks the result below FeatureMCPACLWhen. A server
@@ -586,14 +606,22 @@ func TestMCPACLWhenBelowGate(t *testing.T) {
 	}
 }
 
-// TestMCPACLMixedPairsAfterMerge checks that the merged server ACL uses one
-// field pair. A mix leaves out the MCP server.
-func TestMCPACLMixedPairsAfterMerge(t *testing.T) {
+// TestMCPServerACLsInvalid checks the cases that leave out the MCP server.
+// Server acls permit one field. default_tool_acls permit one field pair.
+func TestMCPServerACLsInvalid(t *testing.T) {
 	cases := []struct {
 		name   string
 		access string
 		fields []string
 	}{
+		{
+			name: "allow and deny in acls",
+			access: `    access:
+      acls:
+        allow: [partners]
+        deny: [interns]`,
+			fields: []string{"access.acls.allow", "access.acls.deny"},
+		},
 		{
 			name: "allow and deny_when in acls",
 			access: `    access:
@@ -610,24 +638,6 @@ func TestMCPACLMixedPairsAfterMerge(t *testing.T) {
         deny_when: ["principal.metadata.status == 'suspended'"]`,
 			fields: []string{"access.default_tool_acls.allow", "access.default_tool_acls.deny_when"},
 		},
-		{
-			name: "allow in acls and deny_when in default_tool_acls",
-			access: `    access:
-      acls:
-        allow: [partners]
-      default_tool_acls:
-        deny_when: ["principal.metadata.status == 'suspended'"]`,
-			fields: []string{"access.acls.allow", "access.default_tool_acls.deny_when"},
-		},
-		{
-			name: "mix across acls and default_tool_acls",
-			access: `    access:
-      acls:
-        deny: [interns]
-      default_tool_acls:
-        allow_when: ["principal.metadata.tier == 'gold'"]`,
-			fields: []string{"access.acls.deny", "access.default_tool_acls.allow_when"},
-		},
 	}
 
 	for _, tc := range cases {
@@ -641,8 +651,47 @@ func TestMCPACLMixedPairsAfterMerge(t *testing.T) {
 	}
 }
 
-// TestMCPACLAllowDenyStillConverts guards the gate's blast radius: a plain
-// allow/deny ACL is the shape ai-mcp-proxy does accept and must keep working.
+// TestMCPServerACLsIndependentOfDefaultToolACLs checks that server acls and
+// default_tool_acls can use different field pairs.
+func TestMCPServerACLsIndependentOfDefaultToolACLs(t *testing.T) {
+	access := `    access:
+      acls:
+        deny: [interns]
+      default_tool_acls:
+        allow_when: ["principal.metadata.tier == 'gold'"]`
+	result, err := Convert([]byte(fmt.Sprintf(mcpWhenACLInput, access, "")), testOptions)
+	require.NoError(t, err)
+	require.Empty(t, result.Issues)
+	plugins := routePlugins(t, result.Output, "guarded-mcp")
+	require.Equal(t, []string{"interns"}, aclPluginConfig(t, plugins)["deny"])
+	require.Equal(t, []map[string]any{{
+		"allow_when": []string{"principal.metadata.tier == 'gold'"},
+	}}, mcpProxyConfig(t, plugins)["default_acl"])
+}
+
+// TestMCPServerACLsRequireListener checks that server acls on a source type
+// leave out the MCP server.
+func TestMCPServerACLsRequireListener(t *testing.T) {
+	for _, mode := range []string{"conversion-only", "upstream-server"} {
+		t.Run(mode, func(t *testing.T) {
+			result, err := Convert([]byte(`
+mcp_servers:
+  - type: `+mode+`
+    name: source
+    upstream_url: https://mcp.internal
+    access:
+      acls:
+        allow: [partners]
+`), testOptions)
+			require.NoError(t, err)
+			requireIssue(t, result.Issues, Error, ConfigFieldInvalid, kindMCPServer, "source", "access.acls")
+			require.Empty(t, result.Output.Services, "the MCP server is left out")
+		})
+	}
+}
+
+// TestMCPACLAllowDenyStillConverts guards the gate's blast radius: allow and
+// deny convert on every 2.x runtime.
 func TestMCPACLAllowDenyStillConverts(t *testing.T) {
 	access := `    access:
       acls:
@@ -650,10 +699,16 @@ func TestMCPACLAllowDenyStillConverts(t *testing.T) {
 	tool := `        access:
           acls:
             deny: [banned-users]`
-	result, err := Convert([]byte(fmt.Sprintf(mcpWhenACLInput, access, tool)), testOptions)
-	require.NoError(t, err)
-	require.Empty(t, result.Issues, "allow/deny ACLs must still convert")
-	require.Len(t, result.Output.Services, 1)
+	for _, version := range []string{"2.1", aimap.LatestVersion.String()} {
+		t.Run(version, func(t *testing.T) {
+			result, err := Convert([]byte(fmt.Sprintf(mcpWhenACLInput, access, tool)),
+				Options{MinRuntimeVersion: version})
+			require.NoError(t, err)
+			require.Empty(t, result.Issues, "allow/deny ACLs must still convert")
+			plugins := routePlugins(t, result.Output, "guarded-mcp")
+			require.Equal(t, []string{"premium-users"}, aclPluginConfig(t, plugins)["allow"])
+		})
+	}
 }
 
 func TestTokenVaultDatastore(t *testing.T) {

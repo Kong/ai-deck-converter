@@ -13,16 +13,6 @@ import (
 	"github.com/Kong/ai-deck-converter/internal/kong"
 )
 
-// mcpListenerTypes are the MCP server modes that support auth-strategy /
-// Protected Resource Metadata based access. Other modes (conversion-only,
-// upstream-server) do not front a client-facing listener the ai-mcp-oauth2
-// plugin can protect.
-var mcpListenerTypes = map[string]bool{
-	"listener":             true,
-	"conversion-listener":  true,
-	"passthrough-listener": true,
-}
-
 // mcpAuthStrategyPlugins builds the authentication plugin(s) for an MCP server's
 // access.auth_strategies / access.metadata, appending the metadata endpoint
 // path to the route when an ai-mcp-oauth2 plugin is produced. It returns nil
@@ -43,7 +33,7 @@ func (c *Converter) mcpAuthStrategyPlugins(
 	// Listener guard: only listener-style modes can front the ai-mcp-oauth2
 	// plugin (and its metadata endpoint). Reject rather than drop the requested
 	// authentication behavior.
-	if !mcpListenerTypes[m.Type] {
+	if !aimap.MCPAccessAllowed(m.Type) {
 		var fields []string
 		if len(m.Access.AuthStrategies) > 0 {
 			fields = append(fields, "access.auth_strategies")

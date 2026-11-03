@@ -1,0 +1,41 @@
+mcp_servers:
+  # access.acls becomes an acl plugin on the route. default_tool_acls becomes
+  # default_acl. A tool's own acls override default_acl.
+  - type: conversion-listener
+    name: flights-mcp
+    upstream_url: https://flights.internal.kongair.com
+    config:
+      route: {paths: [/mcp/flights]}
+    access:
+      acl_attribute_type: consumer
+      acls:
+        allow: [partners]
+      default_tool_acls:
+        deny: [interns]
+    tools:
+      - name: search_flights
+        description: Search flights
+        method: GET
+        path: /flights
+      - name: book_flight
+        description: Book a flight
+        method: POST
+        path: /bookings
+        access:
+          acls:
+            allow: [buyers]
+  # An oauth_access_token server checks token claims with CEL in access.acls.
+  # default_tool_acls match the access_token_claim_field value.
+  - type: passthrough-listener
+    name: vendor-mcp
+    upstream_url: https://vendor.example.com/mcp
+    config:
+      route: {paths: [/mcp/vendor]}
+    access:
+      acl_attribute_type: oauth_access_token
+      access_token_claim_field: .user.email
+      acls:
+        deny_when:
+          - "has(principal.metadata.status) && principal.metadata.status == 'suspended'"
+      default_tool_acls:
+        allow: [ops@kongair.com]

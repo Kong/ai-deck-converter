@@ -1,5 +1,5 @@
 mcp_servers:
-  # access.acls and default_tool_acls merge into one default_acl entry.
+  # access.acls becomes an acl plugin. default_tool_acls becomes default_acl.
   - type: conversion-listener
     display_name: Partner Flights MCP
     name: partner-flights-mcp
