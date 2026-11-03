@@ -149,8 +149,14 @@ func mcpOAuth2Source(
 ) *kong.Source {
 	return source("mcp_server", m.Name, "access.metadata",
 		kong.FieldMapping{GeneratedPrefix: "config.resource", SourcePrefix: "access.metadata.resource"},
-		kong.FieldMapping{GeneratedPrefix: "config.authorization_servers", SourcePrefix: authorizationServersSource(idp, meta)},
-		kong.FieldMapping{GeneratedPrefix: "config.scopes_supported", SourcePrefix: scopesSupportedSource(idp, meta)},
+		kong.FieldMapping{
+			GeneratedPrefix: "config.authorization_servers",
+			SourcePrefix:    authorizationServersSource(idp, meta),
+		},
+		kong.FieldMapping{
+			GeneratedPrefix: "config.scopes_supported",
+			SourcePrefix:    scopesSupportedSource(idp, meta),
+		},
 		kong.FieldMapping{GeneratedPrefix: "config.metadata_endpoint", SourcePrefix: "access.metadata.endpoint"},
 		kong.FieldMapping{
 			GeneratedPrefix: "config.metadata_discovery_endpoint",
@@ -345,14 +351,15 @@ func (c *Converter) mcpOIDCPlugin(
 		return kong.Plugin{}, err
 	}
 
-	cfg := make(map[string]any, len(idp.Config)+2)
+	cfg := make(map[string]any, len(idp.Config))
 	maps.Copy(cfg, idp.Config)
 
 	// Bearer-only on an MCP route, matching ai-mcp-oauth2. The strategy's
 	// auth_methods list is dropped by the ai-mcp-oauth2 field map today, so
 	// interactive flows were never live here; warn when the strategy asked for
 	// more than bearer so the narrowing is visible.
-	if methods := configStrings(idp.Config, "auth_methods"); len(methods) > 1 || (len(methods) == 1 && methods[0] != "bearer") {
+	if methods := configStrings(idp.Config, "auth_methods"); len(methods) > 1 ||
+		(len(methods) == 1 && methods[0] != "bearer") {
 		c.warn(src.at("access.auth_strategies[0]"), ConfigFieldOverridden,
 			"MCP server %q auth strategy %q sets auth_methods beyond bearer. This will be overridden to "+
 				"[bearer] because MCP routes validate bearer tokens only (matching ai-mcp-oauth2); "+
@@ -407,10 +414,22 @@ func mcpOIDCSource(
 	meta *aigw.MCPProtectedResourceMetadata,
 ) *kong.Source {
 	return source("mcp_server", m.Name, "access.metadata",
-		kong.FieldMapping{GeneratedPrefix: "config.protected_resource_metadata.resource", SourcePrefix: "access.metadata.resource"},
-		kong.FieldMapping{GeneratedPrefix: "config.protected_resource_metadata.authorization_servers", SourcePrefix: authorizationServersSource(idp, meta)},
-		kong.FieldMapping{GeneratedPrefix: "config.protected_resource_metadata.scopes_supported", SourcePrefix: scopesSupportedSource(idp, meta)},
-		kong.FieldMapping{GeneratedPrefix: "config.protected_resource_metadata.metadata_endpoint", SourcePrefix: "access.metadata.endpoint"},
+		kong.FieldMapping{
+			GeneratedPrefix: "config.protected_resource_metadata.resource",
+			SourcePrefix:    "access.metadata.resource",
+		},
+		kong.FieldMapping{
+			GeneratedPrefix: "config.protected_resource_metadata.authorization_servers",
+			SourcePrefix:    authorizationServersSource(idp, meta),
+		},
+		kong.FieldMapping{
+			GeneratedPrefix: "config.protected_resource_metadata.scopes_supported",
+			SourcePrefix:    scopesSupportedSource(idp, meta),
+		},
+		kong.FieldMapping{
+			GeneratedPrefix: "config.protected_resource_metadata.metadata_endpoint",
+			SourcePrefix:    "access.metadata.endpoint",
+		},
 		kong.FieldMapping{GeneratedPrefix: "config.client_id", SourcePrefix: "access.auth_strategies"},
 		kong.FieldMapping{GeneratedPrefix: "config.client_secret", SourcePrefix: "access.auth_strategies"},
 		kong.FieldMapping{GeneratedPrefix: "config.ssl_verify", SourcePrefix: "access.auth_strategies"},

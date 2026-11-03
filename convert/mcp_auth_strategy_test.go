@@ -449,11 +449,15 @@ mcp_servers:
 // ai-mcp-oauth2 (an attached strategy lowers to the openid-connect plugin),
 // and it is where the vault's passthrough_credentials forcing stays live.
 var tokenVaultMCPMetadataOnly = func() string {
-	s := strings.Replace(tokenVaultMCPWithMetadata,
-		"    access:\n      auth_strategies: [okta-oidc]\n", "    access:\n", 1)
-	return strings.Replace(s,
-		"auth_strategies:\n  - name: okta-oidc\n    type: openid-connect\n    config:\n      issuer: https://issuer.example.com/oauth2\n",
-		"", 1)
+	const strategyRef = "      auth_strategies: [okta-oidc]\n"
+	const strategyBlock = `auth_strategies:
+  - name: okta-oidc
+    type: openid-connect
+    config:
+      issuer: https://issuer.example.com/oauth2
+`
+	s := strings.Replace(tokenVaultMCPWithMetadata, "    access:\n"+strategyRef, "    access:\n", 1)
+	return strings.Replace(s, strategyBlock, "", 1)
 }()
 
 func TestMCPOAuth2PassthroughForTokenVault(t *testing.T) {
