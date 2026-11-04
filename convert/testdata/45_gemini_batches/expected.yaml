@@ -142,26 +142,26 @@ plugins:
     config:
       models:
         sources:
-          - plugin_id: 2f02d5c7-5d88-55a0-91c2-43023c2fadfd
           - plugin_id: 0aa0cf08-ba3a-578b-b74c-b6380350194d
-          - plugin_id: 4a2caab4-f1c4-5a02-97cb-1c469599a177
           - plugin_id: 2cfe906d-e7c1-5e62-a267-2361660f34d9
+          - plugin_id: 2f02d5c7-5d88-55a0-91c2-43023c2fadfd
+          - plugin_id: 4a2caab4-f1c4-5a02-97cb-1c469599a177
       route_type: llm/v1/models
     route: models
   - name: ai-proxy-advanced
     config:
       models:
         sources:
-          - plugin_id: 2f02d5c7-5d88-55a0-91c2-43023c2fadfd
           - plugin_id: 0aa0cf08-ba3a-578b-b74c-b6380350194d
+          - plugin_id: 2f02d5c7-5d88-55a0-91c2-43023c2fadfd
       route_type: llm/v1/models
     route: models-gm
   - name: ai-proxy-advanced
     config:
       models:
         sources:
-          - plugin_id: 4a2caab4-f1c4-5a02-97cb-1c469599a177
           - plugin_id: 2cfe906d-e7c1-5e62-a267-2361660f34d9
+          - plugin_id: 4a2caab4-f1c4-5a02-97cb-1c469599a177
       route_type: llm/v1/models
     route: models-gm2
 ai_models:

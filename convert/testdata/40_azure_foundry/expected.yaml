@@ -105,16 +105,16 @@ plugins:
     config:
       models:
         sources:
-          - plugin_id: 6a5ce60d-9969-5faf-aaba-48807a26d772
           - plugin_id: 450b7f1b-6821-5e5c-837d-e54a5037b064
+          - plugin_id: 6a5ce60d-9969-5faf-aaba-48807a26d772
       route_type: llm/v1/models
     route: models
   - name: ai-proxy-advanced
     config:
       models:
         sources:
-          - plugin_id: 6a5ce60d-9969-5faf-aaba-48807a26d772
           - plugin_id: 450b7f1b-6821-5e5c-837d-e54a5037b064
+          - plugin_id: 6a5ce60d-9969-5faf-aaba-48807a26d772
       route_type: llm/v1/models
     route: models-ai
 ai_models:

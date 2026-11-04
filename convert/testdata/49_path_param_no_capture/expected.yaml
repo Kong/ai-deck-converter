@@ -108,24 +108,24 @@ plugins:
     config:
       models:
         sources:
-          - plugin_id: f7363f34-c785-5d5f-9d9e-a0272f4aaca6
           - plugin_id: c3811699-ae94-5631-b55d-5295cbc8f7be
+          - plugin_id: f7363f34-c785-5d5f-9d9e-a0272f4aaca6
       route_type: llm/v1/models
     route: models
   - name: ai-proxy-advanced
     config:
       models:
         sources:
-          - plugin_id: f7363f34-c785-5d5f-9d9e-a0272f4aaca6
           - plugin_id: c3811699-ae94-5631-b55d-5295cbc8f7be
+          - plugin_id: f7363f34-c785-5d5f-9d9e-a0272f4aaca6
       route_type: llm/v1/models
     route: models-v1-chat-completions
   - name: ai-proxy-advanced
     config:
       models:
         sources:
-          - plugin_id: f7363f34-c785-5d5f-9d9e-a0272f4aaca6
           - plugin_id: c3811699-ae94-5631-b55d-5295cbc8f7be
+          - plugin_id: f7363f34-c785-5d5f-9d9e-a0272f4aaca6
       route_type: llm/v1/models
     route: models-v1-embeddings
 ai_models:

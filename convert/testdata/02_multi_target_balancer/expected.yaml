@@ -126,16 +126,16 @@ plugins:
     config:
       models:
         sources:
-          - plugin_id: a5417c2e-288d-59b1-820b-126806c41910
           - plugin_id: 2b2a21fd-273c-57dc-9dbc-d0e46d534588
+          - plugin_id: a5417c2e-288d-59b1-820b-126806c41910
       route_type: llm/v1/models
     route: models
   - name: ai-proxy-advanced
     config:
       models:
         sources:
-          - plugin_id: a5417c2e-288d-59b1-820b-126806c41910
           - plugin_id: 2b2a21fd-273c-57dc-9dbc-d0e46d534588
+          - plugin_id: a5417c2e-288d-59b1-820b-126806c41910
       route_type: llm/v1/models
     route: models-ai
 ai_models:

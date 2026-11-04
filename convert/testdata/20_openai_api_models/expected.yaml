@@ -86,16 +86,16 @@ plugins:
     config:
       models:
         sources:
-          - plugin_id: 69bb641c-2b97-5944-bb79-b775b5e2a797
           - plugin_id: 5c7bebfe-d8cd-5892-9576-3573a7dd3fb5
+          - plugin_id: 69bb641c-2b97-5944-bb79-b775b5e2a797
       route_type: llm/v1/models
     route: models
   - name: ai-proxy-advanced
     config:
       models:
         sources:
-          - plugin_id: 69bb641c-2b97-5944-bb79-b775b5e2a797
           - plugin_id: 5c7bebfe-d8cd-5892-9576-3573a7dd3fb5
+          - plugin_id: 69bb641c-2b97-5944-bb79-b775b5e2a797
       route_type: llm/v1/models
     route: models-ai
 ai_models:

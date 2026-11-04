@@ -393,15 +393,15 @@ plugins:
         sources:
           - plugin_id: 3d893dc9-4715-5ed1-a148-5fec1142644e
           - plugin_id: 5a87101f-adfe-5b5d-8661-7efda1e0cd3e
-          - plugin_id: b774d52a-3e0c-5bb7-87ca-dd3520186526
-          - plugin_id: a9b49130-baa0-5afb-b9c0-61ab9faf7d79
-          - plugin_id: c5dc476d-43bb-59ed-9484-3d49611910dd
-          - plugin_id: 89a29fa6-f099-5808-87ba-827ec6b13779
-          - plugin_id: 74067928-53b7-576c-8a4a-8fca6d1e3982
           - plugin_id: 5efdbf89-e743-587c-a226-980ff4446fa8
+          - plugin_id: 74067928-53b7-576c-8a4a-8fca6d1e3982
           - plugin_id: 79dc98ab-0004-5f1c-9056-3b0965bc7238
+          - plugin_id: 89a29fa6-f099-5808-87ba-827ec6b13779
           - plugin_id: 8aa49aa9-1ca6-5461-845e-01bc9bfb48c1
           - plugin_id: 9f89aefe-6eb1-5a12-82a9-52149d450163
+          - plugin_id: a9b49130-baa0-5afb-b9c0-61ab9faf7d79
+          - plugin_id: b774d52a-3e0c-5bb7-87ca-dd3520186526
+          - plugin_id: c5dc476d-43bb-59ed-9484-3d49611910dd
       route_type: llm/v1/models
     route: models
   - name: ai-proxy-advanced
@@ -410,15 +410,15 @@ plugins:
         sources:
           - plugin_id: 3d893dc9-4715-5ed1-a148-5fec1142644e
           - plugin_id: 5a87101f-adfe-5b5d-8661-7efda1e0cd3e
-          - plugin_id: b774d52a-3e0c-5bb7-87ca-dd3520186526
-          - plugin_id: a9b49130-baa0-5afb-b9c0-61ab9faf7d79
-          - plugin_id: c5dc476d-43bb-59ed-9484-3d49611910dd
-          - plugin_id: 89a29fa6-f099-5808-87ba-827ec6b13779
-          - plugin_id: 74067928-53b7-576c-8a4a-8fca6d1e3982
           - plugin_id: 5efdbf89-e743-587c-a226-980ff4446fa8
+          - plugin_id: 74067928-53b7-576c-8a4a-8fca6d1e3982
           - plugin_id: 79dc98ab-0004-5f1c-9056-3b0965bc7238
+          - plugin_id: 89a29fa6-f099-5808-87ba-827ec6b13779
           - plugin_id: 8aa49aa9-1ca6-5461-845e-01bc9bfb48c1
           - plugin_id: 9f89aefe-6eb1-5a12-82a9-52149d450163
+          - plugin_id: a9b49130-baa0-5afb-b9c0-61ab9faf7d79
+          - plugin_id: b774d52a-3e0c-5bb7-87ca-dd3520186526
+          - plugin_id: c5dc476d-43bb-59ed-9484-3d49611910dd
       route_type: llm/v1/models
     route: models-ignored
   - name: ai-proxy-advanced

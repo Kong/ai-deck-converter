@@ -112,8 +112,8 @@ plugins:
     config:
       models:
         sources:
-          - plugin_id: c8fea922-b5bd-5506-8c5d-c69fff7ceb71
           - plugin_id: 8021ce1b-361f-5ffe-b93b-96ebc85efd9e
+          - plugin_id: c8fea922-b5bd-5506-8c5d-c69fff7ceb71
       route_type: llm/v1/models
     route: models
   - name: ai-proxy-advanced

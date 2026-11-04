@@ -247,12 +247,12 @@ plugins:
     config:
       models:
         sources:
-          - plugin_id: 269ee252-1236-504b-9e79-af134227282a
-          - plugin_id: fba051a4-af85-5079-9c17-c0b53849cc0e
           - plugin_id: 267959a1-72cb-514f-90a8-ee9f4a2b748e
+          - plugin_id: 269ee252-1236-504b-9e79-af134227282a
+          - plugin_id: 9a15238f-9ff3-51d4-9aee-b5f949be1e66
           - plugin_id: de3bc8c8-4bf4-50ab-94e8-0ade1c8167ee
           - plugin_id: ee98c63a-c7ab-5f0e-ab9e-8b455e460321
-          - plugin_id: 9a15238f-9ff3-51d4-9aee-b5f949be1e66
+          - plugin_id: fba051a4-af85-5079-9c17-c0b53849cc0e
       route_type: llm/v1/models
     route: models
   - name: ai-proxy-advanced
@@ -268,9 +268,9 @@ plugins:
       models:
         sources:
           - plugin_id: 267959a1-72cb-514f-90a8-ee9f4a2b748e
+          - plugin_id: 9a15238f-9ff3-51d4-9aee-b5f949be1e66
           - plugin_id: de3bc8c8-4bf4-50ab-94e8-0ade1c8167ee
           - plugin_id: ee98c63a-c7ab-5f0e-ab9e-8b455e460321
-          - plugin_id: 9a15238f-9ff3-51d4-9aee-b5f949be1e66
       route_type: llm/v1/models
     route: models-mix
 ai_models:

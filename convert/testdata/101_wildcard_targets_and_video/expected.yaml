@@ -579,16 +579,16 @@ plugins:
       models:
         sources:
           - plugin_id: 003f3c45-1163-5a43-b6e6-e1ad4ef8aef7
+          - plugin_id: 1372b5f8-98c6-5847-80a9-87c4a1a07a5e
+          - plugin_id: 17c9ec99-637b-5237-b747-545154a09447
           - plugin_id: 2694ab80-3151-5968-8195-ff63d77bae24
           - plugin_id: 275328ee-dbcb-5618-91b2-42d281d7fdae
-          - plugin_id: 1372b5f8-98c6-5847-80a9-87c4a1a07a5e
-          - plugin_id: 562662dc-2b3d-5d7f-b1eb-6df783b7d65c
           - plugin_id: 3d43de33-caf1-5c11-b4e1-c745d3232909
           - plugin_id: 50f13f5a-a44d-5781-92ae-f36eea89de8b
+          - plugin_id: 562662dc-2b3d-5d7f-b1eb-6df783b7d65c
+          - plugin_id: 676b27fe-4d0f-5bee-b04a-9bccbaeaea74
           - plugin_id: 876ce109-23ce-5955-b873-19463aaa28a0
           - plugin_id: c1d97688-b283-5aae-85fd-04a0585aee76
-          - plugin_id: 676b27fe-4d0f-5bee-b04a-9bccbaeaea74
-          - plugin_id: 17c9ec99-637b-5237-b747-545154a09447
           - plugin_id: ee1af9ff-0793-5f18-b25b-add7beedab6b
       route_type: llm/v1/models
     route: models
@@ -597,16 +597,16 @@ plugins:
       models:
         sources:
           - plugin_id: 003f3c45-1163-5a43-b6e6-e1ad4ef8aef7
+          - plugin_id: 1372b5f8-98c6-5847-80a9-87c4a1a07a5e
+          - plugin_id: 17c9ec99-637b-5237-b747-545154a09447
           - plugin_id: 2694ab80-3151-5968-8195-ff63d77bae24
           - plugin_id: 275328ee-dbcb-5618-91b2-42d281d7fdae
-          - plugin_id: 1372b5f8-98c6-5847-80a9-87c4a1a07a5e
-          - plugin_id: 562662dc-2b3d-5d7f-b1eb-6df783b7d65c
           - plugin_id: 3d43de33-caf1-5c11-b4e1-c745d3232909
           - plugin_id: 50f13f5a-a44d-5781-92ae-f36eea89de8b
+          - plugin_id: 562662dc-2b3d-5d7f-b1eb-6df783b7d65c
+          - plugin_id: 676b27fe-4d0f-5bee-b04a-9bccbaeaea74
           - plugin_id: 876ce109-23ce-5955-b873-19463aaa28a0
           - plugin_id: c1d97688-b283-5aae-85fd-04a0585aee76
-          - plugin_id: 676b27fe-4d0f-5bee-b04a-9bccbaeaea74
-          - plugin_id: 17c9ec99-637b-5237-b747-545154a09447
           - plugin_id: ee1af9ff-0793-5f18-b25b-add7beedab6b
       route_type: llm/v1/models
     route: models-ai

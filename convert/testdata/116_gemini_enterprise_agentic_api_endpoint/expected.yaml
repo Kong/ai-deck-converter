@@ -108,16 +108,16 @@ plugins:
     config:
       models:
         sources:
-          - plugin_id: da20f7b2-4688-5c16-95e2-55d86839a506
           - plugin_id: bb4a92ac-24f9-5cce-abb6-be676f9bd4f4
+          - plugin_id: da20f7b2-4688-5c16-95e2-55d86839a506
       route_type: llm/v1/models
     route: models
   - name: ai-proxy-advanced
     config:
       models:
         sources:
-          - plugin_id: da20f7b2-4688-5c16-95e2-55d86839a506
           - plugin_id: bb4a92ac-24f9-5cce-abb6-be676f9bd4f4
+          - plugin_id: da20f7b2-4688-5c16-95e2-55d86839a506
       route_type: llm/v1/models
     route: models-ai
 ai_models:

@@ -139,8 +139,8 @@ plugins:
     config:
       models:
         sources:
-          - plugin_id: d30316ff-f181-56ba-a198-bdba56b5ab10
           - plugin_id: 38f8fa8e-ffcb-54a9-87ef-a834217e043f
+          - plugin_id: d30316ff-f181-56ba-a198-bdba56b5ab10
       route_type: llm/v1/models
     route:
       id: aeea4f5f-1d07-59ad-98b1-be41cf62b11c

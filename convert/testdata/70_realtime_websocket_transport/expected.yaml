@@ -161,6 +161,7 @@ plugins:
               allow:
                 - premium-users
             plugin_id: 21dd5f7e-9940-5537-9812-76fb7738f1ce
+          - plugin_id: 2b9a0dff-bb3d-5d83-9318-5bac9967aec8
           - access:
               allow:
                 - premium-users
@@ -169,7 +170,6 @@ plugins:
               allow:
                 - premium-users
             plugin_id: ca80bae8-9d95-5ded-89a1-7c644275b69d
-          - plugin_id: 2b9a0dff-bb3d-5d83-9318-5bac9967aec8
       route_type: llm/v1/models
     route: models
   - name: ai-proxy-advanced

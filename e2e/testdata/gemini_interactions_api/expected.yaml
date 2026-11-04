@@ -237,9 +237,9 @@ plugins:
       models:
         sources:
           - plugin_id: 1e80d997-3f0a-58ae-83c3-6b17fa35263a
-          - plugin_id: f922b2e5-1480-5f81-b41e-d08e57dbac37
-          - plugin_id: 9d77175d-3ff6-513f-9a03-0d7db368dbe6
           - plugin_id: 784c7704-39e4-5514-812c-00e6934c5fff
+          - plugin_id: 9d77175d-3ff6-513f-9a03-0d7db368dbe6
+          - plugin_id: f922b2e5-1480-5f81-b41e-d08e57dbac37
       route_type: llm/v1/models
     route:
       id: aeea4f5f-1d07-59ad-98b1-be41cf62b11c
@@ -249,9 +249,9 @@ plugins:
       models:
         sources:
           - plugin_id: 1e80d997-3f0a-58ae-83c3-6b17fa35263a
-          - plugin_id: f922b2e5-1480-5f81-b41e-d08e57dbac37
-          - plugin_id: 9d77175d-3ff6-513f-9a03-0d7db368dbe6
           - plugin_id: 784c7704-39e4-5514-812c-00e6934c5fff
+          - plugin_id: 9d77175d-3ff6-513f-9a03-0d7db368dbe6
+          - plugin_id: f922b2e5-1480-5f81-b41e-d08e57dbac37
       route_type: llm/v1/models
     route:
       id: fff967a8-311f-5516-9d8e-b30ff67b4993

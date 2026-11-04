@@ -262,9 +262,9 @@ plugins:
       models:
         sources:
           - plugin_id: 184f9206-57ac-558a-9fcc-d6f11259077d
-          - plugin_id: ef9f2fa5-3f6a-5506-ba65-df19a3154b3f
           - plugin_id: 2606c99c-e17a-520a-bf9b-c92695afb4e8
           - plugin_id: 5aec9689-bc2e-5c79-8040-997ce43bf35c
+          - plugin_id: ef9f2fa5-3f6a-5506-ba65-df19a3154b3f
       route_type: llm/v1/models
     route:
       id: aeea4f5f-1d07-59ad-98b1-be41cf62b11c

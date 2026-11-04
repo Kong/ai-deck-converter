@@ -179,10 +179,10 @@ plugins:
     config:
       models:
         sources:
-          - plugin_id: eb745df6-95cd-5dea-9dfc-8513f8c1e48d
           - plugin_id: 61c1814c-7f17-52d7-b05c-73853962749b
           - plugin_id: 7698c1ac-9002-5281-a2f7-02f0cb7cd47c
           - plugin_id: e86c8a74-9101-5847-b2fc-02291ec2e147
+          - plugin_id: eb745df6-95cd-5dea-9dfc-8513f8c1e48d
       route_type: llm/v1/models
     route: models
   - name: ai-proxy-advanced

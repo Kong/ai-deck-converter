@@ -225,9 +225,9 @@ plugins:
     config:
       models:
         sources:
-          - plugin_id: b8553190-2d8c-50bc-8ffb-98fe18f3540d
-          - plugin_id: 7bca52b1-b1fc-55ec-8fff-881642bebd0d
           - plugin_id: 248661d5-cbd2-58ea-a396-a9fbb264e282
+          - plugin_id: 7bca52b1-b1fc-55ec-8fff-881642bebd0d
+          - plugin_id: b8553190-2d8c-50bc-8ffb-98fe18f3540d
           - plugin_id: ecaa0732-39c4-566e-a54d-09ba4941cd40
           - plugin_id: fabad051-e3cc-54b9-b869-463c2cb55e23
       route_type: llm/v1/models
@@ -236,8 +236,8 @@ plugins:
     config:
       models:
         sources:
-          - plugin_id: b8553190-2d8c-50bc-8ffb-98fe18f3540d
           - plugin_id: 7bca52b1-b1fc-55ec-8fff-881642bebd0d
+          - plugin_id: b8553190-2d8c-50bc-8ffb-98fe18f3540d
       route_type: llm/v1/models
     route: models-selector
   - name: ai-proxy-advanced

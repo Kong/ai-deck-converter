@@ -229,12 +229,12 @@ plugins:
               allow:
                 - consumer-alice
                 - group-admins
-            plugin_id: 9b2540c9-6620-5bbe-b947-d6127fb24c17
+            plugin_id: 90bd1684-49bc-5dc8-9afc-f0cb80650f4a
           - access:
               allow:
                 - consumer-alice
                 - group-admins
-            plugin_id: 90bd1684-49bc-5dc8-9afc-f0cb80650f4a
+            plugin_id: 9b2540c9-6620-5bbe-b947-d6127fb24c17
       route_type: llm/v1/models
     route:
       id: aeea4f5f-1d07-59ad-98b1-be41cf62b11c
@@ -247,12 +247,12 @@ plugins:
               allow:
                 - consumer-alice
                 - group-admins
-            plugin_id: 9b2540c9-6620-5bbe-b947-d6127fb24c17
+            plugin_id: 90bd1684-49bc-5dc8-9afc-f0cb80650f4a
           - access:
               allow:
                 - consumer-alice
                 - group-admins
-            plugin_id: 90bd1684-49bc-5dc8-9afc-f0cb80650f4a
+            plugin_id: 9b2540c9-6620-5bbe-b947-d6127fb24c17
       route_type: llm/v1/models
     route:
       id: 6d810826-945f-50ac-af3f-e5a6ba04aea0
@@ -265,12 +265,12 @@ plugins:
               allow:
                 - consumer-alice
                 - group-admins
-            plugin_id: 9b2540c9-6620-5bbe-b947-d6127fb24c17
+            plugin_id: 90bd1684-49bc-5dc8-9afc-f0cb80650f4a
           - access:
               allow:
                 - consumer-alice
                 - group-admins
-            plugin_id: 90bd1684-49bc-5dc8-9afc-f0cb80650f4a
+            plugin_id: 9b2540c9-6620-5bbe-b947-d6127fb24c17
       route_type: llm/v1/models
     route:
       id: 1a1f2026-c208-5e16-b362-ba671f49fb59

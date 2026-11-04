@@ -279,13 +279,7 @@ models:
 	requireIssue(t, result.Issues, Warning, RoutingConflict, kindModel, "c", "config.route.model.values")
 	requireIssue(t, result.Issues, Warning, RoutingConflict, kindModel, "a", "name")
 	require.Len(t, result.Output.AIModels, 1)
-	var proxies int
-	for _, p := range result.Output.Plugins {
-		if p.Name == "ai-proxy-advanced" {
-			proxies++
-		}
-	}
-	require.Equal(t, 3, proxies)
+	require.Len(t, inferenceProxies(result.Output), 3)
 }
 
 // A model on several shared routes gets one issue.
@@ -352,14 +346,11 @@ models:
 	require.Empty(t, result.Issues)
 	require.Len(t, result.Output.AIModels, 1)
 	require.Equal(t, "a", result.Output.AIModels[0].Name)
-	var proxies int
-	for _, p := range result.Output.Plugins {
-		if p.Name == "ai-proxy-advanced" {
-			require.Equal(t, kong.StringRef("a"), *p.Model)
-			proxies++
-		}
+	proxies := inferenceProxies(result.Output)
+	require.Len(t, proxies, 3)
+	for _, p := range proxies {
+		require.Equal(t, kong.StringRef("a"), *p.Model)
 	}
-	require.Equal(t, 3, proxies)
 }
 
 // A disabled model makes no output, so it cannot conflict.

@@ -152,10 +152,10 @@ plugins:
     config:
       models:
         sources:
-          - plugin_id: a68490bd-48d5-5bde-9990-c89554b37bbf
           - plugin_id: 0bd6f0d8-5869-5957-a257-a6987c2b4aa8
-          - plugin_id: 44c3bb4a-6076-5149-88a3-36203518bb20
           - plugin_id: 1e7a9113-b2a2-51a4-8f5d-a12653f0c0b0
+          - plugin_id: 44c3bb4a-6076-5149-88a3-36203518bb20
+          - plugin_id: a68490bd-48d5-5bde-9990-c89554b37bbf
       route_type: llm/v1/models
     route: models
   - name: ai-proxy-advanced

@@ -148,17 +148,17 @@ plugins:
     config:
       models:
         sources:
-          - plugin_id: 9ffd3fba-597f-56ef-9f44-76016596c155
-          - plugin_id: 9d52e068-0110-5d4a-acf4-e8d5a8edac7f
           - plugin_id: 53df3c43-84be-5d5e-bf8d-623373be2d59
+          - plugin_id: 9d52e068-0110-5d4a-acf4-e8d5a8edac7f
+          - plugin_id: 9ffd3fba-597f-56ef-9f44-76016596c155
       route_type: llm/v1/models
     route: models
   - name: ai-proxy-advanced
     config:
       models:
         sources:
-          - plugin_id: 9ffd3fba-597f-56ef-9f44-76016596c155
           - plugin_id: 9d52e068-0110-5d4a-acf4-e8d5a8edac7f
+          - plugin_id: 9ffd3fba-597f-56ef-9f44-76016596c155
       route_type: llm/v1/models
     route: models-embeddings
   - name: ai-proxy-advanced

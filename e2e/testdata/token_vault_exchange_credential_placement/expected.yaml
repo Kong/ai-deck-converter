@@ -275,8 +275,8 @@ plugins:
     config:
       models:
         sources:
-          - plugin_id: 58507262-f4ae-58ed-ac0f-591f2f42f752
           - plugin_id: 3be1c7a6-b293-573b-b1f5-fc30e6a733ff
+          - plugin_id: 58507262-f4ae-58ed-ac0f-591f2f42f752
       route_type: llm/v1/models
     route:
       id: aeea4f5f-1d07-59ad-98b1-be41cf62b11c

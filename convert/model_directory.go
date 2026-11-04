@@ -87,6 +87,10 @@ func (c *Converter) convertModelDirectories(st *modelPass, service *kong.Service
 		g.route.Source = source("model", g.models[0], "config.route.paths")
 		service.Routes = append(service.Routes, g.route)
 
+		sort.SliceStable(g.sources, func(i, j int) bool {
+			return g.sources[i]["plugin_id"].(string) < g.sources[j]["plugin_id"].(string)
+		})
+
 		c.out.Plugins = append(c.out.Plugins, kong.Plugin{
 			Name:  "ai-proxy-advanced",
 			Route: kong.NewStringRef(routeName),

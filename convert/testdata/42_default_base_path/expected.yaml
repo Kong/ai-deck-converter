@@ -88,8 +88,8 @@ plugins:
     config:
       models:
         sources:
-          - plugin_id: 6aa6a1c5-c2fb-5b2f-ac43-90323b7d477b
           - plugin_id: 16caaed6-6413-567b-9716-c086914aa065
+          - plugin_id: 6aa6a1c5-c2fb-5b2f-ac43-90323b7d477b
       route_type: llm/v1/models
     route: models
 ai_models:
