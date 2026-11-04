@@ -158,6 +158,7 @@ func (c *Converter) deriveTokenVaultInbound(
 		return
 	}
 	auth, _ := route.Plugins[pi].Config["auth"].(map[string]any)
+	// mcpPlugin lowers token_vault into this plugin before the auth plugins.
 	block, _ := auth["token_vault"].(map[string]any)
 	cred, _ := block["credential"].(map[string]any)
 	if cred == nil {

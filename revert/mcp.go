@@ -130,6 +130,9 @@ func (r *Reverter) revertMCPServer(svc *kong.Service, rt *kong.Route, plugins, s
 	// AWS SigV4) lifts into config.upstream.auth. The two never coexist — they
 	// lower to the same plugin auth record.
 	authBlock := getMap(cfg, "auth")
+	// Route and service-scoped plugins alike feed the access lift below, so the
+	// key-auth pairing check must see both sets.
+	allPlugins := append(append([]kong.Plugin{}, plugins...), svcPlugins...)
 	if getStr(authBlock, "provider") == aimap.UpstreamAuthProviderTokenVault {
 		tokenVault, err := r.tokenVaultFromConfig(authBlock, fmt.Sprintf("MCP server %q", svc.Name))
 		if err != nil {
@@ -142,8 +145,9 @@ func (r *Reverter) revertMCPServer(svc *kong.Service, rt *kong.Route, plugins, s
 		// The key-auth header carries the credential the exchange must
 		// read. The plugin default Authorization Bearer does not match it.
 		// The derivation is empty for a plugin that reads no header key.
-		keyAuth := findPlugin(plugins, "key-auth")
-		if keyAuth != nil && (tokenVault.Credential == nil || tokenVault.Credential.Inbound == nil) {
+		keyAuth := findPlugin(allPlugins, "key-auth")
+		if keyAuth != nil && tokenVault != nil &&
+			(tokenVault.Credential == nil || tokenVault.Credential.Inbound == nil) {
 			if loc := aimap.TokenVaultInboundFromKeyAuth(keyAuth.Config); loc != nil {
 				if err := r.warn("MCP server %q: the route's key-auth plugin reads the key from header %q, "+
 					"but the token-vault auth record has no credential.inbound; the data plane reads the "+
@@ -200,7 +204,6 @@ func (r *Reverter) revertMCPServer(svc *kong.Service, rt *kong.Route, plugins, s
 	// Pull auth-strategy / OAuth 2.0 Protected Resource Metadata access out
 	// of the route plugins (into access.auth_strategies/metadata) before the
 	// remaining plugins are reconstructed as policies.
-	allPlugins := append(append([]kong.Plugin{}, plugins...), svcPlugins...)
 	var rest []kong.Plugin
 	if m.Type == mcpConversionOnly {
 		// A conversion-only server may not carry access at all: lifting an auth
