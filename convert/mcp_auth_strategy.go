@@ -126,9 +126,9 @@ func (c *Converter) mcpAuthStrategyPlugins(
 	// is visible, not inside one builder. An oauth_access_token ACL without
 	// any auth plugin is left alone (nothing to bind the subjects to; see
 	// case 08's golden).
+	oidcPublishesACLClaims := plugins[0].Name == "openid-connect" && c.supports(aimap.FeatureMCPIdentityAuth)
 	if m.Access.ACLAttributeType == "oauth_access_token" &&
-		plugins[0].Name != "ai-mcp-oauth2" &&
-		!(plugins[0].Name == "openid-connect" && c.supports(aimap.FeatureMCPIdentityAuth)) {
+		plugins[0].Name != "ai-mcp-oauth2" && !oidcPublishesACLClaims {
 		c.warn(src.at("access.acl_attribute_type"), BehaviorMayDiffer,
 			"MCP server %q sets acl_attribute_type oauth_access_token, but the route's auth plugin is %q. "+
 				"oauth_access_token ACL subjects read the token claims published by ai-mcp-oauth2, "+
