@@ -43,7 +43,8 @@ func sessionID(resp httpResponse) string {
 // converter gates each conversion-only route with a pre-function that answers
 // 404 to anything but ai-mcp-proxy's unix-socket re-entry, so the listener's
 // tool calls reach the mock upstream while direct client requests never do,
-// even with the listener's own credential.
+// even with the listener's own credential. An upstream-server route carries
+// the same gate and gets the same direct-request checks.
 func testReusableToolsetsAreInternalOnly(t *testing.T, license string) {
 	mock := startMockUpstream(t)
 	configPath := convertCase(t, "reusable_toolsets_are_internal_only", "2.1", patchMCPPort(18082, mock.Port))
@@ -112,7 +113,7 @@ func testReusableToolsetsAreInternalOnly(t *testing.T, license string) {
 		{"X-Forwarded-Host", "unix"},
 		{"X-Forwarded-Host", "unix://bypass-me"},
 	}
-	for _, server := range []string{"team-a", "team-b"} {
+	for _, server := range []string{"team-a", "team-b", "third-party"} {
 		for _, apiKey := range []string{"", mcpE2EAPIKey} {
 			for _, spoof := range spoofs {
 				context := server + ": direct request without credentials"

@@ -18,6 +18,11 @@ import (
 // mcpToolsetGate).
 const mcpConversionOnly = "conversion-only"
 
+// mcpUpstreamServer is the MCP server mode of a third-party server. Only
+// listeners call it, so its route carries the same gate as a conversion-only
+// route.
+const mcpUpstreamServer = "upstream-server"
+
 // convertMCPServers translates AI Gateway MCP Servers into a Gateway Service +
 // Route with an ai-mcp-proxy plugin (config.mode = the source type, one of
 // conversion-only | conversion-listener | listener | passthrough-listener |
@@ -133,7 +138,7 @@ func (c *Converter) convertMCPServer(
 	}
 	// An unexposed conversion-only server is pruned below, so it gets no
 	// gate and its policies cannot collide with one.
-	if m.Type == mcpConversionOnly && exposed[m.Name] {
+	if m.Type == mcpUpstreamServer || (m.Type == mcpConversionOnly && exposed[m.Name]) {
 		// Kong allows one plugin per name on a route, so a policy of the
 		// gate's type would collide with it; neither can be dropped without
 		// either opening the route or losing the user's plugin.
@@ -141,9 +146,9 @@ func (c *Converter) convertMCPServer(
 			return p.Name == aimap.MCPToolsetGatePlugin
 		}) {
 			return kong.Service{}, c.fail(src.at("policies"), ConfigFieldInvalid,
-				"MCP server %q is conversion-only, so its route carries a generated %q gate; "+
+				"MCP server %q is %s, so its route carries a generated %q gate; "+
 					"it cannot also have a %q policy",
-				m.Name, aimap.MCPToolsetGatePlugin, aimap.MCPToolsetGatePlugin)
+				m.Name, m.Type, aimap.MCPToolsetGatePlugin, aimap.MCPToolsetGatePlugin)
 		}
 		route.Plugins = append(route.Plugins, mcpToolsetGate(m))
 	}
@@ -175,7 +180,8 @@ func (c *Converter) convertMCPServer(
 	return service, nil
 }
 
-// mcpToolsetGate closes a conversion-only server's route to clients. Such a
+// mcpToolsetGate closes the route of a conversion-only or upstream-server
+// MCP server to clients. Such a
 // server serves no MCP traffic of its own and cannot declare access itself
 // (mcpAuthStrategyPlugins rejects auth on non-listener modes): its tools are only
 // meant to be reached through the listeners that name it in config.sources.
