@@ -1,0 +1,152 @@
+_format_version: "3.0"
+_transform: false
+services:
+  - id: 22b7ecbb-f15d-5ff9-9e63-107e087179ea
+    name: reports
+    url: http://host.docker.internal:18083
+    host: host.docker.internal
+    port: 18083
+    protocol: http
+  - id: 241af9b7-9306-529b-997b-c86240493d60
+    name: vendor
+    url: http://host.docker.internal:18084/mcp
+    host: host.docker.internal
+    port: 18084
+    protocol: http
+    path: /mcp
+routes:
+  - id: ec9415ea-8a9e-54c0-98f8-ccf706691acd
+    name: reports-route
+    service:
+      id: 22b7ecbb-f15d-5ff9-9e63-107e087179ea
+    paths:
+      - /mcp/reports
+    protocols:
+      - http
+      - https
+  - id: 1949b1d0-ad0e-51d8-8006-2fd707e7eb2f
+    name: vendor-route
+    service:
+      id: 241af9b7-9306-529b-997b-c86240493d60
+    paths:
+      - /mcp/vendor
+    protocols:
+      - http
+      - https
+consumers:
+  - id: 7acc1200-8054-5755-92cf-be484bbe0293
+    username: allowed-client
+  - id: 10262a56-bd94-5105-a202-3eff70999c95
+    username: buyer-client
+  - id: f4501630-ea01-53fb-a599-4e8fd17fecf4
+    username: outsider-client
+  - id: e28bfa8b-490a-5f23-bb36-3ce9d0dfa564
+    username: buyer-only-client
+  - id: 6ddc29c9-39d3-5673-bace-f8ebb84a97a8
+    username: blocked-client
+consumer_groups:
+  - id: 5b12935c-9bf0-5168-9eb2-87532742a448
+    name: mcp-allowed
+  - id: 9ca5ad8b-20ec-5a2b-8ecd-d6698133c91b
+    name: buyers
+  - id: dcfbdcca-9eae-5252-a835-66585742dfec
+    name: mcp-blocked
+consumer_group_consumers:
+  - consumer: 7acc1200-8054-5755-92cf-be484bbe0293
+    consumer_group: 5b12935c-9bf0-5168-9eb2-87532742a448
+  - consumer: 10262a56-bd94-5105-a202-3eff70999c95
+    consumer_group: 5b12935c-9bf0-5168-9eb2-87532742a448
+  - consumer: 10262a56-bd94-5105-a202-3eff70999c95
+    consumer_group: 9ca5ad8b-20ec-5a2b-8ecd-d6698133c91b
+  - consumer: e28bfa8b-490a-5f23-bb36-3ce9d0dfa564
+    consumer_group: 9ca5ad8b-20ec-5a2b-8ecd-d6698133c91b
+  - consumer: 6ddc29c9-39d3-5673-bace-f8ebb84a97a8
+    consumer_group: 5b12935c-9bf0-5168-9eb2-87532742a448
+  - consumer: 6ddc29c9-39d3-5673-bace-f8ebb84a97a8
+    consumer_group: dcfbdcca-9eae-5252-a835-66585742dfec
+plugins:
+  - id: f72d8dc5-9056-5949-8dec-a39f087834de
+    name: ai-mcp-proxy
+    config:
+      include_consumer_groups: true
+      logging:
+        log_audits: false
+        log_payloads: false
+        log_statistics: true
+      mode: conversion-listener
+      server:
+        forward_client_headers: true
+      tools:
+        - description: List reports
+          method: GET
+          name: list-reports
+          path: reports
+        - acl:
+            allow:
+              - buyers
+          description: Buy a report
+          method: POST
+          name: buy-report
+          path: purchases
+    route:
+      id: ec9415ea-8a9e-54c0-98f8-ccf706691acd
+  - id: 9062f741-d88f-5d02-a811-067d0d091161
+    name: acl
+    config:
+      allow:
+        - mcp-allowed
+      include_consumer_groups: true
+    route:
+      id: ec9415ea-8a9e-54c0-98f8-ccf706691acd
+  - id: 609ed985-31e2-5f67-8de7-17f181db084a
+    name: key-auth
+    config:
+      hide_credentials: false
+      key_names:
+        - apikey
+    route:
+      id: ec9415ea-8a9e-54c0-98f8-ccf706691acd
+  - id: 85c0bd6c-91d6-515f-80d0-d1fabd279191
+    name: ai-mcp-proxy
+    config:
+      include_consumer_groups: true
+      logging:
+        log_audits: false
+        log_payloads: false
+        log_statistics: true
+      mode: passthrough-listener
+      tools: []
+    route:
+      id: 1949b1d0-ad0e-51d8-8006-2fd707e7eb2f
+  - id: 414d6db3-7deb-5f03-9895-57ef8bdb4ff4
+    name: acl
+    config:
+      deny:
+        - mcp-blocked
+      include_consumer_groups: true
+    route:
+      id: 1949b1d0-ad0e-51d8-8006-2fd707e7eb2f
+  - id: 416d067b-cd64-56c1-b90b-c0d80cbb62e3
+    name: key-auth
+    config:
+      hide_credentials: false
+      key_names:
+        - apikey
+    route:
+      id: 1949b1d0-ad0e-51d8-8006-2fd707e7eb2f
+keyauth_credentials:
+  - id: 875c7bee-ea8c-57b7-bc75-7c2d429944bb
+    key: mcp-allowed-secret
+    consumer: 7acc1200-8054-5755-92cf-be484bbe0293
+  - id: df48073d-8b52-521b-8748-c0abc1e88001
+    key: mcp-buyer-secret
+    consumer: 10262a56-bd94-5105-a202-3eff70999c95
+  - id: 5d01fecf-5d59-5bea-82f6-a137e2b735f9
+    key: mcp-outsider-secret
+    consumer: f4501630-ea01-53fb-a599-4e8fd17fecf4
+  - id: 06aa996a-4303-56f7-8b1a-6d3a326ec84e
+    key: mcp-buyer-only-secret
+    consumer: e28bfa8b-490a-5f23-bb36-3ce9d0dfa564
+  - id: 666ce243-78da-5445-bdea-31122c869545
+    key: mcp-blocked-secret
+    consumer: 6ddc29c9-39d3-5673-bace-f8ebb84a97a8

@@ -1,0 +1,132 @@
+_format_version: "3.0"
+_transform: false
+services:
+  - id: 4395de0c-7c0d-5061-a736-c0a29209a16a
+    name: flights
+    url: http://host.docker.internal:18085
+    host: host.docker.internal
+    port: 18085
+    protocol: http
+  - id: 241af9b7-9306-529b-997b-c86240493d60
+    name: vendor
+    url: http://host.docker.internal:18086/mcp
+    host: host.docker.internal
+    port: 18086
+    protocol: http
+    path: /mcp
+routes:
+  - id: 6cc92280-4783-52a1-a35f-49658e3de9d5
+    name: flights-route
+    service:
+      id: 4395de0c-7c0d-5061-a736-c0a29209a16a
+    paths:
+      - /mcp/flights
+    protocols:
+      - http
+      - https
+  - id: 1949b1d0-ad0e-51d8-8006-2fd707e7eb2f
+    name: vendor-route
+    service:
+      id: 241af9b7-9306-529b-997b-c86240493d60
+    paths:
+      - /mcp/vendor
+    protocols:
+      - http
+      - https
+consumers:
+  - id: b9d85f8a-5d57-5c1f-90a6-9825cb84b646
+    username: gold-client
+  - id: 1f5b9991-bd4a-5d04-826e-afa22f72464d
+    username: silver-client
+  - id: 8a022f8f-824e-5ce8-a5b1-a9031c96cd67
+    username: no-group-client
+  - id: 5ce2da21-095e-5e92-b2dd-481751081852
+    username: suspended-client
+consumer_groups:
+  - id: 1e0fe49d-7d0d-5ad5-b5b6-05a120317005
+    name: gold
+  - id: 611a798a-b46f-518f-ac3f-cf84a1878876
+    name: silver
+consumer_group_consumers:
+  - consumer: b9d85f8a-5d57-5c1f-90a6-9825cb84b646
+    consumer_group: 1e0fe49d-7d0d-5ad5-b5b6-05a120317005
+  - consumer: 1f5b9991-bd4a-5d04-826e-afa22f72464d
+    consumer_group: 611a798a-b46f-518f-ac3f-cf84a1878876
+  - consumer: 5ce2da21-095e-5e92-b2dd-481751081852
+    consumer_group: 1e0fe49d-7d0d-5ad5-b5b6-05a120317005
+plugins:
+  - id: be3e4602-8855-5ab5-a7e7-aaf67c2820ef
+    name: ai-mcp-proxy
+    config:
+      include_consumer_groups: true
+      logging:
+        log_audits: false
+        log_payloads: false
+        log_statistics: true
+      mode: conversion-listener
+      server:
+        forward_client_headers: true
+      tools:
+        - description: List reports
+          method: GET
+          name: list-reports
+          path: reports
+    route:
+      id: 6cc92280-4783-52a1-a35f-49658e3de9d5
+  - id: 761eebbe-9a41-5551-98ed-20e28e6c1f29
+    name: acl
+    config:
+      allow_when:
+        - consumer_group.names != null && 'gold' in consumer_group.names
+      include_consumer_groups: true
+    route:
+      id: 6cc92280-4783-52a1-a35f-49658e3de9d5
+  - id: 57c9bb51-b569-578a-b5c1-b109a48c3106
+    name: key-auth
+    config:
+      hide_credentials: false
+      key_names:
+        - apikey
+    route:
+      id: 6cc92280-4783-52a1-a35f-49658e3de9d5
+  - id: 85c0bd6c-91d6-515f-80d0-d1fabd279191
+    name: ai-mcp-proxy
+    config:
+      include_consumer_groups: true
+      logging:
+        log_audits: false
+        log_payloads: false
+        log_statistics: true
+      mode: passthrough-listener
+      tools: []
+    route:
+      id: 1949b1d0-ad0e-51d8-8006-2fd707e7eb2f
+  - id: 414d6db3-7deb-5f03-9895-57ef8bdb4ff4
+    name: acl
+    config:
+      deny_when:
+        - consumer.username == 'suspended-client'
+      include_consumer_groups: true
+    route:
+      id: 1949b1d0-ad0e-51d8-8006-2fd707e7eb2f
+  - id: 416d067b-cd64-56c1-b90b-c0d80cbb62e3
+    name: key-auth
+    config:
+      hide_credentials: false
+      key_names:
+        - apikey
+    route:
+      id: 1949b1d0-ad0e-51d8-8006-2fd707e7eb2f
+keyauth_credentials:
+  - id: fb0b4ddb-b048-5b18-a112-41b3a9136ec9
+    key: mcp-gold-secret
+    consumer: b9d85f8a-5d57-5c1f-90a6-9825cb84b646
+  - id: d5ab7e5d-30a0-5daa-8df7-f8660e285cdc
+    key: mcp-silver-secret
+    consumer: 1f5b9991-bd4a-5d04-826e-afa22f72464d
+  - id: 79bcb277-c2a8-5832-9a49-71d120f5a012
+    key: mcp-no-group-secret
+    consumer: 8a022f8f-824e-5ce8-a5b1-a9031c96cd67
+  - id: 39b462f5-8ca7-538c-a293-3ecf937e7137
+    key: mcp-suspended-secret
+    consumer: 5ce2da21-095e-5e92-b2dd-481751081852

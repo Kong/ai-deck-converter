@@ -1,0 +1,8 @@
+- code: CONFIG_FIELD_OVERRIDDEN
+  reason: MCP server "flights-mcp" of type "conversion-listener" uses a key-auth auth strategy and has forward_client_headers set to false. This will be ignored, and forward_client_headers will be overridden to true because ai-mcp-proxy needs the client's key to execute tools.
+  source:
+    kind: mcp_server
+    name: flights-mcp
+    fields:
+      - config.server.forward_client_headers
+  severity: WARNING
