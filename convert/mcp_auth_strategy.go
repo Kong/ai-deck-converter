@@ -112,6 +112,7 @@ func (c *Converter) mcpAuthStrategyPlugins(
 					m.Name, idp.Name)
 			}
 			cfg["hide_credentials"] = false
+			c.deriveTokenVaultInbound(src, m, idp, route)
 		}
 		plugins = []kong.Plugin{{Name: idp.Type, Config: cfg, Source: source("identity_provider", idp.Name, "config")}}
 	}
@@ -130,6 +131,40 @@ func (c *Converter) mcpAuthStrategyPlugins(
 				"acl_attribute_type.", m.Name, plugins[0].Name)
 	}
 	return plugins, nil
+}
+
+// deriveTokenVaultInbound fills the ai-mcp-proxy token_vault inbound credential
+// from the key-auth strategy when the MCP server sets none: the token exchange
+// must read the credential where the key-auth plugin expects it, and the plugin
+// default (Authorization: Bearer) does not match key-auth. An explicit inbound
+// is never touched. Runs on the ai-mcp-proxy plugin already on the route.
+func (c *Converter) deriveTokenVaultInbound(
+	src ConversionIssueSource, m *aigw.MCPServer, idp *aigw.AuthStrategy, route *kong.Route,
+) {
+	tv := m.TokenVault
+	if tv == nil || (tv.Credential != nil && tv.Credential.Inbound != nil) {
+		return
+	}
+	inbound := aimap.TokenVaultInboundFromKeyAuth(idp.Config)
+	if inbound == nil {
+		c.warn(src.at("token_vault.credential.inbound"), BehaviorMayDiffer,
+			"MCP server %q: the key-auth strategy does not read its key from the headers, so "+
+				"token_vault.credential.inbound cannot be derived from it. The data plane keeps the "+
+				"default inbound (Authorization: Bearer), which the exchange will not find.", m.Name)
+		return
+	}
+	for i := range route.Plugins {
+		if route.Plugins[i].Name != "ai-mcp-proxy" {
+			continue
+		}
+		auth, _ := route.Plugins[i].Config["auth"].(map[string]any)
+		block, _ := auth["token_vault"].(map[string]any)
+		block["credential"] = map[string]any{"inbound": inbound}
+		c.warn(src.at("token_vault.credential.inbound"), ConfigFieldOverridden,
+			"MCP server %q: token_vault.credential.inbound is derived from the route's key-auth plugin "+
+				"(header %q, no prefix), because the plugin default Authorization: Bearer does not match "+
+				"where key-auth reads the key.", m.Name, inbound["name"])
+	}
 }
 
 func mcpOAuth2Source(

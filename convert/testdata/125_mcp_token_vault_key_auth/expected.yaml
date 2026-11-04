@@ -1,0 +1,150 @@
+_format_version: "3.0"
+services:
+  - name: derived-default
+    host: localhost
+    routes:
+      - name: derived-default-route
+        paths:
+          - /mcp/derived-default
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              auth:
+                provider: token_vault
+                token_vault:
+                  credential:
+                    inbound:
+                      location: header
+                      name: apikey
+                      prefix: ""
+                  directory: my-directory
+                  provider: outbound-api
+                  storage:
+                    backend: konnect
+              include_consumer_groups: true
+              logging:
+                log_audits: false
+                log_payloads: false
+                log_statistics: true
+              mode: conversion-listener
+              tools:
+                - description: A tool
+                  name: toolA
+          - name: key-auth
+            config:
+              hide_credentials: false
+  - name: derived-custom
+    host: localhost
+    routes:
+      - name: derived-custom-route
+        paths:
+          - /mcp/derived-custom
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              auth:
+                provider: token_vault
+                token_vault:
+                  credential:
+                    inbound:
+                      location: header
+                      name: x-custom-key
+                      prefix: ""
+                  directory: my-directory
+                  provider: outbound-api
+                  storage:
+                    backend: konnect
+              include_consumer_groups: true
+              logging:
+                log_audits: false
+                log_payloads: false
+                log_statistics: true
+              mode: conversion-listener
+              tools:
+                - description: A tool
+                  name: toolB
+          - name: key-auth
+            config:
+              hide_credentials: false
+              key_names:
+                - x-custom-key
+  - name: explicit-inbound
+    host: localhost
+    routes:
+      - name: explicit-inbound-route
+        paths:
+          - /mcp/explicit-inbound
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              auth:
+                provider: token_vault
+                token_vault:
+                  credential:
+                    inbound:
+                      location: header
+                      name: Authorization
+                      prefix: Bearer
+                    outbound:
+                      location: header
+                      name: X-Upstream-Key
+                      prefix: ""
+                  directory: my-directory
+                  provider: outbound-api
+                  storage:
+                    backend: konnect
+              include_consumer_groups: true
+              logging:
+                log_audits: false
+                log_payloads: false
+                log_statistics: true
+              mode: conversion-listener
+              tools:
+                - description: A tool
+                  name: toolC
+          - name: key-auth
+            config:
+              hide_credentials: false
+  - name: no-header-key
+    host: localhost
+    routes:
+      - name: no-header-key-route
+        paths:
+          - /mcp/no-header-key
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              auth:
+                provider: token_vault
+                token_vault:
+                  directory: my-directory
+                  provider: outbound-api
+                  storage:
+                    backend: konnect
+              include_consumer_groups: true
+              logging:
+                log_audits: false
+                log_payloads: false
+                log_statistics: true
+              mode: conversion-listener
+              tools:
+                - description: A tool
+                  name: toolD
+          - name: key-auth
+            config:
+              hide_credentials: false
+              key_in_body: true
+              key_in_header: false
+routes:
+  - name: token-vault-callback-handler
+    paths:
+      - /_vault
+    protocols:
+      - http
+      - https
+    plugins:
+      - name: token-vault-callback-handler
+        config:
+          directory: my-directory
+          storage:
+            backend: konnect

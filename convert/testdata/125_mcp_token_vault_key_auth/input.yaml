@@ -1,0 +1,77 @@
+datastores:
+  - name: vault-konnect-prod
+    type: token-vault
+    config:
+      directory: my-directory
+
+auth_strategies:
+  # no config: the key-auth default key name (apikey) is derived
+  - name: api-key-default
+    type: key-auth
+    display_name: API Key Default
+  - name: api-key-custom
+    type: key-auth
+    display_name: API Key Custom
+    config:
+      key_names: [x-custom-key]
+  - name: api-key-body
+    type: key-auth
+    display_name: API Key Body
+    config:
+      key_in_header: false
+      key_in_body: true
+
+mcp_servers:
+  - type: conversion-listener
+    display_name: Derived Default
+    name: derived-default
+    config: {route: {paths: [/mcp/derived-default]}}
+    datastores: [{name: vault-konnect-prod}]
+    token_vault:
+      provider: outbound-api
+    access:
+      auth_strategies: [api-key-default]
+    tools:
+      - name: toolA
+        description: A tool
+  - type: conversion-listener
+    display_name: Derived Custom
+    name: derived-custom
+    config: {route: {paths: [/mcp/derived-custom]}}
+    datastores: [{name: vault-konnect-prod}]
+    token_vault:
+      provider: outbound-api
+    access:
+      auth_strategies: [api-key-custom]
+    tools:
+      - name: toolB
+        description: A tool
+  # the explicit inbound wins; nothing is derived or warned
+  - type: conversion-listener
+    display_name: Explicit Inbound
+    name: explicit-inbound
+    config: {route: {paths: [/mcp/explicit-inbound]}}
+    datastores: [{name: vault-konnect-prod}]
+    token_vault:
+      provider: outbound-api
+      credential:
+        inbound: {location: header, name: Authorization, prefix: Bearer}
+        outbound: {location: header, name: X-Upstream-Key, prefix: ""}
+    access:
+      auth_strategies: [api-key-default]
+    tools:
+      - name: toolC
+        description: A tool
+  # the strategy reads its key from the body, so nothing can be derived
+  - type: conversion-listener
+    display_name: No Header Key
+    name: no-header-key
+    config: {route: {paths: [/mcp/no-header-key]}}
+    datastores: [{name: vault-konnect-prod}]
+    token_vault:
+      provider: outbound-api
+    access:
+      auth_strategies: [api-key-body]
+    tools:
+      - name: toolD
+        description: A tool
