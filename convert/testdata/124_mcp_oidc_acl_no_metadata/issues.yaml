@@ -1,0 +1,8 @@
+- code: BEHAVIOR_MAY_DIFFER
+  reason: MCP server "claims-mcp" sets acl_attribute_type oauth_access_token, but the route's auth plugin is "openid-connect". oauth_access_token ACL subjects read the token claims published by ai-mcp-oauth2, or by openid-connect from runtime 2.3. On older runtimes the ACL has no subjects to match and denies every request.
+  source:
+    kind: mcp_server
+    name: claims-mcp
+    fields:
+      - access.acl_attribute_type
+  severity: WARNING

@@ -1,8 +1,0 @@
-- code: CONFIG_FIELD_INVALID
-  reason: 'MCP server "claims-mcp" sets acl_attribute_type oauth_access_token, but the route''s auth plugin is "openid-connect". oauth_access_token ACLs require the ai-mcp-oauth2 plugin: pair access.metadata with an openid-connect strategy at min_runtime_version below 2.3. Otherwise use a consumer acl_attribute_type.'
-  source:
-    kind: mcp_server
-    name: claims-mcp
-    fields:
-      - access.acl_attribute_type
-  severity: ERROR
