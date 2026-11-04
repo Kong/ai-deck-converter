@@ -98,31 +98,29 @@ func TokenVaultFromPlugin(block map[string]any) *aigw.TokenVaultConfig {
 	return tv
 }
 
-// TokenVaultInboundFromKeyAuth derives the ai-mcp-proxy token_vault inbound
-// credential block from a key-auth plugin config. The key-auth header carries
-// the raw key, so the derived prefix is empty rather than the plugin default
+// TokenVaultInboundFromKeyAuth derives the token_vault inbound credential
+// location from a key-auth plugin config. The key-auth header carries the raw
+// key, so the derived prefix is empty rather than the plugin default
 // "Bearer ". Returns nil when the config cannot serve a header key, for
 // example key_in_header: false.
-func TokenVaultInboundFromKeyAuth(cfg map[string]any) map[string]any {
+func TokenVaultInboundFromKeyAuth(cfg map[string]any) *aigw.TokenVaultCredentialLocation {
 	// A nil config means the key-auth defaults: header, key name apikey.
 	if inHeader, ok := cfg["key_in_header"].(bool); ok && !inHeader {
 		return nil
 	}
-	names := keyAuthKeyNames(cfg)
+	names := ConfigStrings(cfg, "key_names")
 	if len(names) == 0 {
-		return nil
+		names = []string{"apikey"}
 	}
-	return map[string]any{"location": "header", "name": names[0], "prefix": ""}
+	return &aigw.TokenVaultCredentialLocation{Location: "header", Name: names[0], Prefix: new("")}
 }
 
-// keyAuthKeyNames reads a key-auth config's key_names, defaulting to
-// ["apikey"] when absent or empty, as the key-auth schema defaults.
-func keyAuthKeyNames(cfg map[string]any) []string {
-	switch v := cfg["key_names"].(type) {
+// ConfigStrings reads config[key] as a []string, accepting []string or []any
+// and dropping non-string elements. Returns nil when the key holds neither.
+func ConfigStrings(cfg map[string]any, key string) []string {
+	switch v := cfg[key].(type) {
 	case []string:
-		if len(v) > 0 {
-			return v
-		}
+		return v
 	case []any:
 		out := make([]string, 0, len(v))
 		for _, e := range v {
@@ -130,11 +128,9 @@ func keyAuthKeyNames(cfg map[string]any) []string {
 				out = append(out, s)
 			}
 		}
-		if len(out) > 0 {
-			return out
-		}
+		return out
 	}
-	return []string{"apikey"}
+	return nil
 }
 
 // TokenVaultRedisToPlugin flattens a RedisCloudConfig (the API model's nested
@@ -459,6 +455,13 @@ func tokenVaultCredentialToPlugin(c *aigw.TokenVaultCredential) map[string]any {
 		return nil
 	}
 	return out
+}
+
+// TokenVaultLocationToPlugin lowers one credential location into the plugin's
+// location block. An empty Prefix differs from the plugin default "Bearer ",
+// so a non-nil empty Prefix emits prefix: "".
+func TokenVaultLocationToPlugin(l *aigw.TokenVaultCredentialLocation) map[string]any {
+	return tokenVaultLocationToPlugin(l)
 }
 
 func tokenVaultLocationToPlugin(l *aigw.TokenVaultCredentialLocation) map[string]any {

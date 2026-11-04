@@ -1,5 +1,5 @@
 - code: CONFIG_FIELD_OVERRIDDEN
-  reason: 'MCP server "derived-default": token_vault.credential.inbound is derived from the route''s key-auth plugin (header "apikey", no prefix), because the plugin default Authorization: Bearer does not match where key-auth reads the key.'
+  reason: 'MCP server "derived-default": token_vault.credential.inbound is derived from the route''s key-auth plugin (header "apikey", the strategy''s first key name, no prefix), because the plugin default Authorization: Bearer does not match where key-auth reads the key.'
   source:
     kind: mcp_server
     name: derived-default
@@ -7,7 +7,7 @@
       - token_vault.credential.inbound
   severity: WARNING
 - code: CONFIG_FIELD_OVERRIDDEN
-  reason: 'MCP server "derived-custom": token_vault.credential.inbound is derived from the route''s key-auth plugin (header "x-custom-key", no prefix), because the plugin default Authorization: Bearer does not match where key-auth reads the key.'
+  reason: 'MCP server "derived-custom": token_vault.credential.inbound is derived from the route''s key-auth plugin (header "x-custom-key", the strategy''s first key name, no prefix), because the plugin default Authorization: Bearer does not match where key-auth reads the key.'
   source:
     kind: mcp_server
     name: derived-custom
@@ -19,6 +19,14 @@
   source:
     kind: mcp_server
     name: no-header-key
+    fields:
+      - token_vault.credential.inbound
+  severity: WARNING
+- code: CONFIG_FIELD_OVERRIDDEN
+  reason: 'MCP server "outbound-only": token_vault.credential.inbound is derived from the route''s key-auth plugin (header "apikey", the strategy''s first key name, no prefix), because the plugin default Authorization: Bearer does not match where key-auth reads the key.'
+  source:
+    kind: mcp_server
+    name: outbound-only
     fields:
       - token_vault.credential.inbound
   severity: WARNING
