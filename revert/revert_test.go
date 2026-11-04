@@ -435,14 +435,18 @@ services:
 	// The same config with an explicit inbound carries no warning.
 	withInbound := []byte(strings.Replace(string(in),
 		"provider: outbound-api",
-		"provider: outbound-api\n                  credential:\n                    inbound: {location: header, name: apikey, prefix: \"\"}",
+		"provider: outbound-api\n"+
+			"                  credential:\n"+
+			"                    inbound: {location: header, name: apikey, prefix: \"\"}",
 		1))
 	_, warnings, err = revertYAML(t, withInbound, Options{})
 	require.NoError(t, err, "revert with inbound")
 	require.Empty(t, warnings, "warnings with explicit inbound")
 
 	// No key-auth plugin: the default inbound matches a bearer caller.
-	noKeyAuth := []byte(strings.Replace(string(in), "          - name: key-auth\n            config: {key_names: [apikey]}\n", "", 1))
+	noKeyAuth := []byte(strings.Replace(string(in),
+		"          - name: key-auth\n"+
+			"            config: {key_names: [apikey]}\n", "", 1))
 	_, warnings, err = revertYAML(t, noKeyAuth, Options{})
 	require.NoError(t, err, "revert without key-auth")
 	require.Empty(t, warnings, "warnings without key-auth")
