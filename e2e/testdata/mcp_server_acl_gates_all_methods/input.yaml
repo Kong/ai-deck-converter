@@ -1,0 +1,75 @@
+# access.acls on an MCP server becomes a Kong acl plugin on the route. It runs
+# before ai-mcp-proxy, so it gates every MCP method, not only tool calls.
+# default_tool_acls and tools[].access.acls stay in the ai-mcp-proxy config and
+# filter tools for the callers the server ACL lets in.
+mcp_servers:
+  # A conversion-listener over the harness's mock REST API. Only the
+  # mcp-allowed group reaches it. Inside, buy-report needs the buyers group.
+  - type: conversion-listener
+    name: reports
+    upstream_url: http://host.docker.internal:18083
+    config:
+      route: {paths: [/mcp/reports]}
+    access:
+      auth_strategies: [mcp-key-auth]
+      acls:
+        allow: [mcp-allowed]
+    tools:
+      - {name: list-reports, description: List reports, method: GET, path: reports}
+      - name: buy-report
+        description: Buy a report
+        method: POST
+        path: purchases
+        access:
+          acls:
+            allow: [buyers]
+  # A passthrough-listener over the harness's mock MCP server. Every caller
+  # except the mcp-blocked group reaches it.
+  - type: passthrough-listener
+    name: vendor
+    upstream_url: http://host.docker.internal:18084/mcp
+    config:
+      route: {paths: [/mcp/vendor]}
+    access:
+      auth_strategies: [mcp-key-auth]
+      acls:
+        deny: [mcp-blocked]
+
+auth_strategies:
+  - name: mcp-key-auth
+    type: key-auth
+    config:
+      key_names: [apikey]
+
+consumer_groups:
+  - name: mcp-allowed
+  - name: buyers
+  - name: mcp-blocked
+
+consumers:
+  - name: allowed-client
+    type: api-key
+    consumer_groups: [mcp-allowed]
+    credentials:
+      - {name: allowed-key, type: api-key, api_key: mcp-allowed-secret}
+  - name: buyer-client
+    type: api-key
+    consumer_groups: [mcp-allowed, buyers]
+    credentials:
+      - {name: buyer-key, type: api-key, api_key: mcp-buyer-secret}
+  # In no group: outside the reports allow list, not on the vendor deny list.
+  - name: outsider-client
+    type: api-key
+    credentials:
+      - {name: outsider-key, type: api-key, api_key: mcp-outsider-secret}
+  # In buyers but not in mcp-allowed: a tool ACL must not open the server.
+  - name: buyer-only-client
+    type: api-key
+    consumer_groups: [buyers]
+    credentials:
+      - {name: buyer-only-key, type: api-key, api_key: mcp-buyer-only-secret}
+  - name: blocked-client
+    type: api-key
+    consumer_groups: [mcp-allowed, mcp-blocked]
+    credentials:
+      - {name: blocked-key, type: api-key, api_key: mcp-blocked-secret}

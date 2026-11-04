@@ -15,3 +15,11 @@
     fields:
       - access.acls
   severity: ERROR
+- code: BEHAVIOR_MAY_DIFFER
+  reason: MCP server "valid-mcp" sets access.acls, but no plugin on its route identifies a consumer or consumer group. The acl plugin has nothing to match and denies every request. Add a key-auth or openid-connect auth strategy to access.auth_strategies.
+  source:
+    kind: mcp_server
+    name: valid-mcp
+    fields:
+      - access.acls
+  severity: WARNING

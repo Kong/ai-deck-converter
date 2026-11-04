@@ -241,8 +241,8 @@ func TestUntaggedPreFunctionOnSourceIsAPolicy(t *testing.T) {
 }
 
 // TestMCPACLPluginOnlyLiftsOnListenerTypes checks that a route acl plugin
-// becomes access.acls on a listener type. On a source type it is dropped
-// with a warning, because convert rejects access.acls there.
+// becomes access.acls on a listener type. On a source type, revert drops it
+// with a warning. convert rejects access.acls there.
 func TestMCPACLPluginOnlyLiftsOnListenerTypes(t *testing.T) {
 	const deck = `
 _format_version: "3.0"
