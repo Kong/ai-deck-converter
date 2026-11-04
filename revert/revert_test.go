@@ -459,7 +459,8 @@ services:
 
 // The AI Gateway API does not accept rate_limiting on a listener.
 // Revert drops it to keep the output valid for convert.
-func TestMCPRateLimitingDroppedOnListener(t *testing.T) {	in := []byte(`
+func TestMCPRateLimitingDroppedOnListener(t *testing.T) {
+	in := []byte(`
 _format_version: "3.0"
 services:
   - name: limited-listener

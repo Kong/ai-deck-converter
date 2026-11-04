@@ -135,6 +135,43 @@ services:
               hide_credentials: false
               key_in_body: true
               key_in_header: false
+  - name: outbound-only
+    host: localhost
+    routes:
+      - name: outbound-only-route
+        paths:
+          - /mcp/outbound-only
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              auth:
+                provider: token_vault
+                token_vault:
+                  credential:
+                    inbound:
+                      location: header
+                      name: apikey
+                      prefix: ""
+                    outbound:
+                      location: header
+                      name: X-Upstream-Key
+                      prefix: ""
+                  directory: my-directory
+                  provider: outbound-api
+                  storage:
+                    backend: konnect
+              include_consumer_groups: true
+              logging:
+                log_audits: false
+                log_payloads: false
+                log_statistics: true
+              mode: conversion-listener
+              tools:
+                - description: A tool
+                  name: toolE
+          - name: key-auth
+            config:
+              hide_credentials: false
 routes:
   - name: token-vault-callback-handler
     paths:

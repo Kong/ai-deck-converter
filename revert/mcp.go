@@ -147,12 +147,12 @@ func (r *Reverter) revertMCPServer(svc *kong.Service, rt *kong.Route, plugins, s
 		// inbound; convert warns instead, and this stays silent to keep
 		// re-converting converter output warning-free.
 		keyAuth := findPlugin(plugins, "key-auth")
-		if keyAuth != nil && tokenVaultInboundMissing(getMap(authBlock, "token_vault")) {
-			if inbound := aimap.TokenVaultInboundFromKeyAuth(keyAuth.Config); inbound != nil {
+		if keyAuth != nil && (tokenVault.Credential == nil || tokenVault.Credential.Inbound == nil) {
+			if loc := aimap.TokenVaultInboundFromKeyAuth(keyAuth.Config); loc != nil {
 				if err := r.warn("MCP server %q: the route's key-auth plugin reads the key from header %q, "+
 					"but the token-vault auth record has no credential.inbound; the data plane reads the "+
 					"inbound credential from Authorization: Bearer, which key-auth does not use",
-					svc.Name, inbound["name"]); err != nil {
+					svc.Name, loc.Name); err != nil {
 					return err
 				}
 			}
@@ -290,15 +290,4 @@ func mcpTool(tool map[string]any) aigw.MCPTool {
 		t.Access.ACLs = aclsFromBlock(acl)
 	}
 	return t
-}
-
-// tokenVaultInboundMissing reports whether a plugin auth.token_vault block
-// carries no credential.inbound. The data plane then reads the inbound
-// credential from its default location, which key-auth routes do not use.
-func tokenVaultInboundMissing(block map[string]any) bool {
-	cred := getMap(block, "credential")
-	if cred == nil {
-		return true
-	}
-	return getMap(cred, "inbound") == nil
 }

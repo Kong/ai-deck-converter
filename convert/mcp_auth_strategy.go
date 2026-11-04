@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"maps"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -145,26 +146,30 @@ func (c *Converter) deriveTokenVaultInbound(
 	if tv == nil || (tv.Credential != nil && tv.Credential.Inbound != nil) {
 		return
 	}
-	inbound := aimap.TokenVaultInboundFromKeyAuth(idp.Config)
-	if inbound == nil {
+	loc := aimap.TokenVaultInboundFromKeyAuth(idp.Config)
+	if loc == nil {
 		c.warn(src.at("token_vault.credential.inbound"), BehaviorMayDiffer,
 			"MCP server %q: the key-auth strategy does not read its key from the headers, so "+
 				"token_vault.credential.inbound cannot be derived from it. The data plane keeps the "+
 				"default inbound (Authorization: Bearer), which the exchange will not find.", m.Name)
 		return
 	}
-	for i := range route.Plugins {
-		if route.Plugins[i].Name != "ai-mcp-proxy" {
-			continue
-		}
-		auth, _ := route.Plugins[i].Config["auth"].(map[string]any)
-		block, _ := auth["token_vault"].(map[string]any)
-		block["credential"] = map[string]any{"inbound": inbound}
-		c.warn(src.at("token_vault.credential.inbound"), ConfigFieldOverridden,
-			"MCP server %q: token_vault.credential.inbound is derived from the route's key-auth plugin "+
-				"(header %q, no prefix), because the plugin default Authorization: Bearer does not match "+
-				"where key-auth reads the key.", m.Name, inbound["name"])
+	pi := slices.IndexFunc(route.Plugins, func(p kong.Plugin) bool { return p.Name == "ai-mcp-proxy" })
+	if pi < 0 {
+		return
 	}
+	auth, _ := route.Plugins[pi].Config["auth"].(map[string]any)
+	block, _ := auth["token_vault"].(map[string]any)
+	cred, _ := block["credential"].(map[string]any)
+	if cred == nil {
+		cred = map[string]any{}
+		block["credential"] = cred
+	}
+	cred["inbound"] = aimap.TokenVaultLocationToPlugin(loc)
+	c.warn(src.at("token_vault.credential.inbound"), ConfigFieldOverridden,
+		"MCP server %q: token_vault.credential.inbound is derived from the route's key-auth plugin "+
+			"(header %q, the strategy's first key name, no prefix), because the plugin default "+
+			"Authorization: Bearer does not match where key-auth reads the key.", m.Name, loc.Name)
 }
 
 func mcpOAuth2Source(
@@ -705,19 +710,7 @@ func firstConfigPath(config map[string]any, key string) []any {
 	return nil
 }
 
-// configStrings reads config[key] as a []string, accepting []any or []string.
+// configStrings reads config[key] as a []string (see aimap.ConfigStrings).
 func configStrings(config map[string]any, key string) []string {
-	switch v := config[key].(type) {
-	case []string:
-		return v
-	case []any:
-		out := make([]string, 0, len(v))
-		for _, e := range v {
-			if s, ok := e.(string); ok {
-				out = append(out, s)
-			}
-		}
-		return out
-	}
-	return nil
+	return aimap.ConfigStrings(config, key)
 }
