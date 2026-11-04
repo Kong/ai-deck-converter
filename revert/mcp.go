@@ -130,8 +130,8 @@ func (r *Reverter) revertMCPServer(svc *kong.Service, rt *kong.Route, plugins, s
 	// AWS SigV4) lifts into config.upstream.auth. The two never coexist — they
 	// lower to the same plugin auth record.
 	authBlock := getMap(cfg, "auth")
-	// Route and service-scoped plugins alike feed the access lift below, so the
-	// key-auth pairing check must see both sets.
+	// Route and service-scoped plugins feed the access lift below.
+	// The key-auth pairing check must see both sets.
 	allPlugins := append(append([]kong.Plugin{}, plugins...), svcPlugins...)
 	if getStr(authBlock, "provider") == aimap.UpstreamAuthProviderTokenVault {
 		tokenVault, err := r.tokenVaultFromConfig(authBlock, fmt.Sprintf("MCP server %q", svc.Name))
