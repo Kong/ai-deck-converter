@@ -98,6 +98,45 @@ func TokenVaultFromPlugin(block map[string]any) *aigw.TokenVaultConfig {
 	return tv
 }
 
+// TokenVaultInboundFromKeyAuth derives the ai-mcp-proxy token_vault inbound
+// credential block from a key-auth plugin config. The key-auth header carries
+// the raw key, so the derived prefix is empty rather than the plugin default
+// "Bearer ". Returns nil when the config cannot serve a header key, for
+// example key_in_header: false.
+func TokenVaultInboundFromKeyAuth(cfg map[string]any) map[string]any {
+	// A nil config means the key-auth defaults: header, key name apikey.
+	if inHeader, ok := cfg["key_in_header"].(bool); ok && !inHeader {
+		return nil
+	}
+	names := keyAuthKeyNames(cfg)
+	if len(names) == 0 {
+		return nil
+	}
+	return map[string]any{"location": "header", "name": names[0], "prefix": ""}
+}
+
+// keyAuthKeyNames reads a key-auth config's key_names, defaulting to
+// ["apikey"] when absent or empty, as the key-auth schema defaults.
+func keyAuthKeyNames(cfg map[string]any) []string {
+	switch v := cfg["key_names"].(type) {
+	case []string:
+		if len(v) > 0 {
+			return v
+		}
+	case []any:
+		out := make([]string, 0, len(v))
+		for _, e := range v {
+			if s, ok := e.(string); ok {
+				out = append(out, s)
+			}
+		}
+		if len(out) > 0 {
+			return out
+		}
+	}
+	return []string{"apikey"}
+}
+
 // TokenVaultRedisToPlugin flattens a RedisCloudConfig (the API model's nested
 // AIGatewayRedisCloudConfiguration shape) into the Kong redis-ee config
 // schema's flat field surface: nested keepalive/sentinel/cluster blocks become

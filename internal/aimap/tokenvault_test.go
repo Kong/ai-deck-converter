@@ -329,3 +329,15 @@ func TestTokenVaultCredentialEmptyPrefix(t *testing.T) {
 		block["credential"].(map[string]any)["outbound"])
 	require.Equal(t, tv, TokenVaultFromPlugin(block))
 }
+
+func TestTokenVaultInboundFromKeyAuth(t *testing.T) {
+	t.Parallel()
+
+	require.Equal(t, map[string]any{"location": "header", "name": "apikey", "prefix": ""},
+		TokenVaultInboundFromKeyAuth(nil), "a nil config means the key-auth defaults")
+	require.Equal(t, map[string]any{"location": "header", "name": "apikey", "prefix": ""},
+		TokenVaultInboundFromKeyAuth(map[string]any{}))
+	require.Equal(t, map[string]any{"location": "header", "name": "x-custom-key", "prefix": ""},
+		TokenVaultInboundFromKeyAuth(map[string]any{"key_names": []any{"x-custom-key"}}))
+	require.Nil(t, TokenVaultInboundFromKeyAuth(map[string]any{"key_in_header": false, "key_in_body": true}))
+}
