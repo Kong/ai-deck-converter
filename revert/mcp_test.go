@@ -1,6 +1,7 @@
 package revert
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/Kong/ai-deck-converter/convert"
@@ -237,4 +238,67 @@ func TestUntaggedPreFunctionOnSourceIsAPolicy(t *testing.T) {
 	require.Len(t, result.Issues, 1)
 	require.Equal(t, convert.Error, result.Issues[0].Severity)
 	require.Contains(t, result.Issues[0].Reason, `MCP server "toolset-a" is conversion-only`)
+}
+
+// TestMCPACLPluginOnlyLiftsOnListenerTypes checks that a route acl plugin
+// becomes access.acls on a listener type. On a source type, revert drops it
+// with a warning. convert rejects access.acls there.
+func TestMCPACLPluginOnlyLiftsOnListenerTypes(t *testing.T) {
+	const deck = `
+_format_version: "3.0"
+services:
+  - name: %s
+    host: localhost
+    routes:
+      - name: %s-route
+        paths: [/mcp/%s]
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              mode: %s
+              default_acl:
+                - allow: [premium]
+          - name: acl
+            config:
+              allow: [agents]
+              include_consumer_groups: true
+`
+	type mcpACLs struct {
+		MCPServers []struct {
+			Access struct {
+				ACLs struct {
+					Allow []string `yaml:"allow"`
+				} `yaml:"acls"`
+				DefaultToolACLs struct {
+					Allow []string `yaml:"allow"`
+				} `yaml:"default_tool_acls"`
+			} `yaml:"access"`
+		} `yaml:"mcp_servers"`
+	}
+	cases := []struct {
+		mode     string
+		lifted   bool
+		warnings int
+	}{
+		{mode: "conversion-listener", lifted: true},
+		{mode: "upstream-server", warnings: 1},
+	}
+	for _, tc := range cases {
+		t.Run(tc.mode, func(t *testing.T) {
+			name := "srv"
+			out, warnings, err := Revert([]byte(fmt.Sprintf(deck, name, name, name, tc.mode)), Options{})
+			require.NoError(t, err)
+			require.Len(t, warnings, tc.warnings)
+			var doc mcpACLs
+			require.NoError(t, yaml.Unmarshal(out, &doc))
+			require.Len(t, doc.MCPServers, 1)
+			access := doc.MCPServers[0].Access
+			require.Equal(t, []string{"premium"}, access.DefaultToolACLs.Allow)
+			if tc.lifted {
+				require.Equal(t, []string{"agents"}, access.ACLs.Allow)
+			} else {
+				require.Empty(t, access.ACLs.Allow)
+			}
+		})
+	}
 }

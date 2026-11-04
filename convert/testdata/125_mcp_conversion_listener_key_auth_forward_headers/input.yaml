@@ -1,0 +1,39 @@
+# ai-mcp-proxy runs a conversion-listener tool call back through the route.
+# Behind key-auth, that internal request needs the client's key, so
+# config.server.forward_client_headers is always true.
+auth_strategies:
+  - name: mcp-key-auth
+    type: key-auth
+    config:
+      key_names: [apikey]
+
+mcp_servers:
+  # No server config: forward_client_headers is set without a warning.
+  - type: conversion-listener
+    name: reports-mcp
+    upstream_url: https://reports.internal.kongair.com
+    config:
+      route: {paths: [/mcp/reports]}
+    access:
+      auth_strategies: [mcp-key-auth]
+    tools:
+      - {name: list-reports, description: List reports, method: GET, path: /reports}
+  # forward_client_headers: false is overridden with a warning.
+  - type: conversion-listener
+    name: flights-mcp
+    upstream_url: https://flights.internal.kongair.com
+    config:
+      route: {paths: [/mcp/flights]}
+      server: {timeout: 10000, forward_client_headers: false}
+    access:
+      auth_strategies: [mcp-key-auth]
+    tools:
+      - {name: search-flights, description: Search flights, method: GET, path: /flights}
+  # A passthrough-listener sends the request to the upstream, not the route.
+  - type: passthrough-listener
+    name: vendor-mcp
+    upstream_url: https://vendor.example.com/mcp
+    config:
+      route: {paths: [/mcp/vendor]}
+    access:
+      auth_strategies: [mcp-key-auth]

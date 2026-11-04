@@ -1,0 +1,30 @@
+_format_version: "3.0"
+services:
+  - name: flights-mcp
+    url: https://flights.internal.kongair.com
+    routes:
+      - name: flights-mcp-route
+        paths:
+          - /mcp/flights
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              default_acl:
+                - deny:
+                    - interns
+              include_consumer_groups: true
+              logging:
+                log_audits: false
+                log_payloads: false
+                log_statistics: true
+              mode: conversion-listener
+              tools:
+                - description: Search flights
+                  method: GET
+                  name: search_flights
+                  path: /flights
+          - name: acl
+            config:
+              allow:
+                - partners
+              include_consumer_groups: true

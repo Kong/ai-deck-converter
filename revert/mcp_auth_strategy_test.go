@@ -65,6 +65,68 @@ services:
               metadata_discovery_endpoint: https://issuer.example.com/.well-known/openid-configuration
 `
 
+// mcpOIDCProtectedResource is an MCP route with the 2.3 openid-connect plugin.
+// It has a protected_resource_metadata block, principals, and auth_methods
+// ["bearer"].
+const mcpOIDCProtectedResource = `
+_format_version: "3.0"
+services:
+  - name: oidc-prm-mcp
+    url: https://vendor.example.com/mcp
+    routes:
+      - name: oidc-prm-route
+        paths:
+          - /mcp/oidc-prm
+          - /mcp/oidc-prm/.well-known/oauth-protected-resource
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              mode: passthrough-listener
+          - name: openid-connect
+            config:
+              auth_methods:
+                - bearer
+              cache_tokens_salt: pepper
+              hide_credentials: true
+              issuer: https://issuer.example.com
+              principals:
+                enabled: true
+                directory: my-directory
+                principal_claim:
+                  - sub
+                jit:
+                  all_claims: true
+              protected_resource_metadata:
+                authorization_servers:
+                  - https://issuer.example.com
+                metadata_endpoint: /mcp/oidc-prm/.well-known/oauth-protected-resource
+                resource: https://api.example.com/mcp/oidc-prm
+                scopes_supported:
+                  - openid
+`
+
+func TestRevertMCPOIDCProtectedResource(t *testing.T) {
+	out, warnings, err := Revert([]byte(mcpOIDCProtectedResource), Options{})
+	require.NoError(t, err)
+	require.Empty(t, warnings)
+	s := string(out)
+	// The protected_resource_metadata block becomes access.metadata.
+	require.Contains(t, s, "metadata:")
+	require.Contains(t, s, "resource: https://api.example.com/mcp/oidc-prm")
+	require.Contains(t, s, "endpoint: /mcp/oidc-prm/.well-known/oauth-protected-resource")
+	// The strategy keeps principals and the fields only openid-connect has. It
+	// does not keep auth_methods ["bearer"].
+	require.Contains(t, s, "type: openid-connect")
+	require.Contains(t, s, "directory: my-directory")
+	require.Contains(t, s, "all_claims: true")
+	require.Contains(t, s, "cache_tokens_salt: pepper")
+	require.NotContains(t, s, "auth_methods:", "converter-forced [bearer] should not lift into the strategy")
+	require.NotContains(t, s, "protected_resource_metadata:", "plugin-only block should not lift into the strategy")
+	// The .well-known path is stripped from the route paths.
+	require.NotContains(t, strings.SplitN(s, "access:", 2)[0],
+		"/mcp/oidc-prm/.well-known/oauth-protected-resource")
+}
+
 func TestRevertMCPOAuth2MetadataOnly(t *testing.T) {
 	out, warnings, err := Revert([]byte(mcpOAuth2MetadataOnly), Options{})
 	require.NoError(t, err)

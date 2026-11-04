@@ -98,3 +98,7 @@ var OIDCToMCPOAuth2Fields = []OAuth2FieldMap{
 //     from the metadata resource (its RFC 8707 audience) when the flag is
 //     false; the concrete audience list is lossy but re-converts to the same
 //     flag.
+//
+// The 2.3 openid-connect lowering in mcpOIDCPlugin always writes auth_methods
+// ["bearer"]. Revert leaves out exactly ["bearer"] from the strategy. It lifts
+// any other list unchanged.

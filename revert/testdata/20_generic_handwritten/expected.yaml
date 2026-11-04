@@ -17,6 +17,8 @@ models:
       route:
         paths:
           - /llm
+        methods:
+          - POST
       logging:
         payloads: false
         statistics: true

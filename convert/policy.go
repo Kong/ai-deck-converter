@@ -49,11 +49,14 @@ func (c *Converter) warnGlobalPoliciesForWebSocket() {
 	}
 }
 
-// globalAuthPolicy returns a global authentication policy, or nil.
+// globalAuthPolicy returns an enabled global authentication policy, or nil.
+// A disabled policy still emits its plugin (with enabled: false), so it
+// authenticates no one.
 func (c *Converter) globalAuthPolicy() *aigw.Policy {
 	for i := range c.src.Policies {
 		p := &c.src.Policies[i]
-		if p.Global != nil && *p.Global && authPolicyTypes[p.Type] {
+		if p.Global != nil && *p.Global && authPolicyTypes[p.Type] &&
+			(p.Enabled == nil || *p.Enabled) {
 			return p
 		}
 	}
@@ -120,8 +123,13 @@ func (c *Converter) scopedPlugins(src ConversionIssueSource, refs []string, acls
 				"acl policy sets %s, but a Kong acl plugin permits exactly one of "+
 					"allow, deny, allow_when, or deny_when", strings.Join(set, " and "))
 		}
-		if fields := celFieldPaths("access.acls.", acls); len(fields) > 0 && !c.supports(aimap.FeatureACLWhen) {
-			return nil, c.failUnsupported(src.at(fields...), aimap.FeatureACLWhen, fields[0])
+		feature := aimap.FeatureACLWhen
+		// The API accepts CEL ACLs on MCP servers from a later release.
+		if src.Kind == kindMCPServer {
+			feature = aimap.FeatureMCPACLWhen
+		}
+		if fields := celFieldPaths("access.acls.", acls); len(fields) > 0 && !c.supports(feature) {
+			return nil, c.failUnsupported(src.at(fields...), feature, fields[0])
 		}
 		plugins = append(plugins, aclPlugin(acls))
 	}

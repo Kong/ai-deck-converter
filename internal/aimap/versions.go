@@ -88,6 +88,7 @@ const (
 	FeatureBaseten                    Feature = "baseten"
 	FeatureSagemaker                  Feature = "sagemaker"
 	FeatureAuthStrategyTokenVault     Feature = "auth-strategy-token-vault"
+	FeatureMCPIdentityAuth            Feature = "mcp-identity-auth"
 	FeatureModelDirectory             Feature = "model-directory"
 )
 
@@ -115,6 +116,7 @@ var featureSince = map[Feature]Version{
 	FeatureBaseten:                    mustVersion("2.3"),
 	FeatureSagemaker:                  mustVersion("2.1"),
 	FeatureAuthStrategyTokenVault:     mustVersion("2.3"),
+	FeatureMCPIdentityAuth:            mustVersion("2.3"),
 	FeatureModelDirectory:             mustVersion("2.3"),
 }
 

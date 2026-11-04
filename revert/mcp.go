@@ -203,7 +203,14 @@ func (r *Reverter) revertMCPServer(svc *kong.Service, rt *kong.Route, plugins, s
 
 	refs, acls := r.policyRefs(rest)
 	m.Policies = refs
-	m.Access.ACLs = acls
+	if aimap.MCPAccessAllowed(m.Type) {
+		m.Access.ACLs = acls
+	} else if !acls.IsEmpty() {
+		if err := r.warn("MCP server %q: an acl plugin is not valid on type %q; dropped",
+			svc.Name, m.Type); err != nil {
+			return err
+		}
+	}
 
 	r.out.MCPServers = append(r.out.MCPServers, m)
 	return nil

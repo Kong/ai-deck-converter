@@ -1,0 +1,38 @@
+# An MCP server whose ACL attribute type is oauth_access_token pairs with the
+# 2.3 openid-connect lowering: from 2.3 the openid-connect plugin serves the
+# protected resource metadata and publishes the token claims under
+# kong.ctx.shared.ai_mcp_oauth2, which is what the ACL subject type reads.
+# Below 2.3 the pairing converts with a BEHAVIOR_MAY_DIFFER warning.
+auth_strategies:
+  - display_name: Okta OIDC
+    name: okta-oidc
+    type: openid-connect
+    config:
+      issuer: https://dev-123456.okta.com/oauth2/default
+      principals:
+        enabled: true
+        directory: my-directory
+mcp_servers:
+  - type: passthrough-listener
+    display_name: Claims MCP
+    name: claims-mcp
+    upstream_url: https://vendor.example.com/mcp
+    config:
+      route:
+        paths: [/mcp/claims]
+    access:
+      auth_strategies: [okta-oidc]
+      acl_attribute_type: oauth_access_token
+      access_token_claim_field: sub
+      metadata:
+        endpoint: /mcp/claims/.well-known/oauth-protected-resource
+        resource: https://api.example.com/mcp/claims
+        authorization_servers:
+          - https://dev-123456.okta.com/oauth2/default
+    tools:
+      - name: searchFlights
+        description: Search available flights
+        method: GET
+        path: /flights
+        scheme: https
+        host: flights.internal

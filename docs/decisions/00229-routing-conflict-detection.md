@@ -34,7 +34,8 @@ A conflict on either layer makes routing ambiguous. Examples:
 - Two models on one base path with different auth strategies. The converter
   splits them into two routes with equal paths. Kong selects one route, and
   the models on the other route are not reachable.
-- Two models with the same alias. The models share one `ai_models` entry.
+- Two models with the same alias on one route. Both models make plugins with
+  the same name, route, and `ai_models` scope.
 
 This RFC makes the converter report each of these conflicts.
 
@@ -44,7 +45,7 @@ This RFC makes the converter report each of these conflicts.
 - In scope:
   - Route conflicts between any two routes that the converter makes: model
     routes, video lifecycle routes, MCP server routes, and agent routes.
-  - Model name conflicts: two models with the same alias.
+  - Model name conflicts: two models with the same alias on one route.
   - Model selector conflicts: two models on one shared route that read the
     model name from different places.
   - A new issue code, `ROUTING_CONFLICT`.
@@ -140,8 +141,10 @@ models:
   source: {kind: model, name: b, fields: [config.route.model.values]}
 ```
 
-The converter keeps `b`. A model without `values` uses its name as the
-alias. The field is then `name`.
+Both models use the default base path. They share one route. The converter
+keeps both models. A model without `values` uses its name as the alias. The
+field is then `name`. Models on different routes can use the same alias
+without an issue.
 
 ### Example 5: different selector sources on one route
 
@@ -279,13 +282,34 @@ issue that is equal to a recorded issue.
 
 The data plane requires a unique `name` and `alias` for each `ai_models`
 entry. The converter writes each model alias into `name` and leaves `alias`
-unset, so one alias check covers both fields. `ToDBLess` gives equal names one
-ID, so the data plane loads them as one entry.
+unset. The converter writes one `ai_models` entry for each alias. Models that
+share an alias share the entry.
 
-The model pass maps each alias to the first model that uses it. A later model
-with the same alias gets a `WARNING` and stays in the output. Each model scoped
-plugin also has a route scope. A model on another route does not get it. The check covers only enabled models, because the converter leaves
-out disabled models. See [Disabled models](#disabled-models).
+A shared entry keeps the labels and the alias group marker of the model that
+made it. The marker is `aimap.EncodeModelAliasGroup`. Revert uses it to merge
+the entries of a multi-alias model. A model puts its ID and its marker on the
+first entry that it makes, not on its first alias. A model that makes fewer
+than two entries gets no marker.
+
+A model that makes no entry gives its ID to the first shared entry without an
+ID. A later model gets a `CONFIG_FIELD_DROPPED` `WARNING` for an ID or labels
+that the entry cannot keep. A later multi-alias model also gets one for each
+shared entry, because a revert does not restore its full alias list.
+
+Revert makes one model for each route config that uses a shared entry. The
+first model in the converter order gets the entry name, the ID, and the
+labels. Each other model gets the entry name in `config.route.model.values`.
+
+Each model scoped plugin also has a route scope. A model on another route
+does not get it. An alias is therefore ambiguous only on one route. Each route
+maps each alias to the first model on the route that uses it. A later model on
+the route with the same alias makes plugins with an equal scope. It gets one
+`WARNING` for each alias, and the converter keeps it. The data plane accepts
+this config today. Only models whose plugins have an `ai_models` scope claim
+an alias. A `type: api` model, a passthrough model, and a WebSocket route
+have no such plugins. The check covers only enabled
+models, because the converter leaves out disabled models. See
+[Disabled models](#disabled-models).
 
 ## Disabled models
 
@@ -347,9 +371,8 @@ conflict by one code. The severity and the output stay the same.
 
 A passthrough route has no `ai-model-selector`. Two passthrough models whose
 routes match the same requests therefore cannot both work. `convertModel`
-leaves out the later model with an `ERROR` on `config.route.paths`. This
- stays because it follows the rule for model name conflicts: the output
-cannot work, so the later model is left out.
+leaves out the later model with an `ERROR` on `config.route.paths`. The
+output cannot work, so the later model is left out.
 
 The route conflict check compares the request matchers of the two routes for exact
 equality. The route check later sees only the earlier model, so it reports
@@ -380,8 +403,8 @@ matches on the old code for these two checks must match on
 
 ## Order
 
-The checks run in conversion order. A model left out for a name conflict
-therefore gets no route warnings. The output, the issues, and their order are
+The checks run in conversion order. A model left out for a passthrough path
+conflict therefore gets no route warnings. The output, the issues, and their order are
 deterministic for one input.
 
 # Drawbacks
@@ -416,11 +439,11 @@ This RFC makes these choices:
 
 - **Check the output, not the source.** Only the final output shows the
   generated routes and paths.
-- **Use the severity that matches the effect.** A model name conflict makes
-  the data plane reject the whole output. It therefore gets an `ERROR`, and
-  the converter leaves out the later model so the rest of the output stays
-  valid. Route and selector conflicts can be intended. They get a `WARNING`,
-  and both entities still convert.
+- **Use the severity that matches the effect.** The data plane accepts a
+  model name conflict today, although it should reject it. A model name
+  conflict therefore gets a `WARNING`, and both models still convert. Route
+  and selector conflicts can be intended. They also get a `WARNING`, and both
+  entities still convert.
 
 This RFC rejects these alternatives:
 
@@ -443,7 +466,7 @@ None.
 - Add unit tests in `convert/routing_conflict_test.go` that cover each
   matcher, the host wildcard rules, and disabled services.
 - Add a golden test case that covers:
-  - two models with one alias. The later model is left out with an `ERROR`.
+  - two models with one alias. The later model gets a `WARNING`.
   - two models with different selector sources on one route.
   - a route split by auth strategies.
   - a route with `hosts` and a route without `hosts`.

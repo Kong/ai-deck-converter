@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/Kong/ai-deck-converter/internal/kong"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 )
@@ -174,6 +175,122 @@ func entryTags(t *testing.T, entry map[string]any) []string {
 		tags = append(tags, s)
 	}
 	return tags
+}
+
+// An ai_models entry keeps the group marker of the model that made it. A
+// later multi-alias model that shares the entry gets a warning. Model y makes
+// only one entry, so the entry has no group marker.
+func TestConvertMultiAliasValuesSharesRowAcrossRoutes(t *testing.T) {
+	result, err := Convert([]byte(`
+model_providers: [{name: openai, type: openai}]
+models:
+  - name: x
+    capabilities: [generate]
+    targets: [{name: gpt-5, provider: openai}]
+    config: {route: {paths: [/x], model: {values: [foo, baz]}}}
+  - name: y
+    capabilities: [generate]
+    targets: [{name: gpt-5, provider: openai}]
+    config: {route: {paths: [/y], model: {values: [bar, foo]}}}
+`), testOptions)
+	require.NoError(t, err)
+	require.Len(t, result.Issues, 1)
+	requireIssue(t, result.Issues, Warning, ConfigFieldDropped, kindModel, "y", "config.route.model.values")
+
+	tags := map[string][]string{}
+	for _, m := range result.Output.AIModels {
+		tags[m.Name] = m.Tags
+	}
+	require.Equal(t, map[string][]string{
+		"foo": {"ai-gateway-model-alias-group:foo"},
+		"baz": {"ai-gateway-model-alias-group:foo"},
+		"bar": nil,
+	}, tags)
+}
+
+// The group marker and the ID go to the first entry that the model makes.
+func TestConvertSharedAliasMovesGroupAndIDToOwnedEntry(t *testing.T) {
+	result, err := Convert([]byte(`
+model_providers: [{name: openai, type: openai}]
+models:
+  - name: x
+    capabilities: [generate]
+    targets: [{name: gpt-5, provider: openai}]
+    config: {route: {paths: [/x], model: {values: [foo]}}}
+  - name: y
+    id: 22222222-2222-2222-2222-222222222222
+    capabilities: [generate]
+    targets: [{name: gpt-5, provider: openai}]
+    config: {route: {paths: [/y], model: {values: [foo, bar, baz]}}}
+`), testOptions)
+	require.NoError(t, err)
+	require.Len(t, result.Issues, 1)
+	requireIssue(t, result.Issues, Warning, ConfigFieldDropped, kindModel, "y", "config.route.model.values")
+	rows := map[string]kong.AIModel{}
+	for _, m := range result.Output.AIModels {
+		rows[m.Name] = m
+	}
+	require.Empty(t, rows["foo"].ID)
+	require.Equal(t, "22222222-2222-2222-2222-222222222222", rows["bar"].ID)
+	require.Empty(t, rows["baz"].ID)
+	require.Equal(t, []string{"ai-gateway-model-alias-group:bar"}, rows["bar"].Tags)
+	require.Equal(t, []string{"ai-gateway-model-alias-group:bar"}, rows["baz"].Tags)
+}
+
+// A later model gives its ID to a shared entry without an ID.
+func TestConvertSharedAliasFillsEmptyID(t *testing.T) {
+	result, err := Convert([]byte(`
+model_providers: [{name: openai, type: openai}]
+models:
+  - name: a
+    capabilities: [generate]
+    targets: [{name: gpt-5, provider: openai}]
+    config: {route: {paths: [/a], model: {values: [gpt]}}}
+  - name: b
+    id: 22222222-2222-2222-2222-222222222222
+    capabilities: [generate]
+    targets: [{name: gpt-5, provider: openai}]
+    config: {route: {paths: [/b], model: {values: [gpt]}}}
+`), testOptions)
+	require.NoError(t, err)
+	require.Empty(t, result.Issues)
+	require.Len(t, result.Output.AIModels, 1)
+	require.Equal(t, "22222222-2222-2222-2222-222222222222", result.Output.AIModels[0].ID)
+}
+
+// An ai_models entry keeps the ID and labels of the model that made it.
+func TestConvertSharedAliasWarnsDroppedIDAndLabels(t *testing.T) {
+	result, err := Convert([]byte(`
+model_providers: [{name: openai, type: openai}]
+models:
+  - name: a
+    id: 11111111-1111-1111-1111-111111111111
+    labels: {team: x}
+    capabilities: [generate]
+    targets: [{name: gpt-5, provider: openai}]
+    config: {route: {paths: [/a], model: {values: [gpt]}}}
+  - name: b
+    id: 22222222-2222-2222-2222-222222222222
+    labels: {team: y}
+    capabilities: [generate]
+    targets: [{name: gpt-5, provider: openai}]
+    config: {route: {paths: [/b], model: {values: [gpt]}}}
+  - name: c
+    capabilities: [generate]
+    targets: [{name: gpt-5, provider: openai}]
+    config: {route: {paths: [/c], model: {values: [gpt]}}}
+`), testOptions)
+	require.NoError(t, err)
+	var fields []string
+	for _, issue := range result.Issues {
+		require.Equal(t, Warning, issue.Severity)
+		require.Equal(t, ConfigFieldDropped, issue.Code)
+		require.Equal(t, "b", issue.Source.Name)
+		fields = append(fields, issue.Source.Fields...)
+	}
+	require.ElementsMatch(t, []string{"id", "labels"}, fields)
+	require.Len(t, result.Output.AIModels, 1)
+	require.Equal(t, "11111111-1111-1111-1111-111111111111", result.Output.AIModels[0].ID)
 }
 
 func TestConvertMultiAliasValuesDeduplicates(t *testing.T) {

@@ -2,6 +2,7 @@ package revert
 
 import (
 	"encoding/base64"
+	"maps"
 	"net"
 	"net/url"
 	"strconv"
@@ -20,7 +21,9 @@ import (
 // converter emits it from access.auth_strategies/metadata, never as a
 // policy), so — unlike agents/models — recognition does not depend on the
 // synthesized "anonymous" fallback marker (MCP auth carries none):
-//   - ai-mcp-oauth2      -> access.metadata + a synthesized openid-connect provider
+//   - ai-mcp-oauth2 -> access.metadata + a synthesized openid-connect provider
+//   - openid-connect with protected_resource_metadata -> access.metadata +
+//     a synthesized provider with the plugin config unchanged
 //   - key-auth / openid-connect (no metadata) -> a synthesized provider
 func (r *Reverter) revertMCPAccess(m *aigw.MCPServer, plugins []kong.Plugin) []kong.Plugin {
 	var rest []kong.Plugin
@@ -29,6 +32,15 @@ func (r *Reverter) revertMCPAccess(m *aigw.MCPServer, plugins []kong.Plugin) []k
 		case "ai-mcp-oauth2":
 			r.applyMCPOAuth2(m, p)
 		case "key-auth", "openid-connect":
+			// The 2.3 MCP lowering has a protected_resource_metadata block. A
+			// plain openid-connect plugin has none. Revert does not know the
+			// runtime version.
+			if p.Name == "openid-connect" {
+				if prm := getMap(p.Config, "protected_resource_metadata"); getStr(prm, "resource") != "" {
+					r.applyMCPOIDCProtectedResource(m, p, prm)
+					continue
+				}
+			}
 			idp := r.registerAuthStrategy(p)
 			m.Access.AuthStrategies = append(m.Access.AuthStrategies, idp.Name)
 		default:
@@ -36,6 +48,40 @@ func (r *Reverter) revertMCPAccess(m *aigw.MCPServer, plugins []kong.Plugin) []k
 		}
 	}
 	return rest
+}
+
+// stripMetadataEndpointPath removes the metadata endpoint path that convert
+// adds to the route paths.
+func stripMetadataEndpointPath(m *aigw.MCPServer, meta *aigw.MCPProtectedResourceMetadata) {
+	if meta.Endpoint != "" {
+		m.Config.Route.Paths = removeFirst(m.Config.Route.Paths, meta.Endpoint)
+	}
+}
+
+// applyMCPOIDCProtectedResource changes the 2.3 openid-connect MCP plugin back
+// into access.metadata and an auth strategy. The strategy gets the plugin
+// config unchanged. Only auth_methods ["bearer"] from convert is left out.
+func (r *Reverter) applyMCPOIDCProtectedResource(
+	m *aigw.MCPServer, p kong.Plugin, prm map[string]any,
+) {
+	meta := &aigw.MCPProtectedResourceMetadata{
+		Endpoint:             getStr(prm, "metadata_endpoint"),
+		Resource:             getStr(prm, "resource"),
+		AuthorizationServers: toStrings(prm["authorization_servers"]),
+		ScopesSupported:      toStrings(prm["scopes_supported"]),
+	}
+	m.Access.Metadata = meta
+	stripMetadataEndpointPath(m, meta)
+
+	cfg := make(map[string]any, len(p.Config))
+	maps.Copy(cfg, p.Config)
+	delete(cfg, "protected_resource_metadata")
+	if methods := toStrings(cfg["auth_methods"]); len(methods) == 1 && methods[0] == "bearer" {
+		delete(cfg, "auth_methods")
+	}
+
+	idp := r.registerAuthStrategy(kong.Plugin{Name: "openid-connect", Config: cfg})
+	m.Access.AuthStrategies = append(m.Access.AuthStrategies, idp.Name)
 }
 
 // applyMCPOAuth2 lifts an ai-mcp-oauth2 plugin back into an MCP server's
@@ -59,13 +105,7 @@ func (r *Reverter) applyMCPOAuth2(m *aigw.MCPServer, p kong.Plugin) {
 		ScopesSupported:      toStrings(cfg["scopes_supported"]),
 	}
 	m.Access.Metadata = meta
-
-	// The forward converter appends metadata_endpoint to the route's paths so
-	// one route serves both MCP traffic and the .well-known metadata; strip it
-	// back out here.
-	if meta.Endpoint != "" {
-		m.Config.Route.Paths = removeFirst(m.Config.Route.Paths, meta.Endpoint)
-	}
+	stripMetadataEndpointPath(m, meta)
 
 	oidcCfg := oidcConfigFromOAuth2(cfg)
 	if len(oidcCfg) == 0 {

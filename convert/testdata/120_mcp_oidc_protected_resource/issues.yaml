@@ -1,0 +1,16 @@
+- code: CONFIG_FIELD_OVERRIDDEN
+  reason: MCP server "flights-mcp" auth strategy "okta-oidc" sets auth_methods beyond bearer. This will be overridden to [bearer] because MCP routes validate bearer tokens only (matching ai-mcp-oauth2); interactive flows would break the MCP authorization challenge.
+  source:
+    kind: mcp_server
+    name: flights-mcp
+    fields:
+      - access.auth_strategies[0]
+  severity: WARNING
+- code: CONFIG_FIELD_IGNORED
+  reason: MCP server "flights-mcp" access.metadata sets discovery_endpoint, which the openid-connect plugin's protected_resource_metadata block does not support; it will be ignored.
+  source:
+    kind: mcp_server
+    name: flights-mcp
+    fields:
+      - access.metadata.discovery_endpoint
+  severity: WARNING

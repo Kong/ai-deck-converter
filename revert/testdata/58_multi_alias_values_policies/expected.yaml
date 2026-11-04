@@ -20,6 +20,8 @@ models:
       route:
         paths:
           - /ai
+        methods:
+          - POST
         model:
           values:
             - '@kong/gpt-4o'
@@ -42,6 +44,8 @@ models:
       route:
         paths:
           - /ai
+        methods:
+          - POST
       logging:
         payloads: false
         statistics: true

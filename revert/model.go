@@ -1,6 +1,7 @@
 package revert
 
 import (
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"maps"
@@ -22,6 +23,19 @@ type modelGroup struct {
 	targetsSeen map[string]bool
 	aliasless   bool   // no model_alias on the targets; name is provisional
 	routeName   string // route the group was created from (for warnings)
+	// firstRoute is the acc.routes value of the route that made the group.
+	firstRoute int
+	// split is true when the group shares its ai-models entry with the
+	// group of familyKey.
+	split     bool
+	familyKey string
+	// alias is the ai-models entry name that the targets of g use.
+	alias string
+	// hasEntry is true when an ai-models entry has the name of g.
+	hasEntry bool
+	// routeMethods maps the default methods of an endpoint to the methods of
+	// the routes of g that use it.
+	routeMethods map[string][]string
 	// mergedFKs are the model FKs of other ai-proxy-advanced plugins folded
 	// into this group (see mergeableAliasFKs): distinct aliases of the one
 	// underlying model produced by route.model.values fan-out. Guard plugins
@@ -57,6 +71,13 @@ func targetFingerprint(tm aigw.TargetModel) string {
 type modelAcc struct {
 	groups map[string]*modelGroup
 	order  []string
+	// splits maps a group key to the keys of the groups that share its model
+	// FK or alias on routes with another route config.
+	splits map[string][]string
+	// routes counts the model routes seen so far.
+	routes int
+	// routeGroups holds, for each model route, its groups in plugin order.
+	routeGroups [][]*modelGroup
 }
 
 // accumulateModelRoute folds a route's ai-proxy-advanced plugins into the model
@@ -68,6 +89,8 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 	if hasTag(rt.Tags, aimap.VideoLifecycleRouteTag) {
 		return nil
 	}
+	acc.routes++
+	acc.routeGroups = append(acc.routeGroups, nil)
 	var path string
 	if len(rt.Paths) > 0 {
 		path = rt.Paths[0]
@@ -107,6 +130,9 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 	}
 
 	routeProxies, redirect := r.mergeableAliasFKs(findPlugins(plugins, "ai-proxy-advanced"))
+	if err := r.warnSharedRouteFKs(rt, routeProxies); err != nil {
+		return err
+	}
 
 	for _, proxy := range routeProxies {
 		cfg := proxy.Config
@@ -265,10 +291,13 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 			}
 			if g == nil {
 				var err error
-				g, err = r.modelGroupFor(acc, rt, groupFK, alias, llmFormat, bases, cfg, nextEntry, refs, acls, idpRefs)
+				g, err = r.modelGroupFor(acc, rt, spec, groupFK, alias, llmFormat, bases, cfg, nextEntry, refs, acls, idpRefs)
 				if err != nil {
 					return err
 				}
+			}
+			if seq := &acc.routeGroups[len(acc.routeGroups)-1]; !slices.Contains(*seq, g) {
+				*seq = append(*seq, g)
 			}
 			if realtimeModel != "" {
 				r.mergeAliasGroupMembers(g, realtimeModel)
@@ -296,6 +325,29 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 			if !g.targetsSeen[key] {
 				g.targetsSeen[key] = true
 				g.model.TargetModels = append(g.model.TargetModels, tm)
+			}
+		}
+	}
+	return nil
+}
+
+// warnSharedRouteFKs warns for each model FK that several ai-proxy-advanced
+// plugins of rt use. Two models with one alias on one route make such plugins.
+// Revert merges them into one model.
+func (r *Reverter) warnSharedRouteFKs(rt *kong.Route, proxies []*kong.Plugin) error {
+	count := map[string]int{}
+	for _, proxy := range proxies {
+		if proxy.Model == nil {
+			continue
+		}
+		fk := string(*proxy.Model)
+		count[fk]++
+		// The second plugin is the first duplicate. Each FK gets one warning.
+		if count[fk] == 2 { //nolint:mnd
+			if err := r.warn(
+				"route %q: several ai-proxy-advanced plugins use ai-models entry %q; merging them into one model",
+				rt.Name, fk); err != nil {
+				return err
 			}
 		}
 	}
@@ -413,8 +465,11 @@ func hasTag(tags []string, want string) bool {
 // FK-less, for an alias or the route), seeding model-level config from the
 // plugin config. A non-empty fkName names the group directly (the type "model"
 // case where ai-proxy-advanced carries an ai-model FK).
+//
+// Models on different routes can share one ai-models entry. Each base path
+// and route config of the entry then gets its own group.
 func (r *Reverter) modelGroupFor(
-	acc *modelAcc, rt *kong.Route, fkName, alias, llmFormat string, bases []string,
+	acc *modelAcc, rt *kong.Route, spec *aimap.EndpointSpec, fkName, alias, llmFormat string, bases []string,
 	cfg map[string]any, nextEntry func() map[string]any, refs []string, acls aigw.ACLs, idpRefs []string,
 ) (*modelGroup, error) {
 	var key string
@@ -426,9 +481,31 @@ func (r *Reverter) modelGroupFor(
 	default:
 		key = "route:" + rt.Name
 	}
+	lifted := liftModelRoute(rt, spec)
+	paths := modelRoutePaths(bases)
+	split, familyKey := false, ""
 	if g, ok := acc.groups[key]; ok {
-		mergeAliasIntoGroup(g, alias, refs, acls, idpRefs)
-		return g, nil
+		base := key
+		for _, k := range append([]string{base}, acc.splits[base]...) {
+			g := acc.groups[k]
+			if slices.Equal(g.model.Config.Route.Paths, paths) && sameModelRoute(g.model.Config.Route, lifted) &&
+				g.methodsAgree(spec, rt) {
+				fillModelRoute(&g.model.Config.Route, lifted)
+				g.recordMethods(spec, rt)
+				mergeAliasIntoGroup(g, alias, refs, acls, idpRefs)
+				return g, nil
+			}
+		}
+		if g.aliasless {
+			mergeAliasIntoGroup(g, alias, refs, acls, idpRefs)
+			return g, nil
+		}
+		familyKey = base
+		// The key only has to be unique in acc.groups. The model name comes
+		// from splitModelName.
+		key = fmt.Sprintf("%s#%d", base, len(acc.splits[base]))
+		acc.splits[base] = append(acc.splits[base], key)
+		split = true
 	}
 
 	var name string
@@ -459,6 +536,9 @@ func (r *Reverter) modelGroupFor(
 		name = rt.Name
 		aliasless = true
 	}
+	if split {
+		name = r.splitModelName(acc, name)
+	}
 
 	g := &modelGroup{
 		capsSeen:    map[string]bool{},
@@ -467,6 +547,10 @@ func (r *Reverter) modelGroupFor(
 		capTies:     map[string][][]string{},
 		aliasless:   aliasless,
 		routeName:   rt.Name,
+		firstRoute:  acc.routes,
+		split:       split,
+		familyKey:   familyKey,
+		alias:       cmp.Or(alias, fkName),
 		model: aigw.Model{
 			Type:     "model",
 			Name:     name,
@@ -475,10 +559,15 @@ func (r *Reverter) modelGroupFor(
 			Access:   aigw.ModelAccess{ACLs: acls, AuthStrategies: idpRefs},
 		},
 	}
-	g.model.Config.Route.Paths = modelRoutePaths(bases)
-	if alias != "" {
+	g.model.Config.Route.Paths = paths
+	switch {
+	case alias != "":
 		setAliasField(&g.model.Config.Route.Model, alias, name, nextEntry())
+	case split:
+		g.model.Config.Route.Model.Values = []string{fkName}
 	}
+	applyLiftedRoute(&g.model.Config.Route, lifted)
+	g.recordMethods(spec, rt)
 	g.model.Config.ResponseStreaming = getStr(cfg, "response_streaming")
 	g.model.Config.Proxy = proxyFromConfig(getMap(cfg, "proxy_config"))
 	g.model.Config.MaxRequestBodySize = getInt(cfg, "max_request_body_size")
@@ -488,6 +577,27 @@ func (r *Reverter) modelGroupFor(
 	acc.groups[key] = g
 	acc.order = append(acc.order, key)
 	return g, nil
+}
+
+// splitModelName returns a model name for a split group of base. The name
+// differs from every ai-models entry and every group.
+func (r *Reverter) splitModelName(acc *modelAcc, base string) string {
+	used := func(name string) bool {
+		if _, ok := r.aiModelByName[name]; ok {
+			return true
+		}
+		for _, g := range acc.groups {
+			if g.model.Name == name {
+				return true
+			}
+		}
+		return false
+	}
+	for n := 2; ; n++ {
+		if name := fmt.Sprintf("%s-%d", base, n); !used(name) {
+			return name
+		}
+	}
 }
 
 // mergeAliasIntoGroup folds another alias of an already-built group's
@@ -849,14 +959,144 @@ func (r *Reverter) orderedModelKeys(acc *modelAcc) []string {
 		if key, ok := byName[model.Name]; ok {
 			ordered = append(ordered, key)
 			seen[key] = true
+			acc.groups[key].hasEntry = true
 		}
 	}
 	for _, key := range acc.order {
-		if !seen[key] {
+		if !seen[key] && !acc.groups[key].split {
 			ordered = append(ordered, key)
 		}
 	}
+	for _, key := range acc.order {
+		if acc.groups[key].split {
+			ordered = append(ordered, key)
+		}
+	}
+	if len(acc.splits) == 0 {
+		return ordered
+	}
+	ordered = acc.sortByRoutes(ordered)
+	acc.giveEntriesToFirst(ordered)
 	return ordered
+}
+
+// family returns the group that holds the ai-models entry of g.
+func (acc *modelAcc) family(g *modelGroup) *modelGroup {
+	if g.split {
+		return acc.groups[g.familyKey]
+	}
+	return g
+}
+
+// sortByRoutes sorts keys into the model order of the converter. It keeps the
+// model order on each route, the route order, and the ai-models entry order.
+// On a cycle, keys stays.
+func (acc *modelAcc) sortByRoutes(keys []string) []string {
+	pos := make(map[*modelGroup]int, len(keys))
+	for i, key := range keys {
+		pos[acc.groups[key]] = i
+	}
+	// rowOf holds the ai-models position of each family.
+	rowOf := map[*modelGroup]int{}
+	for _, key := range keys {
+		if g := acc.groups[key]; !g.split && g.hasEntry {
+			rowOf[g] = len(rowOf)
+		}
+	}
+	row := func(i int) int {
+		if r, ok := rowOf[acc.family(acc.groups[keys[i]])]; ok {
+			return r
+		}
+		return -1
+	}
+
+	after := make([][]int, len(keys))
+	indegree := make([]int, len(keys))
+	edge := func(a, b *modelGroup) {
+		i, okA := pos[a]
+		j, okB := pos[b]
+		if !okA || !okB || i == j || slices.Contains(after[i], j) {
+			return
+		}
+		after[i] = append(after[i], j)
+		indegree[j]++
+	}
+	var prevFirst *modelGroup
+	for _, seq := range acc.routeGroups {
+		for i := 1; i < len(seq); i++ {
+			edge(seq[i-1], seq[i])
+		}
+		if len(seq) > 0 {
+			edge(prevFirst, seq[0])
+			prevFirst = seq[0]
+		}
+	}
+
+	byRoute := make([]int, 0, len(keys))
+	for _, key := range acc.order {
+		if i, ok := pos[acc.groups[key]]; ok {
+			byRoute = append(byRoute, i)
+		}
+	}
+	out := make([]string, 0, len(keys))
+	done := make([]bool, len(keys))
+	nextRow := 0
+	for len(out) < len(keys) {
+		next := -1
+		for _, i := range byRoute {
+			if !done[i] && indegree[i] == 0 && row(i) <= nextRow {
+				next = i
+				break
+			}
+		}
+		if next < 0 {
+			return keys
+		}
+		if row(next) == nextRow {
+			nextRow++
+		}
+		done[next] = true
+		out = append(out, keys[next])
+		for _, j := range after[next] {
+			indegree[j]--
+		}
+	}
+	return out
+}
+
+// giveEntriesToFirst gives the name of each ai-models entry to the first
+// model of its family in keys. The converter writes the entry from that
+// model. That model therefore gets the ID and the labels.
+func (acc *modelAcc) giveEntriesToFirst(keys []string) {
+	seen := map[*modelGroup]bool{}
+	for _, key := range keys {
+		g := acc.groups[key]
+		owner := acc.family(g)
+		if owner == nil || seen[owner] {
+			continue
+		}
+		seen[owner] = true
+		if g == owner || len(owner.model.Config.Route.Model.Values) > 1 || len(owner.mergedFKs) > 0 {
+			continue
+		}
+		g.model.Name, owner.model.Name = owner.model.Name, g.model.Name
+		g.syncAliasValue()
+		owner.syncAliasValue()
+	}
+}
+
+// syncAliasValue sets route.model.values to the alias of g when the alias
+// differs from the model name.
+func (g *modelGroup) syncAliasValue() {
+	sel := &g.model.Config.Route.Model
+	if sel.Body != (aigw.ModelBodySelectorConfig{}) || sel.Header != (aigw.ModelHeaderSelectorConfig{}) {
+		return
+	}
+	if g.model.Name == g.alias {
+		sel.Values = nil
+	} else {
+		sel.Values = []string{g.alias}
+	}
 }
 
 // nameAliaslessGroups assigns names to model groups whose targets carry no

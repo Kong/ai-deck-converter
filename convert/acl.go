@@ -1,15 +1,13 @@
 package convert
 
 import (
-	"slices"
-
 	"github.com/Kong/ai-deck-converter/internal/aigw"
 	"github.com/Kong/ai-deck-converter/internal/kong"
 )
 
 // aclFields lists the ACL fields in schema order. The Kong acl plugin permits
-// exactly one of them. An MCP ACL sets allow and deny, or allow_when and
-// deny_when.
+// exactly one of them. An ai-mcp-proxy tool ACL sets allow and deny, or
+// allow_when and deny_when.
 var aclFields = []struct {
 	name   string
 	cel    bool
@@ -60,17 +58,6 @@ func fieldPaths(prefix string, acls aigw.ACLs, celOnly bool) []string {
 // a field of the allow_when/deny_when pair.
 func mixesACLPairs(acls aigw.ACLs) bool {
 	return len(acls.Allow)+len(acls.Deny) > 0 && len(acls.AllowWhen)+len(acls.DenyWhen) > 0
-}
-
-// mergeACLs joins each list of base and extra, base first. Duplicate subjects
-// stay.
-func mergeACLs(base, extra aigw.ACLs) aigw.ACLs {
-	return aigw.ACLs{
-		Allow:     slices.Concat(base.Allow, extra.Allow),
-		Deny:      slices.Concat(base.Deny, extra.Deny),
-		AllowWhen: slices.Concat(base.AllowWhen, extra.AllowWhen),
-		DenyWhen:  slices.Concat(base.DenyWhen, extra.DenyWhen),
-	}
 }
 
 // defaultACLBlock wraps an AI Gateway ACL into the ai-mcp-proxy config.default_acl

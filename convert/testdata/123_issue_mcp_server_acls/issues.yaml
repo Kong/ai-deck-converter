@@ -1,0 +1,25 @@
+- code: CONFIG_FIELD_INVALID
+  reason: acl policy sets allow and deny, but a Kong acl plugin permits exactly one of allow, deny, allow_when, or deny_when
+  source:
+    kind: mcp_server
+    name: two-fields-mcp
+    fields:
+      - access.acls.allow
+      - access.acls.deny
+  severity: ERROR
+- code: CONFIG_FIELD_INVALID
+  reason: MCP server "source-mcp" has type "upstream-server"; access.acls is only supported for listener, conversion-listener, and passthrough-listener
+  source:
+    kind: mcp_server
+    name: source-mcp
+    fields:
+      - access.acls
+  severity: ERROR
+- code: BEHAVIOR_MAY_DIFFER
+  reason: MCP server "valid-mcp" sets access.acls, but no plugin on its route identifies a consumer or consumer group. The acl plugin has nothing to match and denies every request. Add a key-auth or openid-connect auth strategy to access.auth_strategies.
+  source:
+    kind: mcp_server
+    name: valid-mcp
+    fields:
+      - access.acls
+  severity: WARNING

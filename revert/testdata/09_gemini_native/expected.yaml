@@ -19,6 +19,9 @@ models:
       route:
         paths:
           - /ai
+        methods:
+          - GET
+          - POST
         model:
           values:
             - '@gemini/gemini-2.5-pro'
@@ -43,6 +46,9 @@ models:
       route:
         paths:
           - /ai
+        methods:
+          - GET
+          - POST
         model:
           values:
             - '@gemini/text-embedding-005'

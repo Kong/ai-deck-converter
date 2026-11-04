@@ -16,6 +16,9 @@ models:
       route:
         paths:
           - /ai
+        methods:
+          - GET
+          - POST
         model:
           values:
             - '@bedrock/titan-embed-text-v2'
@@ -38,6 +41,9 @@ models:
       route:
         paths:
           - /ai
+        methods:
+          - GET
+          - POST
         model:
           values:
             - '@bedrock/nova-canvas'
@@ -60,6 +66,9 @@ models:
       route:
         paths:
           - /ai
+        methods:
+          - GET
+          - POST
         model:
           values:
             - '@bedrock/nova-sonic'
@@ -83,6 +92,9 @@ models:
       route:
         paths:
           - /ai
+        methods:
+          - GET
+          - POST
         model:
           values:
             - '@bedrock/nova-reel'

@@ -255,7 +255,83 @@ agents:
 	require.Empty(t, result.Issues)
 }
 
-func TestRoutingConflictKeepsModelWithUsedAlias(t *testing.T) {
+// Two models with one alias on one route make plugins with the same scope.
+// The data plane accepts this config, so the converter keeps both models.
+func TestRoutingConflictWarnsModelWithUsedAlias(t *testing.T) {
+	result, err := Convert([]byte(`
+model_providers: [{name: openai, type: openai}]
+models:
+  - name: b
+    capabilities: [generate]
+    targets: [{name: gpt-5, provider: openai}]
+    config: {route: {paths: [/shared], model: {values: [a]}}}
+  - name: c
+    capabilities: [generate]
+    targets: [{name: gpt-5, provider: openai}]
+    config: {route: {paths: [/shared], model: {values: [a]}}}
+  - name: a
+    capabilities: [generate]
+    targets: [{name: gpt-5, provider: openai}]
+    config: {route: {paths: [/shared]}}
+`), testOptions)
+	require.NoError(t, err)
+	require.Len(t, result.Issues, 2)
+	requireIssue(t, result.Issues, Warning, RoutingConflict, kindModel, "c", "config.route.model.values")
+	requireIssue(t, result.Issues, Warning, RoutingConflict, kindModel, "a", "name")
+	require.Len(t, result.Output.AIModels, 1)
+	var proxies int
+	for _, p := range result.Output.Plugins {
+		if p.Name == "ai-proxy-advanced" {
+			proxies++
+		}
+	}
+	require.Equal(t, 3, proxies)
+}
+
+// A model on several shared routes gets one issue.
+func TestRoutingConflictReportsUsedAliasOnce(t *testing.T) {
+	result, err := Convert([]byte(`
+model_providers: [{name: openai, type: openai}]
+models:
+  - name: a
+    capabilities: [generate, embeddings]
+    targets: [{name: gpt-5, provider: openai}]
+    config: {route: {paths: [/shared]}}
+  - name: b
+    capabilities: [generate, embeddings]
+    targets: [{name: gpt-5, provider: openai}]
+    config: {route: {paths: [/shared], model: {values: [a]}}}
+`), testOptions)
+	require.NoError(t, err)
+	require.Len(t, result.Issues, 1)
+	requireIssue(t, result.Issues, Warning, RoutingConflict, kindModel, "b", "config.route.model.values")
+}
+
+// type api models share one route-scoped plugin without an ai_models scope.
+func TestRoutingConflictIgnoresAliasOfAPIModels(t *testing.T) {
+	result, err := Convert([]byte(`
+model_providers: [{name: openai, type: openai}]
+models:
+  - name: files-a
+    type: api
+    capabilities: [files]
+    targets: [{name: api-target, provider: openai}]
+    config: {route: {paths: [/api], model: {values: [x]}}}
+  - name: files-b
+    type: api
+    capabilities: [files]
+    targets: [{name: api-target, provider: openai}]
+    config: {route: {paths: [/api], model: {values: [x]}}}
+`), testOptions)
+	require.NoError(t, err)
+	for _, issue := range result.Issues {
+		require.NotEqual(t, RoutingConflict, issue.Code, "issue: %v", issue)
+	}
+}
+
+// Models on different routes can share an alias. They share one ai_models
+// entry. The data plane rejects two entries with one name.
+func TestRoutingConflictIgnoresAliasOnOtherRoute(t *testing.T) {
 	result, err := Convert([]byte(`
 model_providers: [{name: openai, type: openai}]
 models:
@@ -267,26 +343,23 @@ models:
     capabilities: [generate]
     targets: [{name: gpt-5, provider: openai}]
     config: {route: {paths: [/b], model: {values: [a]}}}
-  - name: a
+  - name: c
     capabilities: [generate]
     targets: [{name: gpt-5, provider: openai}]
-    config: {route: {paths: [/c]}}
+    config: {route: {paths: [/a], headers: {x-team: [c]}, model: {values: [a]}}}
 `), testOptions)
 	require.NoError(t, err)
-	require.Len(t, result.Issues, 2)
-	requireIssue(t, result.Issues, Warning, RoutingConflict, kindModel, "b", "config.route.model.values")
-	var fields [][]string
-	for _, issue := range result.Issues {
-		fields = append(fields, issue.Source.Fields)
+	require.Empty(t, result.Issues)
+	require.Len(t, result.Output.AIModels, 1)
+	require.Equal(t, "a", result.Output.AIModels[0].Name)
+	var proxies int
+	for _, p := range result.Output.Plugins {
+		if p.Name == "ai-proxy-advanced" {
+			require.Equal(t, kong.StringRef("a"), *p.Model)
+			proxies++
+		}
 	}
-	require.Contains(t, fields, []string{"name"})
-	require.Len(t, result.Output.AIModels, 3)
-	dbless := result.Output.ToDBLess()
-	require.Len(t, dbless.AIModels, 3)
-	for _, model := range dbless.AIModels {
-		require.Equal(t, "a", model.Name)
-		require.Equal(t, dbless.AIModels[0].ID, model.ID, "the data plane loads equal IDs as one entry")
-	}
+	require.Equal(t, 3, proxies)
 }
 
 // A disabled model makes no output, so it cannot conflict.

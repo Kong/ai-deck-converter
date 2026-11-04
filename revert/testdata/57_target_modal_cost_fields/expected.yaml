@@ -61,6 +61,8 @@ models:
       route:
         paths:
           - /ai
+        methods:
+          - POST
         model:
           values:
             - '@openai/gpt-5.2'

@@ -1,0 +1,22 @@
+_format_version: "3.0"
+services:
+  - name: claims-mcp
+    url: https://vendor.example.com/mcp
+    routes:
+      - name: claims-mcp-route
+        paths:
+          - /mcp/claims
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              access_token_claim_field: sub
+              acl_attribute_type: oauth_access_token
+              logging:
+                log_audits: false
+                log_payloads: false
+                log_statistics: true
+              mode: passthrough-listener
+              tools: []
+          - name: openid-connect
+            config:
+              issuer: https://dev-123456.okta.com/oauth2/default

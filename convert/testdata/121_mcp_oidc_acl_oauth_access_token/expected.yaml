@@ -1,0 +1,39 @@
+_format_version: "3.0"
+services:
+  - name: claims-mcp
+    url: https://vendor.example.com/mcp
+    routes:
+      - name: claims-mcp-route
+        paths:
+          - /mcp/claims
+          - /mcp/claims/.well-known/oauth-protected-resource
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              access_token_claim_field: sub
+              acl_attribute_type: oauth_access_token
+              logging:
+                log_audits: false
+                log_payloads: false
+                log_statistics: true
+              mode: passthrough-listener
+              tools:
+                - description: Search available flights
+                  host: flights.internal
+                  method: GET
+                  name: searchFlights
+                  path: /flights
+                  scheme: https
+          - name: openid-connect
+            config:
+              auth_methods:
+                - bearer
+              issuer: https://dev-123456.okta.com/oauth2/default
+              principals:
+                directory: my-directory
+                enabled: true
+              protected_resource_metadata:
+                authorization_servers:
+                  - https://dev-123456.okta.com/oauth2/default
+                metadata_endpoint: /mcp/claims/.well-known/oauth-protected-resource
+                resource: https://api.example.com/mcp/claims
