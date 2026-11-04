@@ -486,6 +486,11 @@ mcp_servers:
 //
 //nolint:gosec
 const mcpWhenACLInput = `
+auth_strategies:
+  - name: mcp-key-auth
+    type: key-auth
+    config:
+      key_names: [apikey]
 mcp_servers:
   - type: listener
     display_name: Guarded MCP
@@ -505,9 +510,10 @@ mcp_servers:
 `
 
 // TestMCPACLWhenConverts checks that server acls become a Kong acl plugin.
-// default_tool_acls reach default_acl, and tool ACLs reach tools[].acl.
+// default_tool_acls reach default_acl. Tool ACLs reach tools[].acl.
 func TestMCPACLWhenConverts(t *testing.T) {
 	access := `    access:
+      auth_strategies: [mcp-key-auth]
       acls:
         allow_when: ["principal.metadata.tier == 'partner'"]
       default_tool_acls:
@@ -655,6 +661,7 @@ func TestMCPServerACLsInvalid(t *testing.T) {
 // default_tool_acls can use different field pairs.
 func TestMCPServerACLsIndependentOfDefaultToolACLs(t *testing.T) {
 	access := `    access:
+      auth_strategies: [mcp-key-auth]
       acls:
         deny: [interns]
       default_tool_acls:
@@ -690,10 +697,11 @@ mcp_servers:
 	}
 }
 
-// TestMCPACLAllowDenyStillConverts guards the gate's blast radius: allow and
-// deny convert on every 2.x runtime.
+// TestMCPACLAllowDenyStillConverts checks that allow and deny convert on every
+// 2.x runtime.
 func TestMCPACLAllowDenyStillConverts(t *testing.T) {
 	access := `    access:
+      auth_strategies: [mcp-key-auth]
       acls:
         allow: [premium-users]`
 	tool := `        access:
@@ -968,4 +976,131 @@ mcp_servers:
 	require.Contains(t, issue.Reason, `"tv"`)
 	auth := routePlugins(t, result.Output, "vaulted")[0].Config["auth"].(map[string]any)
 	require.Equal(t, "from-datastore", auth["token_vault"].(map[string]any)["directory"])
+}
+
+// TestMCPServerACLsWithoutCallerIdentity checks the warning for server acls on
+// a route where no plugin sets a consumer or consumer group.
+func TestMCPServerACLsWithoutCallerIdentity(t *testing.T) {
+	const strategies = `
+auth_strategies:
+  - name: mcp-key-auth
+    type: key-auth
+    config: {key_names: [apikey]}
+  - name: mcp-oidc
+    type: openid-connect
+    config: {issuer: "https://idp.example.com"}
+  - name: mcp-oidc-consumer
+    type: openid-connect
+    config: {issuer: "https://idp.example.com", consumer_claims: [[sub]], consumer_by: [username]}
+`
+	const metadata = `
+      metadata:
+        resource: https://api.example.com/mcp
+        authorization_servers: ["https://idp.example.com"]
+        endpoint: /mcp/guarded/.well-known/oauth-protected-resource`
+	cases := []struct {
+		name    string
+		version string
+		access  string
+		global  string
+		warns   bool
+	}{
+		{name: "no auth", access: "", warns: true},
+		{name: "metadata only", access: metadata, warns: true},
+		{name: "key-auth", access: "\n      auth_strategies: [mcp-key-auth]"},
+		{name: "openid-connect", access: "\n      auth_strategies: [mcp-oidc]"},
+		{
+			name: "ai-mcp-oauth2 without consumer mapping", version: "2.2",
+			access: "\n      auth_strategies: [mcp-oidc]" + metadata, warns: true,
+		},
+		{
+			name: "ai-mcp-oauth2 with consumer mapping", version: "2.2",
+			access: "\n      auth_strategies: [mcp-oidc-consumer]" + metadata,
+		},
+		{
+			name: "global key-auth policy",
+			global: `
+policies:
+  - name: global-key-auth
+    type: key-auth
+    global: true
+    config: {key_names: [apikey]}
+`,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			version := tc.version
+			if version == "" {
+				version = aimap.LatestVersion.String()
+			}
+			result, err := Convert([]byte(strategies+tc.global+`
+mcp_servers:
+  - type: listener
+    name: guarded-mcp
+    config:
+      route: {paths: [/mcp/guarded]}
+    access:
+      acls:
+        allow: [partners]`+tc.access+`
+`), Options{MinRuntimeVersion: version})
+			require.NoError(t, err)
+			var found bool
+			for _, issue := range result.Issues {
+				if issue.Code == BehaviorMayDiffer && slices.Contains(issue.Source.Fields, "access.acls") {
+					found = true
+				}
+			}
+			require.Equal(t, tc.warns, found, "issues: %v", result.Issues)
+			require.NotEmpty(t, result.Output.Services, "the MCP server still converts")
+		})
+	}
+}
+
+// TestMCPServerACLsOAuthAccessTokenLists checks the warning for allow and
+// deny lists in server acls on an oauth_access_token server.
+func TestMCPServerACLsOAuthAccessTokenLists(t *testing.T) {
+	cases := []struct {
+		name      string
+		attribute string
+		acls      string
+		fields    []string
+	}{
+		{name: "allow", attribute: "oauth_access_token", acls: "allow: [alice@example.com]",
+			fields: []string{"access.acls.allow"}},
+		{name: "deny", attribute: "oauth_access_token", acls: "deny: [bob@example.com]",
+			fields: []string{"access.acls.deny"}},
+		{name: "deny_when", attribute: "oauth_access_token",
+			acls: `deny_when: ["principal.metadata.status == 'suspended'"]`},
+		{name: "consumer attribute", attribute: "consumer", acls: "allow: [partners]"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			result, err := Convert([]byte(`
+auth_strategies:
+  - name: mcp-oidc
+    type: openid-connect
+    config: {issuer: "https://idp.example.com", authenticated_groups_claim: [groups]}
+mcp_servers:
+  - type: listener
+    name: claims-mcp
+    config:
+      route: {paths: [/mcp/claims]}
+    access:
+      auth_strategies: [mcp-oidc]
+      acl_attribute_type: `+tc.attribute+`
+      access_token_claim_field: email
+      acls:
+        `+tc.acls+`
+`), testOptions)
+			require.NoError(t, err)
+			if tc.fields == nil {
+				require.Empty(t, result.Issues)
+			} else {
+				requireIssue(t, result.Issues, Warning, BehaviorMayDiffer, kindMCPServer, "claims-mcp", tc.fields...)
+				require.Len(t, result.Issues, 1)
+			}
+			require.NotEmpty(t, result.Output.Services, "the MCP server still converts")
+		})
+	}
 }

@@ -65,9 +65,9 @@ services:
               metadata_discovery_endpoint: https://issuer.example.com/.well-known/openid-configuration
 `
 
-// mcpOIDCProtectedResource is an MCP route carrying the 2.3 openid-connect MCP
-// auth lowering: an openid-connect plugin with a protected_resource_metadata
-// block, the strategy's principals, and the converter-forced auth_methods.
+// mcpOIDCProtectedResource is an MCP route with the 2.3 openid-connect plugin.
+// It has a protected_resource_metadata block, principals, and auth_methods
+// ["bearer"].
 const mcpOIDCProtectedResource = `
 _format_version: "3.0"
 services:
@@ -110,12 +110,12 @@ func TestRevertMCPOIDCProtectedResource(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, warnings)
 	s := string(out)
-	// The PRM block reconstructs access.metadata...
+	// The protected_resource_metadata block becomes access.metadata.
 	require.Contains(t, s, "metadata:")
 	require.Contains(t, s, "resource: https://api.example.com/mcp/oidc-prm")
 	require.Contains(t, s, "endpoint: /mcp/oidc-prm/.well-known/oauth-protected-resource")
-	// ...and the plugin config lifts verbatim into a strategy: principals and
-	// OIDC-only fields survive, the converter-forced auth_methods does not.
+	// The strategy keeps principals and the fields only openid-connect has. It
+	// does not keep auth_methods ["bearer"].
 	require.Contains(t, s, "type: openid-connect")
 	require.Contains(t, s, "directory: my-directory")
 	require.Contains(t, s, "all_claims: true")

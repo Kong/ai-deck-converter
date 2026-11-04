@@ -8,9 +8,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// convertYAMLBelow23 converts with min_runtime_version 2.2: the
-// ai-mcp-oauth2 MCP lowering's gate (from 2.3 an attached openid-connect
-// strategy lowers to the openid-connect plugin instead).
+// convertYAMLBelow23 converts with min_runtime_version 2.2. Below 2.3, an
+// openid-connect strategy lowers to ai-mcp-oauth2.
 func convertYAMLBelow23(src []byte) ([]byte, []string, error) {
 	opts := testOptions
 	opts.MinRuntimeVersion = aimap.Version{Major: 2, Minor: 2}.String()
@@ -379,12 +378,9 @@ mcp_servers:
         host: httpbin.internal
 `
 
-// TestMCPMetadataDropsTokenExchange pins the security invariant: below 2.3 an
-// openid-connect strategy with token_exchange + access.metadata lowers to
-// ai-mcp-oauth2, which cannot represent token_exchange, so the conversion
-// fails rather than silently dropping the control. From 2.3 the strategy
-// lowers to the openid-connect plugin, where token_exchange is a real field
-// and rides along verbatim.
+// TestMCPMetadataDropsTokenExchange checks that token_exchange below 2.3 fails
+// the server. ai-mcp-oauth2 cannot represent token_exchange. From 2.3, the
+// openid-connect plugin keeps token_exchange.
 func TestMCPMetadataDropsTokenExchange(t *testing.T) {
 	t.Run("fails below 2.3 (ai-mcp-oauth2 cannot represent it)", func(t *testing.T) {
 		opts := testOptions
@@ -444,10 +440,8 @@ mcp_servers:
         host: tools.example.com
 `
 
-// tokenVaultMCPMetadataOnly drops the auth strategy from
-// tokenVaultMCPWithMetadata: from 2.3 this is the only shape still lowered to
-// ai-mcp-oauth2 (an attached strategy lowers to the openid-connect plugin),
-// and it is where the vault's passthrough_credentials forcing stays live.
+// tokenVaultMCPMetadataOnly is tokenVaultMCPWithMetadata without the auth
+// strategy. From 2.3, only this shape lowers to ai-mcp-oauth2 with token_vault.
 var tokenVaultMCPMetadataOnly = func() string {
 	const strategyRef = "      auth_strategies: [okta-oidc]\n"
 	const strategyBlock = `auth_strategies:
@@ -461,8 +455,8 @@ var tokenVaultMCPMetadataOnly = func() string {
 }()
 
 func TestMCPOAuth2PassthroughForTokenVault(t *testing.T) {
-	// Metadata-only vault servers keep ai-mcp-oauth2 (it serves discovery and
-	// validates tokens without a strategy); the vault needs passthrough_credentials.
+	// A metadata-only vault server keeps ai-mcp-oauth2. The vault needs
+	// passthrough_credentials.
 	out, warnings, err := convertYAML([]byte(tokenVaultMCPMetadataOnly))
 	require.NoError(t, err)
 	require.Len(t, warnings, 1, "token_vault without a datastore warns")
@@ -471,9 +465,9 @@ func TestMCPOAuth2PassthroughForTokenVault(t *testing.T) {
 	require.Contains(t, s, "name: ai-mcp-oauth2")
 }
 
-// TestMCPOIDCTokenVaultForcesHideCredentials checks the 2.3 openid-connect
-// lowering: the Token Vault needs the caller's bearer token, so hide_credentials
-// is forced to false (the ai-mcp-oauth2 lowering's passthrough_credentials: true).
+// TestMCPOIDCTokenVaultForcesHideCredentials checks that the 2.3 openid-connect
+// plugin gets hide_credentials false with token_vault. The Token Vault needs
+// the caller's bearer token.
 func TestMCPOIDCTokenVaultForcesHideCredentials(t *testing.T) {
 	src := strings.Replace(tokenVaultMCPWithMetadata,
 		"      issuer: https://issuer.example.com/oauth2\n",

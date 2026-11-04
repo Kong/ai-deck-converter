@@ -3,6 +3,7 @@
 package e2e
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -212,4 +213,25 @@ func writeJSONRPC(w http.ResponseWriter, id any, code int, message, session stri
 	}
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(payload)
+}
+
+// startMCPUpstream serves the tokenVaultMCPUpstream JSON-RPC server and
+// records every request it gets.
+func startMCPUpstream(t *testing.T) *mockUpstream {
+	t.Helper()
+	m := &mockUpstream{t: t}
+	inner := tokenVaultMCPUpstream(t)
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		m.record(recordedRequest{
+			Path:          r.URL.Path,
+			Authorization: r.Header.Get("Authorization"),
+			Body:          string(body),
+		})
+		r.Body = io.NopCloser(bytes.NewReader(body))
+		inner.ServeHTTP(w, r)
+	})
+	m.Port = serveOnFreePort(t, handler)
+	m.URL = fmt.Sprintf("http://host.docker.internal:%d", m.Port)
+	return m
 }
