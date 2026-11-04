@@ -1,0 +1,23 @@
+# An oauth_access_token ACL with an openid-connect strategy and NO metadata
+# emits a plain openid-connect plugin. At 2.1 that plugin does not publish the
+# token claims the ACL subject type reads, so the ACL denies every request;
+# the pairing converts (as it did before the 2.3 lowering) and warns.
+# Pinned to 2.1 to lock the warning.
+auth_strategies:
+  - display_name: Okta OIDC
+    name: okta-oidc
+    type: openid-connect
+    config:
+      issuer: https://dev-123456.okta.com/oauth2/default
+mcp_servers:
+  - type: passthrough-listener
+    display_name: Claims MCP
+    name: claims-mcp
+    upstream_url: https://vendor.example.com/mcp
+    config:
+      route:
+        paths: [/mcp/claims]
+    access:
+      auth_strategies: [okta-oidc]
+      acl_attribute_type: oauth_access_token
+      access_token_claim_field: sub

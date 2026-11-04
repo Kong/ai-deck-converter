@@ -1,7 +1,8 @@
-# An MCP server whose ACL attribute type is oauth_access_token cannot use the
-# 2.3 openid-connect lowering: that ACL subject type reads the token claims
-# ai-mcp-oauth2 publishes, which openid-connect does not set. The server fails
-# conversion and is skipped.
+# An MCP server whose ACL attribute type is oauth_access_token pairs with the
+# 2.3 openid-connect lowering: from 2.3 the openid-connect plugin serves the
+# protected resource metadata and publishes the token claims under
+# kong.ctx.shared.ai_mcp_oauth2, which is what the ACL subject type reads.
+# Below 2.3 the pairing converts with a BEHAVIOR_MAY_DIFFER warning.
 auth_strategies:
   - display_name: Okta OIDC
     name: okta-oidc

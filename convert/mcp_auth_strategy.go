@@ -117,17 +117,23 @@ func (c *Converter) mcpAuthStrategyPlugins(
 	}
 
 	// ai-mcp-proxy's oauth_access_token ACL subjects read the token claims
-	// ai-mcp-oauth2 publishes (kong.ctx.shared.ai_mcp_oauth2); no other auth
-	// plugin sets that context, so the combination cannot work. The check
-	// lives here, where the whole auth-plugin decision is visible, not inside
-	// one builder. An oauth_access_token ACL without any auth plugin is left
-	// alone (nothing to bind the subjects to; see case 08's golden).
-	if m.Access.ACLAttributeType == "oauth_access_token" && plugins[0].Name != "ai-mcp-oauth2" {
-		return nil, c.fail(src.at("access.acl_attribute_type"), ConfigFieldInvalid,
+	// published under kong.ctx.shared.ai_mcp_oauth2. ai-mcp-oauth2 always
+	// publishes it; the openid-connect plugin does too, but only from 2.3,
+	// when it gained protected resource metadata support. Below 2.3 the
+	// pairing converts (as it always has) but the ACL has no subjects to
+	// read, so every request fails closed; say so without blocking the
+	// conversion. The check lives here, where the whole auth-plugin decision
+	// is visible, not inside one builder. An oauth_access_token ACL without
+	// any auth plugin is left alone (nothing to bind the subjects to; see
+	// case 08's golden).
+	if m.Access.ACLAttributeType == "oauth_access_token" &&
+		plugins[0].Name != "ai-mcp-oauth2" &&
+		!(plugins[0].Name == "openid-connect" && c.supports(aimap.FeatureMCPIdentityAuth)) {
+		c.warn(src.at("access.acl_attribute_type"), BehaviorMayDiffer,
 			"MCP server %q sets acl_attribute_type oauth_access_token, but the route's auth plugin is %q. "+
-				"oauth_access_token ACLs require the ai-mcp-oauth2 plugin: pair access.metadata with an "+
-				"openid-connect strategy at min_runtime_version below 2.3. Otherwise use a consumer "+
-				"acl_attribute_type.", m.Name, plugins[0].Name)
+				"oauth_access_token ACL subjects read the token claims published by ai-mcp-oauth2, "+
+				"or by openid-connect from runtime 2.3. On older runtimes the ACL has no subjects to "+
+				"match and denies every request.", m.Name, plugins[0].Name)
 	}
 	return plugins, nil
 }
