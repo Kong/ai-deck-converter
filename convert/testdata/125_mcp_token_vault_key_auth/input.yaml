@@ -75,3 +75,18 @@ mcp_servers:
     tools:
       - name: toolD
         description: A tool
+  # only the outbound is set: the inbound is derived and the outbound survives
+  - type: conversion-listener
+    display_name: Outbound Only
+    name: outbound-only
+    config: {route: {paths: [/mcp/outbound-only]}}
+    datastores: [{name: vault-konnect-prod}]
+    token_vault:
+      provider: outbound-api
+      credential:
+        outbound: {location: header, name: X-Upstream-Key, prefix: ""}
+    access:
+      auth_strategies: [api-key-default]
+    tools:
+      - name: toolE
+        description: A tool
