@@ -2,6 +2,7 @@ package convert
 
 import (
 	"maps"
+	"slices"
 
 	"github.com/Kong/ai-deck-converter/internal/aigw"
 	"github.com/Kong/ai-deck-converter/internal/aimap"
@@ -117,11 +118,10 @@ func (c *Converter) mcpAuthStrategyPlugins(
 // The schema allows at most one.
 const mcpAuthStrategyField = "access.auth_strategies[0]"
 
-// deriveTokenVaultInbound fills the ai-mcp-proxy token_vault inbound credential
-// from the key-auth strategy when the MCP server sets none: the token exchange
-// must read the credential where the key-auth plugin expects it, and the plugin
-// default (Authorization: Bearer) does not match key-auth. An explicit inbound
-// is never touched. Runs on the ai-mcp-proxy plugin already on the route.
+// deriveTokenVaultInbound fills the ai-mcp-proxy token_vault inbound
+// credential from the key-auth strategy when the MCP server sets none.
+// The plugin default inbound Authorization Bearer does not match where
+// key-auth expects the credential. An explicit inbound is never touched.
 func (c *Converter) deriveTokenVaultInbound(
 	src ConversionIssueSource, m *aigw.MCPServer, idp *aigw.AuthStrategy, route *kong.Route,
 ) {
