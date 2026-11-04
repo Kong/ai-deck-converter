@@ -831,7 +831,7 @@ func TestAuthStrategyTokenVaultUnusedStrategyLeavesCallbackRouteOpen(t *testing.
     type: key-auth`, "ka")
 
 	// The server's token_vault derives its inbound credential from the
-	// key-auth strategy, which is the one expected issue here.
+	// key-auth strategy. That derivation is the one expected issue here.
 	requireIssue(t, res.Issues, Warning, ConfigFieldOverridden, kindMCPServer, "m", "token_vault.credential.inbound")
 	require.Len(t, res.Issues, 1)
 	requireCallbackRoutes(t, res.Output.Routes)

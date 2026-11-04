@@ -139,13 +139,9 @@ func (r *Reverter) revertMCPServer(svc *kong.Service, rt *kong.Route, plugins, s
 		if tokenVault != nil {
 			m.Datastores = r.tokenVaultDatastoreRef(getMap(authBlock, "token_vault"), tokenVault)
 		}
-		// A key-auth plugin whose header key the token-vault record never
-		// names leaves the data plane reading the default Authorization:
-		// Bearer, which key-auth does not use. Convert would have derived
-		// the inbound for this shape, so its absence is an authoring gap.
-		// A key-auth plugin that reads no header key has no derivable
-		// inbound; convert warns instead, and this stays silent to keep
-		// re-converting converter output warning-free.
+		// The key-auth header carries the credential the exchange must
+		// read. The plugin default Authorization Bearer does not match it.
+		// The derivation is empty for a plugin that reads no header key.
 		keyAuth := findPlugin(plugins, "key-auth")
 		if keyAuth != nil && (tokenVault.Credential == nil || tokenVault.Credential.Inbound == nil) {
 			if loc := aimap.TokenVaultInboundFromKeyAuth(keyAuth.Config); loc != nil {

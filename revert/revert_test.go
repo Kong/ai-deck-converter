@@ -406,8 +406,8 @@ services:
 }
 
 // A key-auth plugin on an MCP route pairs with a token-vault auth record that
-// names its inbound credential. Without one the data plane reads the default
-// Authorization: Bearer, which key-auth routes do not carry, so revert warns.
+// names its inbound credential. The plugin default Authorization Bearer does
+// not match key-auth. Revert warns when the record names none.
 func TestMCPTokenVaultInboundKeyAuthWarning(t *testing.T) {
 	in := []byte(`
 _format_version: "3.0"
@@ -447,8 +447,8 @@ services:
 	require.NoError(t, err, "revert without key-auth")
 	require.Empty(t, warnings, "warnings without key-auth")
 
-	// A key-auth plugin that reads no header key has no derivable inbound;
-	// convert warns for that shape itself, so revert stays silent.
+	// A key-auth plugin that reads no header key has no derivable inbound.
+	// Convert warns for that shape itself, and revert stays silent there.
 	bodyKey := []byte(strings.Replace(string(in),
 		"config: {key_names: [apikey]}",
 		"config: {key_in_header: false, key_in_body: true}", 1))
