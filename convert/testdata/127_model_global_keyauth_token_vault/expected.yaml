@@ -1,0 +1,181 @@
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: anthropic-messages
+        paths:
+          - /ai/claude-global/v1/messages
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: anthropic-messages-2
+        paths:
+          - /ai/claude-divergent/v1/messages
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: anthropic-messages-3
+        paths:
+          - /ai/claude-aligned/v1/messages
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+routes:
+  - name: token-vault-callback-handler
+    paths:
+      - /_vault
+    protocols:
+      - http
+      - https
+    plugins:
+      - name: token-vault-callback-handler
+        config:
+          directory: my-directory
+          storage:
+            backend: konnect
+plugins:
+  - name: key-auth
+    config:
+      key_names:
+        - x-api-key
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: anthropic-messages
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      targets:
+        - description: claude-sonnet
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: claude-global
+            name: claude-sonnet
+            options:
+              anthropic_version: "2023-06-01"
+            provider: anthropic
+          route_type: llm/v1/chat
+    route: anthropic-messages
+    model: claude-global
+  - name: token-vault-exchange
+    config:
+      credential:
+        inbound:
+          location: header
+          name: x-api-key
+          prefix: ""
+      directory: my-directory
+      provider: anthropic
+      storage:
+        backend: konnect
+      subject_token_type: api_key
+    route: anthropic-messages
+    model: claude-global
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: anthropic-messages-2
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      targets:
+        - description: claude-sonnet
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: claude-divergent
+            name: claude-sonnet
+            options:
+              anthropic_version: "2023-06-01"
+            provider: anthropic
+          route_type: llm/v1/chat
+    route: anthropic-messages-2
+    model: claude-divergent
+  - name: token-vault-exchange
+    config:
+      credential:
+        inbound:
+          location: header
+          name: x-custom-key
+          prefix: ""
+      directory: my-directory
+      provider: anthropic
+      storage:
+        backend: konnect
+      subject_token_type: api_key
+    route: anthropic-messages-2
+    model: claude-divergent
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: anthropic-messages-3
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      targets:
+        - description: claude-sonnet
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: claude-aligned
+            name: claude-sonnet
+            options:
+              anthropic_version: "2023-06-01"
+            provider: anthropic
+          route_type: llm/v1/chat
+    route: anthropic-messages-3
+    model: claude-aligned
+  - name: token-vault-exchange
+    config:
+      credential:
+        inbound:
+          location: header
+          name: x-api-key
+          prefix: ""
+      directory: my-directory
+      provider: anthropic
+      storage:
+        backend: konnect
+      subject_token_type: api_key
+    route: anthropic-messages-3
+    model: claude-aligned
+  - name: key-auth
+    config:
+      key_names:
+        - x-custom-key
+    route: anthropic-messages-2
+  - name: key-auth
+    config:
+      key_names:
+        - x-api-key
+    route: anthropic-messages-3
+ai_models:
+  - name: claude-global
+  - name: claude-divergent
+  - name: claude-aligned

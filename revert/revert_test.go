@@ -524,6 +524,18 @@ services:
 	_, warnings, err = revertYAML(t, bodyKey, Options{})
 	require.NoError(t, err, "revert with body-only key")
 	require.Empty(t, warnings, "warnings with body-only key")
+
+	// A global key-auth plugin stands in when the route carries none.
+	globalKeyAuth := []byte(strings.Replace(string(in),
+		"          - name: key-auth\n"+
+			"            config: {key_names: [apikey]}\n", "", 1))
+	globalKeyAuth = []byte(strings.Replace(string(globalKeyAuth),
+		"_format_version: \"3.0\"\n",
+		"_format_version: \"3.0\"\nplugins:\n  - name: key-auth\n"+
+			"    config: {key_names: [x-api-key]}\n", 1))
+	_, warnings, err = revertYAML(t, globalKeyAuth, Options{})
+	require.NoError(t, err, "revert with global key-auth")
+	require.Contains(t, strings.Join(warnings, "\n"), "the global key-auth plugin reads the key")
 }
 
 // The AI Gateway API does not accept rate_limiting on a listener.
