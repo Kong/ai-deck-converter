@@ -28,6 +28,9 @@ func (c *Converter) mcpAuthStrategyPlugins(
 ) ([]kong.Plugin, error) {
 	meta := m.Access.Metadata
 	if len(m.Access.AuthStrategies) == 0 && meta == nil {
+		// A global key-auth policy can still gate the server and supply the
+		// token vault inbound.
+		c.deriveTokenVaultInbound(src, m, nil, route)
 		return nil, nil
 	}
 

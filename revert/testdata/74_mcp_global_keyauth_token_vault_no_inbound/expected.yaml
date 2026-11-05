@@ -1,0 +1,30 @@
+mcp_servers:
+  - type: listener
+    name: vaulted-global
+    config:
+      route:
+        paths:
+          - /mcp/vaulted-global
+      logging:
+        payloads: false
+        statistics: true
+        audits: false
+    tools:
+      - name: report
+        description: Get a report
+        method: GET
+        path: /report
+    datastores:
+      - name: token-vault
+    token_vault:
+      provider: outbound-api
+policies:
+  - type: key-auth
+    name: key-auth
+    global: true
+    config:
+      key_names:
+        - x-api-key
+datastores:
+  - type: token-vault
+    name: token-vault
