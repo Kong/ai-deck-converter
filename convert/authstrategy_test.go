@@ -830,7 +830,10 @@ func TestAuthStrategyTokenVaultUnusedStrategyLeavesCallbackRouteOpen(t *testing.
   - name: ka
     type: key-auth`, "ka")
 
-	require.Empty(t, res.Issues)
+	// The server's token_vault derives its inbound credential from the
+	// key-auth strategy. That derivation is the one expected issue here.
+	requireIssue(t, res.Issues, Warning, ConfigFieldOverridden, kindMCPServer, "m", "token_vault.credential.inbound")
+	require.Len(t, res.Issues, 1)
 	requireCallbackRoutes(t, res.Output.Routes)
 	require.Nil(t, tvOIDCPlugins(res).initiate,
 		"an unused strategy adds no start route")

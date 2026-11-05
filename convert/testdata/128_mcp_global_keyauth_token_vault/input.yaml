@@ -1,0 +1,67 @@
+# The caller auth of each server comes from a global key-auth policy instead
+# of a strategy. The servers show the derivation from the global policy, a
+# strategy that diverges from the policy's header, and a strategy that agrees
+# with it.
+datastores:
+  - name: vault-konnect-prod
+    type: token-vault
+    config:
+      directory: my-directory
+
+policies:
+  - type: key-auth
+    name: org-key-auth
+    global: true
+    config:
+      key_names: [x-api-key]
+
+auth_strategies:
+  - name: api-key-custom
+    type: key-auth
+    display_name: API Key Custom
+    config:
+      key_names: [x-custom-key]
+  - name: api-key-aligned
+    type: key-auth
+    display_name: API Key Aligned
+    config:
+      key_names: [x-api-key]
+
+mcp_servers:
+  # no strategy: the inbound is derived from the global policy
+  - type: conversion-listener
+    display_name: Derived Global
+    name: derived-global
+    config: {route: {paths: [/mcp/derived-global]}}
+    datastores: [{name: vault-konnect-prod}]
+    token_vault:
+      provider: outbound-api
+    tools:
+      - name: toolA
+        description: A tool
+  # the strategy wins the derivation, and diverges from the policy's header
+  - type: conversion-listener
+    display_name: Divergent
+    name: divergent
+    config: {route: {paths: [/mcp/divergent]}}
+    datastores: [{name: vault-konnect-prod}]
+    token_vault:
+      provider: outbound-api
+    access:
+      auth_strategies: [api-key-custom]
+    tools:
+      - name: toolB
+        description: A tool
+  # the strategy wins the derivation, and agrees with the policy's header
+  - type: conversion-listener
+    display_name: Aligned
+    name: aligned
+    config: {route: {paths: [/mcp/aligned]}}
+    datastores: [{name: vault-konnect-prod}]
+    token_vault:
+      provider: outbound-api
+    access:
+      auth_strategies: [api-key-aligned]
+    tools:
+      - name: toolC
+        description: A tool

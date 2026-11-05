@@ -1,0 +1,124 @@
+_format_version: "3.0"
+services:
+  - name: derived-global
+    host: localhost
+    routes:
+      - name: derived-global-route
+        paths:
+          - /mcp/derived-global
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              auth:
+                provider: token_vault
+                token_vault:
+                  credential:
+                    inbound:
+                      location: header
+                      name: x-api-key
+                      prefix: ""
+                  directory: my-directory
+                  provider: outbound-api
+                  storage:
+                    backend: konnect
+              include_consumer_groups: true
+              logging:
+                log_audits: false
+                log_payloads: false
+                log_statistics: true
+              mode: conversion-listener
+              tools:
+                - description: A tool
+                  name: toolA
+  - name: divergent
+    host: localhost
+    routes:
+      - name: divergent-route
+        paths:
+          - /mcp/divergent
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              auth:
+                provider: token_vault
+                token_vault:
+                  credential:
+                    inbound:
+                      location: header
+                      name: x-custom-key
+                      prefix: ""
+                  directory: my-directory
+                  provider: outbound-api
+                  storage:
+                    backend: konnect
+              include_consumer_groups: true
+              logging:
+                log_audits: false
+                log_payloads: false
+                log_statistics: true
+              mode: conversion-listener
+              server:
+                forward_client_headers: true
+              tools:
+                - description: A tool
+                  name: toolB
+          - name: key-auth
+            config:
+              hide_credentials: false
+              key_names:
+                - x-custom-key
+  - name: aligned
+    host: localhost
+    routes:
+      - name: aligned-route
+        paths:
+          - /mcp/aligned
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              auth:
+                provider: token_vault
+                token_vault:
+                  credential:
+                    inbound:
+                      location: header
+                      name: x-api-key
+                      prefix: ""
+                  directory: my-directory
+                  provider: outbound-api
+                  storage:
+                    backend: konnect
+              include_consumer_groups: true
+              logging:
+                log_audits: false
+                log_payloads: false
+                log_statistics: true
+              mode: conversion-listener
+              server:
+                forward_client_headers: true
+              tools:
+                - description: A tool
+                  name: toolC
+          - name: key-auth
+            config:
+              hide_credentials: false
+              key_names:
+                - x-api-key
+routes:
+  - name: token-vault-callback-handler
+    paths:
+      - /_vault
+    protocols:
+      - http
+      - https
+    plugins:
+      - name: token-vault-callback-handler
+        config:
+          directory: my-directory
+          storage:
+            backend: konnect
+plugins:
+  - name: key-auth
+    config:
+      key_names:
+        - x-api-key

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"maps"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -27,6 +28,9 @@ func (c *Converter) mcpAuthStrategyPlugins(
 ) ([]kong.Plugin, error) {
 	meta := m.Access.Metadata
 	if len(m.Access.AuthStrategies) == 0 && meta == nil {
+		// A global key-auth policy can still gate the server and supply the
+		// token vault inbound.
+		c.deriveTokenVaultInbound(src, m, nil, route)
 		return nil, nil
 	}
 
@@ -86,6 +90,7 @@ func (c *Converter) mcpAuthStrategyPlugins(
 		plugins = []kong.Plugin{plugin}
 	} else {
 		if idp == nil {
+			c.deriveTokenVaultInbound(src, m, nil, route)
 			return nil, nil
 		}
 		cfg := make(map[string]any, len(idp.Config))
@@ -118,7 +123,81 @@ func (c *Converter) mcpAuthStrategyPlugins(
 				"or by openid-connect from runtime 2.3. On older runtimes the ACL has no subjects to "+
 				"match and denies every request.", m.Name, plugins[0].Name)
 	}
+	c.deriveTokenVaultInbound(src, m, idp, route)
 	return plugins, nil
+}
+
+// deriveTokenVaultInbound fills the ai-mcp-proxy token_vault inbound
+// credential from the server's key-auth strategy, or from a global key-auth
+// policy when no strategy supplies it. The plugin default inbound
+// Authorization Bearer does not match where key-auth expects the credential.
+// An explicit inbound is never touched.
+func (c *Converter) deriveTokenVaultInbound(
+	src ConversionIssueSource, m *aigw.MCPServer, idp *aigw.AuthStrategy, route *kong.Route,
+) {
+	tv := m.TokenVault
+	if tv == nil || (tv.Credential != nil && tv.Credential.Inbound != nil) {
+		return
+	}
+	apply := func(kind, name string, keyAuth map[string]any) *aigw.TokenVaultCredentialLocation {
+		loc := aimap.TokenVaultInboundFromKeyAuth(keyAuth)
+		if loc == nil {
+			// The warning recurs on a re-conversion, whose reverter
+			// synthesizes strategy and policy names. It names only the kind.
+			c.warn(src.at("token_vault.credential.inbound"), BehaviorMayDiffer,
+				"MCP server %q: the %s does not read its key from the headers, so "+
+					"token_vault.credential.inbound cannot be derived from it. The data plane keeps "+
+					"the default inbound (Authorization: Bearer), which the exchange will not find.",
+				m.Name, kind)
+			return nil
+		}
+		pi := slices.IndexFunc(route.Plugins, func(p kong.Plugin) bool { return p.Name == "ai-mcp-proxy" })
+		if pi < 0 {
+			return nil
+		}
+		auth, _ := route.Plugins[pi].Config["auth"].(map[string]any)
+		// mcpPlugin lowers token_vault into this plugin before the auth plugins.
+		block, _ := auth["token_vault"].(map[string]any)
+		cred, _ := block["credential"].(map[string]any)
+		if cred == nil {
+			cred = map[string]any{}
+			block["credential"] = cred
+		}
+		cred["inbound"] = aimap.TokenVaultLocationToPlugin(loc)
+		c.warn(src.at("token_vault.credential.inbound"), ConfigFieldOverridden,
+			"MCP server %q: token_vault.credential.inbound is derived from the %s %q "+
+				"(header %q, its first key name, no prefix), because the plugin default "+
+				"Authorization: Bearer does not match where key-auth reads the key.",
+			m.Name, kind, name, loc.Name)
+		return loc
+	}
+	if idp != nil && idp.Type != "key-auth" {
+		// A bearer strategy matches the plugin default inbound. A global
+		// key-auth policy still gates the same request.
+		idp = nil
+	}
+	gpol := c.globalKeyAuthPolicy()
+	switch {
+	case idp != nil:
+		loc := apply("key-auth strategy", idp.Name, idp.Config)
+		if loc == nil || gpol == nil {
+			return
+		}
+		if gloc := aimap.TokenVaultInboundFromKeyAuth(gpol.Config); gloc == nil || gloc.Name != loc.Name {
+			reads := "the request body"
+			if gloc != nil {
+				reads = fmt.Sprintf("header %q", gloc.Name)
+			}
+			// The warning recurs on a re-conversion, whose reverter
+			// synthesizes policy names. It names only the header names.
+			c.warn(src.at("token_vault.credential.inbound"), BehaviorMayDiffer,
+				"MCP server %q: the global key-auth policy reads its key from %s, but the derived "+
+					"inbound reads header %q. The exchange uses only the derived inbound.",
+				m.Name, reads, loc.Name)
+		}
+	case gpol != nil:
+		apply("global key-auth policy", gpol.Name, gpol.Config)
+	}
 }
 
 func mcpOAuth2Source(
@@ -631,19 +710,7 @@ func firstConfigPath(config map[string]any, key string) []any {
 	return nil
 }
 
-// configStrings reads config[key] as a []string, accepting []any or []string.
+// configStrings reads config[key] as a []string (see aimap.ConfigStrings).
 func configStrings(config map[string]any, key string) []string {
-	switch v := config[key].(type) {
-	case []string:
-		return v
-	case []any:
-		out := make([]string, 0, len(v))
-		for _, e := range v {
-			if s, ok := e.(string); ok {
-				out = append(out, s)
-			}
-		}
-		return out
-	}
-	return nil
+	return aimap.ConfigStrings(config, key)
 }
