@@ -112,7 +112,6 @@ plugins:
   - id: 416d067b-cd64-56c1-b90b-c0d80cbb62e3
     name: key-auth
     config:
-      hide_credentials: false
       key_names:
         - apikey
     route:

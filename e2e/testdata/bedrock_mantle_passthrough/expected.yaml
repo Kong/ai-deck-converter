@@ -1,0 +1,50 @@
+_format_version: "3.0"
+_transform: false
+services:
+  - id: 947a4e23-b483-5a65-8165-da9aed24565b
+    name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    host: ai-gateway.upstream.local
+    port: 80
+    protocol: http
+routes:
+  - id: 40e7c726-7e8a-5d90-95b7-e779f60427e4
+    name: bedrock-passthrough
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /mantle-passthrough
+    protocols:
+      - http
+      - https
+    strip_path: false
+plugins:
+  - id: 4f272023-c721-52f1-a99f-03afec02ed35
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            aws_access_key_id: e2e-fake-access-key-id
+            aws_secret_access_key: e2e-fake-secret-access-key
+          description: openai.gpt-oss-120b
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: openai.gpt-oss-120b
+            options:
+              bedrock:
+                aws_region: us-east-1
+                endpoint_type: mantle
+                mantle_openai_path_prefix: /v1
+            provider: bedrock
+          route_type: passthrough
+    route:
+      id: 40e7c726-7e8a-5d90-95b7-e779f60427e4
+ai_models:
+  - id: 6b6197d5-0e3c-5d7a-b000-52959d3e6b84
+    name: mantle-passthrough

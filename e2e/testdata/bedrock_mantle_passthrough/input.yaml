@@ -1,0 +1,22 @@
+# A Bedrock mantle target in a model with the passthrough format.
+model_providers:
+  - name: bedrock-prod
+    type: bedrock
+    config:
+      auth:
+        type: aws
+        access_key_id: e2e-fake-access-key-id
+        secret_access_key: e2e-fake-secret-access-key
+models:
+  - name: mantle-passthrough
+    type: model
+    formats: [ { type: passthrough } ]
+    config:
+      route: { paths: [ /mantle-passthrough ] }
+    targets:
+      - name: openai.gpt-oss-120b
+        provider: bedrock-prod
+        config:
+          type: bedrock
+          region: us-east-1
+          endpoint_type: mantle

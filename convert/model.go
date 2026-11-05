@@ -519,9 +519,10 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 				m.Name, tm.Name)
 		}
 		c.warnUnsupportedCostLists(src, tm, j)
+		target := aimapTarget(tm, providerType)
 		targets = append(targets, plannedTarget{
 			index: j, tm: tm, provider: provider, providerType: providerType,
-			target: aimapTarget(tm, providerType),
+			target: target,
 		})
 		if passthrough && !aimap.HasNativeFormat(providerType) {
 			c.warn(src.at(fmt.Sprintf("targets[%d].config.type", j)), BehaviorMayDiffer,
@@ -529,7 +530,7 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 					"format may not extract usage or cost", m.Name, tm.Name, providerType)
 		}
 		if passthrough {
-			format := aimap.ClientFormat(aimap.PassthroughFormat, providerType)
+			format := aimap.PassthroughClientFormat(target)
 			if passthroughFormat == "" {
 				passthroughFormat = format
 			} else if format != passthroughFormat {
@@ -579,6 +580,9 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 			}
 			sec := aimap.SectionFor(pair.format, providerType)
 			format := aimap.ClientFormat(pair.format, providerType)
+			if passthrough {
+				format = aimap.PassthroughClientFormat(t.target)
+			}
 			// A capability with secondary endpoints (bedrock generate, also
 			// reachable via invoke) emits one route per endpoint, each
 			// carrying this target; revert's capsSeen folds the routes back
@@ -1289,7 +1293,9 @@ func (c *Converter) checkTarget(m *aigw.Model, j int) (*aigw.Provider, string, *
 	}
 	// The Mantle endpoint does not serve the Converse or InvokeModel APIs.
 	// Under "*", aimap.SupportedFormats always selects openai for it.
+	// The data plane accepts the passthrough route type on a mantle target.
 	if formats := clientFormats(explicitFormats(m), providerType); isMantleTarget(tm, providerType) &&
+		!isPassthrough(m) &&
 		formats != nil && !slices.Contains(formats, "openai") && !slices.Contains(formats, "anthropic") {
 		return nil, "", &targetProblem{
 			field: fmt.Sprintf("targets[%d].config.endpoint_type", j),

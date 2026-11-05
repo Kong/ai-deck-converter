@@ -47,7 +47,7 @@ func (c *Converter) mcpAuthStrategyPlugins(
 			m.Name, m.Type)
 	}
 
-	idp, idpField, err := c.mcpAccessAuthStrategy(src, m)
+	idp, err := c.mcpAccessAuthStrategy(src, m)
 	if err != nil {
 		return nil, err
 	}
@@ -60,13 +60,15 @@ func (c *Converter) mcpAuthStrategyPlugins(
 	// key-auth cannot serve OAuth 2.0 Protected Resource Metadata; reject the
 	// combination unconditionally.
 	if meta != nil && idp != nil && idp.Type == "key-auth" {
-		return nil, c.fail(src.at("access.metadata", idpField), ConfigFieldInvalid,
+		return nil, c.fail(src.at("access.metadata", mcpAuthStrategyField), ConfigFieldInvalid,
 			"MCP server %q references key-auth auth strategy %q with access.metadata; "+
 				"OAuth Protected Resource Metadata is not supported for key-auth",
 			m.Name, idp.Name)
 	}
 
-	var plugins []kong.Plugin
+	// Without metadata, idp is never nil. The function returns early when both
+	// are missing.
+	var plugin kong.Plugin
 	if meta != nil {
 		// From 2.3, the openid-connect plugin serves the metadata. It also
 		// resolves the Kong Identity principals of the strategy. Metadata
@@ -75,7 +77,7 @@ func (c *Converter) mcpAuthStrategyPlugins(
 		if idp != nil && idp.Type == authStrategyTypeOpenIDConnect && c.supports(aimap.FeatureMCPIdentityAuth) {
 			build, source = c.mcpOIDCPlugin, mcpOIDCSource
 		}
-		plugin, err := build(src, m, idp, meta)
+		plugin, err = build(src, m, idp, meta)
 		if err != nil {
 			return nil, err
 		}
@@ -83,42 +85,28 @@ func (c *Converter) mcpAuthStrategyPlugins(
 			route.Paths = append(route.Paths, meta.Endpoint)
 		}
 		plugin.Source = source(m, idp, meta)
-		plugins = []kong.Plugin{plugin}
 	} else {
-		if idp == nil {
-			return nil, nil
-		}
 		cfg := make(map[string]any, len(idp.Config))
 		maps.Copy(cfg, idp.Config)
-		if idp.Type == "key-auth" {
-			// ai-mcp-proxy needs the client's key on the internal request for a
-			// tool call. Models and agents can share the strategy and hide the
-			// key.
-			if hide, _ := idp.Config["hide_credentials"].(bool); hide {
-				c.warn(src.at(idpField), ConfigFieldOverridden,
-					"MCP server %q references key-auth auth strategy %q with hide_credentials: true. "+
-						"This will be ignored, and hide_credentials will be overridden to false "+
-						"because ai-mcp-proxy needs the credential to execute tools.",
-					m.Name, idp.Name)
-			}
-			cfg["hide_credentials"] = false
+		if reason := c.mcpKeyAuthRevealReason(m, idp); reason != "" {
+			c.revealMCPCredentials(src, m, idp, cfg, reason)
 		}
-		plugins = []kong.Plugin{{Name: idp.Type, Config: cfg, Source: source("identity_provider", idp.Name, "config")}}
+		plugin = kong.Plugin{Name: idp.Type, Config: cfg, Source: source("identity_provider", idp.Name, "config")}
 	}
 
 	// oauth_access_token ACL subjects read the claims in
 	// kong.ctx.shared.ai_mcp_oauth2. ai-mcp-oauth2 always sets these claims.
 	// openid-connect sets them from 2.3.
-	oidcPublishesACLClaims := plugins[0].Name == "openid-connect" && c.supports(aimap.FeatureMCPIdentityAuth)
+	oidcPublishesACLClaims := plugin.Name == authStrategyTypeOpenIDConnect && c.supports(aimap.FeatureMCPIdentityAuth)
 	if m.Access.ACLAttributeType == "oauth_access_token" &&
-		plugins[0].Name != "ai-mcp-oauth2" && !oidcPublishesACLClaims {
+		plugin.Name != "ai-mcp-oauth2" && !oidcPublishesACLClaims {
 		c.warn(src.at("access.acl_attribute_type"), BehaviorMayDiffer,
 			"MCP server %q sets acl_attribute_type oauth_access_token, but the route's auth plugin is %q. "+
 				"oauth_access_token ACL subjects read the token claims published by ai-mcp-oauth2, "+
 				"or by openid-connect from runtime 2.3. On older runtimes the ACL has no subjects to "+
-				"match and denies every request.", m.Name, plugins[0].Name)
+				"match and denies every request.", m.Name, plugin.Name)
 	}
-	return plugins, nil
+	return []kong.Plugin{plugin}, nil
 }
 
 func mcpOAuth2Source(
@@ -147,26 +135,28 @@ func mcpOAuth2Source(
 	)
 }
 
-// mcpAccessAuthStrategy resolves the single (schema max 1) auth strategy
-// referenced by an MCP server's access block and returns its field path. An
-// unknown reference fails the server.
+// mcpAuthStrategyField is the path of the auth strategy of an MCP server.
+// The schema allows at most one.
+const mcpAuthStrategyField = "access.auth_strategies[0]"
+
+// mcpAccessAuthStrategy resolves the auth strategy referenced by an MCP
+// server's access block. An unknown reference fails the server.
 func (c *Converter) mcpAccessAuthStrategy(
 	src ConversionIssueSource, m *aigw.MCPServer,
-) (*aigw.AuthStrategy, string, error) {
+) (*aigw.AuthStrategy, error) {
 	if len(m.Access.AuthStrategies) == 0 {
-		return nil, "", nil
+		return nil, nil
 	}
-	const field = "access.auth_strategies[0]"
 	ref := m.Access.AuthStrategies[0]
 	idp := c.authStrategies[ref]
 	if idp == nil {
-		return nil, "", c.fail(src.at(field), UndefinedReference,
+		return nil, c.fail(src.at(mcpAuthStrategyField), UndefinedReference,
 			"MCP server %q references unknown auth strategy %q", m.Name, ref)
 	}
-	if err := c.checkAuthStrategyType(src, field, idp); err != nil {
-		return nil, "", err
+	if err := c.checkAuthStrategyType(src, mcpAuthStrategyField, idp); err != nil {
+		return nil, err
 	}
-	return idp, field, nil
+	return idp, nil
 }
 
 // mcpProtectedResource gets the resource and authorization servers of an MCP
@@ -240,7 +230,7 @@ func (c *Converter) mcpOAuth2Plugin(
 		// the caller's token goes to the upstream unchanged. The openid-connect
 		// lowering keeps token_exchange.
 		if te, ok := idp.Config["token_exchange"]; ok && !isEmptyConfigValue(te) {
-			return kong.Plugin{}, c.fail(src.at("access.auth_strategies[0]"), ConfigFieldInvalid,
+			return kong.Plugin{}, c.fail(src.at(mcpAuthStrategyField), ConfigFieldInvalid,
 				"MCP server %q auth strategy %q sets config.token_exchange, which ai-mcp-oauth2 "+
 					"cannot represent; the token exchange would NOT be applied and the caller's token "+
 					"forwarded verbatim. Remove access.metadata to keep an openid-connect plugin, "+
@@ -254,7 +244,7 @@ func (c *Converter) mcpOAuth2Plugin(
 		if firstConfigString(idp.Config, "client_id") != "" &&
 			firstConfigString(idp.Config, "client_secret") == "" {
 			delete(cfg, "client_id")
-			c.warn(src.at("access.auth_strategies[0]"), ConfigFieldIgnored,
+			c.warn(src.at(mcpAuthStrategyField), ConfigFieldIgnored,
 				"MCP server %q auth strategy %q sets client_id but no client_secret. "+
 					"The gateway requires a client credential with client_id, so the plugin "+
 					"leaves client_id out. Token validation does not use it.",
@@ -262,7 +252,7 @@ func (c *Converter) mcpOAuth2Plugin(
 		}
 		proxyConfig, err := oidcProxyConfig(idp.Config)
 		if err != nil {
-			return kong.Plugin{}, c.fail(src.at("access.auth_strategies[0]"), ConfigFieldInvalid,
+			return kong.Plugin{}, c.fail(src.at(mcpAuthStrategyField), ConfigFieldInvalid,
 				"MCP server %q references an auth strategy with unsupported proxy configuration: %s",
 				m.Name, err)
 		}
@@ -314,7 +304,7 @@ func (c *Converter) mcpOIDCPlugin(
 	// Interactive flows would break the MCP authorization challenge.
 	if methods := configStrings(idp.Config, "auth_methods"); len(methods) > 1 ||
 		(len(methods) == 1 && methods[0] != "bearer") {
-		c.warn(src.at("access.auth_strategies[0]"), ConfigFieldOverridden,
+		c.warn(src.at(mcpAuthStrategyField), ConfigFieldOverridden,
 			"MCP server %q auth strategy %q sets auth_methods beyond bearer. This will be overridden to "+
 				"[bearer] because MCP routes validate bearer tokens only (matching ai-mcp-oauth2); "+
 				"interactive flows would break the MCP authorization challenge.",
@@ -345,17 +335,11 @@ func (c *Converter) mcpOIDCPlugin(
 	// credential. hide_credentials: true removes that token before the
 	// exchange.
 	if m.TokenVault != nil {
-		if hide, _ := idp.Config["hide_credentials"].(bool); hide {
-			c.warn(src.at("access.auth_strategies[0]"), ConfigFieldOverridden,
-				"MCP server %q references openid-connect auth strategy %q with hide_credentials: true. "+
-					"This will be ignored, and hide_credentials will be overridden to false "+
-					"because the Token Vault needs the caller's bearer token to resolve the upstream credential.",
-				m.Name, idp.Name)
-		}
-		cfg["hide_credentials"] = false
+		c.revealMCPCredentials(src, m, idp, cfg,
+			"the Token Vault needs the caller's bearer token to resolve the upstream credential")
 	}
 
-	return kong.Plugin{Name: "openid-connect", Config: cfg}, nil
+	return kong.Plugin{Name: authStrategyTypeOpenIDConnect, Config: cfg}, nil
 }
 
 // mcpOIDCSource is mcpOAuth2Source for the fields of mcpOIDCPlugin.
@@ -646,4 +630,35 @@ func configStrings(config map[string]any, key string) []string {
 		return out
 	}
 	return nil
+}
+
+// mcpKeyAuthRevealReason returns why the key-auth plugin of m must send the
+// client's key on. It returns "" when the strategy's hide_credentials stays.
+func (c *Converter) mcpKeyAuthRevealReason(m *aigw.MCPServer, idp *aigw.AuthStrategy) string {
+	switch {
+	case idp.Type != "key-auth":
+		return ""
+	case c.mcpReentersKeyAuthRoute(m):
+		// A tool call comes back through this route. Its key-auth plugin
+		// needs the client's key again.
+		return "ai-mcp-proxy needs the credential to execute tools"
+	case m.TokenVault != nil:
+		return "the Token Vault reads the credential of the caller from the request"
+	}
+	return ""
+}
+
+// revealMCPCredentials sets hide_credentials to false in cfg. It warns when
+// the strategy sets hide_credentials to true.
+func (c *Converter) revealMCPCredentials(
+	src ConversionIssueSource, m *aigw.MCPServer, idp *aigw.AuthStrategy, cfg map[string]any, reason string,
+) {
+	if hide, _ := idp.Config["hide_credentials"].(bool); hide {
+		c.warn(src.at(mcpAuthStrategyField), ConfigFieldOverridden,
+			"MCP server %q references %s auth strategy %q with hide_credentials: true. "+
+				"This will be ignored, and hide_credentials will be overridden to false "+
+				"because %s.",
+			m.Name, idp.Type, idp.Name, reason)
+	}
+	cfg["hide_credentials"] = false
 }

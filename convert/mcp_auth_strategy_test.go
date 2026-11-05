@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/Kong/ai-deck-converter/internal/aimap"
+	"github.com/Kong/ai-deck-converter/internal/kong"
 	"github.com/stretchr/testify/require"
 )
 
@@ -484,4 +485,70 @@ func TestMCPOIDCTokenVaultForcesHideCredentials(t *testing.T) {
 	require.Contains(t, out, "hide_credentials: false")
 	require.Contains(t, out, "protected_resource_metadata:")
 	require.NotContains(t, out, "ai-mcp-oauth2")
+}
+
+// TestMCPKeyAuthKeepsHideCredentials checks the KOKO-4840 fix. A key-auth
+// strategy with hide_credentials true keeps the key away from the upstream.
+// A conversion-listener needs the key on the tool call back through its route.
+// A Token Vault reads the key from the request.
+func TestMCPKeyAuthKeepsHideCredentials(t *testing.T) {
+	for _, tc := range []struct {
+		name, mcpType, server, extra string
+		wantHide                     bool
+	}{
+		{
+			name: "passthrough forward_client_headers on", mcpType: "passthrough-listener",
+			server: "server: {forward_client_headers: true}", wantHide: true,
+		},
+		{
+			name: "passthrough forward_client_headers off", mcpType: "passthrough-listener",
+			server: "server: {forward_client_headers: false}", wantHide: true,
+		},
+		{
+			name: "conversion-listener", mcpType: "conversion-listener",
+			server: "server: {timeout: 10000}", wantHide: false,
+		},
+		{
+			name: "passthrough with token_vault", mcpType: "passthrough-listener",
+			server: "server: {timeout: 10000}", extra: "token_vault: {provider: github}", wantHide: false,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			src := `
+auth_strategies:
+  - name: mcp-key-auth
+    type: key-auth
+    config:
+      key_names: [apikey]
+      hide_credentials: true
+mcp_servers:
+  - type: ` + tc.mcpType + `
+    name: upstream-mcp
+    upstream_url: https://mcp.internal.kongair.com/mcp
+    config:
+      route: {paths: [/mcp/upstream]}
+      ` + tc.server + `
+    access:
+      auth_strategies: [mcp-key-auth]
+    tools:
+      - {name: list-reports, description: List reports, method: GET, path: /reports}
+    ` + tc.extra + `
+`
+			out, warnings := convertMCP(t, src)
+
+			var keyAuth *kong.Plugin
+			for _, p := range routePlugins(t, out, "upstream-mcp") {
+				if p.Name == "key-auth" {
+					keyAuth = &p
+				}
+			}
+			require.NotNil(t, keyAuth)
+			require.Equal(t, tc.wantHide, keyAuth.Config["hide_credentials"])
+			if tc.wantHide {
+				require.Empty(t, warnings)
+			} else {
+				require.Contains(t, strings.Join(warnings, "\n"), "hide_credentials will be overridden to false")
+			}
+		})
+	}
 }
