@@ -363,11 +363,13 @@ func (c *Converter) deriveTokenVaultExchangeInbound(
 	apply := func(kind, name string, keyAuth map[string]any) *aigw.TokenVaultCredentialLocation {
 		loc := aimap.TokenVaultInboundFromKeyAuth(keyAuth)
 		if loc == nil {
+			// The warning recurs on a re-conversion, whose reverter
+			// synthesizes strategy and policy names. It names only the kind.
 			c.warn(src.at(field), BehaviorMayDiffer,
-				"Model %q: the %s %q does not read its key from the headers, so "+
+				"Model %q: the %s does not read its key from the headers, so "+
 					"token_vault.credential.inbound cannot be derived from it. The data plane keeps "+
 					"the default inbound (Authorization: Bearer), which the exchange will not find.",
-				m.Name, kind, name)
+				m.Name, kind)
 			return nil
 		}
 		if cred == nil {
@@ -386,7 +388,7 @@ func (c *Converter) deriveTokenVaultExchangeInbound(
 	gpol := c.globalKeyAuthPolicy()
 	switch {
 	case idp != nil:
-		loc := apply("key-auth strategy", idp.Name, idp.Config)
+		loc := apply("key-auth strategy", idp.Config)
 		if loc == nil || gpol == nil {
 			return
 		}
@@ -395,13 +397,15 @@ func (c *Converter) deriveTokenVaultExchangeInbound(
 			if gloc != nil {
 				reads = fmt.Sprintf("header %q", gloc.Name)
 			}
+			// The warning recurs on a re-conversion, whose reverter
+			// synthesizes policy names. It names only the header names.
 			c.warn(src.at(field), BehaviorMayDiffer,
-				"Model %q: the global key-auth policy %q reads its key from %s, but the derived "+
+				"Model %q: the global key-auth policy reads its key from %s, but the derived "+
 					"inbound reads header %q. The exchange uses only the derived inbound.",
-				m.Name, gpol.Name, reads, loc.Name)
+				m.Name, reads, loc.Name)
 		}
 	case gpol != nil:
-		apply("global key-auth policy", gpol.Name, gpol.Config)
+		apply("global key-auth policy", gpol.Config)
 	}
 }
 
