@@ -1,24 +1,5 @@
 _format_version: "3.0"
 services:
-  - name: ai-gateway
-    url: http://ai-gateway.upstream.local
-    routes:
-      - name: models
-        paths:
-          - /v1/models
-        methods:
-          - GET
-        protocols:
-          - http
-          - https
-      - name: models-ai
-        paths:
-          - /ai/v1/models
-        methods:
-          - GET
-        protocols:
-          - http
-          - https
   - name: ai-gateway-websocket
     url: ws://ai-gateway.upstream.local
     routes:
@@ -30,8 +11,7 @@ services:
           - wss
         strip_path: false
 plugins:
-  - id: 18d87ee7-0791-5691-9eba-fd52c8dfd8dd
-    name: ai-proxy-advanced
+  - name: ai-proxy-advanced
     protocols:
       - ws
       - wss
@@ -55,19 +35,5 @@ plugins:
     route: gemini-realtime
     tags:
       - ai-gateway-realtime-model:gemini-live
-  - name: ai-proxy-advanced
-    config:
-      models:
-        sources:
-          - plugin_id: 18d87ee7-0791-5691-9eba-fd52c8dfd8dd
-      route_type: llm/v1/models
-    route: models
-  - name: ai-proxy-advanced
-    config:
-      models:
-        sources:
-          - plugin_id: 18d87ee7-0791-5691-9eba-fd52c8dfd8dd
-      route_type: llm/v1/models
-    route: models-ai
 ai_models:
   - name: gemini-live

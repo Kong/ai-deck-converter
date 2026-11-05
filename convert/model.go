@@ -259,6 +259,7 @@ func (c *Converter) convertModelsPass(skipped map[int][]ConversionIssue) bool {
 
 	service := kong.Service{Name: aimap.GatewayServiceName, URL: aimap.GatewayServiceURL}
 	websocketService := kong.Service{Name: aimap.GatewayWebSocketServiceName, URL: aimap.GatewayWebSocketServiceURL}
+	withDirectory := c.supports(aimap.FeatureModelDirectory)
 	for _, key := range st.order {
 		g := st.groups[key]
 		c.modelRouteModels[g.route.Name] = g.models
@@ -291,9 +292,12 @@ func (c *Converter) convertModelsPass(skipped map[int][]ConversionIssue) bool {
 					tags = []string{aimap.EncodeRealtimeModel(pg.realtimeModel)}
 				}
 				proxyCfg := pg.proxyConfig()
-				id := c.nextModelPluginID(st, pg.routeName, proxyCfg)
-				for _, owner := range g.models {
-					st.addDirectorySource(owner, id)
+				var id string
+				if withDirectory && !g.websocket {
+					id = c.nextModelPluginID(st, pg.routeName, proxyCfg)
+					for _, owner := range g.models {
+						st.addDirectorySource(owner, id)
+					}
 				}
 				c.out.Plugins = append(c.out.Plugins, kong.Plugin{
 					ID:            id,
@@ -315,8 +319,11 @@ func (c *Converter) convertModelsPass(skipped map[int][]ConversionIssue) bool {
 			for _, alias := range pg.aliases {
 				cfg := pg.proxyConfig()
 				cfg["targets"] = withModelAlias(pg.targets, alias, pg.llmFormat)
-				id := c.nextModelPluginID(st, pg.routeName, cfg)
-				st.addDirectorySource(pg.source.EntityName, id)
+				var id string
+				if withDirectory {
+					id = c.nextModelPluginID(st, pg.routeName, cfg)
+					st.addDirectorySource(pg.source.EntityName, id)
+				}
 				c.out.Plugins = append(c.out.Plugins, kong.Plugin{
 					ID:            id,
 					Name:          "ai-proxy-advanced",

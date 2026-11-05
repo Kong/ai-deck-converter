@@ -18,8 +18,7 @@ plugins:
         - body_path: model
           source: body
     route: openai-chat
-  - id: 50f09e25-93c8-5aca-a160-48932389cecd
-    name: ai-proxy-advanced
+  - name: ai-proxy-advanced
     config:
       balancer:
         algorithm: semantic

@@ -107,7 +107,11 @@ The video lifecycle route of a video model has its own `ai-proxy-advanced`
 instance and is not advertised: it serves a lifecycle operation rather than a
 model a client selects.
 
-Below the 2.3 gate no list route is made, and one
+A realtime (`ws`/`wss`) instance is not advertised either. Its targets carry
+no `model_alias`, so the list has no id to show for them, and a plain HTTP
+caller cannot reach a WebSocket-only route.
+
+Below the 2.3 gate no list route is made, no instance gets an `id`, and one
 `UNSUPPORTED_IN_MIN_RUNTIME_VERSION` warning names the conversion option.
 
 Revert drops a route whose plugins carry `route_type: llm/v1/models`. The list
@@ -119,8 +123,10 @@ constants, shared by both directions.
 # Drawbacks
 [drawbacks]: #drawbacks
 
-- Every `ai-proxy-advanced` instance now carries an `id`. The field is valid
-  in decK and in db-less output, but it widens the diff for every config.
+- On 2.3 and later, every advertised `ai-proxy-advanced` instance carries an
+  `id`. The field is valid in decK and in db-less output, but it widens the
+  diff for those configs. Below the gate no id is set, so the output for an
+  older runtime stays as it was.
 - A model declared on several base paths is advertised on several lists, so
   the same instance id repeats. The gateway deduplicates per caller.
 - Two models on one base path with different auth strategies share one route

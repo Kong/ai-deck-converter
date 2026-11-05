@@ -19,8 +19,7 @@ plugins:
         - path_pattern: model/([^/]+)/
           source: path
     route: bedrock-retrieve
-  - id: 688531fe-5c0e-5b07-bb08-9758195292e7
-    name: ai-proxy-advanced
+  - name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin

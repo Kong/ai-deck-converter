@@ -449,16 +449,9 @@ func TestRealtimeRoutesAreNotSharedBetweenModels(t *testing.T) {
 `+overrideProvider)
 	require.Len(t, warnings, 1)
 	require.Contains(t, warnings[0], `route "openai-realtime-2" of model "b" can match the same requests`)
-	require.Len(t, doc.Services, 2, "the model list service joins the WebSocket service")
-	var websocketRoutes int
-	for _, svc := range doc.Services {
-		if svc.Name == aimap.GatewayWebSocketServiceName {
-			websocketRoutes = len(svc.Routes)
-			continue
-		}
-		require.Empty(t, modelRoutesFor(svc), "no HTTP Service without HTTP routes")
-	}
-	require.Equal(t, 2, websocketRoutes)
+	require.Len(t, doc.Services, 1, "no HTTP Service without HTTP routes")
+	require.Equal(t, aimap.GatewayWebSocketServiceName, doc.Services[0].Name)
+	require.Len(t, doc.Services[0].Routes, 2)
 }
 
 func TestRealtimeRouteAuthStrategyHasNoAnonymousFallback(t *testing.T) {

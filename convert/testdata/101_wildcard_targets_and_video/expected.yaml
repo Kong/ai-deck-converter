@@ -414,8 +414,7 @@ plugins:
           route_type: image/v1/images/generations
     route: openai-images
     model: a
-  - id: 876ce109-23ce-5955-b873-19463aaa28a0
-    name: ai-proxy-advanced
+  - name: ai-proxy-advanced
     protocols:
       - ws
       - wss
@@ -587,7 +586,6 @@ plugins:
           - plugin_id: 50f13f5a-a44d-5781-92ae-f36eea89de8b
           - plugin_id: 562662dc-2b3d-5d7f-b1eb-6df783b7d65c
           - plugin_id: 676b27fe-4d0f-5bee-b04a-9bccbaeaea74
-          - plugin_id: 876ce109-23ce-5955-b873-19463aaa28a0
           - plugin_id: c1d97688-b283-5aae-85fd-04a0585aee76
           - plugin_id: ee1af9ff-0793-5f18-b25b-add7beedab6b
       route_type: llm/v1/models
@@ -605,7 +603,6 @@ plugins:
           - plugin_id: 50f13f5a-a44d-5781-92ae-f36eea89de8b
           - plugin_id: 562662dc-2b3d-5d7f-b1eb-6df783b7d65c
           - plugin_id: 676b27fe-4d0f-5bee-b04a-9bccbaeaea74
-          - plugin_id: 876ce109-23ce-5955-b873-19463aaa28a0
           - plugin_id: c1d97688-b283-5aae-85fd-04a0585aee76
           - plugin_id: ee1af9ff-0793-5f18-b25b-add7beedab6b
       route_type: llm/v1/models

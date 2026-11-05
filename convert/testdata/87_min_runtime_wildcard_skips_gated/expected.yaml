@@ -93,8 +93,7 @@ plugins:
         - body_path: model
           source: body
     route: openai-chat
-  - id: 481cafde-a96a-5112-8a4a-2f47bfaef0d0
-    name: ai-proxy-advanced
+  - name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -119,8 +118,7 @@ plugins:
         - body_path: model
           source: body
     route: openai-responses
-  - id: 509623e1-8599-5646-a1bb-d8a5d4b9e958
-    name: ai-proxy-advanced
+  - name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -145,8 +143,7 @@ plugins:
         - body_path: model
           source: body
     route: openai-audio-speech
-  - id: 445de19b-5ec9-5ed1-845b-d76b85bc78f4
-    name: ai-proxy-advanced
+  - name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -171,8 +168,7 @@ plugins:
         - body_path: model
           source: body
     route: openai-audio-transcribe
-  - id: 72eb71b9-3bec-5d90-861f-28775bc85341
-    name: ai-proxy-advanced
+  - name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -197,8 +193,7 @@ plugins:
         - body_path: model
           source: body
     route: openai-audio-translate
-  - id: dff30354-c192-56dd-9b26-ab29b220fdc5
-    name: ai-proxy-advanced
+  - name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -223,8 +218,7 @@ plugins:
         - body_path: model
           source: body
     route: openai-embeddings
-  - id: ee42b6f3-6636-58c4-a37d-c817c496ea83
-    name: ai-proxy-advanced
+  - name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -249,8 +243,7 @@ plugins:
         - body_path: model
           source: body
     route: openai-images
-  - id: b03a17ba-c9bb-57ef-9d0c-df2880120281
-    name: ai-proxy-advanced
+  - name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -268,8 +261,7 @@ plugins:
           route_type: image/v1/images/generations
     route: openai-images
     model: everything
-  - id: 5efdbf89-e743-587c-a226-980ff4446fa8
-    name: ai-proxy-advanced
+  - name: ai-proxy-advanced
     protocols:
       - ws
       - wss
@@ -297,8 +289,7 @@ plugins:
         - body_path: model
           source: body
     route: openai-videos
-  - id: 29d44cad-530e-5b2d-ac8a-775c99366cdf
-    name: ai-proxy-advanced
+  - name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -323,8 +314,7 @@ plugins:
         - body_path: model
           source: body
     route: anthropic-messages
-  - id: f63c73f0-c4cd-5745-a36c-2707eab6e663
-    name: ai-proxy-advanced
+  - name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin

@@ -93,7 +93,7 @@ plugins:
       id: 8ae36805-da7a-55b9-b056-72bde6bb937d
     model:
       id: bdb67c7a-33a3-5664-a801-be7b64f9516e
-  - id: ca80bae8-9d95-5ded-89a1-7c644275b69d
+  - id: fe4129f3-2075-5492-8b59-90def2cf73ab
     name: ai-proxy-advanced
     protocols:
       - ws
@@ -128,10 +128,6 @@ plugins:
               allow:
                 - premium-users
             plugin_id: 21dd5f7e-9940-5537-9812-76fb7738f1ce
-          - access:
-              allow:
-                - premium-users
-            plugin_id: ca80bae8-9d95-5ded-89a1-7c644275b69d
       route_type: llm/v1/models
     route:
       id: aeea4f5f-1d07-59ad-98b1-be41cf62b11c
@@ -144,10 +140,6 @@ plugins:
               allow:
                 - premium-users
             plugin_id: 21dd5f7e-9940-5537-9812-76fb7738f1ce
-          - access:
-              allow:
-                - premium-users
-            plugin_id: ca80bae8-9d95-5ded-89a1-7c644275b69d
       route_type: llm/v1/models
     route:
       id: e0980ed9-920f-5cc8-9415-3b9feb54f7f3

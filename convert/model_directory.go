@@ -65,13 +65,15 @@ func (g *directoryGroup) add(m *aigw.Model, ids []string, access map[string]any)
 // base path, plus one at the gateway root. Each list advertises the instances
 // of the models it covers and carries the access rule of each one.
 func (c *Converter) convertModelDirectories(st *modelPass, service *kong.Service) {
-	if len(st.directorySources) == 0 {
+	if !c.supports(aimap.FeatureModelDirectory) {
+		if len(service.Routes) > 0 {
+			c.reportUnsupported(issueSource(kindConversionOption, "min_runtime_version"),
+				Warning, aimap.FeatureModelDirectory, "a model list route")
+		}
 		return
 	}
 
-	if !c.supports(aimap.FeatureModelDirectory) {
-		c.reportUnsupported(issueSource(kindConversionOption, "min_runtime_version"),
-			Warning, aimap.FeatureModelDirectory, "a model list route")
+	if len(st.directorySources) == 0 {
 		return
 	}
 

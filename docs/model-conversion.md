@@ -324,7 +324,10 @@ plugins:
 
 - The source `plugin_id` is the `id` of the model's instance. The converter
   derives that id from the route name and the rendered plugin config, so a
-  forward-revert-forward cycle reproduces it.
+  forward-revert-forward cycle reproduces it. Only configs at 2.3 or later
+  carry instance ids; below the gate the output is unchanged.
+- Realtime (`ws`/`wss`) instances are not advertised: their targets carry no
+  `model_alias`, and a plain HTTP caller cannot reach a WebSocket route.
 - `access` is the model's `access.acls`. The model's ACLs already lower to one
   acl rule, so the source carries one rule.
 - The list route carries the auth strategies of the models it covers, with the

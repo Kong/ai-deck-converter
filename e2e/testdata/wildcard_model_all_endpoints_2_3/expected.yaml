@@ -1311,7 +1311,7 @@ plugins:
       id: 67276980-b7e0-58ee-8c51-bafe739db8f8
     model:
       id: 290b3237-5b60-5df0-bfbe-912660aef648
-  - id: 9b253355-f00a-53a3-87ea-fe2a26026209
+  - id: 7f38955a-5cc4-5370-b6ad-aae52d1f7c2f
     name: ai-proxy-advanced
     protocols:
       - ws
@@ -2712,7 +2712,6 @@ plugins:
           - plugin_id: 81bf9fc3-3b14-5a15-9582-971653786751
           - plugin_id: 877883e5-0ef3-5955-8c40-92df52e7d073
           - plugin_id: 94a571ca-6b7e-543c-a756-6d887a9e415a
-          - plugin_id: 9b253355-f00a-53a3-87ea-fe2a26026209
           - plugin_id: a0831fa4-ea1e-5e8c-bfe4-b113a279efef
           - plugin_id: a0d13e0b-d3ef-5424-87b4-cc9fb8933185
           - plugin_id: a132e2ff-e354-5ace-871a-a7877898db44
@@ -2756,7 +2755,6 @@ plugins:
           - plugin_id: 719c9d82-a909-5716-84e5-5da71bc555ea
           - plugin_id: 81bf9fc3-3b14-5a15-9582-971653786751
           - plugin_id: 877883e5-0ef3-5955-8c40-92df52e7d073
-          - plugin_id: 9b253355-f00a-53a3-87ea-fe2a26026209
           - plugin_id: a0831fa4-ea1e-5e8c-bfe4-b113a279efef
           - plugin_id: a0d13e0b-d3ef-5424-87b4-cc9fb8933185
           - plugin_id: a1833e1e-8250-5103-b048-d46222dac6af

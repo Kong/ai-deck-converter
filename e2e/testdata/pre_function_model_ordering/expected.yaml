@@ -35,7 +35,7 @@ plugins:
           - pre-function
     route:
       id: 8ae36805-da7a-55b9-b056-72bde6bb937d
-  - id: 71c65e4c-0455-55c1-9ee7-252d4783237d
+  - id: f3adc007-171c-5519-8763-3a0eef79bde3
     name: ai-proxy-advanced
     config:
       balancer:
@@ -59,7 +59,7 @@ plugins:
       id: 8ae36805-da7a-55b9-b056-72bde6bb937d
     model:
       id: 59d0dfe0-0ba4-5e7d-aea2-2b0c4e0c2cac
-  - id: 085b6eca-b47e-5b09-abd5-966c3e44b35b
+  - id: fe4129f3-2075-5492-8b59-90def2cf73ab
     name: ai-proxy-advanced
     config:
       balancer:
@@ -83,7 +83,7 @@ plugins:
       id: 8ae36805-da7a-55b9-b056-72bde6bb937d
     model:
       id: 5b33a0d9-1bc4-51f3-a699-3aef2f6c1913
-  - id: 7191564e-9966-5faa-b565-c6c5d7d75a65
+  - id: 75ff22ed-6245-594b-895f-6a9fa36f4581
     name: ai-proxy-advanced
     config:
       balancer:
