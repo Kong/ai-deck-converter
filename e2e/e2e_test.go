@@ -43,7 +43,6 @@ func TestE2E(t *testing.T) {
 		{"gemini_model_all_capabilities", func(t *testing.T) { testGeminiModelAllCapabilities(t, license) }},
 		{"bedrock_model_all_endpoints", func(t *testing.T) { testBedrockModelAllEndpoints(t, license) }},
 		{"bedrock_mantle_vpc_endpoint", func(t *testing.T) { testBedrockMantleVPCEndpoint(t, license) }},
-		{"bedrock_mantle_passthrough", func(t *testing.T) { testBedrockMantlePassthrough(t, license) }},
 		{"gemini_interactions_api", func(t *testing.T) { testGeminiInteractionsAPI(t, license) }},
 		{"reusable_toolsets_are_internal_only", func(t *testing.T) { testReusableToolsetsAreInternalOnly(t, license) }},
 		{"mcp_server_acl_gates_all_methods", func(t *testing.T) { testMCPServerACLGatesAllMethods(t, license) }},

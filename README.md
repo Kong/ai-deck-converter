@@ -306,9 +306,7 @@ and `formats` beyond the first.
   `generate` endpoint. On any other endpoint of the model the target is left
   out with a `BEHAVIOR_MAY_DIFFER` warning. The model fails when no target
   serves a capability. The `bedrock` format has no `responses` endpoint. The
-  data plane rejects `llm/v1/responses` for it. A mantle target also serves
-  the `passthrough` format with `llm_format: openai`, the only `llm_format`
-  the data plane accepts for it.
+  data plane rejects `llm/v1/responses` for it.
 - **Provider Token Vault.** A Model Provider's top-level `token_vault`
   (`provider`, optional `subject_token_type`, `credential` and `cache`) plus
   exactly one `token-vault` datastore lowers to a `token-vault-exchange`

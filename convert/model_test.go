@@ -637,13 +637,13 @@ func TestBedrockMantleEndpointType(t *testing.T) {
       - {name: c, provider: b, config: {type: bedrock, region: us-east-1, endpoint_type: mantle}}`,
 			0, 6,
 		},
-		// The data plane accepts the passthrough route type on a mantle target.
+		// Passthrough forwards the provider's native format, which is bedrock here.
 		"mantle with passthrough format": {
 			`
   - name: m
     formats: [{type: passthrough}]
     targets: [{name: a, provider: b, config: {type: bedrock, region: us-east-1, endpoint_type: mantle}}]`,
-			0, 1,
+			1, 0,
 		},
 		"mantle with bedrock after openai": {
 			`
