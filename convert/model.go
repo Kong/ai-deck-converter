@@ -388,7 +388,7 @@ func (c *Converter) deriveTokenVaultExchangeInbound(
 	gpol := c.globalKeyAuthPolicy()
 	switch {
 	case idp != nil:
-		loc := apply("key-auth strategy", idp.Config)
+		loc := apply("key-auth strategy", idp.Name, idp.Config)
 		if loc == nil || gpol == nil {
 			return
 		}
@@ -405,7 +405,7 @@ func (c *Converter) deriveTokenVaultExchangeInbound(
 				m.Name, reads, loc.Name)
 		}
 	case gpol != nil:
-		apply("global key-auth policy", gpol.Config)
+		apply("global key-auth policy", gpol.Name, gpol.Config)
 	}
 }
 

@@ -15,7 +15,7 @@
       - targets[0].provider.token_vault.credential.inbound
   severity: WARNING
 - code: BEHAVIOR_MAY_DIFFER
-  reason: 'Model "claude-divergent": the global key-auth policy "org-key-auth" reads its key from header "x-api-key", but the derived inbound reads header "x-custom-key". The exchange uses only the derived inbound.'
+  reason: 'Model "claude-divergent": the global key-auth policy reads its key from header "x-api-key", but the derived inbound reads header "x-custom-key". The exchange uses only the derived inbound.'
   source:
     kind: model
     name: claude-divergent
