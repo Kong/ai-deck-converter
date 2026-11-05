@@ -1,5 +1,5 @@
 - code: CONFIG_FIELD_OVERRIDDEN
-  reason: 'Model "claude": token_vault.credential.inbound of provider "anthropic-vault" is derived from the route''s key-auth plugin (header "apikey", the strategy''s first key name, no prefix), because the plugin default Authorization: Bearer does not match where key-auth reads the key.'
+  reason: 'Model "claude": token_vault.credential.inbound of provider "anthropic-vault" is derived from the key-auth strategy "api-key-default" (header "apikey", its first key name, no prefix), because the plugin default Authorization: Bearer does not match where key-auth reads the key.'
   source:
     kind: model
     name: claude
@@ -7,7 +7,7 @@
       - targets[0].provider.token_vault.credential.inbound
   severity: WARNING
 - code: CONFIG_FIELD_OVERRIDDEN
-  reason: 'Model "claude-custom": token_vault.credential.inbound of provider "anthropic-vault" is derived from the route''s key-auth plugin (header "x-custom-key", the strategy''s first key name, no prefix), because the plugin default Authorization: Bearer does not match where key-auth reads the key.'
+  reason: 'Model "claude-custom": token_vault.credential.inbound of provider "anthropic-vault" is derived from the key-auth strategy "api-key-custom" (header "x-custom-key", its first key name, no prefix), because the plugin default Authorization: Bearer does not match where key-auth reads the key.'
   source:
     kind: model
     name: claude-custom
@@ -23,7 +23,7 @@
       - targets[0].provider.token_vault.credential.inbound
   severity: WARNING
 - code: CONFIG_FIELD_OVERRIDDEN
-  reason: 'Model "claude-outbound": token_vault.credential.inbound of provider "anthropic-outbound" is derived from the route''s key-auth plugin (header "apikey", the strategy''s first key name, no prefix), because the plugin default Authorization: Bearer does not match where key-auth reads the key.'
+  reason: 'Model "claude-outbound": token_vault.credential.inbound of provider "anthropic-outbound" is derived from the key-auth strategy "api-key-default" (header "apikey", its first key name, no prefix), because the plugin default Authorization: Bearer does not match where key-auth reads the key.'
   source:
     kind: model
     name: claude-outbound
