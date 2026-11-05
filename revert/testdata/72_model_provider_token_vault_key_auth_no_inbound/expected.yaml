@@ -1,0 +1,63 @@
+models:
+  - type: model
+    name: claude
+    capabilities:
+      - generate
+    formats:
+      - type: anthropic
+    targets:
+      - name: claude-sonnet
+        provider: anthropic-1
+        config:
+          type: anthropic
+          version: "2023-06-01"
+    policies:
+      - token-vault-exchange
+    access:
+      auth_strategies:
+        - key-auth-1
+    config:
+      route:
+        paths:
+          - /ai/claude
+      logging:
+        payloads: false
+        statistics: true
+model_providers:
+  - type: anthropic
+    name: anthropic-1
+agents:
+  - type: http
+    name: token-vault-callback
+    policies:
+      - token-vault-callback-handler
+    config:
+      url: http://localhost
+      route:
+        name: token-vault-callback-handler
+        paths:
+          - /_vault
+        protocols:
+          - http
+          - https
+policies:
+  - type: token-vault-exchange
+    name: token-vault-exchange
+    config:
+      directory: my-directory
+      provider: anthropic
+      storage:
+        backend: konnect
+      subject_token_type: api_key
+  - type: token-vault-callback-handler
+    name: token-vault-callback-handler
+    config:
+      directory: my-directory
+      storage:
+        backend: konnect
+auth_strategies:
+  - type: key-auth
+    name: key-auth-1
+    config:
+      key_names:
+        - apikey

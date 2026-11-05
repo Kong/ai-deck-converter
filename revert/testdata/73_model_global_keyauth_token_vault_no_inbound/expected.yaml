@@ -1,0 +1,40 @@
+models:
+  - type: model
+    name: claude
+    capabilities:
+      - generate
+    formats:
+      - type: anthropic
+    targets:
+      - name: claude-sonnet
+        provider: anthropic-1
+        config:
+          type: anthropic
+          version: "2023-06-01"
+    policies:
+      - token-vault-exchange
+    config:
+      route:
+        paths:
+          - /ai/claude
+      logging:
+        payloads: false
+        statistics: true
+model_providers:
+  - type: anthropic
+    name: anthropic-1
+policies:
+  - type: key-auth
+    name: key-auth
+    global: true
+    config:
+      key_names:
+        - x-api-key
+  - type: token-vault-exchange
+    name: token-vault-exchange
+    config:
+      directory: my-directory
+      provider: anthropic
+      storage:
+        backend: konnect
+      subject_token_type: api_key

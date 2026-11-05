@@ -348,6 +348,77 @@ func (c *Converter) appendTokenVaultExchange(pg *proxyGroup, model *kong.StringR
 	})
 }
 
+// deriveTokenVaultExchangeInbound fills the token-vault-exchange inbound
+// credential from the model's first key-auth strategy, or from a global
+// key-auth policy when no strategy supplies it. The plugin default inbound
+// Authorization Bearer does not match where key-auth expects the credential.
+// An explicit inbound is never touched.
+func (c *Converter) deriveTokenVaultExchangeInbound(
+	src ConversionIssueSource, m *aigw.Model, provider, field string, cfg map[string]any,
+) {
+	cred, _ := cfg["credential"].(map[string]any)
+	if cred != nil && cred["inbound"] != nil {
+		return
+	}
+	apply := func(kind, name string, keyAuth map[string]any) *aigw.TokenVaultCredentialLocation {
+		loc := aimap.TokenVaultInboundFromKeyAuth(keyAuth)
+		if loc == nil {
+			// The warning recurs on a re-conversion, whose reverter
+			// synthesizes strategy and policy names. It names only the kind.
+			c.warn(src.at(field), BehaviorMayDiffer,
+				"Model %q: the %s does not read its key from the headers, so "+
+					"token_vault.credential.inbound cannot be derived from it. The data plane keeps "+
+					"the default inbound (Authorization: Bearer), which the exchange will not find.",
+				m.Name, kind)
+			return nil
+		}
+		if cred == nil {
+			cred = map[string]any{}
+			cfg["credential"] = cred
+		}
+		cred["inbound"] = aimap.TokenVaultLocationToPlugin(loc)
+		c.warn(src.at(field), ConfigFieldOverridden,
+			"Model %q: token_vault.credential.inbound of provider %q is derived from the %s %q "+
+				"(header %q, its first key name, no prefix), because the plugin default "+
+				"Authorization: Bearer does not match where key-auth reads the key.",
+			m.Name, provider, kind, name, loc.Name)
+		return loc
+	}
+	idp := c.firstKeyAuthStrategy(m.Access.AuthStrategies)
+	gpol := c.globalKeyAuthPolicy()
+	switch {
+	case idp != nil:
+		loc := apply("key-auth strategy", idp.Name, idp.Config)
+		if loc == nil || gpol == nil {
+			return
+		}
+		if gloc := aimap.TokenVaultInboundFromKeyAuth(gpol.Config); gloc == nil || gloc.Name != loc.Name {
+			reads := "the request body"
+			if gloc != nil {
+				reads = fmt.Sprintf("header %q", gloc.Name)
+			}
+			// The warning recurs on a re-conversion, whose reverter
+			// synthesizes policy names. It names only the header names.
+			c.warn(src.at(field), BehaviorMayDiffer,
+				"Model %q: the global key-auth policy reads its key from %s, but the derived "+
+					"inbound reads header %q. The exchange uses only the derived inbound.",
+				m.Name, reads, loc.Name)
+		}
+	case gpol != nil:
+		apply("global key-auth policy", gpol.Name, gpol.Config)
+	}
+}
+
+// firstKeyAuthStrategy returns the first key-auth strategy of refs, or nil.
+func (c *Converter) firstKeyAuthStrategy(refs []string) *aigw.AuthStrategy {
+	for _, ref := range refs {
+		if idp := c.authStrategies[ref]; idp != nil && idp.Type == "key-auth" {
+			return idp
+		}
+	}
+	return nil
+}
+
 // convertModelOnce runs fn for the model at index i. A skipped model only
 // replays its issues. When fn fails, it records the model as skipped and
 // returns false.
@@ -518,6 +589,15 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 					m.Name, tm.Name, passthroughFormat, passthroughFormat, format)
 			}
 		}
+	}
+
+	// Every route of the model carries the same auth strategies. One
+	// derivation therefore serves the whole model. The token vault is the
+	// first target's, so targets[0] is its producing target.
+	if tokenVault != nil {
+		c.deriveTokenVaultExchangeInbound(src, m, targets[0].provider.Name,
+			fmt.Sprintf("targets[%d].provider.token_vault.credential.inbound", targets[0].index),
+			tokenVault)
 	}
 
 	formats := c.effectiveFormats(lists, targets)

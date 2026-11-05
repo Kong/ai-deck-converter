@@ -1,0 +1,32 @@
+- code: CONFIG_FIELD_OVERRIDDEN
+  reason: 'MCP server "derived-default": token_vault.credential.inbound is derived from the key-auth strategy "api-key-default" (header "apikey", its first key name, no prefix), because the plugin default Authorization: Bearer does not match where key-auth reads the key.'
+  source:
+    kind: mcp_server
+    name: derived-default
+    fields:
+      - token_vault.credential.inbound
+  severity: WARNING
+- code: CONFIG_FIELD_OVERRIDDEN
+  reason: 'MCP server "derived-custom": token_vault.credential.inbound is derived from the key-auth strategy "api-key-custom" (header "x-custom-key", its first key name, no prefix), because the plugin default Authorization: Bearer does not match where key-auth reads the key.'
+  source:
+    kind: mcp_server
+    name: derived-custom
+    fields:
+      - token_vault.credential.inbound
+  severity: WARNING
+- code: BEHAVIOR_MAY_DIFFER
+  reason: 'MCP server "no-header-key": the key-auth strategy does not read its key from the headers, so token_vault.credential.inbound cannot be derived from it. The data plane keeps the default inbound (Authorization: Bearer), which the exchange will not find.'
+  source:
+    kind: mcp_server
+    name: no-header-key
+    fields:
+      - token_vault.credential.inbound
+  severity: WARNING
+- code: CONFIG_FIELD_OVERRIDDEN
+  reason: 'MCP server "outbound-only": token_vault.credential.inbound is derived from the key-auth strategy "api-key-default" (header "apikey", its first key name, no prefix), because the plugin default Authorization: Bearer does not match where key-auth reads the key.'
+  source:
+    kind: mcp_server
+    name: outbound-only
+    fields:
+      - token_vault.credential.inbound
+  severity: WARNING

@@ -1,0 +1,84 @@
+# The providers get their credential from the Token Vault. The caller auth of
+# each model comes from a global key-auth policy instead of a strategy. The
+# models show the derivation from the global policy, a strategy that diverges
+# from the policy's header, and a strategy that agrees with it.
+datastores:
+  - name: vault-konnect-prod
+    type: token-vault
+    config:
+      directory: my-directory
+
+policies:
+  - type: key-auth
+    name: org-key-auth
+    global: true
+    config:
+      key_names: [x-api-key]
+
+auth_strategies:
+  - name: api-key-custom
+    type: key-auth
+    display_name: API Key Custom
+    config:
+      key_names: [x-custom-key]
+  - name: api-key-aligned
+    type: key-auth
+    display_name: API Key Aligned
+    config:
+      key_names: [x-api-key]
+
+models:
+  # no strategy: the inbound is derived from the global policy
+  - name: claude-global
+    type: model
+    capabilities: [generate]
+    formats:
+      - type: anthropic
+    config:
+      route:
+        paths: [/ai/claude-global]
+    targets:
+      - name: claude-sonnet
+        provider: anthropic-vault
+        config:
+          type: anthropic
+  # the strategy wins the derivation, and diverges from the policy's header
+  - name: claude-divergent
+    type: model
+    capabilities: [generate]
+    formats:
+      - type: anthropic
+    config:
+      route:
+        paths: [/ai/claude-divergent]
+    targets:
+      - name: claude-sonnet
+        provider: anthropic-vault
+        config:
+          type: anthropic
+    access:
+      auth_strategies: [api-key-custom]
+  # the strategy wins the derivation, and agrees with the policy's header
+  - name: claude-aligned
+    type: model
+    capabilities: [generate]
+    formats:
+      - type: anthropic
+    config:
+      route:
+        paths: [/ai/claude-aligned]
+    targets:
+      - name: claude-sonnet
+        provider: anthropic-vault
+        config:
+          type: anthropic
+    access:
+      auth_strategies: [api-key-aligned]
+
+model_providers:
+  - name: anthropic-vault
+    type: anthropic
+    datastores: [{name: vault-konnect-prod}]
+    token_vault:
+      provider: anthropic
+      subject_token_type: api_key
