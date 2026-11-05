@@ -246,18 +246,18 @@ func TestSourceSharedByListenersWithDifferentAccess(t *testing.T) {
 
 	require.Equal(t, []string{"ai-mcp-proxy", "pre-function"}, pluginNames(t, out, "shared"))
 	require.Equal(t,
-		map[string]any{"key_names": []any{"apikey"}, "hide_credentials": false},
+		map[string]any{"key_names": []any{"apikey"}},
 		routePlugins(t, out, "first")[1].Config)
 	require.Equal(t,
-		map[string]any{"key_names": []any{"other-key"}, "hide_credentials": false},
+		map[string]any{"key_names": []any{"other-key"}},
 		routePlugins(t, out, "second")[1].Config)
 
 	_, _, err := convertDoc([]byte(mcpConflictingListeners), true)
 	require.NoError(t, err)
 }
 
-// mcpHiddenCredentials has a listener whose key-auth strategy asks to hide the
-// credential -- which an MCP listener cannot afford to do.
+// mcpHiddenCredentials has a listener whose key-auth strategy hides the
+// credential.
 const mcpHiddenCredentials = `
 auth_strategies:
   - name: mcp-key-auth
@@ -281,19 +281,19 @@ mcp_servers:
       auth_strategies: [mcp-key-auth]
 `
 
-func TestMCPKeyAuthNeverHidesCredentials(t *testing.T) {
+// TestMCPListenerKeyAuthKeepsHideCredentials checks that a listener keeps
+// hide_credentials true. The source route gate checks the unix socket, not
+// the key.
+func TestMCPListenerKeyAuthKeepsHideCredentials(t *testing.T) {
 	out, warnings := convertMCP(t, mcpHiddenCredentials)
-	require.Len(t, warnings, 1)
-	require.Contains(t, warnings[0], "hide_credentials will be overridden to false")
+	require.Empty(t, warnings)
 
-	// Forced to false on the listener -- a strategy asking to hide it does
-	// not win here.
 	keyAuth := routePlugins(t, out, "aggregate")[1]
 	require.Equal(t, "key-auth", keyAuth.Name)
-	require.Equal(t, false, keyAuth.Config["hide_credentials"])
+	require.Equal(t, true, keyAuth.Config["hide_credentials"])
 
 	_, _, err := convertDoc([]byte(mcpHiddenCredentials), true)
-	require.Error(t, err)
+	require.NoError(t, err)
 }
 
 // mcpUnexposedSources has a conversion-only server no listener names, next to
