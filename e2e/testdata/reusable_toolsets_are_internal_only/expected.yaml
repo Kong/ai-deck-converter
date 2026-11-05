@@ -168,7 +168,6 @@ plugins:
   - id: 9d81b785-26fc-5d9b-b02f-3595cd69219f
     name: key-auth
     config:
-      hide_credentials: false
       key_names:
         - apikey
     route:
