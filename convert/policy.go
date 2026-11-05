@@ -60,6 +60,18 @@ func (c *Converter) globalAuthPolicy() *aigw.Policy {
 	return nil
 }
 
+// globalKeyAuthPolicy returns the enabled global key-auth policy, or nil.
+func (c *Converter) globalKeyAuthPolicy() *aigw.Policy {
+	p := c.globalAuthPolicy()
+	if p == nil || p.Type != "key-auth" {
+		return nil
+	}
+	if p.Enabled != nil && !*p.Enabled {
+		return nil
+	}
+	return p
+}
+
 // hasWebSocketRoute reports whether any converted model route moved to the
 // WebSocket Service.
 func (c *Converter) hasWebSocketRoute() bool {

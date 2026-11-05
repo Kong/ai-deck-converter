@@ -94,6 +94,7 @@ func (c *Converter) mcpAuthStrategyPlugins(
 		// No metadata: emit a plain passthrough auth plugin (key-auth or
 		// openid-connect) named after the auth strategy type.
 		if idp == nil {
+			c.deriveTokenVaultInbound(src, m, nil, route)
 			return nil, nil
 		}
 		cfg := make(map[string]any, len(idp.Config))
@@ -113,7 +114,6 @@ func (c *Converter) mcpAuthStrategyPlugins(
 					m.Name, idp.Name)
 			}
 			cfg["hide_credentials"] = false
-			c.deriveTokenVaultInbound(src, m, idp, route)
 		}
 		plugins = []kong.Plugin{{Name: idp.Type, Config: cfg, Source: source("identity_provider", idp.Name, "config")}}
 	}
@@ -131,13 +131,15 @@ func (c *Converter) mcpAuthStrategyPlugins(
 				"openid-connect strategy at min_runtime_version below 2.3. Otherwise use a consumer "+
 				"acl_attribute_type.", m.Name, plugins[0].Name)
 	}
+	c.deriveTokenVaultInbound(src, m, idp, route)
 	return plugins, nil
 }
 
 // deriveTokenVaultInbound fills the ai-mcp-proxy token_vault inbound
-// credential from the key-auth strategy when the MCP server sets none.
-// The plugin default inbound Authorization Bearer does not match where
-// key-auth expects the credential. An explicit inbound is never touched.
+// credential from the server's key-auth strategy, or from a global key-auth
+// policy when no strategy supplies it. The plugin default inbound
+// Authorization Bearer does not match where key-auth expects the credential.
+// An explicit inbound is never touched.
 func (c *Converter) deriveTokenVaultInbound(
 	src ConversionIssueSource, m *aigw.MCPServer, idp *aigw.AuthStrategy, route *kong.Route,
 ) {
@@ -145,31 +147,65 @@ func (c *Converter) deriveTokenVaultInbound(
 	if tv == nil || (tv.Credential != nil && tv.Credential.Inbound != nil) {
 		return
 	}
-	loc := aimap.TokenVaultInboundFromKeyAuth(idp.Config)
-	if loc == nil {
-		c.warn(src.at("token_vault.credential.inbound"), BehaviorMayDiffer,
-			"MCP server %q: the key-auth strategy does not read its key from the headers, so "+
-				"token_vault.credential.inbound cannot be derived from it. The data plane keeps the "+
-				"default inbound (Authorization: Bearer), which the exchange will not find.", m.Name)
-		return
+	apply := func(kind, name string, keyAuth map[string]any) *aigw.TokenVaultCredentialLocation {
+		loc := aimap.TokenVaultInboundFromKeyAuth(keyAuth)
+		if loc == nil {
+			// The warning recurs on a re-conversion, whose reverter
+			// synthesizes strategy and policy names. It names only the kind.
+			c.warn(src.at("token_vault.credential.inbound"), BehaviorMayDiffer,
+				"MCP server %q: the %s does not read its key from the headers, so "+
+					"token_vault.credential.inbound cannot be derived from it. The data plane keeps "+
+					"the default inbound (Authorization: Bearer), which the exchange will not find.",
+				m.Name, kind)
+			return nil
+		}
+		pi := slices.IndexFunc(route.Plugins, func(p kong.Plugin) bool { return p.Name == "ai-mcp-proxy" })
+		if pi < 0 {
+			return nil
+		}
+		auth, _ := route.Plugins[pi].Config["auth"].(map[string]any)
+		// mcpPlugin lowers token_vault into this plugin before the auth plugins.
+		block, _ := auth["token_vault"].(map[string]any)
+		cred, _ := block["credential"].(map[string]any)
+		if cred == nil {
+			cred = map[string]any{}
+			block["credential"] = cred
+		}
+		cred["inbound"] = aimap.TokenVaultLocationToPlugin(loc)
+		c.warn(src.at("token_vault.credential.inbound"), ConfigFieldOverridden,
+			"MCP server %q: token_vault.credential.inbound is derived from the %s %q "+
+				"(header %q, its first key name, no prefix), because the plugin default "+
+				"Authorization: Bearer does not match where key-auth reads the key.",
+			m.Name, kind, name, loc.Name)
+		return loc
 	}
-	pi := slices.IndexFunc(route.Plugins, func(p kong.Plugin) bool { return p.Name == "ai-mcp-proxy" })
-	if pi < 0 {
-		return
+	if idp != nil && idp.Type != "key-auth" {
+		// A bearer strategy matches the plugin default inbound. A global
+		// key-auth policy still gates the same request.
+		idp = nil
 	}
-	auth, _ := route.Plugins[pi].Config["auth"].(map[string]any)
-	// mcpPlugin lowers token_vault into this plugin before the auth plugins.
-	block, _ := auth["token_vault"].(map[string]any)
-	cred, _ := block["credential"].(map[string]any)
-	if cred == nil {
-		cred = map[string]any{}
-		block["credential"] = cred
+	gpol := c.globalKeyAuthPolicy()
+	switch {
+	case idp != nil:
+		loc := apply("key-auth strategy", idp.Name, idp.Config)
+		if loc == nil || gpol == nil {
+			return
+		}
+		if gloc := aimap.TokenVaultInboundFromKeyAuth(gpol.Config); gloc == nil || gloc.Name != loc.Name {
+			reads := "the request body"
+			if gloc != nil {
+				reads = fmt.Sprintf("header %q", gloc.Name)
+			}
+			// The warning recurs on a re-conversion, whose reverter
+			// synthesizes policy names. It names only the header names.
+			c.warn(src.at("token_vault.credential.inbound"), BehaviorMayDiffer,
+				"MCP server %q: the global key-auth policy reads its key from %s, but the derived "+
+					"inbound reads header %q. The exchange uses only the derived inbound.",
+				m.Name, reads, loc.Name)
+		}
+	case gpol != nil:
+		apply("global key-auth policy", gpol.Name, gpol.Config)
 	}
-	cred["inbound"] = aimap.TokenVaultLocationToPlugin(loc)
-	c.warn(src.at("token_vault.credential.inbound"), ConfigFieldOverridden,
-		"MCP server %q: token_vault.credential.inbound is derived from the route's key-auth plugin "+
-			"(header %q, the strategy's first key name, no prefix), because the plugin default "+
-			"Authorization: Bearer does not match where key-auth reads the key.", m.Name, loc.Name)
 }
 
 func mcpOAuth2Source(
