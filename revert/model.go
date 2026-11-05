@@ -95,6 +95,25 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 	if len(rt.Paths) > 0 {
 		path = rt.Paths[0]
 	}
+	// The key-auth header carries the credential the exchange must read. The
+	// plugin default Authorization Bearer does not match it. The derivation is
+	// empty for a plugin that reads no header key.
+	if tvx := findPlugin(plugins, "token-vault-exchange"); tvx != nil &&
+		findPlugin(plugins, "key-auth") != nil {
+		cred, _ := tvx.Config["credential"].(map[string]any)
+		inbound, _ := cred["inbound"].(map[string]any)
+		if inbound == nil {
+			keyAuth := findPlugin(plugins, "key-auth")
+			if loc := aimap.TokenVaultInboundFromKeyAuth(keyAuth.Config); loc != nil {
+				if err := r.warn("model route %q: the route's key-auth plugin reads the key from header %q, "+
+					"but the token-vault-exchange plugin has no credential.inbound; the data plane reads the "+
+					"inbound credential from Authorization: Bearer, which key-auth does not use",
+					rt.Name, loc.Name); err != nil {
+					return err
+				}
+			}
+		}
+	}
 
 	// Partition guard plugins: those carrying a model FK belong to that specific
 	// model; FK-less guards apply route-wide (every model on the route).
