@@ -52,16 +52,6 @@ func MantleSupports(format string, spec EndpointSpec) bool {
 	return (format == "openai" || format == "anthropic") && mantleRouteTypes[spec.RouteType]
 }
 
-// PassthroughClientFormat returns the llm_format of target in the passthrough
-// format. The data plane accepts only the openai llm_format for a passthrough
-// mantle target.
-func PassthroughClientFormat(target Target) string {
-	if target.Mantle {
-		return DefaultLLMFormat
-	}
-	return ClientFormat(PassthroughFormat, target.ProviderType)
-}
-
 // MantlePathPrefixes are the path prefixes that a mantle target serves in the
 // openai format. Each prefix gives one path on the route.
 var MantlePathPrefixes = []string{"/v1", "/openai/v1"}
