@@ -1,0 +1,58 @@
+# From 2.3, access.acls on an MCP server takes CEL expressions. They become
+# allow_when and deny_when on a Kong acl plugin in front of ai-mcp-proxy.
+mcp_servers:
+  # Only the gold consumer group reaches flights.
+  - type: conversion-listener
+    name: flights
+    upstream_url: http://host.docker.internal:18085
+    config:
+      route: {paths: [/mcp/flights]}
+    access:
+      auth_strategies: [mcp-key-auth]
+      acls:
+        allow_when:
+          - "consumer_group.names != null && 'gold' in consumer_group.names"
+    tools:
+      - {name: list-reports, description: List reports, method: GET, path: reports}
+  # Every consumer except suspended-client reaches vendor.
+  - type: passthrough-listener
+    name: vendor
+    upstream_url: http://host.docker.internal:18086/mcp
+    config:
+      route: {paths: [/mcp/vendor]}
+    access:
+      auth_strategies: [mcp-key-auth]
+      acls:
+        deny_when:
+          - "consumer.username == 'suspended-client'"
+
+auth_strategies:
+  - name: mcp-key-auth
+    type: key-auth
+    config:
+      key_names: [apikey]
+
+consumer_groups:
+  - name: gold
+  - name: silver
+
+consumers:
+  - name: gold-client
+    type: api-key
+    consumer_groups: [gold]
+    credentials:
+      - {name: gold-key, type: api-key, api_key: mcp-gold-secret}
+  - name: silver-client
+    type: api-key
+    consumer_groups: [silver]
+    credentials:
+      - {name: silver-key, type: api-key, api_key: mcp-silver-secret}
+  - name: no-group-client
+    type: api-key
+    credentials:
+      - {name: no-group-key, type: api-key, api_key: mcp-no-group-secret}
+  - name: suspended-client
+    type: api-key
+    consumer_groups: [gold]
+    credentials:
+      - {name: suspended-key, type: api-key, api_key: mcp-suspended-secret}

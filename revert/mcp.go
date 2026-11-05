@@ -14,6 +14,8 @@ import (
 // be recognized here so it is not misread as a policy.
 const mcpConversionOnly = "conversion-only"
 
+const mcpUpstreamServer = "upstream-server"
+
 // indexMCPListenerSources reconstructs the listener/source relationship the
 // forward converter encodes purely as tags (see convert.wireListenerSources): a
 // listener's ai-mcp-proxy carries a config.server.tag bucket selector, and each
@@ -215,6 +217,9 @@ func (r *Reverter) revertMCPServer(svc *kong.Service, rt *kong.Route, plugins, s
 		// access.
 		rest = dropToolsetGate(allPlugins)
 	} else {
+		if m.Type == mcpUpstreamServer {
+			allPlugins = dropToolsetGate(allPlugins)
+		}
 		rest = r.revertMCPAccess(&m, allPlugins)
 	}
 

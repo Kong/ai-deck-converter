@@ -141,7 +141,12 @@ func newBrowserClient(t *testing.T, proxyURL string) (*http.Client, *cookiejar.J
 
 func httpPost(t *testing.T, url string, headers map[string]string, body string) httpResponse {
 	t.Helper()
-	req, err := http.NewRequest(http.MethodPost, url, strings.NewReader(body))
+	return httpDo(t, http.MethodPost, url, headers, body)
+}
+
+func httpDo(t *testing.T, method, url string, headers map[string]string, body string) httpResponse {
+	t.Helper()
+	req, err := http.NewRequest(method, url, strings.NewReader(body))
 	if err != nil {
 		t.Fatalf("building request for %s: %v", url, err)
 	}
@@ -151,7 +156,7 @@ func httpPost(t *testing.T, url string, headers map[string]string, body string) 
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
-		t.Fatalf("POST %s: %v", url, err)
+		t.Fatalf("%s %s: %v", method, url, err)
 	}
 	defer resp.Body.Close()
 	respBody, err := io.ReadAll(resp.Body)

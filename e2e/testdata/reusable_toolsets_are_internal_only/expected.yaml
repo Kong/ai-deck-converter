@@ -13,6 +13,12 @@ services:
     host: host.docker.internal
     port: 18082
     protocol: http
+  - id: ac289cac-2b28-5a34-9cd5-c8e54c35c997
+    name: third-party
+    url: http://host.docker.internal:18082
+    host: host.docker.internal
+    port: 18082
+    protocol: http
   - id: 05eb9429-4518-5093-97a0-996b25774817
     name: aggregate
     host: localhost
@@ -32,6 +38,15 @@ routes:
       id: 15350122-8c21-5d6c-8271-8ca7a60e76a0
     paths:
       - /mcp/team-b
+    protocols:
+      - http
+      - https
+  - id: 9c47d621-cb2a-572d-9e7a-a03481384763
+    name: third-party-route
+    service:
+      id: ac289cac-2b28-5a34-9cd5-c8e54c35c997
+    paths:
+      - /mcp/third-party
     protocols:
       - http
       - https
@@ -108,6 +123,32 @@ plugins:
           end
     route:
       id: 9ffeb599-0bf8-5581-925c-5445c0cdb425
+    tags:
+      - aigw-generated:mcp-toolset-gate
+  - id: 522a95bc-1a42-5e02-b0b4-e0d384aa9071
+    name: ai-mcp-proxy
+    config:
+      include_consumer_groups: true
+      logging:
+        log_audits: false
+        log_payloads: false
+        log_statistics: true
+      mode: upstream-server
+      tools: []
+      tools_cache_ttl_seconds: 300
+    route:
+      id: 9c47d621-cb2a-572d-9e7a-a03481384763
+  - id: bfd16503-3006-5146-8bed-aa6fa175bcc0
+    name: pre-function
+    config:
+      access:
+        - |
+          local addr = ngx.var.server_addr or ""
+          if addr:sub(1, 5) ~= "unix:" then
+            return ngx.exit(ngx.HTTP_NOT_FOUND)
+          end
+    route:
+      id: 9c47d621-cb2a-572d-9e7a-a03481384763
     tags:
       - aigw-generated:mcp-toolset-gate
   - id: 702ac868-583d-5c8d-ade7-0e006b8bef35

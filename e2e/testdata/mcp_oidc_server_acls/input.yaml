@@ -1,0 +1,55 @@
+# From 2.3, an MCP server's openid-connect strategy with access.metadata
+# becomes the openid-connect plugin itself. Its authenticated groups feed the
+# Kong acl plugin from access.acls. It also publishes the token claims that
+# oauth_access_token tool ACLs in ai-mcp-proxy read.
+auth_strategies:
+  - name: idp-oidc
+    type: openid-connect
+    config:
+      issuer: http://host.docker.internal:18090
+      auth_methods: [bearer]
+      authenticated_groups_claim: [groups]
+
+mcp_servers:
+  # Only tokens with mcp-allowed in the groups claim reach vendor.
+  - type: passthrough-listener
+    name: vendor
+    upstream_url: http://host.docker.internal:18087/mcp
+    config:
+      route: {paths: [/mcp/vendor]}
+    access:
+      auth_strategies: [idp-oidc]
+      acls:
+        allow: [mcp-allowed]
+      metadata:
+        endpoint: /mcp/vendor/.well-known/oauth-protected-resource
+        resource: http://localhost/mcp/vendor
+  # Every valid token reaches claims. The tool ACL matches the email claim.
+  - type: passthrough-listener
+    name: claims
+    upstream_url: http://host.docker.internal:18087/mcp
+    config:
+      route: {paths: [/mcp/claims]}
+    access:
+      auth_strategies: [idp-oidc]
+      acl_attribute_type: oauth_access_token
+      access_token_claim_field: email
+      default_tool_acls:
+        allow: [alice@example.com]
+      metadata:
+        endpoint: /mcp/claims/.well-known/oauth-protected-resource
+        resource: http://localhost/mcp/claims
+  # A conversion-listener over the harness's mock REST API. ai-mcp-proxy runs
+  # each tool call back through this route, so openid-connect sees it twice.
+  - type: conversion-listener
+    name: reports
+    upstream_url: http://host.docker.internal:18088
+    config:
+      route: {paths: [/mcp/reports]}
+    access:
+      auth_strategies: [idp-oidc]
+      metadata:
+        endpoint: /mcp/reports/.well-known/oauth-protected-resource
+        resource: http://localhost/mcp/reports
+    tools:
+      - {name: list-reports, description: List reports, method: GET, path: reports}
