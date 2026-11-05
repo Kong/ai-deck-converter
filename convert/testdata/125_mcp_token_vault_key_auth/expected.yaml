@@ -27,6 +27,8 @@ services:
                 log_payloads: false
                 log_statistics: true
               mode: conversion-listener
+              server:
+                forward_client_headers: true
               tools:
                 - description: A tool
                   name: toolA
@@ -60,6 +62,8 @@ services:
                 log_payloads: false
                 log_statistics: true
               mode: conversion-listener
+              server:
+                forward_client_headers: true
               tools:
                 - description: A tool
                   name: toolB
@@ -99,6 +103,8 @@ services:
                 log_payloads: false
                 log_statistics: true
               mode: conversion-listener
+              server:
+                forward_client_headers: true
               tools:
                 - description: A tool
                   name: toolC
@@ -127,6 +133,8 @@ services:
                 log_payloads: false
                 log_statistics: true
               mode: conversion-listener
+              server:
+                forward_client_headers: true
               tools:
                 - description: A tool
                   name: toolD
@@ -166,6 +174,8 @@ services:
                 log_payloads: false
                 log_statistics: true
               mode: conversion-listener
+              server:
+                forward_client_headers: true
               tools:
                 - description: A tool
                   name: toolE
