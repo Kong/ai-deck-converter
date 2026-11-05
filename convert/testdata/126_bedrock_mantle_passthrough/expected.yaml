@@ -7,8 +7,25 @@ services:
         paths:
           - /mantle-passthrough
         strip_path: false
+      - name: models
+        paths:
+          - /v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-mantle-passthrough
+        paths:
+          - /mantle-passthrough/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
 plugins:
-  - name: ai-proxy-advanced
+  - id: 221fb025-ba28-524f-bc26-de1cab26f84e
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -32,5 +49,19 @@ plugins:
             provider: bedrock
           route_type: passthrough
     route: bedrock-passthrough
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 221fb025-ba28-524f-bc26-de1cab26f84e
+      route_type: llm/v1/models
+    route: models
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 221fb025-ba28-524f-bc26-de1cab26f84e
+      route_type: llm/v1/models
+    route: models-mantle-passthrough
 ai_models:
   - name: mantle-passthrough

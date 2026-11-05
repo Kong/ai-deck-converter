@@ -18,8 +18,30 @@ routes:
       - http
       - https
     strip_path: false
+  - id: aeea4f5f-1d07-59ad-98b1-be41cf62b11c
+    name: models
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /v1/models
+    methods:
+      - GET
+    protocols:
+      - http
+      - https
+  - id: 4d7f3eac-b31d-5176-b861-0bb729f43afb
+    name: models-mantle-passthrough
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /mantle-passthrough/v1/models
+    methods:
+      - GET
+    protocols:
+      - http
+      - https
 plugins:
-  - id: 4f272023-c721-52f1-a99f-03afec02ed35
+  - id: f0904945-5b1a-5bb7-9f12-2528f97e0d5d
     name: ai-proxy-advanced
     config:
       balancer:
@@ -45,6 +67,24 @@ plugins:
           route_type: passthrough
     route:
       id: 40e7c726-7e8a-5d90-95b7-e779f60427e4
+  - id: f3adc007-171c-5519-8763-3a0eef79bde3
+    name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: f0904945-5b1a-5bb7-9f12-2528f97e0d5d
+      route_type: llm/v1/models
+    route:
+      id: aeea4f5f-1d07-59ad-98b1-be41cf62b11c
+  - id: fe4129f3-2075-5492-8b59-90def2cf73ab
+    name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: f0904945-5b1a-5bb7-9f12-2528f97e0d5d
+      route_type: llm/v1/models
+    route:
+      id: 4d7f3eac-b31d-5176-b861-0bb729f43afb
 ai_models:
   - id: 6b6197d5-0e3c-5d7a-b000-52959d3e6b84
     name: mantle-passthrough
