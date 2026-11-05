@@ -17,6 +17,13 @@ mcp_servers:
       route: {name: team-b-route, paths: [/mcp/team-b]}
     tools:
       - {name: team-b-report, description: Get a report, method: GET, path: report}
+  # Upstream servers get the same gate: no client reaches them directly.
+  - type: upstream-server
+    name: third-party
+    upstream_url: http://host.docker.internal:18082
+    config:
+      route: {name: third-party-route, paths: [/mcp/third-party]}
+      tools_cache_ttl_seconds: 300
   - type: listener
     name: aggregate
     config:

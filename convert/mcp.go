@@ -18,6 +18,11 @@ import (
 // mcpToolsetGate).
 const mcpConversionOnly = "conversion-only"
 
+// mcpUpstreamServer is the MCP server mode of a third-party server. Only
+// listeners call it, so its route carries the same gate as a conversion-only
+// route.
+const mcpUpstreamServer = "upstream-server"
+
 // convertMCPServers translates AI Gateway MCP Servers into a Gateway Service +
 // Route with an ai-mcp-proxy plugin (config.mode = the source type, one of
 // conversion-only | conversion-listener | listener | passthrough-listener |
@@ -110,10 +115,30 @@ func (c *Converter) convertMCPServer(
 	if err != nil {
 		return kong.Service{}, err
 	}
+	if m.Access.ACLAttributeType == "oauth_access_token" {
+		fields := slices.DeleteFunc(aclFieldPaths("access.acls.", m.Access.ACLs), func(f string) bool {
+			return strings.HasSuffix(f, "_when")
+		})
+		if len(fields) > 0 {
+			c.warn(src.at(fields...), BehaviorMayDiffer,
+				"MCP server %q sets acl_attribute_type oauth_access_token, but %s "+
+					"is matched against consumers and consumer groups, not token claims. "+
+					"A claim value there matches no caller and denies the request. "+
+					"Move claim values to access.default_tool_acls, or use allow_when or deny_when on principal.",
+				m.Name, strings.Join(fields, " and "))
+		}
+	}
 	route.Plugins = append(route.Plugins, authPlugins...)
+	if !m.Access.ACLs.IsEmpty() && !mcpRouteIdentifiesCaller(route.Plugins) && c.globalAuthPolicy() == nil {
+		c.warn(src.at("access.acls"), BehaviorMayDiffer,
+			"MCP server %q sets access.acls, but no plugin on its route identifies a consumer "+
+				"or consumer group. The acl plugin has nothing to match and denies every request. "+
+				"Add a key-auth or openid-connect auth strategy to access.auth_strategies.",
+			m.Name)
+	}
 	// An unexposed conversion-only server is pruned below, so it gets no
 	// gate and its policies cannot collide with one.
-	if m.Type == mcpConversionOnly && exposed[m.Name] {
+	if m.Type == mcpUpstreamServer || (m.Type == mcpConversionOnly && exposed[m.Name]) {
 		// Kong allows one plugin per name on a route, so a policy of the
 		// gate's type would collide with it; neither can be dropped without
 		// either opening the route or losing the user's plugin.
@@ -121,9 +146,9 @@ func (c *Converter) convertMCPServer(
 			return p.Name == aimap.MCPToolsetGatePlugin
 		}) {
 			return kong.Service{}, c.fail(src.at("policies"), ConfigFieldInvalid,
-				"MCP server %q is conversion-only, so its route carries a generated %q gate; "+
+				"MCP server %q is %s, so its route carries a generated %q gate; "+
 					"it cannot also have a %q policy",
-				m.Name, aimap.MCPToolsetGatePlugin, aimap.MCPToolsetGatePlugin)
+				m.Name, m.Type, aimap.MCPToolsetGatePlugin, aimap.MCPToolsetGatePlugin)
 		}
 		route.Plugins = append(route.Plugins, mcpToolsetGate(m))
 	}
@@ -155,7 +180,8 @@ func (c *Converter) convertMCPServer(
 	return service, nil
 }
 
-// mcpToolsetGate closes a conversion-only server's route to clients. Such a
+// mcpToolsetGate closes the route of a conversion-only or upstream-server
+// MCP server to clients. Such a
 // server serves no MCP traffic of its own and cannot declare access itself
 // (mcpAuthStrategyPlugins rejects auth on non-listener modes): its tools are only
 // meant to be reached through the listeners that name it in config.sources.
@@ -325,8 +351,22 @@ func (c *Converter) mcpPlugin(src ConversionIssueSource, m *aigw.MCPServer) (kon
 		field := "config.server.upstream_protocol_version"
 		return kong.Plugin{}, c.failUnsupported(src.at(field), aimap.FeatureMCPUpstreamProtocolVersion, field)
 	}
-	if len(m.Config.Server) > 0 {
-		cfg["server"] = mcpServerConfigForPlugin(m.Config.Server)
+	server := mcpServerConfigForPlugin(m.Config.Server)
+	if c.mcpReentersKeyAuthRoute(m) {
+		// The DP runs a tool call back through this route. key-auth rejects the
+		// internal request without the client's key.
+		if forward, ok := server["forward_client_headers"].(bool); ok && !forward {
+			c.warn(src.at("config.server.forward_client_headers"), ConfigFieldOverridden,
+				"MCP server %q of type %q uses a key-auth auth strategy and has "+
+					"forward_client_headers set to false. This will be ignored, and "+
+					"forward_client_headers will be overridden to true because ai-mcp-proxy "+
+					"needs the client's key to execute tools.",
+				m.Name, m.Type)
+		}
+		server["forward_client_headers"] = true
+	}
+	if len(server) > 0 {
+		cfg["server"] = server
 	}
 	// proxy_config is honored by the plugin only in passthrough-listener mode,
 	// but we pass it through whenever set and let the plugin validate.
@@ -445,6 +485,38 @@ func (c *Converter) mcpPlugin(src ConversionIssueSource, m *aigw.MCPServer) (kon
 		Config: cfg,
 		Tags:   c.labelsToTags(m.Labels),
 	}, nil
+}
+
+// mcpRouteIdentifiesCaller reports whether a plugin on the route can set the
+// consumer or groups that a Kong acl plugin matches. key-auth always resolves
+// a consumer. openid-connect and ai-mcp-oauth2 set them only with a consumer
+// or group claim. A disabled plugin sets nothing.
+func mcpRouteIdentifiesCaller(plugins []kong.Plugin) bool {
+	return slices.ContainsFunc(plugins, func(p kong.Plugin) bool {
+		if p.Enabled != nil && !*p.Enabled {
+			return false
+		}
+		switch p.Name {
+		case "key-auth":
+			return true
+		case "openid-connect":
+			return p.Config["consumer_claims"] != nil || p.Config["consumer_by"] != nil ||
+				p.Config["authenticated_groups_claim"] != nil
+		case "ai-mcp-oauth2":
+			return p.Config["consumer_claim"] != nil || p.Config["consumer_groups_claim"] != nil
+		}
+		return false
+	})
+}
+
+// mcpReentersKeyAuthRoute reports whether m is a conversion-listener behind a
+// key-auth auth strategy. An unknown strategy fails the server later.
+func (c *Converter) mcpReentersKeyAuthRoute(m *aigw.MCPServer) bool {
+	if m.Type != "conversion-listener" || len(m.Access.AuthStrategies) == 0 {
+		return false
+	}
+	idp := c.authStrategies[m.Access.AuthStrategies[0]]
+	return idp != nil && idp.Type == "key-auth"
 }
 
 // mcpServerConfigForPlugin returns a shallow copy of the MCP server's server

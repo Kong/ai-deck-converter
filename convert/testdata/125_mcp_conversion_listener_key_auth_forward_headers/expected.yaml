@@ -1,0 +1,78 @@
+_format_version: "3.0"
+services:
+  - name: reports-mcp
+    url: https://reports.internal.kongair.com
+    routes:
+      - name: reports-mcp-route
+        paths:
+          - /mcp/reports
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              include_consumer_groups: true
+              logging:
+                log_audits: false
+                log_payloads: false
+                log_statistics: true
+              mode: conversion-listener
+              server:
+                forward_client_headers: true
+              tools:
+                - description: List reports
+                  method: GET
+                  name: list-reports
+                  path: /reports
+          - name: key-auth
+            config:
+              hide_credentials: false
+              key_names:
+                - apikey
+  - name: flights-mcp
+    url: https://flights.internal.kongair.com
+    routes:
+      - name: flights-mcp-route
+        paths:
+          - /mcp/flights
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              include_consumer_groups: true
+              logging:
+                log_audits: false
+                log_payloads: false
+                log_statistics: true
+              mode: conversion-listener
+              server:
+                forward_client_headers: true
+                timeout: 10000
+              tools:
+                - description: Search flights
+                  method: GET
+                  name: search-flights
+                  path: /flights
+          - name: key-auth
+            config:
+              hide_credentials: false
+              key_names:
+                - apikey
+  - name: vendor-mcp
+    url: https://vendor.example.com/mcp
+    routes:
+      - name: vendor-mcp-route
+        paths:
+          - /mcp/vendor
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              include_consumer_groups: true
+              logging:
+                log_audits: false
+                log_payloads: false
+                log_statistics: true
+              mode: passthrough-listener
+              tools: []
+          - name: key-auth
+            config:
+              hide_credentials: false
+              key_names:
+                - apikey

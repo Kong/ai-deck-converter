@@ -49,11 +49,14 @@ func (c *Converter) warnGlobalPoliciesForWebSocket() {
 	}
 }
 
-// globalAuthPolicy returns a global authentication policy, or nil.
+// globalAuthPolicy returns an enabled global authentication policy, or nil.
+// A disabled policy still emits its plugin (with enabled: false), so it
+// authenticates no one.
 func (c *Converter) globalAuthPolicy() *aigw.Policy {
 	for i := range c.src.Policies {
 		p := &c.src.Policies[i]
-		if p.Global != nil && *p.Global && authPolicyTypes[p.Type] {
+		if p.Global != nil && *p.Global && authPolicyTypes[p.Type] &&
+			(p.Enabled == nil || *p.Enabled) {
 			return p
 		}
 	}
