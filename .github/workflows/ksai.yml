@@ -148,7 +148,7 @@ jobs:
       actions: write  # dispatch this workflow onto the default branch
       contents: read  # download the actions this call runs
     with:
-      runs_on: ubuntu-latest
+      runs_on: ubuntu-24.04
       client_id: ${{ vars.AI_DECK_CONVERTER_GH_APP_ID }}
     secrets:
       ksai_private_key: ${{ secrets.AI_DECK_CONVERTER_GH_APP_PRIVATE_KEY }}
