@@ -459,6 +459,15 @@ services:
 	_, warnings, err = revertYAML(t, bodyKey, Options{})
 	require.NoError(t, err, "revert with body-only key")
 	require.Empty(t, warnings, "warnings with body-only key")
+
+	// A global key-auth plugin stands in when no scoped one exists.
+	globalKeyAuth := []byte(strings.Replace(string(noKeyAuth),
+		"_format_version: \"3.0\"\n",
+		"_format_version: \"3.0\"\nplugins:\n  - name: key-auth\n"+
+			"    config: {key_names: [x-api-key]}\n", 1))
+	_, warnings, err = revertYAML(t, globalKeyAuth, Options{})
+	require.NoError(t, err, "revert with global key-auth")
+	require.Contains(t, strings.Join(warnings, "\n"), "the global key-auth plugin reads the key")
 }
 
 // A key-auth plugin on a model route pairs with a token-vault-exchange plugin
