@@ -1,0 +1,32 @@
+- code: CONFIG_FIELD_OVERRIDDEN
+  reason: 'MCP server "derived-global": token_vault.credential.inbound is derived from the global key-auth policy "org-key-auth" (header "x-api-key", its first key name, no prefix), because the plugin default Authorization: Bearer does not match where key-auth reads the key.'
+  source:
+    kind: mcp_server
+    name: derived-global
+    fields:
+      - token_vault.credential.inbound
+  severity: WARNING
+- code: CONFIG_FIELD_OVERRIDDEN
+  reason: 'MCP server "divergent": token_vault.credential.inbound is derived from the key-auth strategy "api-key-custom" (header "x-custom-key", its first key name, no prefix), because the plugin default Authorization: Bearer does not match where key-auth reads the key.'
+  source:
+    kind: mcp_server
+    name: divergent
+    fields:
+      - token_vault.credential.inbound
+  severity: WARNING
+- code: BEHAVIOR_MAY_DIFFER
+  reason: 'MCP server "divergent": the global key-auth policy reads its key from header "x-api-key", but the derived inbound reads header "x-custom-key". The exchange uses only the derived inbound.'
+  source:
+    kind: mcp_server
+    name: divergent
+    fields:
+      - token_vault.credential.inbound
+  severity: WARNING
+- code: CONFIG_FIELD_OVERRIDDEN
+  reason: 'MCP server "aligned": token_vault.credential.inbound is derived from the key-auth strategy "api-key-aligned" (header "x-api-key", its first key name, no prefix), because the plugin default Authorization: Bearer does not match where key-auth reads the key.'
+  source:
+    kind: mcp_server
+    name: aligned
+    fields:
+      - token_vault.credential.inbound
+  severity: WARNING

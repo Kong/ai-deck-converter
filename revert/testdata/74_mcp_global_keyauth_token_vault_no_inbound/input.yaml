@@ -1,0 +1,26 @@
+_format_version: "3.0"
+plugins:
+  - name: key-auth
+    config:
+      key_names:
+        - x-api-key
+services:
+  - name: vaulted-global
+    host: localhost
+    routes:
+      - name: vaulted-global-route
+        paths:
+          - /mcp/vaulted-global
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              mode: listener
+              auth:
+                provider: token_vault
+                token_vault:
+                  provider: outbound-api
+              tools:
+                - name: report
+                  description: Get a report
+                  method: GET
+                  path: /report
