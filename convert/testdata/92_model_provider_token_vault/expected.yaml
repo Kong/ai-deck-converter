@@ -17,6 +17,22 @@ services:
           - POST
           - OPTIONS
         strip_path: false
+      - name: models
+        paths:
+          - /v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-ai
+        paths:
+          - /ai/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
 routes:
   - name: token-vault-callback-handler
     paths:
@@ -42,7 +58,8 @@ plugins:
         - body_path: model
           source: body
     route: anthropic-messages
-  - name: ai-proxy-advanced
+  - id: 58507262-f4ae-58ed-ac0f-591f2f42f752
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -91,7 +108,8 @@ plugins:
         - body_path: model
           source: body
     route: openai-chat
-  - name: ai-proxy-advanced
+  - id: face7983-b495-5d5a-9cee-f1dd49c1b5a4
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -112,6 +130,22 @@ plugins:
           route_type: llm/v1/chat
     route: openai-chat
     model: gpt
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 58507262-f4ae-58ed-ac0f-591f2f42f752
+          - plugin_id: face7983-b495-5d5a-9cee-f1dd49c1b5a4
+      route_type: llm/v1/models
+    route: models
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 58507262-f4ae-58ed-ac0f-591f2f42f752
+          - plugin_id: face7983-b495-5d5a-9cee-f1dd49c1b5a4
+      route_type: llm/v1/models
+    route: models-ai
 ai_models:
   - name: claude
   - name: gpt

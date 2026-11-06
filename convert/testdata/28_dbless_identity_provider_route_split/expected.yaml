@@ -34,6 +34,39 @@ routes:
       - http
       - https
     strip_path: false
+  - id: aeea4f5f-1d07-59ad-98b1-be41cf62b11c
+    name: models
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /v1/models
+    methods:
+      - GET
+    protocols:
+      - http
+      - https
+  - id: 50097e8e-4ecb-50ee-9e93-154a836e5926
+    name: models-oidc-repro-model-a
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /oidc-repro/model-a/v1/models
+    methods:
+      - GET
+    protocols:
+      - http
+      - https
+  - id: 45f10150-bbb5-5bf2-991a-a40b5ac65e0f
+    name: models-oidc-repro-model-b
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /oidc-repro/model-b/v1/models
+    methods:
+      - GET
+    protocols:
+      - http
+      - https
 plugins:
   - id: 17fa8192-4b9f-5b5a-8379-20ad8bc836a7
     name: ai-model-selector
@@ -44,7 +77,7 @@ plugins:
           source: body
     route:
       id: 8ae36805-da7a-55b9-b056-72bde6bb937d
-  - id: f3adc007-171c-5519-8763-3a0eef79bde3
+  - id: d30316ff-f181-56ba-a198-bdba56b5ab10
     name: ai-proxy-advanced
     config:
       balancer:
@@ -77,7 +110,7 @@ plugins:
           source: body
     route:
       id: 2384fe9d-eacc-5ac2-ae4c-4752cc597f81
-  - id: 75ff22ed-6245-594b-895f-6a9fa36f4581
+  - id: 38f8fa8e-ffcb-54a9-87ef-a834217e043f
     name: ai-proxy-advanced
     config:
       balancer:
@@ -101,7 +134,35 @@ plugins:
       id: 2384fe9d-eacc-5ac2-ae4c-4752cc597f81
     model:
       id: ef3104b8-4849-51ba-9ccb-7d66e827436a
-  - id: bb79eabd-8d6e-57e1-9428-fd9dc2b9cbad
+  - id: 12106a5c-cbd2-5942-8432-ef9bc4adca1b
+    name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 38f8fa8e-ffcb-54a9-87ef-a834217e043f
+          - plugin_id: d30316ff-f181-56ba-a198-bdba56b5ab10
+      route_type: llm/v1/models
+    route:
+      id: aeea4f5f-1d07-59ad-98b1-be41cf62b11c
+  - id: 628550fd-b362-5247-b3ba-f2f6fa95de13
+    name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: d30316ff-f181-56ba-a198-bdba56b5ab10
+      route_type: llm/v1/models
+    route:
+      id: 50097e8e-4ecb-50ee-9e93-154a836e5926
+  - id: 693f2c49-9a06-59cc-92cf-0747f3214011
+    name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 38f8fa8e-ffcb-54a9-87ef-a834217e043f
+      route_type: llm/v1/models
+    route:
+      id: 45f10150-bbb5-5bf2-991a-a40b5ac65e0f
+  - id: 5d7f5d67-5074-5104-936e-4ff5694c5a80
     name: openid-connect
     config:
       auth_methods:
@@ -114,6 +175,32 @@ plugins:
       issuer: https://your-idp.example.com/oauth2/default
     route:
       id: 2384fe9d-eacc-5ac2-ae4c-4752cc597f81
+  - id: 2e75e110-d4b1-515c-a07d-abfb5aba8365
+    name: openid-connect
+    config:
+      auth_methods:
+        - bearer
+      bearer_token_param_type:
+        - header
+      cache_tokens_salt: REPRO-SALT
+      consumer_optional: true
+      hide_credentials: true
+      issuer: https://your-idp.example.com/oauth2/default
+    route:
+      id: aeea4f5f-1d07-59ad-98b1-be41cf62b11c
+  - id: 38168781-1f13-57fb-8c42-d2ed4f27fbee
+    name: openid-connect
+    config:
+      auth_methods:
+        - bearer
+      bearer_token_param_type:
+        - header
+      cache_tokens_salt: REPRO-SALT
+      consumer_optional: true
+      hide_credentials: true
+      issuer: https://your-idp.example.com/oauth2/default
+    route:
+      id: 45f10150-bbb5-5bf2-991a-a40b5ac65e0f
 ai_models:
   - id: f8ad1382-e6e4-5c95-86fd-ab9a0c84e2b4
     name: oidc-repro-model-a

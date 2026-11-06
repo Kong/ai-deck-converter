@@ -1,0 +1,35 @@
+model_providers:
+  - name: openai
+    type: openai
+    display_name: OpenAI
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://env/openai-token}"
+models:
+  - name: alpha
+    type: model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/team-a]}
+      model: {alias: alpha}
+    targets:
+      - name: gpt-5
+        provider: openai
+        config: {type: openai}
+    access:
+      acls: {deny: [contractors]}
+  - name: beta
+    type: model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/team-b]}
+      model: {alias: beta}
+    targets:
+      - name: gpt-5-mini
+        provider: openai
+        config: {type: openai}

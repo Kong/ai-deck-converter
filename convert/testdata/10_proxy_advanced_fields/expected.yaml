@@ -17,6 +17,22 @@ services:
           - POST
           - OPTIONS
         strip_path: false
+      - name: models
+        paths:
+          - /v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-ai
+        paths:
+          - /ai/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
 plugins:
   - name: ai-model-selector
     config:
@@ -25,7 +41,8 @@ plugins:
         - body_path: model
           source: body
     route: openai-chat
-  - name: ai-proxy-advanced
+  - id: 1f992701-63e8-5f80-8d20-391fd9769941
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -56,7 +73,8 @@ plugins:
         - body_path: model
           source: body
     route: openai-embeddings
-  - name: ai-proxy-advanced
+  - id: ca003cdb-c65d-5673-b0a6-036144fa8fe7
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -77,6 +95,22 @@ plugins:
           route_type: llm/v1/embeddings
     route: openai-embeddings
     model: bare-model
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 1f992701-63e8-5f80-8d20-391fd9769941
+          - plugin_id: ca003cdb-c65d-5673-b0a6-036144fa8fe7
+      route_type: llm/v1/models
+    route: models
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 1f992701-63e8-5f80-8d20-391fd9769941
+          - plugin_id: ca003cdb-c65d-5673-b0a6-036144fa8fe7
+      route_type: llm/v1/models
+    route: models-ai
 ai_models:
   - name: full-model
   - name: bare-model

@@ -17,6 +17,22 @@ services:
           - POST
           - OPTIONS
         strip_path: false
+      - name: models
+        paths:
+          - /v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-cohere
+        paths:
+          - /cohere/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
   - name: ai-gateway-websocket
     url: ws://ai-gateway.upstream.local
     routes:
@@ -87,7 +103,8 @@ plugins:
         - body_path: model
           source: body
     route: openai-chat
-  - name: ai-proxy-advanced
+  - id: 7698c1ac-9002-5281-a2f7-02f0cb7cd47c
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -121,7 +138,8 @@ plugins:
         - body_path: model
           source: body
     route: cohere-rerank
-  - name: ai-proxy-advanced
+  - id: e86c8a74-9101-5847-b2fc-02291ec2e147
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -139,6 +157,22 @@ plugins:
           route_type: llm/v1/chat
     route: cohere-rerank
     model: cohere-and-openai
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 7698c1ac-9002-5281-a2f7-02f0cb7cd47c
+          - plugin_id: e86c8a74-9101-5847-b2fc-02291ec2e147
+      route_type: llm/v1/models
+    route: models
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 7698c1ac-9002-5281-a2f7-02f0cb7cd47c
+          - plugin_id: e86c8a74-9101-5847-b2fc-02291ec2e147
+      route_type: llm/v1/models
+    route: models-cohere
 ai_models:
   - name: mixed
   - name: gemini-only

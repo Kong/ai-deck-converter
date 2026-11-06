@@ -61,6 +61,7 @@ var allFeatures = []Feature{
 	FeatureSagemaker,
 	FeatureAuthStrategyTokenVault,
 	FeatureMCPIdentityAuth,
+	FeatureModelDirectory,
 }
 
 func TestFeatureTable(t *testing.T) {

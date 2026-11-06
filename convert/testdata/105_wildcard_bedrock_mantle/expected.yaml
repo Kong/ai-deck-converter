@@ -36,6 +36,30 @@ services:
           - DELETE
           - OPTIONS
         strip_path: false
+      - name: models
+        paths:
+          - /v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-mantle-files
+        paths:
+          - /mantle-files/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-mantle
+        paths:
+          - /mantle/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
 plugins:
   - name: ai-model-selector
     config:
@@ -44,7 +68,8 @@ plugins:
         - body_path: model
           source: body
     route: openai-chat
-  - name: ai-proxy-advanced
+  - id: d5c80b48-5f02-5dca-bef0-513c34f37b77
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -77,7 +102,8 @@ plugins:
         - body_path: model
           source: body
     route: openai-responses
-  - name: ai-proxy-advanced
+  - id: b203783d-5b68-5c91-9d46-de8a4f2e936f
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -110,7 +136,8 @@ plugins:
         - body_path: model
           source: body
     route: anthropic-messages
-  - name: ai-proxy-advanced
+  - id: 1fa06e58-c803-5807-b42f-9aa0f32c1422
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -136,7 +163,8 @@ plugins:
           route_type: llm/v1/chat
     route: anthropic-messages
     model: mantle
-  - name: ai-proxy-advanced
+  - id: ad258040-0677-5c8c-892f-4c69acca6305
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -161,6 +189,32 @@ plugins:
             provider: bedrock
           route_type: llm/v1/files
     route: openai-files
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 1fa06e58-c803-5807-b42f-9aa0f32c1422
+          - plugin_id: ad258040-0677-5c8c-892f-4c69acca6305
+          - plugin_id: b203783d-5b68-5c91-9d46-de8a4f2e936f
+          - plugin_id: d5c80b48-5f02-5dca-bef0-513c34f37b77
+      route_type: llm/v1/models
+    route: models
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: ad258040-0677-5c8c-892f-4c69acca6305
+      route_type: llm/v1/models
+    route: models-mantle-files
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 1fa06e58-c803-5807-b42f-9aa0f32c1422
+          - plugin_id: b203783d-5b68-5c91-9d46-de8a4f2e936f
+          - plugin_id: d5c80b48-5f02-5dca-bef0-513c34f37b77
+      route_type: llm/v1/models
+    route: models-mantle
 ai_models:
   - name: mantle
   - name: mantle-files

@@ -11,6 +11,22 @@ services:
           - POST
           - OPTIONS
         strip_path: false
+      - name: models
+        paths:
+          - /v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-ai
+        paths:
+          - /ai/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
 plugins:
   - name: ai-model-selector
     config:
@@ -19,7 +35,8 @@ plugins:
         - path_pattern: model/([^/]+)/
           source: path
     route: bedrock-invoke
-  - name: ai-proxy-advanced
+  - id: 2e56183c-abb7-5f88-8bd1-9e3022e12c00
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: semantic
@@ -55,5 +72,19 @@ plugins:
           route_type: llm/v1/embeddings
     route: bedrock-invoke
     model: titan-embed-text-v2
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 2e56183c-abb7-5f88-8bd1-9e3022e12c00
+      route_type: llm/v1/models
+    route: models
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 2e56183c-abb7-5f88-8bd1-9e3022e12c00
+      route_type: llm/v1/models
+    route: models-ai
 ai_models:
   - name: titan-embed-text-v2

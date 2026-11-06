@@ -26,6 +26,22 @@ services:
           - DELETE
           - OPTIONS
         strip_path: false
+      - name: models
+        paths:
+          - /v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-ai
+        paths:
+          - /ai/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
 plugins:
   - name: ai-model-selector
     config:
@@ -34,7 +50,8 @@ plugins:
         - body_path: model
           source: body
     route: openai-chat
-  - name: ai-proxy-advanced
+  - id: 820dd6e2-8df9-5c5b-a3d5-bcf670ccc247
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -61,7 +78,8 @@ plugins:
         - body_path: model
           source: body
     route: anthropic-messages
-  - name: ai-proxy-advanced
+  - id: 90a1b264-a143-53aa-b526-5c96e157ce53
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -81,7 +99,8 @@ plugins:
           route_type: llm/v1/chat
     route: anthropic-messages
     model: ordered
-  - name: ai-proxy-advanced
+  - id: dd14bf2b-2aef-54b9-98f9-44d24f93fa92
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -102,5 +121,23 @@ plugins:
           route_type: llm/v1/skills
     route: anthropic-skills
     model: ordered
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 820dd6e2-8df9-5c5b-a3d5-bcf670ccc247
+          - plugin_id: 90a1b264-a143-53aa-b526-5c96e157ce53
+          - plugin_id: dd14bf2b-2aef-54b9-98f9-44d24f93fa92
+      route_type: llm/v1/models
+    route: models
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 820dd6e2-8df9-5c5b-a3d5-bcf670ccc247
+          - plugin_id: 90a1b264-a143-53aa-b526-5c96e157ce53
+          - plugin_id: dd14bf2b-2aef-54b9-98f9-44d24f93fa92
+      route_type: llm/v1/models
+    route: models-ai
 ai_models:
   - name: ordered

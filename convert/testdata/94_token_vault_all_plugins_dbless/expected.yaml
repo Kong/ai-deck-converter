@@ -27,6 +27,28 @@ routes:
       - http
       - https
     strip_path: false
+  - id: aeea4f5f-1d07-59ad-98b1-be41cf62b11c
+    name: models
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /v1/models
+    methods:
+      - GET
+    protocols:
+      - http
+      - https
+  - id: 894112b2-5d36-58ad-9910-f9a4f598af7f
+    name: models-ai
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /ai/v1/models
+    methods:
+      - GET
+    protocols:
+      - http
+      - https
   - id: b0d3e53d-2a03-51d9-886a-95a81bf161d7
     name: tools-a-route
     service:
@@ -215,7 +237,7 @@ plugins:
           source: body
     route:
       id: bb559a54-dc17-5c0f-b946-b0d9c5cebd7a
-  - id: f3adc007-171c-5519-8763-3a0eef79bde3
+  - id: 58507262-f4ae-58ed-ac0f-591f2f42f752
     name: ai-proxy-advanced
     config:
       balancer:
@@ -253,6 +275,24 @@ plugins:
       id: bb559a54-dc17-5c0f-b946-b0d9c5cebd7a
     model:
       id: 0a6904fa-4d19-5e62-aa3c-ab58139fcc54
+  - id: 75ff22ed-6245-594b-895f-6a9fa36f4581
+    name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 58507262-f4ae-58ed-ac0f-591f2f42f752
+      route_type: llm/v1/models
+    route:
+      id: aeea4f5f-1d07-59ad-98b1-be41cf62b11c
+  - id: 12106a5c-cbd2-5942-8432-ef9bc4adca1b
+    name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 58507262-f4ae-58ed-ac0f-591f2f42f752
+      route_type: llm/v1/models
+    route:
+      id: 894112b2-5d36-58ad-9910-f9a4f598af7f
 ai_models:
   - id: 0a6904fa-4d19-5e62-aa3c-ab58139fcc54
     name: claude

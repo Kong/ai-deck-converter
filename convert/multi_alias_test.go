@@ -76,6 +76,10 @@ func TestConvertMultiAliasValuesFanOut(t *testing.T) {
 		plugin := raw.(map[string]any)
 		switch plugin["name"] {
 		case "ai-proxy-advanced":
+			if cfg, ok := plugin["config"].(map[string]any); ok &&
+				cfg["route_type"] == "llm/v1/models" {
+				continue
+			}
 			proxies = append(proxies, plugin)
 		case "ai-model-selector":
 			selectors++
@@ -326,9 +330,15 @@ models:
 
 	proxies := 0
 	for _, raw := range got["plugins"].([]any) {
-		if raw.(map[string]any)["name"] == "ai-proxy-advanced" {
-			proxies++
+		plugin := raw.(map[string]any)
+		if plugin["name"] != "ai-proxy-advanced" {
+			continue
 		}
+		if cfg, ok := plugin["config"].(map[string]any); ok &&
+			cfg["route_type"] == "llm/v1/models" {
+			continue
+		}
+		proxies++
 	}
 	require.Equal(t, 2, proxies, "one ai-proxy-advanced per unique alias")
 }

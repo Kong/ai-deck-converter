@@ -17,6 +17,22 @@ services:
           - POST
           - OPTIONS
         strip_path: false
+      - name: models
+        paths:
+          - /v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-ai
+        paths:
+          - /ai/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
 plugins:
   - name: ai-model-selector
     config:
@@ -25,7 +41,8 @@ plugins:
         - body_path: model
           source: body
     route: openai-chat
-  - name: ai-proxy-advanced
+  - id: 6a5ce60d-9969-5faf-aaba-48807a26d772
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -57,7 +74,8 @@ plugins:
         - body_path: model
           source: body
     route: anthropic-messages
-  - name: ai-proxy-advanced
+  - id: 450b7f1b-6821-5e5c-837d-e54a5037b064
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -83,6 +101,22 @@ plugins:
           route_type: llm/v1/chat
     route: anthropic-messages
     model: claude-foundry
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 450b7f1b-6821-5e5c-837d-e54a5037b064
+          - plugin_id: 6a5ce60d-9969-5faf-aaba-48807a26d772
+      route_type: llm/v1/models
+    route: models
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 450b7f1b-6821-5e5c-837d-e54a5037b064
+          - plugin_id: 6a5ce60d-9969-5faf-aaba-48807a26d772
+      route_type: llm/v1/models
+    route: models-ai
 ai_models:
   - name: gpt-4o-foundry
   - name: claude-foundry

@@ -194,7 +194,9 @@ type modelPass struct {
 	// skipped holds the issues of each model index that a pass left out.
 	skipped map[int][]ConversionIssue
 	// tokenVaults holds the token-vault-exchange config of each model.
-	tokenVaults map[*aigw.Model]map[string]any
+	tokenVaults      map[*aigw.Model]map[string]any
+	directorySources map[string][]string
+	usedPluginIDs    map[string]bool
 }
 
 // convertModels groups all (model, target, capability) tuples into routes under
@@ -237,6 +239,8 @@ func (c *Converter) convertModelsPass(skipped map[int][]ConversionIssue) bool {
 		aliasConflicts:      map[string]bool{},
 		skipped:             skipped,
 		tokenVaults:         map[*aigw.Model]map[string]any{},
+		directorySources:    map[string][]string{},
+		usedPluginIDs:       map[string]bool{},
 	}
 	c.modelRouteModels = map[string][]string{}
 	lifecycleCandidates := c.videoLifecycleCandidates(skipped)
@@ -255,6 +259,7 @@ func (c *Converter) convertModelsPass(skipped map[int][]ConversionIssue) bool {
 
 	service := kong.Service{Name: aimap.GatewayServiceName, URL: aimap.GatewayServiceURL}
 	websocketService := kong.Service{Name: aimap.GatewayWebSocketServiceName, URL: aimap.GatewayWebSocketServiceURL}
+	withDirectory := c.supports(aimap.FeatureModelDirectory)
 	for _, key := range st.order {
 		g := st.groups[key]
 		c.modelRouteModels[g.route.Name] = g.models
@@ -286,11 +291,20 @@ func (c *Converter) convertModelsPass(skipped map[int][]ConversionIssue) bool {
 				if pg.realtimeModel != "" {
 					tags = []string{aimap.EncodeRealtimeModel(pg.realtimeModel)}
 				}
+				proxyCfg := pg.proxyConfig()
+				var id string
+				if withDirectory && !g.websocket {
+					id = c.nextModelPluginID(st, pg.routeName, proxyCfg)
+					for _, owner := range g.models {
+						st.addDirectorySource(owner, id)
+					}
+				}
 				c.out.Plugins = append(c.out.Plugins, kong.Plugin{
+					ID:            id,
 					Name:          "ai-proxy-advanced",
 					Protocols:     protocols,
 					Route:         kong.NewStringRef(pg.routeName),
-					Config:        pg.proxyConfig(),
+					Config:        proxyCfg,
 					Tags:          tags,
 					TargetSources: pg.targetSources,
 					Source:        pg.source,
@@ -305,7 +319,13 @@ func (c *Converter) convertModelsPass(skipped map[int][]ConversionIssue) bool {
 			for _, alias := range pg.aliases {
 				cfg := pg.proxyConfig()
 				cfg["targets"] = withModelAlias(pg.targets, alias, pg.llmFormat)
+				var id string
+				if withDirectory {
+					id = c.nextModelPluginID(st, pg.routeName, cfg)
+					st.addDirectorySource(pg.source.EntityName, id)
+				}
 				c.out.Plugins = append(c.out.Plugins, kong.Plugin{
+					ID:            id,
 					Name:          "ai-proxy-advanced",
 					Route:         kong.NewStringRef(pg.routeName),
 					Config:        cfg,
@@ -317,6 +337,7 @@ func (c *Converter) convertModelsPass(skipped map[int][]ConversionIssue) bool {
 			}
 		}
 	}
+	c.convertModelDirectories(st, &service)
 	for _, candidate := range lifecycleCandidates {
 		if !c.convertModelOnce(st, candidate.index, func() error {
 			return c.convertVideoLifecycle(st, candidate, &service)

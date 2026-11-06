@@ -41,6 +41,30 @@ services:
           - POST
           - OPTIONS
         strip_path: false
+      - name: models
+        paths:
+          - /v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-mantle
+        paths:
+          - /mantle/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-runtime
+        paths:
+          - /runtime/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
 plugins:
   - name: ai-model-selector
     config:
@@ -49,7 +73,8 @@ plugins:
         - body_path: model
           source: body
     route: openai-chat
-  - name: ai-proxy-advanced
+  - id: 90a4e109-b00a-5864-9571-fdeff0195414
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -84,7 +109,8 @@ plugins:
         - path_pattern: model/([^/]+)/
           source: path
     route: bedrock-converse
-  - name: ai-proxy-advanced
+  - id: 8bae2929-09c2-569a-97ed-c8901e76f4f3
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -118,7 +144,8 @@ plugins:
         - path_pattern: model/([^/]+)/
           source: path
     route: bedrock-invoke
-  - name: ai-proxy-advanced
+  - id: 8f9f0286-1b6b-50bd-86e4-917183360550
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -152,7 +179,8 @@ plugins:
         - body_path: model
           source: body
     route: bedrock-chat
-  - name: ai-proxy-advanced
+  - id: b7078145-ffcb-5b6d-a90a-843bb12e7fa4
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -186,7 +214,8 @@ plugins:
         - body_path: model
           source: body
     route: bedrock-messages
-  - name: ai-proxy-advanced
+  - id: 4176055a-7167-5733-b409-f9c66a3df17f
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -213,6 +242,34 @@ plugins:
           route_type: llm/v1/chat
     route: bedrock-messages
     model: claude-runtime
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 4176055a-7167-5733-b409-f9c66a3df17f
+          - plugin_id: 8bae2929-09c2-569a-97ed-c8901e76f4f3
+          - plugin_id: 8f9f0286-1b6b-50bd-86e4-917183360550
+          - plugin_id: 90a4e109-b00a-5864-9571-fdeff0195414
+          - plugin_id: b7078145-ffcb-5b6d-a90a-843bb12e7fa4
+      route_type: llm/v1/models
+    route: models
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 90a4e109-b00a-5864-9571-fdeff0195414
+      route_type: llm/v1/models
+    route: models-mantle
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 4176055a-7167-5733-b409-f9c66a3df17f
+          - plugin_id: 8bae2929-09c2-569a-97ed-c8901e76f4f3
+          - plugin_id: 8f9f0286-1b6b-50bd-86e4-917183360550
+          - plugin_id: b7078145-ffcb-5b6d-a90a-843bb12e7fa4
+      route_type: llm/v1/models
+    route: models-runtime
 ai_models:
   - name: claude-mantle
   - name: claude-runtime

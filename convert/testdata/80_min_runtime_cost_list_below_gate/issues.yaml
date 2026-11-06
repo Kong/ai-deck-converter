@@ -14,3 +14,9 @@
     fields:
       - targets[0].config.output_cost_list
   severity: WARNING
+- code: UNSUPPORTED_IN_MIN_RUNTIME_VERSION
+  reason: a model list route requires minimum runtime version "2.3", but the configured minimum is "2.0"
+  source:
+    kind: option
+    name: min_runtime_version
+  severity: WARNING

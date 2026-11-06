@@ -31,6 +31,46 @@ services:
           - POST
           - OPTIONS
         strip_path: false
+      - name: models
+        paths:
+          - /v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-ai-body-alias
+        paths:
+          - /ai-body-alias/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-ai-default-alias
+        paths:
+          - /ai-default-alias/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-ai-headers-alias
+        paths:
+          - /ai-headers-alias/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-ai-path-alias
+        paths:
+          - /ai-path-alias/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
 plugins:
   - name: ai-model-selector
     config:
@@ -39,7 +79,8 @@ plugins:
         - body_path: model
           source: body
     route: openai-chat
-  - name: ai-proxy-advanced
+  - id: 7ac8c137-f428-5963-82fc-6b819697fb45
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -71,7 +112,8 @@ plugins:
         - body_path: my-model-alias
           source: body
     route: openai-chat-2
-  - name: ai-proxy-advanced
+  - id: 7d351682-ce98-5820-89ff-785327bf53c5
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -102,7 +144,8 @@ plugins:
         - header_name: my-model-alias
           source: header
     route: openai-chat-3
-  - name: ai-proxy-advanced
+  - id: 006f9177-d143-5b04-9031-fe71186cd1e6
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -134,7 +177,8 @@ plugins:
         - body_path: model
           source: body
     route: openai-chat-4
-  - name: ai-proxy-advanced
+  - id: 0441f68d-3e67-5f93-a299-05d5fddd7667
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -159,6 +203,44 @@ plugins:
           route_type: llm/v1/chat
     route: openai-chat-4
     model: my-model-path-alias-value
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 006f9177-d143-5b04-9031-fe71186cd1e6
+          - plugin_id: 0441f68d-3e67-5f93-a299-05d5fddd7667
+          - plugin_id: 7ac8c137-f428-5963-82fc-6b819697fb45
+          - plugin_id: 7d351682-ce98-5820-89ff-785327bf53c5
+      route_type: llm/v1/models
+    route: models
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 7d351682-ce98-5820-89ff-785327bf53c5
+      route_type: llm/v1/models
+    route: models-ai-body-alias
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 7ac8c137-f428-5963-82fc-6b819697fb45
+      route_type: llm/v1/models
+    route: models-ai-default-alias
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 006f9177-d143-5b04-9031-fe71186cd1e6
+      route_type: llm/v1/models
+    route: models-ai-headers-alias
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 0441f68d-3e67-5f93-a299-05d5fddd7667
+      route_type: llm/v1/models
+    route: models-ai-path-alias
 ai_models:
   - name: gpt-5-2-default-alias-config
   - name: my-body-alias-value

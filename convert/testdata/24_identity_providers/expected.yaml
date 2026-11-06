@@ -10,6 +10,22 @@ services:
           - POST
           - OPTIONS
         strip_path: false
+      - name: models
+        paths:
+          - /v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-ai
+        paths:
+          - /ai/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
 plugins:
   - name: ai-model-selector
     config:
@@ -18,7 +34,8 @@ plugins:
         - body_path: model
           source: body
     route: openai-chat
-  - name: ai-proxy-advanced
+  - id: 94adadc1-46c4-535e-92ac-7a9598a7b2f6
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -39,9 +56,31 @@ plugins:
           route_type: llm/v1/chat
     route: openai-chat
     model: openai-gpt-5-4
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 94adadc1-46c4-535e-92ac-7a9598a7b2f6
+      route_type: llm/v1/models
+    route: models
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 94adadc1-46c4-535e-92ac-7a9598a7b2f6
+      route_type: llm/v1/models
+    route: models-ai
   - name: openid-connect
     config:
       issuer: https://dev-123456.okta.com/oauth2/default
     route: openai-chat
+  - name: openid-connect
+    config:
+      issuer: https://dev-123456.okta.com/oauth2/default
+    route: models
+  - name: openid-connect
+    config:
+      issuer: https://dev-123456.okta.com/oauth2/default
+    route: models-ai
 ai_models:
   - name: openai-gpt-5-4

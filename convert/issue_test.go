@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	publicaigw "github.com/Kong/ai-deck-converter/aigw"
+	"github.com/Kong/ai-deck-converter/internal/aimap"
 	"github.com/Kong/ai-deck-converter/internal/kong"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -126,8 +127,23 @@ agents:
 		services = append(services, svc.Name)
 	}
 	require.Equal(t, []string{"ai-gateway", "healthy-agent"}, services)
-	require.Len(t, result.Output.Services[0].Routes, 1)
-	targets := result.Output.Plugins[1].Config["targets"].([]map[string]any)
+	var gateway kong.Service
+	for _, svc := range result.Output.Services {
+		if svc.Name == aimap.GatewayServiceName {
+			gateway = svc
+		}
+	}
+	require.Len(t, modelRoutesFor(gateway), 1)
+	var proxy *kong.Plugin
+	for i := range result.Output.Plugins {
+		if result.Output.Plugins[i].Name == "ai-proxy-advanced" &&
+			result.Output.Plugins[i].Config["targets"] != nil {
+			proxy = &result.Output.Plugins[i]
+			break
+		}
+	}
+	require.NotNil(t, proxy)
+	targets := proxy.Config["targets"].([]map[string]any)
 	require.Len(t, targets, 1, "the crashing model adds no target to the shared route")
 }
 

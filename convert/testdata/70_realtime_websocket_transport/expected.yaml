@@ -10,6 +10,22 @@ services:
           - POST
           - OPTIONS
         strip_path: false
+      - name: models
+        paths:
+          - /v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-mixed
+        paths:
+          - /mixed/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
   - name: ai-gateway-websocket
     url: ws://ai-gateway.upstream.local
     routes:
@@ -35,7 +51,8 @@ plugins:
         - body_path: model
           source: body
     route: openai-chat
-  - name: ai-proxy-advanced
+  - id: 21dd5f7e-9940-5537-9812-76fb7738f1ce
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -56,7 +73,8 @@ plugins:
           route_type: llm/v1/chat
     route: openai-chat
     model: mixed-realtime
-  - name: ai-proxy-advanced
+  - id: 4f2ec823-ee35-53d4-801a-3bc8e88d65be
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -125,6 +143,34 @@ plugins:
     route: openai-realtime-2
     tags:
       - ai-gateway-realtime-model:realtime-only
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - access:
+              allow:
+                - premium-users
+            plugin_id: 21dd5f7e-9940-5537-9812-76fb7738f1ce
+          - access:
+              allow:
+                - premium-users
+            plugin_id: 4f2ec823-ee35-53d4-801a-3bc8e88d65be
+      route_type: llm/v1/models
+    route: models
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - access:
+              allow:
+                - premium-users
+            plugin_id: 21dd5f7e-9940-5537-9812-76fb7738f1ce
+          - access:
+              allow:
+                - premium-users
+            plugin_id: 4f2ec823-ee35-53d4-801a-3bc8e88d65be
+      route_type: llm/v1/models
+    route: models-mixed
   - name: http-log
     config:
       http_endpoint: https://logs.example.com/ingest
@@ -176,6 +222,14 @@ plugins:
     config:
       issuer: https://dev-123456.okta.com/oauth2/default
     route: openai-realtime
+  - name: openid-connect
+    config:
+      issuer: https://dev-123456.okta.com/oauth2/default
+    route: models
+  - name: openid-connect
+    config:
+      issuer: https://dev-123456.okta.com/oauth2/default
+    route: models-mixed
 ai_models:
   - name: mixed-realtime
     tags:

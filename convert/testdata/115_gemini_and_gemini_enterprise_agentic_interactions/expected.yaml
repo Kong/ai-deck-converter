@@ -35,6 +35,22 @@ services:
           - POST
           - OPTIONS
         strip_path: false
+      - name: models
+        paths:
+          - /v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-ai
+        paths:
+          - /ai/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
 plugins:
   - name: ai-model-selector
     config:
@@ -43,7 +59,8 @@ plugins:
         - body_path: model
           source: body
     route: gemini-responses
-  - name: ai-proxy-advanced
+  - id: d465b851-bfa5-566a-aa10-759c94f02a99
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -72,7 +89,8 @@ plugins:
         - body_path: model
           source: body
     route: gemini-beta-responses
-  - name: ai-proxy-advanced
+  - id: c24cc1d4-21d4-505c-b2a0-35daa9ffb896
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -101,7 +119,8 @@ plugins:
         - body_path: model
           source: body
     route: gemini-enterprise-responses
-  - name: ai-proxy-advanced
+  - id: 904b6ea9-410f-5714-9263-2f0c976046e8
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -134,7 +153,8 @@ plugins:
         - body_path: model
           source: body
     route: gemini-enterprise-beta-responses
-  - name: ai-proxy-advanced
+  - id: 475e44f9-aa90-59e9-b60f-b898bb27ccd2
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -160,5 +180,25 @@ plugins:
           route_type: llm/v1/responses
     route: gemini-enterprise-beta-responses
     model: gemini-agentic
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 475e44f9-aa90-59e9-b60f-b898bb27ccd2
+          - plugin_id: 904b6ea9-410f-5714-9263-2f0c976046e8
+          - plugin_id: c24cc1d4-21d4-505c-b2a0-35daa9ffb896
+          - plugin_id: d465b851-bfa5-566a-aa10-759c94f02a99
+      route_type: llm/v1/models
+    route: models
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 475e44f9-aa90-59e9-b60f-b898bb27ccd2
+          - plugin_id: 904b6ea9-410f-5714-9263-2f0c976046e8
+          - plugin_id: c24cc1d4-21d4-505c-b2a0-35daa9ffb896
+          - plugin_id: d465b851-bfa5-566a-aa10-759c94f02a99
+      route_type: llm/v1/models
+    route: models-ai
 ai_models:
   - name: gemini-agentic

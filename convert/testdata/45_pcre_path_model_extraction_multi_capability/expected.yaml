@@ -19,6 +19,30 @@ services:
           - POST
           - OPTIONS
         strip_path: false
+      - name: models
+        paths:
+          - /v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-alternative-path-openai-model
+        paths:
+          - ~/alternative/path/(?<openai_model>[^:/]+)/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-openai-openai-model
+        paths:
+          - ~/openai/(?<openai_model>[^:/]+)/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
 plugins:
   - name: ai-model-selector
     config:
@@ -31,7 +55,8 @@ plugins:
           pcre_pattern: ~/alternative/path/(?<openai_model>[^:/]+)
           source: path
     route: openai-chat
-  - name: ai-proxy-advanced
+  - id: 78fcb6e1-6d9a-5c47-8b05-bd178d922d4b
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -65,7 +90,8 @@ plugins:
           pcre_pattern: ~/alternative/path/(?<openai_model>[^:/]+)
           source: path
     route: openai-responses
-  - name: ai-proxy-advanced
+  - id: ac143bf3-cb10-58fe-89b1-90354ce8fabb
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -88,5 +114,29 @@ plugins:
           route_type: llm/v1/responses
     route: openai-responses
     model: full-model
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 78fcb6e1-6d9a-5c47-8b05-bd178d922d4b
+          - plugin_id: ac143bf3-cb10-58fe-89b1-90354ce8fabb
+      route_type: llm/v1/models
+    route: models
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 78fcb6e1-6d9a-5c47-8b05-bd178d922d4b
+          - plugin_id: ac143bf3-cb10-58fe-89b1-90354ce8fabb
+      route_type: llm/v1/models
+    route: models-alternative-path-openai-model
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 78fcb6e1-6d9a-5c47-8b05-bd178d922d4b
+          - plugin_id: ac143bf3-cb10-58fe-89b1-90354ce8fabb
+      route_type: llm/v1/models
+    route: models-openai-openai-model
 ai_models:
   - name: full-model

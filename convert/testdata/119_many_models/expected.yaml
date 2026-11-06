@@ -207,6 +207,46 @@ services:
         regex_priority: 0
         request_buffering: true
         response_buffering: true
+      - name: models
+        paths:
+          - /v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-compat
+        paths:
+          - /compat/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-health-check
+        paths:
+          - /health/check/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-model-m1
+        paths:
+          - /model/m1/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-team-b
+        paths:
+          - /team-b/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
 consumers:
   - username: anonymous
     custom_id: anonymous
@@ -224,7 +264,8 @@ plugins:
         - body_path: model
           source: body
     route: anthropic-messages
-  - name: ai-proxy-advanced
+  - id: 3b7f795e-8e99-544b-8b8e-6bda269cd8c2
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -252,7 +293,8 @@ plugins:
           weight: 100
     route: anthropic-messages
     model: model-02
-  - name: ai-proxy-advanced
+  - id: 3d919164-1463-52b6-9ec3-1f36cf94eba8
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -284,7 +326,8 @@ plugins:
           weight: 100
     route: anthropic-messages
     model: org/model-04
-  - name: ai-proxy-advanced
+  - id: 41e1a82a-4b87-5a8d-a847-2d11973e064b
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -321,7 +364,8 @@ plugins:
           weight: 100
     route: anthropic-messages
     model: model-11
-  - name: ai-proxy-advanced
+  - id: fc359975-7de4-5755-85ed-9b592d101629
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -353,7 +397,8 @@ plugins:
           weight: 100
     route: anthropic-messages
     model: org/model-17
-  - name: ai-proxy-advanced
+  - id: 86589ecf-7e92-52ff-a7fd-fb0eb7144349
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -385,7 +430,8 @@ plugins:
           weight: 100
     route: anthropic-messages
     model: org/model-08
-  - name: ai-proxy-advanced
+  - id: 0077a40b-54dd-578c-a2d9-1583acd0895b
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -420,7 +466,8 @@ plugins:
           weight: 100
     route: anthropic-messages
     model: model-28
-  - name: ai-proxy-advanced
+  - id: 2530727a-c0d2-54a9-bc09-6604553e01a2
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -457,7 +504,8 @@ plugins:
           weight: 100
     route: anthropic-messages
     model: model-29
-  - name: ai-proxy-advanced
+  - id: 4fb33079-e807-5736-98b3-4a18a5cdda20
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -493,7 +541,8 @@ plugins:
           weight: 100
     route: anthropic-messages
     model: model-31
-  - name: ai-proxy-advanced
+  - id: cf6f851e-daf6-52dd-acf9-5d329ea5db7c
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -530,7 +579,8 @@ plugins:
           weight: 100
     route: anthropic-messages
     model: model-33
-  - name: ai-proxy-advanced
+  - id: a628879c-048b-5d3a-a7a6-31c0c04a818e
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -562,7 +612,8 @@ plugins:
           weight: 100
     route: anthropic-messages
     model: org/model-35
-  - name: ai-proxy-advanced
+  - id: 83342b28-d945-5a41-82c1-138540e659a8
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -594,7 +645,8 @@ plugins:
           weight: 100
     route: anthropic-messages
     model: org/model-48
-  - name: ai-proxy-advanced
+  - id: 245c1004-aa89-587b-a274-be4f7f5b42d2
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -626,7 +678,8 @@ plugins:
           weight: 100
     route: anthropic-messages
     model: org/model-23
-  - name: ai-proxy-advanced
+  - id: 264eb36e-a681-519f-88af-9401624dd916
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -663,7 +716,8 @@ plugins:
           weight: 100
     route: anthropic-messages
     model: model-43
-  - name: ai-proxy-advanced
+  - id: 90a2d145-6dc9-569c-a6cb-4ef260dae62f
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -695,7 +749,8 @@ plugins:
           weight: 100
     route: anthropic-messages
     model: org/model-19
-  - name: ai-proxy-advanced
+  - id: a48105a2-7f14-5ce9-843d-c48a9ed1942b
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -727,7 +782,8 @@ plugins:
           weight: 100
     route: anthropic-messages
     model: org/model-58
-  - name: ai-proxy-advanced
+  - id: 769724ec-99be-5372-8e5b-cd6a5863debd
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -764,7 +820,8 @@ plugins:
           weight: 100
     route: anthropic-messages
     model: model-64
-  - name: ai-proxy-advanced
+  - id: 9a2f5195-ee6e-5535-9479-3dc0648dfa5e
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -796,7 +853,8 @@ plugins:
           weight: 100
     route: anthropic-messages
     model: org/model-60
-  - name: ai-proxy-advanced
+  - id: bb959941-e6a8-5950-90c5-b1ac71f7a496
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -827,7 +885,8 @@ plugins:
           weight: 100
     route: anthropic-messages
     model: org/model-71
-  - name: ai-proxy-advanced
+  - id: 2aa83abd-8646-59ad-9c50-2388bc0e03aa
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -866,7 +925,8 @@ plugins:
         - body_path: model
           source: body
     route: anthropic-messages-2
-  - name: ai-proxy-advanced
+  - id: 585567e8-b83b-5862-96be-49255074cf75
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -898,7 +958,8 @@ plugins:
           weight: 100
     route: anthropic-messages-2
     model: org/model-06
-  - name: ai-proxy-advanced
+  - id: 42ac4774-4a4f-5be9-9a97-319cb4875786
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -930,7 +991,8 @@ plugins:
           weight: 100
     route: anthropic-messages-2
     model: org/model-08
-  - name: ai-proxy-advanced
+  - id: 3bf440f0-c790-59e7-b944-4423a58bbde3
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -967,7 +1029,8 @@ plugins:
           weight: 100
     route: anthropic-messages-2
     model: model-02
-  - name: ai-proxy-advanced
+  - id: 07a55e2d-6abe-581b-b092-b61cb7584ba6
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -999,7 +1062,8 @@ plugins:
           weight: 100
     route: anthropic-messages-2
     model: org/model-19
-  - name: ai-proxy-advanced
+  - id: 8698360b-3c8c-562c-9360-f4274905fed4
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -1034,7 +1098,8 @@ plugins:
           weight: 100
     route: anthropic-messages-2
     model: model-28
-  - name: ai-proxy-advanced
+  - id: 9308b56c-d876-536f-be66-d4890148633e
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -1066,7 +1131,8 @@ plugins:
           weight: 100
     route: anthropic-messages-2
     model: org/model-04
-  - name: ai-proxy-advanced
+  - id: f175329d-b992-5042-8e0c-f2de0ad98813
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -1103,7 +1169,8 @@ plugins:
           weight: 100
     route: anthropic-messages-2
     model: model-43
-  - name: ai-proxy-advanced
+  - id: f89a38e7-2a86-5315-b32b-7cf107fcb8ae
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -1140,7 +1207,8 @@ plugins:
           weight: 100
     route: anthropic-messages-2
     model: model-33
-  - name: ai-proxy-advanced
+  - id: ca7023a0-7606-5647-b3e7-cad6f418d10d
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -1172,7 +1240,8 @@ plugins:
           weight: 100
     route: anthropic-messages-2
     model: org/model-48
-  - name: ai-proxy-advanced
+  - id: a91f3459-976a-5ce2-a387-371999d62d9d
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -1209,7 +1278,8 @@ plugins:
           weight: 100
     route: anthropic-messages-2
     model: model-11
-  - name: ai-proxy-advanced
+  - id: 3bedc4d6-8ca2-5072-8dc1-3ca30a22c87d
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -1241,7 +1311,8 @@ plugins:
           weight: 100
     route: anthropic-messages-2
     model: org/model-60
-  - name: ai-proxy-advanced
+  - id: 8cba61cd-df5e-5b41-b13f-4959a776e74c
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -1273,7 +1344,8 @@ plugins:
           weight: 100
     route: anthropic-messages-2
     model: org/model-23
-  - name: ai-proxy-advanced
+  - id: 9d7dc61b-01bd-592c-910f-762649a518a4
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -1305,7 +1377,8 @@ plugins:
           weight: 100
     route: anthropic-messages-2
     model: org/model-17
-  - name: ai-proxy-advanced
+  - id: 8ab1b35d-47e3-5872-81d4-f9df51670913
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -1342,7 +1415,8 @@ plugins:
           weight: 100
     route: anthropic-messages-2
     model: model-64
-  - name: ai-proxy-advanced
+  - id: 5b17a25b-399b-56e6-8518-235323bb737c
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -1381,7 +1455,8 @@ plugins:
         - body_path: model
           source: body
     route: openai-chat
-  - name: ai-proxy-advanced
+  - id: 1a42b231-f3b5-5f18-8393-3dc141b7a806
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -1414,7 +1489,8 @@ plugins:
         - body_path: model
           source: body
     route: openai-responses
-  - name: ai-proxy-advanced
+  - id: 96b72fc6-e019-5b17-8fef-21422c23867f
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -1454,7 +1530,8 @@ plugins:
         access:
           - openid-connect
     route: anthropic-messages-3
-  - name: ai-proxy-advanced
+  - id: cf492e10-72d9-55ea-8407-52b05cfabfe9
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -1486,7 +1563,8 @@ plugins:
           weight: 100
     route: anthropic-messages-3
     model: org/model-04
-  - name: ai-proxy-advanced
+  - id: f742b6f6-935d-5139-87fc-5fc7e781d8fb
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -1518,7 +1596,8 @@ plugins:
           weight: 100
     route: anthropic-messages-3
     model: org/model-06
-  - name: ai-proxy-advanced
+  - id: 49b2c353-8d6f-5378-9fb0-a77d32dfa82f
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -1550,7 +1629,8 @@ plugins:
           weight: 100
     route: anthropic-messages-3
     model: org/model-35
-  - name: ai-proxy-advanced
+  - id: c2d6a919-b975-58bf-b586-744ff37d69b5
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -1589,7 +1669,8 @@ plugins:
         - body_path: model
           source: body
     route: typesafe-decisions
-  - name: ai-proxy-advanced
+  - id: 962f9e0c-f4f4-5126-aba1-6985adfc4eaf
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -1627,7 +1708,8 @@ plugins:
           weight: 100
     route: typesafe-decisions
     model: org/model-21
-  - name: ai-proxy-advanced
+  - id: d571e846-345f-5a65-aa20-e3ab317deff6
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -1666,7 +1748,8 @@ plugins:
           weight: 100
     route: typesafe-decisions
     model: model-26
-  - name: ai-proxy-advanced
+  - id: a87b4a26-da17-5330-8af6-b3fed26a5bc5
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -1711,7 +1794,8 @@ plugins:
         - body_path: model
           source: body
     route: anthropic-messages-4
-  - name: ai-proxy-advanced
+  - id: 19922992-7e59-52df-b4e3-8291c3836897
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -1742,7 +1826,8 @@ plugins:
           weight: 100
     route: anthropic-messages-4
     model: org/model-23
-  - name: ai-proxy-advanced
+  - id: ee049586-adfb-553c-99d2-5dcbc679de67
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -1773,7 +1858,8 @@ plugins:
           weight: 100
     route: anthropic-messages-4
     model: org/model-35
-  - name: ai-proxy-advanced
+  - id: 01e0e17b-599c-5c44-805a-a28a60152f35
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -1804,7 +1890,8 @@ plugins:
           weight: 100
     route: anthropic-messages-4
     model: org/model-04
-  - name: ai-proxy-advanced
+  - id: a039f9ee-1804-5cd8-8a1a-a6c59ea6f2df
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -1835,7 +1922,8 @@ plugins:
           weight: 100
     route: anthropic-messages-4
     model: org/model-08
-  - name: ai-proxy-advanced
+  - id: 9aca0a5a-ab0d-55de-acd4-4a5ca5fc2d14
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -1866,7 +1954,8 @@ plugins:
           weight: 100
     route: anthropic-messages-4
     model: org/model-06
-  - name: ai-proxy-advanced
+  - id: 812c33e3-5546-542a-9fc4-5a2c8706f4e7
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -1897,7 +1986,8 @@ plugins:
           weight: 100
     route: anthropic-messages-4
     model: org/model-17
-  - name: ai-proxy-advanced
+  - id: 08f61c83-d30e-51f2-a75c-c348834c07ea
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -1935,7 +2025,8 @@ plugins:
         - body_path: model
           source: body
     route: anthropic-messages-5
-  - name: ai-proxy-advanced
+  - id: 20a580a3-d1d9-56c7-8389-8d535bad7231
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -1980,7 +2071,8 @@ plugins:
         - body_path: model
           source: body
     route: typesafe-decisions-2
-  - name: ai-proxy-advanced
+  - id: 409a5d90-a3a2-5823-b541-a07baaa9a72a
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -2025,7 +2117,8 @@ plugins:
         - body_path: model
           source: body
     route: openai-chat-2
-  - name: ai-proxy-advanced
+  - id: 81431a19-a832-5113-8553-e8fbbca58934
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -2071,7 +2164,8 @@ plugins:
         - body_path: model
           source: body
     route: openai-responses-2
-  - name: ai-proxy-advanced
+  - id: 663bf383-6578-5789-b03e-6311c8f6ed13
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -2110,7 +2204,8 @@ plugins:
           weight: 100
     route: openai-responses-2
     model: model-31
-  - name: ai-proxy-advanced
+  - id: 564ed1fc-bc43-5946-80bf-d97a5e3ce8e4
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -2134,7 +2229,8 @@ plugins:
           route_type: llm/v1/batches
           weight: 100
     route: openai-batches
-  - name: ai-proxy-advanced
+  - id: df40b11b-42c8-5f08-9947-3fce380060c3
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -2158,6 +2254,108 @@ plugins:
           route_type: llm/v1/files
           weight: 100
     route: openai-files
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 0077a40b-54dd-578c-a2d9-1583acd0895b
+          - plugin_id: 01e0e17b-599c-5c44-805a-a28a60152f35
+          - plugin_id: 07a55e2d-6abe-581b-b092-b61cb7584ba6
+          - plugin_id: 08f61c83-d30e-51f2-a75c-c348834c07ea
+          - plugin_id: 19922992-7e59-52df-b4e3-8291c3836897
+          - plugin_id: 1a42b231-f3b5-5f18-8393-3dc141b7a806
+          - plugin_id: 20a580a3-d1d9-56c7-8389-8d535bad7231
+          - plugin_id: 245c1004-aa89-587b-a274-be4f7f5b42d2
+          - plugin_id: 2530727a-c0d2-54a9-bc09-6604553e01a2
+          - plugin_id: 264eb36e-a681-519f-88af-9401624dd916
+          - plugin_id: 2aa83abd-8646-59ad-9c50-2388bc0e03aa
+          - plugin_id: 3b7f795e-8e99-544b-8b8e-6bda269cd8c2
+          - plugin_id: 3bedc4d6-8ca2-5072-8dc1-3ca30a22c87d
+          - plugin_id: 3bf440f0-c790-59e7-b944-4423a58bbde3
+          - plugin_id: 3d919164-1463-52b6-9ec3-1f36cf94eba8
+          - plugin_id: 409a5d90-a3a2-5823-b541-a07baaa9a72a
+          - plugin_id: 41e1a82a-4b87-5a8d-a847-2d11973e064b
+          - plugin_id: 42ac4774-4a4f-5be9-9a97-319cb4875786
+          - plugin_id: 49b2c353-8d6f-5378-9fb0-a77d32dfa82f
+          - plugin_id: 4fb33079-e807-5736-98b3-4a18a5cdda20
+          - plugin_id: 564ed1fc-bc43-5946-80bf-d97a5e3ce8e4
+          - plugin_id: 585567e8-b83b-5862-96be-49255074cf75
+          - plugin_id: 5b17a25b-399b-56e6-8518-235323bb737c
+          - plugin_id: 663bf383-6578-5789-b03e-6311c8f6ed13
+          - plugin_id: 769724ec-99be-5372-8e5b-cd6a5863debd
+          - plugin_id: 812c33e3-5546-542a-9fc4-5a2c8706f4e7
+          - plugin_id: 81431a19-a832-5113-8553-e8fbbca58934
+          - plugin_id: 83342b28-d945-5a41-82c1-138540e659a8
+          - plugin_id: 86589ecf-7e92-52ff-a7fd-fb0eb7144349
+          - plugin_id: 8698360b-3c8c-562c-9360-f4274905fed4
+          - plugin_id: 8ab1b35d-47e3-5872-81d4-f9df51670913
+          - plugin_id: 8cba61cd-df5e-5b41-b13f-4959a776e74c
+          - plugin_id: 90a2d145-6dc9-569c-a6cb-4ef260dae62f
+          - plugin_id: 9308b56c-d876-536f-be66-d4890148633e
+          - plugin_id: 962f9e0c-f4f4-5126-aba1-6985adfc4eaf
+          - plugin_id: 96b72fc6-e019-5b17-8fef-21422c23867f
+          - plugin_id: 9a2f5195-ee6e-5535-9479-3dc0648dfa5e
+          - plugin_id: 9aca0a5a-ab0d-55de-acd4-4a5ca5fc2d14
+          - plugin_id: 9d7dc61b-01bd-592c-910f-762649a518a4
+          - plugin_id: a039f9ee-1804-5cd8-8a1a-a6c59ea6f2df
+          - plugin_id: a48105a2-7f14-5ce9-843d-c48a9ed1942b
+          - plugin_id: a628879c-048b-5d3a-a7a6-31c0c04a818e
+          - plugin_id: a87b4a26-da17-5330-8af6-b3fed26a5bc5
+          - plugin_id: a91f3459-976a-5ce2-a387-371999d62d9d
+          - plugin_id: bb959941-e6a8-5950-90c5-b1ac71f7a496
+          - plugin_id: c2d6a919-b975-58bf-b586-744ff37d69b5
+          - plugin_id: ca7023a0-7606-5647-b3e7-cad6f418d10d
+          - plugin_id: cf492e10-72d9-55ea-8407-52b05cfabfe9
+          - plugin_id: cf6f851e-daf6-52dd-acf9-5d329ea5db7c
+          - plugin_id: d571e846-345f-5a65-aa20-e3ab317deff6
+          - plugin_id: df40b11b-42c8-5f08-9947-3fce380060c3
+          - plugin_id: ee049586-adfb-553c-99d2-5dcbc679de67
+          - plugin_id: f175329d-b992-5042-8e0c-f2de0ad98813
+          - plugin_id: f742b6f6-935d-5139-87fc-5fc7e781d8fb
+          - plugin_id: f89a38e7-2a86-5315-b32b-7cf107fcb8ae
+          - plugin_id: fc359975-7de4-5755-85ed-9b592d101629
+      route_type: llm/v1/models
+    route: models
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 01e0e17b-599c-5c44-805a-a28a60152f35
+          - plugin_id: 08f61c83-d30e-51f2-a75c-c348834c07ea
+          - plugin_id: 19922992-7e59-52df-b4e3-8291c3836897
+          - plugin_id: 663bf383-6578-5789-b03e-6311c8f6ed13
+          - plugin_id: 812c33e3-5546-542a-9fc4-5a2c8706f4e7
+          - plugin_id: 81431a19-a832-5113-8553-e8fbbca58934
+          - plugin_id: 9aca0a5a-ab0d-55de-acd4-4a5ca5fc2d14
+          - plugin_id: a039f9ee-1804-5cd8-8a1a-a6c59ea6f2df
+          - plugin_id: ee049586-adfb-553c-99d2-5dcbc679de67
+      route_type: llm/v1/models
+    route: models-compat
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 564ed1fc-bc43-5946-80bf-d97a5e3ce8e4
+          - plugin_id: df40b11b-42c8-5f08-9947-3fce380060c3
+      route_type: llm/v1/models
+    route: models-health-check
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 20a580a3-d1d9-56c7-8389-8d535bad7231
+      route_type: llm/v1/models
+    route: models-model-m1
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 49b2c353-8d6f-5378-9fb0-a77d32dfa82f
+          - plugin_id: c2d6a919-b975-58bf-b586-744ff37d69b5
+          - plugin_id: cf492e10-72d9-55ea-8407-52b05cfabfe9
+          - plugin_id: f742b6f6-935d-5139-87fc-5fc7e781d8fb
+      route_type: llm/v1/models
+    route: models-team-b
   - name: key-auth
     config:
       anonymous: anonymous
@@ -2281,6 +2479,37 @@ plugins:
       message: ok
       status_code: 200
     route: openai-files
+  - name: key-auth
+    config:
+      anonymous: anonymous
+      key_names:
+        - x-api-key
+    route: models
+  - name: openid-connect
+    config:
+      anonymous: anonymous
+      issuer: https://sso.example.com/oauth2/default
+    route: models
+  - name: openid-connect
+    config:
+      anonymous: anonymous
+      issuer: https://ci.example.com
+    route: models
+  - name: key-auth
+    config:
+      anonymous: anonymous
+      key_names:
+        - x-api-key
+    route: models-compat
+  - name: openid-connect
+    config:
+      anonymous: anonymous
+      issuer: https://sso.example.com/oauth2/default
+    route: models-compat
+  - name: openid-connect
+    config:
+      issuer: https://sso.example.com/oauth2/default
+    route: models-team-b
 ai_models:
   - name: model-02
   - name: org/model-04

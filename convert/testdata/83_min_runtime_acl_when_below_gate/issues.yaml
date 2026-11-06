@@ -7,6 +7,12 @@
       - access.acls.allow_when
   severity: ERROR
 - code: UNSUPPORTED_IN_MIN_RUNTIME_VERSION
+  reason: a model list route requires minimum runtime version "2.3", but the configured minimum is "2.1"
+  source:
+    kind: option
+    name: min_runtime_version
+  severity: WARNING
+- code: UNSUPPORTED_IN_MIN_RUNTIME_VERSION
   reason: access.acls.deny_when requires minimum runtime version "2.2", but the configured minimum is "2.1"
   source:
     kind: agent

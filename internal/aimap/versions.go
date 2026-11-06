@@ -89,6 +89,7 @@ const (
 	FeatureSagemaker                  Feature = "sagemaker"
 	FeatureAuthStrategyTokenVault     Feature = "auth-strategy-token-vault"
 	FeatureMCPIdentityAuth            Feature = "mcp-identity-auth"
+	FeatureModelDirectory             Feature = "model-directory"
 )
 
 // featureSince maps each feature to its first AI Gateway release. The source
@@ -116,6 +117,7 @@ var featureSince = map[Feature]Version{
 	FeatureSagemaker:                  mustVersion("2.1"),
 	FeatureAuthStrategyTokenVault:     mustVersion("2.3"),
 	FeatureMCPIdentityAuth:            mustVersion("2.3"),
+	FeatureModelDirectory:             mustVersion("2.3"),
 }
 
 // Since returns the first AI Gateway release that has f. It panics for an

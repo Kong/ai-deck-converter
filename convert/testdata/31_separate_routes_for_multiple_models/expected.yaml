@@ -17,6 +17,30 @@ services:
           - POST
           - OPTIONS
         strip_path: false
+      - name: models
+        paths:
+          - /v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-transcribev0
+        paths:
+          - /transcribev0/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-transcribev1
+        paths:
+          - /transcribev1/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
 plugins:
   - name: ai-model-selector
     config:
@@ -25,7 +49,8 @@ plugins:
         - body_path: model
           source: body
     route: openai-audio-transcribe
-  - name: ai-proxy-advanced
+  - id: c8fea922-b5bd-5506-8c5d-c69fff7ceb71
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -57,7 +82,8 @@ plugins:
         - body_path: model
           source: body
     route: openai-audio-transcribe-2
-  - name: ai-proxy-advanced
+  - id: 8021ce1b-361f-5ffe-b93b-96ebc85efd9e
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -82,6 +108,28 @@ plugins:
           route_type: audio/v1/audio/transcriptions
     route: openai-audio-transcribe-2
     model: gpt-5-2.1
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 8021ce1b-361f-5ffe-b93b-96ebc85efd9e
+          - plugin_id: c8fea922-b5bd-5506-8c5d-c69fff7ceb71
+      route_type: llm/v1/models
+    route: models
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: c8fea922-b5bd-5506-8c5d-c69fff7ceb71
+      route_type: llm/v1/models
+    route: models-transcribev0
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 8021ce1b-361f-5ffe-b93b-96ebc85efd9e
+      route_type: llm/v1/models
+    route: models-transcribev1
 ai_models:
   - name: gpt-5-2
   - name: gpt-5-2.1

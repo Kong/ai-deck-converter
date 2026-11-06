@@ -10,6 +10,22 @@ services:
           - POST
           - OPTIONS
         strip_path: false
+      - name: models
+        paths:
+          - /v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-ai
+        paths:
+          - /ai/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
       - name: openai-videos-lifecycle
         paths:
           - /ai/videos
@@ -27,7 +43,8 @@ plugins:
         - body_path: model
           source: body
     route: openai-videos
-  - name: ai-proxy-advanced
+  - id: c6cf42eb-cc1d-5cf2-bada-61a03ec7c0ac
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -48,6 +65,20 @@ plugins:
           route_type: video/v1/videos/generations
     route: openai-videos
     model: sora
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: c6cf42eb-cc1d-5cf2-bada-61a03ec7c0ac
+      route_type: llm/v1/models
+    route: models
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: c6cf42eb-cc1d-5cf2-bada-61a03ec7c0ac
+      route_type: llm/v1/models
+    route: models-ai
   - name: ai-proxy-advanced
     config:
       balancer:

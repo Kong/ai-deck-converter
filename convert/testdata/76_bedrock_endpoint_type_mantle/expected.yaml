@@ -11,6 +11,22 @@ services:
           - POST
           - OPTIONS
         strip_path: false
+      - name: models
+        paths:
+          - /v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-ai
+        paths:
+          - /ai/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
 plugins:
   - name: ai-model-selector
     config:
@@ -19,7 +35,8 @@ plugins:
         - body_path: model
           source: body
     route: openai-chat
-  - name: ai-proxy-advanced
+  - id: 3dfecf94-ec2a-5a37-aaf0-29dbae6f8667
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -47,5 +64,19 @@ plugins:
           route_type: llm/v1/chat
     route: openai-chat
     model: claude-bedrock
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 3dfecf94-ec2a-5a37-aaf0-29dbae6f8667
+      route_type: llm/v1/models
+    route: models
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 3dfecf94-ec2a-5a37-aaf0-29dbae6f8667
+      route_type: llm/v1/models
+    route: models-ai
 ai_models:
   - name: claude-bedrock

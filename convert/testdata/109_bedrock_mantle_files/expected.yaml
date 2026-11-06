@@ -13,8 +13,25 @@ services:
           - DELETE
           - OPTIONS
         strip_path: false
+      - name: models
+        paths:
+          - /v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-mantle-files
+        paths:
+          - /mantle-files/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
 plugins:
-  - name: ai-proxy-advanced
+  - id: ad258040-0677-5c8c-892f-4c69acca6305
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -39,5 +56,19 @@ plugins:
             provider: bedrock
           route_type: llm/v1/files
     route: openai-files
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: ad258040-0677-5c8c-892f-4c69acca6305
+      route_type: llm/v1/models
+    route: models
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: ad258040-0677-5c8c-892f-4c69acca6305
+      route_type: llm/v1/models
+    route: models-mantle-files
 ai_models:
   - name: mantle-files

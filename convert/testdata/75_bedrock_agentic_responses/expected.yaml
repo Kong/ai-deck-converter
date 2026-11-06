@@ -20,6 +20,22 @@ services:
           - DELETE
           - OPTIONS
         strip_path: false
+      - name: models
+        paths:
+          - /v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-ai
+        paths:
+          - /ai/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
 plugins:
   - name: ai-model-selector
     config:
@@ -28,7 +44,8 @@ plugins:
         - path_pattern: model/([^/]+)/
           source: path
     route: bedrock-retrieve
-  - name: ai-proxy-advanced
+  - id: 688531fe-5c0e-5b07-bb08-9758195292e7
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -61,7 +78,8 @@ plugins:
         - body_path: model
           source: body
     route: bedrock-responses
-  - name: ai-proxy-advanced
+  - id: 4cd36941-33fb-5aac-9d49-1966dde6ea9e
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -87,5 +105,21 @@ plugins:
           route_type: llm/v1/responses
     route: bedrock-responses
     model: claude-bedrock
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 4cd36941-33fb-5aac-9d49-1966dde6ea9e
+          - plugin_id: 688531fe-5c0e-5b07-bb08-9758195292e7
+      route_type: llm/v1/models
+    route: models
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 4cd36941-33fb-5aac-9d49-1966dde6ea9e
+          - plugin_id: 688531fe-5c0e-5b07-bb08-9758195292e7
+      route_type: llm/v1/models
+    route: models-ai
 ai_models:
   - name: claude-bedrock

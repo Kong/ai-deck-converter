@@ -33,6 +33,22 @@ services:
           - POST
           - OPTIONS
         strip_path: false
+      - name: models
+        paths:
+          - /v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-ai
+        paths:
+          - /ai/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
 plugins:
   - name: ai-model-selector
     config:
@@ -41,7 +57,8 @@ plugins:
         - path_pattern: model/([^/]+)/
           source: path
     route: bedrock-converse
-  - name: ai-proxy-advanced
+  - id: e9247dff-033e-5c66-96ff-83585d3ece96
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -74,7 +91,8 @@ plugins:
         - path_pattern: model/([^/]+)/
           source: path
     route: bedrock-invoke
-  - name: ai-proxy-advanced
+  - id: 30dd3b75-d847-54d5-9115-b448a763b381
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -107,7 +125,8 @@ plugins:
         - body_path: model
           source: body
     route: bedrock-chat
-  - name: ai-proxy-advanced
+  - id: 711ed38a-681a-5e99-bdb2-f00c0bd67758
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -140,7 +159,8 @@ plugins:
         - body_path: model
           source: body
     route: bedrock-messages
-  - name: ai-proxy-advanced
+  - id: a8cd1a6c-6905-5b42-9de9-c01d6bea8c9c
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -166,5 +186,25 @@ plugins:
           route_type: llm/v1/chat
     route: bedrock-messages
     model: claude-bedrock
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 30dd3b75-d847-54d5-9115-b448a763b381
+          - plugin_id: 711ed38a-681a-5e99-bdb2-f00c0bd67758
+          - plugin_id: a8cd1a6c-6905-5b42-9de9-c01d6bea8c9c
+          - plugin_id: e9247dff-033e-5c66-96ff-83585d3ece96
+      route_type: llm/v1/models
+    route: models
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 30dd3b75-d847-54d5-9115-b448a763b381
+          - plugin_id: 711ed38a-681a-5e99-bdb2-f00c0bd67758
+          - plugin_id: a8cd1a6c-6905-5b42-9de9-c01d6bea8c9c
+          - plugin_id: e9247dff-033e-5c66-96ff-83585d3ece96
+      route_type: llm/v1/models
+    route: models-ai
 ai_models:
   - name: claude-bedrock

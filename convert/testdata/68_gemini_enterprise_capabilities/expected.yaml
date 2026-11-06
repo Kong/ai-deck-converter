@@ -51,6 +51,30 @@ services:
           - POST
           - OPTIONS
         strip_path: false
+      - name: models
+        paths:
+          - /v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-img
+        paths:
+          - /img/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-mix
+        paths:
+          - /mix/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
 plugins:
   - name: ai-model-selector
     config:
@@ -59,7 +83,8 @@ plugins:
         - path_pattern: 'models/([%w%.%-]+):'
           source: path
     route: gemini-predict
-  - name: ai-proxy-advanced
+  - id: 269ee252-1236-504b-9e79-af134227282a
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -87,7 +112,8 @@ plugins:
         - path_pattern: 'models/([%w%.%-]+):'
           source: path
     route: gemini-predict-long-running
-  - name: ai-proxy-advanced
+  - id: fba051a4-af85-5079-9c17-c0b53849cc0e
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -115,7 +141,8 @@ plugins:
         - path_pattern: 'models/([%w%.%-]+):'
           source: path
     route: gemini-generate
-  - name: ai-proxy-advanced
+  - id: 267959a1-72cb-514f-90a8-ee9f4a2b748e
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -143,7 +170,8 @@ plugins:
         - path_pattern: 'models/([%w%.%-]+):'
           source: path
     route: gemini-enterprise-generate
-  - name: ai-proxy-advanced
+  - id: de3bc8c8-4bf4-50ab-94e8-0ade1c8167ee
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -171,7 +199,8 @@ plugins:
         - path_pattern: 'models/([%w%.%-]+):'
           source: path
     route: gemini-predict-2
-  - name: ai-proxy-advanced
+  - id: ee98c63a-c7ab-5f0e-ab9e-8b455e460321
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -192,7 +221,8 @@ plugins:
           route_type: image/v1/images/generations
     route: gemini-predict-2
     model: mixed
-  - name: ai-proxy-advanced
+  - id: 9a15238f-9ff3-51d4-9aee-b5f949be1e66
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -213,6 +243,36 @@ plugins:
           route_type: llm/v1/chat
     route: gemini-ranking
     model: mixed
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 267959a1-72cb-514f-90a8-ee9f4a2b748e
+          - plugin_id: 269ee252-1236-504b-9e79-af134227282a
+          - plugin_id: 9a15238f-9ff3-51d4-9aee-b5f949be1e66
+          - plugin_id: de3bc8c8-4bf4-50ab-94e8-0ade1c8167ee
+          - plugin_id: ee98c63a-c7ab-5f0e-ab9e-8b455e460321
+          - plugin_id: fba051a4-af85-5079-9c17-c0b53849cc0e
+      route_type: llm/v1/models
+    route: models
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 269ee252-1236-504b-9e79-af134227282a
+          - plugin_id: fba051a4-af85-5079-9c17-c0b53849cc0e
+      route_type: llm/v1/models
+    route: models-img
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 267959a1-72cb-514f-90a8-ee9f4a2b748e
+          - plugin_id: 9a15238f-9ff3-51d4-9aee-b5f949be1e66
+          - plugin_id: de3bc8c8-4bf4-50ab-94e8-0ade1c8167ee
+          - plugin_id: ee98c63a-c7ab-5f0e-ab9e-8b455e460321
+      route_type: llm/v1/models
+    route: models-mix
 ai_models:
   - name: imagen
   - name: mixed

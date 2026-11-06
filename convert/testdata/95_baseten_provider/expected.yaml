@@ -10,6 +10,22 @@ services:
           - POST
           - OPTIONS
         strip_path: false
+      - name: models
+        paths:
+          - /v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-baseten
+        paths:
+          - /baseten/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
 plugins:
   - name: ai-model-selector
     config:
@@ -18,7 +34,8 @@ plugins:
         - body_path: model
           source: body
     route: openai-chat
-  - name: ai-proxy-advanced
+  - id: 981b264a-1e5a-55bc-93c8-00cad8b04030
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -53,5 +70,19 @@ plugins:
           route_type: llm/v1/chat
     route: openai-chat
     model: baseten-chat
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 981b264a-1e5a-55bc-93c8-00cad8b04030
+      route_type: llm/v1/models
+    route: models
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 981b264a-1e5a-55bc-93c8-00cad8b04030
+      route_type: llm/v1/models
+    route: models-baseten
 ai_models:
   - name: baseten-chat

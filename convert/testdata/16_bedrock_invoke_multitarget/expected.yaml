@@ -11,6 +11,22 @@ services:
           - POST
           - OPTIONS
         strip_path: false
+      - name: models
+        paths:
+          - /v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-ai
+        paths:
+          - /ai/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
 plugins:
   - name: ai-model-selector
     config:
@@ -19,7 +35,8 @@ plugins:
         - path_pattern: model/([^/]+)/
           source: path
     route: bedrock-invoke
-  - name: ai-proxy-advanced
+  - id: cd6c9f1e-debd-51d7-b84d-f1c22ccd644b
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -44,7 +61,8 @@ plugins:
           route_type: llm/v1/embeddings
     route: bedrock-invoke
     model: titan-embed-text-v2
-  - name: ai-proxy-advanced
+  - id: 124d6707-f48b-539c-a11b-05c0dc202012
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -68,7 +86,8 @@ plugins:
           route_type: image/v1/images/generations
     route: bedrock-invoke
     model: nova-canvas-image
-  - name: ai-proxy-advanced
+  - id: 3cda2386-178b-53ad-a7c2-a3545f0c5533
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -92,7 +111,8 @@ plugins:
           route_type: llm/v1/chat
     route: bedrock-invoke
     model: nova-sonic-audio
-  - name: ai-proxy-advanced
+  - id: f263b353-1807-551f-be31-0050b57e7011
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -117,6 +137,26 @@ plugins:
           route_type: video/v1/videos/generations
     route: bedrock-invoke
     model: nova-reel-video
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 124d6707-f48b-539c-a11b-05c0dc202012
+          - plugin_id: 3cda2386-178b-53ad-a7c2-a3545f0c5533
+          - plugin_id: cd6c9f1e-debd-51d7-b84d-f1c22ccd644b
+          - plugin_id: f263b353-1807-551f-be31-0050b57e7011
+      route_type: llm/v1/models
+    route: models
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: 124d6707-f48b-539c-a11b-05c0dc202012
+          - plugin_id: 3cda2386-178b-53ad-a7c2-a3545f0c5533
+          - plugin_id: cd6c9f1e-debd-51d7-b84d-f1c22ccd644b
+          - plugin_id: f263b353-1807-551f-be31-0050b57e7011
+      route_type: llm/v1/models
+    route: models-ai
 ai_models:
   - name: titan-embed-text-v2
   - name: nova-canvas-image

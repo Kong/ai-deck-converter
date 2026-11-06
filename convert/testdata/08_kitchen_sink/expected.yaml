@@ -10,6 +10,22 @@ services:
           - POST
           - OPTIONS
         strip_path: false
+      - name: models
+        paths:
+          - /v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-ai
+        paths:
+          - /ai/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
   - name: tools-mcp
     url: https://tools.internal/mcp
     routes:
@@ -55,7 +71,8 @@ plugins:
         - body_path: model
           source: body
     route: openai-chat
-  - name: ai-proxy-advanced
+  - id: b652ccfb-f5fd-5dc1-81bd-01018d2e0958
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: lowest-latency
@@ -109,6 +126,26 @@ plugins:
           weight: 10
     route: openai-chat
     model: prod-chat
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - access:
+              allow:
+                - premium
+            plugin_id: b652ccfb-f5fd-5dc1-81bd-01018d2e0958
+      route_type: llm/v1/models
+    route: models
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - access:
+              allow:
+                - premium
+            plugin_id: b652ccfb-f5fd-5dc1-81bd-01018d2e0958
+      route_type: llm/v1/models
+    route: models-ai
   - name: ai-prompt-guard
     config:
       allow_patterns:

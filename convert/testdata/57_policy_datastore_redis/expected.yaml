@@ -10,6 +10,22 @@ services:
           - POST
           - OPTIONS
         strip_path: false
+      - name: models
+        paths:
+          - /v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
+      - name: models-redis-datastore
+        paths:
+          - /redis-datastore/v1/models
+        methods:
+          - GET
+        protocols:
+          - http
+          - https
 plugins:
   - name: ai-model-selector
     config:
@@ -18,7 +34,8 @@ plugins:
         - body_path: model
           source: body
     route: openai-chat
-  - name: ai-proxy-advanced
+  - id: aa91ac6b-9364-58a2-8ee4-58faf847c116
+    name: ai-proxy-advanced
     config:
       balancer:
         algorithm: round-robin
@@ -39,6 +56,20 @@ plugins:
           route_type: llm/v1/chat
     route: openai-chat
     model: redis-datastore-model
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: aa91ac6b-9364-58a2-8ee4-58faf847c116
+      route_type: llm/v1/models
+    route: models
+  - name: ai-proxy-advanced
+    config:
+      models:
+        sources:
+          - plugin_id: aa91ac6b-9364-58a2-8ee4-58faf847c116
+      route_type: llm/v1/models
+    route: models-redis-datastore
   - name: ai-rag-injector
     config:
       embeddings:
