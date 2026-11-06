@@ -90,14 +90,15 @@ var OIDCToMCPOAuth2Fields = []OAuth2FieldMap{
 //     hide_credentials: false. Both defaults (hide=true / passthrough=false)
 //     agree, so the defaulted case is emitted on neither side.
 //
-//   - insecure_relaxed_audience_validation (plugin) mirrors whether the OIDC
-//     provider enforces an audience: AI Gateway validates the audience only
-//     when audience_required is set. The converter therefore ALWAYS emits the
-//     flag — false when audience_required is set, true otherwise (overriding
-//     the plugin's own false default). The reverse reconstructs audience_required
-//     from the metadata resource (its RFC 8707 audience) when the flag is
-//     false; the concrete audience list is lossy but re-converts to the same
-//     flag.
+//   - audience_required (OIDC array) maps to expected_audience (plugin single
+//     string): the converter carries the first value and warns when more than
+//     one is set, since the plugin validates one audience. insecure_relaxed_
+//     audience_validation mirrors whether audience_required is set at all: the
+//     converter ALWAYS emits the flag — false when audience_required is set,
+//     true otherwise (overriding the plugin's own false default). The reverse
+//     reconstructs audience_required from expected_audience when the flag is
+//     false; a hand-authored plugin config without expected_audience falls
+//     back to the resource, matching the plugin's own default.
 //
 // The 2.3 openid-connect lowering in mcpOIDCPlugin always writes auth_methods
 // ["bearer"]. Revert leaves out exactly ["bearer"] from the strategy. It lifts
