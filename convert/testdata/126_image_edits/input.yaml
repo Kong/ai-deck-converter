@@ -1,0 +1,95 @@
+models:
+  - name: image-all
+    type: model
+    capabilities: [image]
+    formats:
+      - type: openai
+    config:
+      route:
+        paths: [/images]
+    targets:
+      - name: gpt-image-1
+        provider: openai-prod
+        config:
+          type: openai
+      - name: dall-e-3
+        provider: azure-prod
+        config:
+          type: azure
+          azure_instance: my-instance
+          azure_deployment_id: dall-e-3
+          azure_api_version: "2024-10-21"
+      - name: amazon.nova-canvas-v1:0
+        provider: bedrock-prod
+        config:
+          type: bedrock
+          aws_region: us-east-1
+      - name: gemini-2.5-flash-image
+        provider: gemini-prod
+        config:
+          type: gemini
+      - name: wanx-v1
+        provider: dashscope-prod
+        config:
+          type: dashscope
+  - name: grok-image
+    type: model
+    capabilities: [image]
+    formats:
+      - type: openai
+    config:
+      route:
+        paths: [/grok]
+    targets:
+      - name: grok-2-image
+        provider: xai-prod
+        config:
+          type: xai
+model_providers:
+  - name: openai-prod
+    type: openai
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "Bearer {vault://env/openai-token}"
+  - name: azure-prod
+    type: azure
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: api-key
+            value: "{vault://env/azure-key}"
+  - name: bedrock-prod
+    type: bedrock
+    config:
+      auth:
+        type: aws
+        access_key_id: "{vault://env/aws-key-id}"
+        secret_access_key: "{vault://env/aws-secret}"
+  - name: gemini-prod
+    type: gemini
+    config:
+      auth:
+        type: basic
+        params:
+          - name: key
+            value: "{vault://env/gemini-key}"
+  - name: dashscope-prod
+    type: dashscope
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "Bearer {vault://env/dashscope-token}"
+  - name: xai-prod
+    type: xai
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "Bearer {vault://env/xai-token}"

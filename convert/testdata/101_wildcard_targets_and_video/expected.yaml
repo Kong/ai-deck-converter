@@ -52,6 +52,13 @@ services:
           - POST
           - OPTIONS
         strip_path: false
+      - name: openai-images-edits
+        paths:
+          - /ai/images/edits
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
       - name: openai-skills
         paths:
           - /ai/skills
@@ -390,6 +397,47 @@ plugins:
             provider: azure
           route_type: image/v1/images/generations
     route: openai-images
+    model: a
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-images-edits
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: image/generation
+      llm_format: openai
+      targets:
+        - description: primary
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: a
+            name: primary
+            provider: openai
+          route_type: image/v1/images/edits
+        - auth:
+            header_name: api-key
+            header_value: '{vault://ai/azure-key}'
+          description: fallback
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: a
+            name: fallback
+            options:
+              azure_api_version: "2024-10-21"
+              azure_deployment_id: fallback
+              azure_instance: kong-prod
+            provider: azure
+          route_type: image/v1/images/edits
+    route: openai-images-edits
     model: a
   - name: ai-proxy-advanced
     protocols:
