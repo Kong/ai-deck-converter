@@ -281,11 +281,24 @@ func (c *Converter) mcpOAuth2Plugin(
 		cfg["passthrough_credentials"] = true
 	}
 
+	// expected_audience carries the literal audience value. ai-mcp-oauth2
+	// validates a single audience; a provider with more than one
+	// audience_required value keeps only the first and warns.
 	// insecure_relaxed_audience_validation mirrors the provider's audience
 	// enforcement: AI Gateway validates the audience only when audience_required
 	// is set, so the plugin relaxes validation (true) unless the provider
 	// required one. Always emitted (see aimap.OIDCToMCPOAuth2Fields doc).
-	cfg["insecure_relaxed_audience_validation"] = !oidcRequiresAudience(idp)
+	auds := oidcAudienceRequired(idp)
+	if len(auds) > 0 {
+		cfg["expected_audience"] = auds[0]
+		if len(auds) > 1 {
+			c.warn(src.at(mcpAuthStrategyField), ConfigFieldIgnored,
+				"MCP server %q auth strategy %q sets %d values in config.audience_required. "+
+					"ai-mcp-oauth2 validates a single config.expected_audience, so only %q is kept.",
+				m.Name, idp.Name, len(auds), auds[0])
+		}
+	}
+	cfg["insecure_relaxed_audience_validation"] = len(auds) == 0
 
 	return kong.Plugin{Name: "ai-mcp-oauth2", Config: cfg}, nil
 }
@@ -527,10 +540,13 @@ func configString(config map[string]any, key string) string {
 	return v
 }
 
-// oidcRequiresAudience reports whether an openid-connect auth strategy
-// enforces a token audience (audience_required is set and non-empty).
-func oidcRequiresAudience(idp *aigw.AuthStrategy) bool {
-	return idp != nil && len(configStrings(idp.Config, "audience_required")) > 0
+// oidcAudienceRequired returns an openid-connect auth strategy's
+// audience_required values, or nil when idp is nil or the field is unset.
+func oidcAudienceRequired(idp *aigw.AuthStrategy) []string {
+	if idp == nil {
+		return nil
+	}
+	return configStrings(idp.Config, "audience_required")
 }
 
 // isEmptyConfigValue reports whether a decoded config value carries no data:

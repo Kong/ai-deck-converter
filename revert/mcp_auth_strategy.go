@@ -152,12 +152,17 @@ func oidcConfigFromOAuth2(cfg map[string]any) map[string]any {
 		oidcCfg["hide_credentials"] = false
 	}
 	// insecure_relaxed_audience_validation: false <=> the provider required an
-	// audience; reconstruct audience_required from the resource (its RFC 8707
-	// audience). The concrete audience list is lossy but re-converts to the
-	// same plugin flag. The relaxed default (true) leaves audience_required off.
+	// audience. expected_audience carries the literal value; a hand-authored
+	// plugin config that omits it falls back to the resource, matching the
+	// plugin's own default ("unset expected_audience expects config.resource").
+	// The relaxed default (true) leaves audience_required off.
 	if v := getBool(cfg, "insecure_relaxed_audience_validation"); v != nil && !*v {
-		if resource := getStr(cfg, "resource"); resource != "" {
-			oidcCfg["audience_required"] = []any{resource}
+		aud := getStr(cfg, "expected_audience")
+		if aud == "" {
+			aud = getStr(cfg, "resource")
+		}
+		if aud != "" {
+			oidcCfg["audience_required"] = []any{aud}
 		}
 	}
 
