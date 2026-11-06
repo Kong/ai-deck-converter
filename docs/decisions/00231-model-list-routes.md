@@ -165,3 +165,23 @@ constants, shared by both directions.
 [unresolved-questions]: #unresolved-questions
 
 None.
+
+# Testing
+[testing]: #testing
+
+- `115_model_directory` is new: two models on two base paths, one with
+  `access.acls` that denies a consumer group. Its output covers the root
+  list, one list per base path, a source access rule and the auth strategies
+  of a list route.
+- Every below-gate `min_runtime_*` golden case asserts the 2.3 gate: no list
+  route, no instance `id`, and one `UNSUPPORTED_IN_MIN_RUNTIME_VERSION`
+  warning.
+- The realtime golden cases (`100_wildcard_realtime_global_auth`,
+  `102_wildcard_realtime_auth_strategies`, `107_realtime_log_payloads`)
+  advertise no `ws`/`wss` instance, and the video case
+  `101_wildcard_targets_and_video` advertises no lifecycle instance.
+- `TestConvertScopesAuthStrategiesWithoutLeakingAcrossSharedRoutes` and
+  `TestConvertSharesAuthStrategyForUniformlyGuardedSharedRoute` cover the
+  auth strategies of the list routes.
+- `revert/roundtrip_test.go` keeps every forward golden byte-identical, so
+  the revert half of the round trip drops each list route.
