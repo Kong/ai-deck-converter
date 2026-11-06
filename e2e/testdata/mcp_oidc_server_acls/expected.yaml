@@ -86,6 +86,7 @@ plugins:
           - http://host.docker.internal:18090
         metadata_endpoint: /mcp/vendor/.well-known/oauth-protected-resource
         resource: http://localhost/mcp/vendor
+      upstream_access_token_header: null
     route:
       id: 1949b1d0-ad0e-51d8-8006-2fd707e7eb2f
   - id: 6b624042-a0e9-529e-aa3d-da8cfcb978e1
@@ -117,6 +118,7 @@ plugins:
           - http://host.docker.internal:18090
         metadata_endpoint: /mcp/claims/.well-known/oauth-protected-resource
         resource: http://localhost/mcp/claims
+      upstream_access_token_header: null
     route:
       id: eb80dd89-4bf0-57bb-af51-d412da34ccc4
   - id: f72d8dc5-9056-5949-8dec-a39f087834de
@@ -148,5 +150,6 @@ plugins:
           - http://host.docker.internal:18090
         metadata_endpoint: /mcp/reports/.well-known/oauth-protected-resource
         resource: http://localhost/mcp/reports
+      upstream_access_token_header: null
     route:
       id: ec9415ea-8a9e-54c0-98f8-ccf706691acd

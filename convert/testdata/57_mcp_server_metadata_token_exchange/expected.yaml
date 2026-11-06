@@ -45,3 +45,4 @@ services:
                         - mcp-api
                     issuer: https://dev-123456.okta.com/oauth2/default
                     verify_signature: true
+              upstream_access_token_header: null

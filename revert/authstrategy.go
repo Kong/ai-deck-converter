@@ -2,6 +2,7 @@ package revert
 
 import (
 	"fmt"
+	"maps"
 	"reflect"
 
 	"github.com/Kong/ai-deck-converter/internal/aigw"
@@ -86,4 +87,30 @@ func stripSyntheticAuthFields(pluginName string, config map[string]any) map[stri
 		return nil
 	}
 	return out
+}
+
+// withoutHiddenAccessTokenHeader returns p without the
+// upstream_access_token_header null that convert adds to agent and MCP
+// openid-connect plugins.
+func withoutHiddenAccessTokenHeader(p kong.Plugin) kong.Plugin {
+	if p.Name != "openid-connect" {
+		return p
+	}
+	cfg := make(map[string]any, len(p.Config))
+	maps.Copy(cfg, p.Config)
+	dropHiddenAccessTokenHeader(cfg)
+	p.Config = cfg
+	return p
+}
+
+// dropHiddenAccessTokenHeader removes upstream_access_token_header null from
+// an openid-connect config that hides credentials.
+func dropHiddenAccessTokenHeader(cfg map[string]any) {
+	if v, set := cfg["upstream_access_token_header"]; !set || v != nil {
+		return
+	}
+	if hide, ok := cfg["hide_credentials"].(bool); ok && !hide {
+		return
+	}
+	delete(cfg, "upstream_access_token_header")
 }

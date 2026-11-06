@@ -37,3 +37,4 @@ services:
                   - https://dev-123456.okta.com/oauth2/default
                 metadata_endpoint: /mcp/claims/.well-known/oauth-protected-resource
                 resource: https://api.example.com/mcp/claims
+              upstream_access_token_header: null

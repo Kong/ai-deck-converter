@@ -62,7 +62,12 @@ func (c *Converter) scopedAuthStrategyPlugins(src ConversionIssueSource, refs []
 		if err := c.applyAuthStrategyTokenVault(idp); err != nil {
 			return nil, err
 		}
-		plugins = append(plugins, authStrategyPlugin(idp))
+		plugin := authStrategyPlugin(idp)
+		// A model upstream can check the caller's token itself.
+		if src.Kind == kindAgent && idp.Type == authStrategyTypeOpenIDConnect {
+			hideOIDCAccessToken(plugin.Config)
+		}
+		plugins = append(plugins, plugin)
 	}
 	return plugins, nil
 }
@@ -554,7 +559,8 @@ func (c *Converter) tokenVaultRouteNames() map[string]bool {
 }
 
 // revealedTokenVaultPlugins returns a copy of plugins in which each selected
-// openid-connect plugin has hide_credentials set to false. It reports false
+// openid-connect plugin has hide_credentials set to false. It also removes the
+// upstream_access_token_header null of hideOIDCAccessToken. It reports false
 // when no plugin changes, and then returns plugins unchanged.
 func (c *Converter) revealedTokenVaultPlugins(
 	plugins []kong.Plugin, selected func(kong.Plugin) bool,
@@ -564,10 +570,12 @@ func (c *Converter) revealedTokenVaultPlugins(
 		if p.Name != authStrategyTypeOpenIDConnect || !selected(p) {
 			continue
 		}
-		if hide, _ := p.Config["hide_credentials"].(bool); !hide {
+		hide, _ := p.Config["hide_credentials"].(bool)
+		hidesToken := c.hidesOIDCAccessToken(p)
+		if !hide && !hidesToken {
 			continue
 		}
-		if p.Source != nil {
+		if hide && p.Source != nil {
 			c.warn(issueSource(kindAuthStrategy, p.Source.EntityName).at("config.hide_credentials"),
 				ConfigFieldOverridden,
 				"auth strategy %q sets config.hide_credentials to true. "+
@@ -579,7 +587,12 @@ func (c *Converter) revealedTokenVaultPlugins(
 			out = slices.Clone(plugins)
 		}
 		cfg := maps.Clone(p.Config)
-		cfg["hide_credentials"] = false
+		if hide {
+			cfg["hide_credentials"] = false
+		}
+		if hidesToken {
+			delete(cfg, oidcUpstreamAccessTokenHeader)
+		}
 		out[i].Config = cfg
 	}
 	if out == nil {
@@ -683,6 +696,39 @@ func authStrategyPlugin(idp *aigw.AuthStrategy) kong.Plugin {
 		Config: cfg,
 		Source: source("identity_provider", idp.Name, "config"),
 	}
+}
+
+// oidcUpstreamAccessTokenHeader is the openid-connect field that sends the
+// access token to the upstream. Its data plane default is
+// "authorization:bearer".
+const oidcUpstreamAccessTokenHeader = "upstream_access_token_header"
+
+// hideOIDCAccessToken sets upstream_access_token_header to null in an
+// openid-connect config that hides credentials. The access token then stays
+// at the gateway. A value that the strategy sets stays.
+func hideOIDCAccessToken(cfg map[string]any) {
+	if _, set := cfg[oidcUpstreamAccessTokenHeader]; set {
+		return
+	}
+	if hide, ok := cfg["hide_credentials"].(bool); ok && !hide {
+		return
+	}
+	cfg[oidcUpstreamAccessTokenHeader] = nil
+}
+
+// hidesOIDCAccessToken reports whether hideOIDCAccessToken set the null in
+// p. A Token Vault reads the access token from the upstream header.
+// Without hide_credentials false, that header is its only source.
+func (c *Converter) hidesOIDCAccessToken(p kong.Plugin) bool {
+	if v, set := p.Config[oidcUpstreamAccessTokenHeader]; !set || v != nil || p.Source == nil {
+		return false
+	}
+	idp := c.authStrategies[p.Source.EntityName]
+	if idp == nil {
+		return false
+	}
+	_, set := idp.Config[oidcUpstreamAccessTokenHeader]
+	return !set
 }
 
 // withoutAnonymousFallback returns a copy of p without config.anonymous.

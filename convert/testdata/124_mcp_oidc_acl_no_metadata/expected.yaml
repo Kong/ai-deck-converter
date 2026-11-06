@@ -20,3 +20,4 @@ services:
           - name: openid-connect
             config:
               issuer: https://dev-123456.okta.com/oauth2/default
+              upstream_access_token_header: null
