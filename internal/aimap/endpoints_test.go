@@ -217,8 +217,16 @@ func TestEndpointsForAndSectionEndpoints(t *testing.T) {
 	require.NotNil(t, responses.DefaultModelSelectorConfig, "the model travels in the body")
 
 	// A section with no secondaries returns exactly the primary specs.
-	require.Len(t, SectionEndpoints("openai"), len(EndpointTable["openai"]),
-		"openai section has no secondary endpoints")
+	require.Len(t, SectionEndpoints("anthropic"), len(EndpointTable["anthropic"]),
+		"anthropic section has no secondary endpoints")
+
+	specs, ok = EndpointsFor("openai", "image")
+	require.True(t, ok)
+	require.Len(t, specs, 2, "openai image has generations and edits")
+	require.Equal(t, "/images/generations", specs[0].PathSuffix)
+	require.Equal(t, "/images/edits", specs[1].PathSuffix)
+	require.Equal(t, "image/v1/images/edits", specs[1].RouteType)
+	require.NotNil(t, specs[1].DefaultModelSelectorConfig, "the model travels in the multipart body")
 }
 
 func TestSkillsCapability(t *testing.T) {

@@ -337,6 +337,13 @@ var EndpointTable = map[string]map[string]EndpointEntry{
 				"images", "/images/generations", false, mPost, "image/v1/images/generations", catImage,
 				&defaultBodyModelSelectorConfig, true,
 			},
+			// TargetSupports keeps only the providers that serve edits.
+			Secondary: []EndpointSpec{
+				{
+					"images-edits", "/images/edits", false, mPost, "image/v1/images/edits", catImage,
+					&defaultBodyModelSelectorConfig, true,
+				},
+			},
 		},
 		"audio/speech": {
 			Primary: EndpointSpec{

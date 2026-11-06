@@ -1,0 +1,222 @@
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: openai-images
+        paths:
+          - /images/images/generations
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-images-edits
+        paths:
+          - /images/images/edits
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-images-2
+        paths:
+          - /grok/images/generations
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+plugins:
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-images
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: image/generation
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: Bearer {vault://env/openai-token}
+          description: gpt-image-1
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: image-all
+            name: gpt-image-1
+            provider: openai
+          route_type: image/v1/images/generations
+        - auth:
+            header_name: api-key
+            header_value: '{vault://env/azure-key}'
+          description: dall-e-3
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: image-all
+            name: dall-e-3
+            options:
+              azure_api_version: "2024-10-21"
+              azure_deployment_id: dall-e-3
+              azure_instance: my-instance
+            provider: azure
+          route_type: image/v1/images/generations
+        - auth:
+            aws_access_key_id: '{vault://env/aws-key-id}'
+            aws_secret_access_key: '{vault://env/aws-secret}'
+          description: amazon.nova-canvas-v1:0
+          logging:
+            log_payloads: false
+            log_statistics: false
+          model:
+            model_alias: image-all
+            name: amazon.nova-canvas-v1:0
+            options:
+              aws_region: us-east-1
+            provider: bedrock
+          route_type: image/v1/images/generations
+        - auth:
+            param_name: key
+            param_value: '{vault://env/gemini-key}'
+          description: gemini-2.5-flash-image
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: image-all
+            name: gemini-2.5-flash-image
+            provider: gemini
+          route_type: image/v1/images/generations
+        - auth:
+            header_name: Authorization
+            header_value: Bearer {vault://env/dashscope-token}
+          description: wanx-v1
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: image-all
+            name: wanx-v1
+            provider: dashscope
+          route_type: image/v1/images/generations
+    route: openai-images
+    model: image-all
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-images-edits
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: image/generation
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: Bearer {vault://env/openai-token}
+          description: gpt-image-1
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: image-all
+            name: gpt-image-1
+            provider: openai
+          route_type: image/v1/images/edits
+        - auth:
+            header_name: api-key
+            header_value: '{vault://env/azure-key}'
+          description: dall-e-3
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: image-all
+            name: dall-e-3
+            options:
+              azure_api_version: "2024-10-21"
+              azure_deployment_id: dall-e-3
+              azure_instance: my-instance
+            provider: azure
+          route_type: image/v1/images/edits
+        - auth:
+            aws_access_key_id: '{vault://env/aws-key-id}'
+            aws_secret_access_key: '{vault://env/aws-secret}'
+          description: amazon.nova-canvas-v1:0
+          logging:
+            log_payloads: false
+            log_statistics: false
+          model:
+            model_alias: image-all
+            name: amazon.nova-canvas-v1:0
+            options:
+              aws_region: us-east-1
+            provider: bedrock
+          route_type: image/v1/images/edits
+        - auth:
+            param_name: key
+            param_value: '{vault://env/gemini-key}'
+          description: gemini-2.5-flash-image
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: image-all
+            name: gemini-2.5-flash-image
+            provider: gemini
+          route_type: image/v1/images/edits
+        - auth:
+            header_name: Authorization
+            header_value: Bearer {vault://env/dashscope-token}
+          description: wanx-v1
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: image-all
+            name: wanx-v1
+            provider: dashscope
+          route_type: image/v1/images/edits
+    route: openai-images-edits
+    model: image-all
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-images-2
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: image/generation
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: Bearer {vault://env/xai-token}
+          description: grok-2-image
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: grok-image
+            name: grok-2-image
+            provider: xai
+          route_type: image/v1/images/generations
+    route: openai-images-2
+    model: grok-image
+ai_models:
+  - name: image-all
+  - name: grok-image
