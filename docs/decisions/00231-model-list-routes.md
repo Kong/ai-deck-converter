@@ -104,9 +104,9 @@ The list is a discovery surface, not an inference surface.
 Two models that share one `type: api` instance share one `ai-proxy-advanced`
 plugin, which carries one access rule. When their rules differ, the instance
 is left out of every list with a warning, so the list never shows a model to a
-caller its rule excludes. A model whose instances are all left out of a list
-is advertised nowhere, but its auth strategies still join the union of the
-lists it was grouped onto. A base path whose instances are all left out gets
+caller its rule excludes. A model whose instances are all left out is
+advertised nowhere, but its auth strategies still join the union of the lists
+it was grouped onto. A base path whose instances are all left out gets
 no list.
 
 The video lifecycle route of a video model has its own `ai-proxy-advanced`
@@ -132,8 +132,8 @@ constants, shared by both directions.
 
 - On 2.3 and later, every advertised `ai-proxy-advanced` instance carries an
   `id`. The field is valid in decK and in db-less output, but it widens the
-  diff for those configs. Below the gate no id is set, so the output for an
-  older runtime stays as it was.
+  diff for those configs. Below the gate no id is set, so older-runtime
+  output stays as it was.
 - A model declared on several base paths is advertised on several lists, so
   the same instance id repeats. The gateway deduplicates per caller.
 - Two models on one base path with different auth strategies share one route
@@ -157,14 +157,13 @@ constants, shared by both directions.
   list.
 - Split a list by auth strategy, as the model routes split. Rejected: a list
   route matches on its path only, so two lists on one base path would match
-  the same requests. That is the routing conflict RFC 00229 reports.
+  the same requests: the routing conflict RFC 00229 reports.
 - Suppress the list of a base path whose models disagree on auth strategies.
   Rejected: the root list covers every model, so one disagreement anywhere
-  would suppress it. On a base path, two models that disagree would strip
-  discovery from every model on the path, including the ones that share a
-  strategy. Merging keeps every per-model rule, because each source still
-  carries the access rule of its model. The cost of merging is the third
-  drawback above.
+  would suppress it, and two models that disagree would strip discovery from
+  every model on their base path. Merging keeps every per-model rule, because
+  each source still carries the access rule of its model; the cost is the
+  third drawback above.
 
 # Unresolved questions
 [unresolved-questions]: #unresolved-questions
