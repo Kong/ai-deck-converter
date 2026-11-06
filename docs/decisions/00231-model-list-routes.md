@@ -36,8 +36,8 @@ In scope:
 Out of scope:
 
 - Special handling of a base path that already answers `GET`. AIXSM-104
-  decided that case: the existing route stays, no list is made there, and
-  the administrator is told. The routing-conflict warning of RFC 00229
+  decided that case: Konnect keeps the existing route, makes no list there
+  and tells the administrator. The routing-conflict warning of RFC 00229
   reports the conflict today.
 - Evaluating the access rule at the data plane. The gateway owns that.
 
@@ -157,9 +157,9 @@ constants, shared by both directions.
   Rejected: the root list covers every model, so one disagreement anywhere
   would suppress it. On a base path, two models that disagree would strip
   discovery from every model on the path, including the ones that share a
-  strategy. Merging keeps every per-model rule: each source still carries the
-  access rule of its model, and the gateway hides a model from a caller the
-  rule excludes. The cost of merging is the third drawback above.
+  strategy. Merging keeps every per-model rule, because each source still
+  carries the access rule of its model. The cost of merging is the third
+  drawback above.
 
 # Unresolved questions
 [unresolved-questions]: #unresolved-questions
