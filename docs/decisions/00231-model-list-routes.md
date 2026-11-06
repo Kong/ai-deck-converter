@@ -65,9 +65,9 @@ rejects that caller on the model route.
 model's emitted instance ids by base path and adds `aimap.DefaultBasePath` to
 every model, so the root list covers everything.
 
-Each group emits one route, `models` for the root and `models-<base>` for the
-others, with `GET` on `aimap.RoutePath(base, aimap.ModelDirectorySpec)`, and
-one route-scoped `ai-proxy-advanced` plugin:
+Each group with at least one source emits one route, `models` for the root
+and `models-<base>` for the others, with `GET` on `aimap.RoutePath(base,
+aimap.ModelDirectorySpec)`, and one route-scoped `ai-proxy-advanced` plugin:
 
 ```yaml
 plugins:
@@ -87,8 +87,8 @@ rendered config (`kong.StableUUID`). The rendered config decides it, not the
 model name or alias, because revert recovers those differently and the round
 trip must stay byte-identical.
 
-The list route carries the union of the listed models' auth strategies. With
-more than one strategy, the same anonymous consumer and
+The list route carries the union of the auth strategies of the models grouped
+onto it. With more than one strategy, the same anonymous consumer and
 `request-termination` the model routes use protect the route: a caller that
 matches no strategy reaches the anonymous consumer, which answers 401. With
 one strategy, the strategy's own plugin rejects such a caller.
@@ -104,7 +104,10 @@ The list is a discovery surface, not an inference surface.
 Two models that share one `type: api` instance share one `ai-proxy-advanced`
 plugin, which carries one access rule. When their rules differ, the instance
 is left out of every list with a warning, so the list never shows a model to a
-caller its rule excludes.
+caller its rule excludes. A model whose instances are all left out of a list
+is advertised nowhere, but its auth strategies still join the union of the
+lists it was grouped onto. A base path whose instances are all left out gets
+no list.
 
 The video lifecycle route of a video model has its own `ai-proxy-advanced`
 instance and is not advertised: it serves a lifecycle operation rather than a
