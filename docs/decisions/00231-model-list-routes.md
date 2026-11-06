@@ -81,7 +81,7 @@ plugins:
             access: {deny: [contractors]}
 ```
 
-`sources[].plugin_id` needs an id that survives a reload, so each
+`sources[].plugin_id` needs an id that survives a reload, so each advertised
 `ai-proxy-advanced` instance carries an `id` derived from its route name and
 rendered config (`kong.StableUUID`). The rendered config decides it, not the
 model name or alias, because revert recovers those differently and the round
@@ -113,8 +113,9 @@ A realtime (`ws`/`wss`) instance is not advertised either. Its targets carry
 no `model_alias`, so the list has no id to show for them, and a plain HTTP
 caller cannot reach a WebSocket-only route.
 
-Below the 2.3 gate no list route is made, no instance gets an `id`, and one
-`UNSUPPORTED_IN_MIN_RUNTIME_VERSION` warning names the conversion option.
+Below the 2.3 gate no list route is made and no instance gets an `id`. A
+document with at least one HTTP model route also gets one
+`UNSUPPORTED_IN_MIN_RUNTIME_VERSION` warning that names the conversion option.
 
 Revert drops a route whose plugins carry `route_type: llm/v1/models`. The list
 route has no AI Gateway entity, so it must not become a model.
@@ -171,17 +172,17 @@ None.
 
 - `115_model_directory` is new: two models on two base paths, one with
   `access.acls` that denies a consumer group. Its output covers the root
-  list, one list per base path, a source access rule and the auth strategies
-  of a list route.
-- Every below-gate `min_runtime_*` golden case asserts the 2.3 gate: no list
-  route, no instance `id`, and one `UNSUPPORTED_IN_MIN_RUNTIME_VERSION`
-  warning.
+  list, one list per base path and a source access rule.
+- Every below-gate `min_runtime_*` golden case that converts a model asserts
+  the 2.3 gate: no list route, no instance `id`, and one
+  `UNSUPPORTED_IN_MIN_RUNTIME_VERSION` warning for the list route.
 - The realtime golden cases (`100_wildcard_realtime_global_auth`,
   `102_wildcard_realtime_auth_strategies`, `107_realtime_log_payloads`)
   advertise no `ws`/`wss` instance, and the video case
   `101_wildcard_targets_and_video` advertises no lifecycle instance.
-- `TestConvertScopesAuthStrategiesWithoutLeakingAcrossSharedRoutes` and
-  `TestConvertSharesAuthStrategyForUniformlyGuardedSharedRoute` cover the
-  auth strategies of the list routes.
+- The auth-strategy golden cases (`51_auth_strategies`,
+  `52_auth_strategies_multi`, `24_identity_providers`,
+  `25_identity_providers_multi`, `102_wildcard_realtime_auth_strategies`)
+  assert the auth plugins of the list routes.
 - `revert/roundtrip_test.go` keeps every forward golden byte-identical, so
   the revert half of the round trip drops each list route.
