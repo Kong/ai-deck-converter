@@ -87,10 +87,11 @@ rendered config (`kong.StableUUID`). The rendered config decides it, not the
 model name or alias, because revert recovers those differently and the round
 trip must stay byte-identical.
 
-The list route carries the union of the listed models' auth strategies, with
-the same anonymous consumer and `request-termination` the model routes use. A
-caller that matches no strategy reaches the anonymous consumer, which answers
-401.
+The list route carries the union of the listed models' auth strategies. With
+more than one strategy, the same anonymous consumer and
+`request-termination` the model routes use protect the route: a caller that
+matches no strategy reaches the anonymous consumer, which answers 401. With
+one strategy, the strategy's own plugin rejects such a caller.
 
 A model whose `access.acls` sets more than one of `allow`, `deny`,
 `allow_when` and `deny_when` never reaches this step: its acl plugin fails, so
