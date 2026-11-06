@@ -41,7 +41,8 @@ func (r *Reverter) revertMCPAccess(m *aigw.MCPServer, plugins []kong.Plugin) []k
 					continue
 				}
 			}
-			idp := r.registerAuthStrategy(withoutHiddenAccessTokenHeader(p))
+			p.Config = withoutHiddenAccessTokenHeader(p.Config)
+			idp := r.registerAuthStrategy(p)
 			m.Access.AuthStrategies = append(m.Access.AuthStrategies, idp.Name)
 		default:
 			rest = append(rest, p)
@@ -79,7 +80,7 @@ func (r *Reverter) applyMCPOIDCProtectedResource(
 	if methods := toStrings(cfg["auth_methods"]); len(methods) == 1 && methods[0] == "bearer" {
 		delete(cfg, "auth_methods")
 	}
-	dropHiddenAccessTokenHeader(cfg)
+	cfg = withoutHiddenAccessTokenHeader(cfg)
 
 	idp := r.registerAuthStrategy(kong.Plugin{Name: "openid-connect", Config: cfg})
 	m.Access.AuthStrategies = append(m.Access.AuthStrategies, idp.Name)

@@ -559,8 +559,7 @@ func (c *Converter) tokenVaultRouteNames() map[string]bool {
 }
 
 // revealedTokenVaultPlugins returns a copy of plugins in which each selected
-// openid-connect plugin has hide_credentials set to false. It also removes the
-// upstream_access_token_header null of hideOIDCAccessToken. It reports false
+// openid-connect plugin has hide_credentials set to false. It reports false
 // when no plugin changes, and then returns plugins unchanged.
 func (c *Converter) revealedTokenVaultPlugins(
 	plugins []kong.Plugin, selected func(kong.Plugin) bool,
@@ -570,12 +569,10 @@ func (c *Converter) revealedTokenVaultPlugins(
 		if p.Name != authStrategyTypeOpenIDConnect || !selected(p) {
 			continue
 		}
-		hide, _ := p.Config["hide_credentials"].(bool)
-		hidesToken := c.hidesOIDCAccessToken(p)
-		if !hide && !hidesToken {
+		if hide, _ := p.Config["hide_credentials"].(bool); !hide {
 			continue
 		}
-		if hide && p.Source != nil {
+		if p.Source != nil {
 			c.warn(issueSource(kindAuthStrategy, p.Source.EntityName).at("config.hide_credentials"),
 				ConfigFieldOverridden,
 				"auth strategy %q sets config.hide_credentials to true. "+
@@ -587,12 +584,7 @@ func (c *Converter) revealedTokenVaultPlugins(
 			out = slices.Clone(plugins)
 		}
 		cfg := maps.Clone(p.Config)
-		if hide {
-			cfg["hide_credentials"] = false
-		}
-		if hidesToken {
-			delete(cfg, oidcUpstreamAccessTokenHeader)
-		}
+		cfg["hide_credentials"] = false
 		out[i].Config = cfg
 	}
 	if out == nil {
@@ -714,21 +706,6 @@ func hideOIDCAccessToken(cfg map[string]any) {
 		return
 	}
 	cfg[oidcUpstreamAccessTokenHeader] = nil
-}
-
-// hidesOIDCAccessToken reports whether hideOIDCAccessToken set the null in
-// p. A Token Vault reads the access token from the upstream header.
-// Without hide_credentials false, that header is its only source.
-func (c *Converter) hidesOIDCAccessToken(p kong.Plugin) bool {
-	if v, set := p.Config[oidcUpstreamAccessTokenHeader]; !set || v != nil || p.Source == nil {
-		return false
-	}
-	idp := c.authStrategies[p.Source.EntityName]
-	if idp == nil {
-		return false
-	}
-	_, set := idp.Config[oidcUpstreamAccessTokenHeader]
-	return !set
 }
 
 // withoutAnonymousFallback returns a copy of p without config.anonymous.

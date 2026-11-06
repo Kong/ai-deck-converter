@@ -91,7 +91,8 @@ func (c *Converter) mcpAuthStrategyPlugins(
 		if reason := c.mcpKeyAuthRevealReason(m, idp); reason != "" {
 			c.revealMCPCredentials(src, m, idp, cfg, reason)
 		}
-		if idp.Type == authStrategyTypeOpenIDConnect {
+		// The Token Vault reads the access token from the upstream header.
+		if idp.Type == authStrategyTypeOpenIDConnect && m.TokenVault == nil {
 			hideOIDCAccessToken(cfg)
 		}
 		plugin = kong.Plugin{Name: idp.Type, Config: cfg, Source: source("identity_provider", idp.Name, "config")}
