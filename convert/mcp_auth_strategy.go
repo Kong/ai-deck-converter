@@ -91,6 +91,10 @@ func (c *Converter) mcpAuthStrategyPlugins(
 		if reason := c.mcpKeyAuthRevealReason(m, idp); reason != "" {
 			c.revealMCPCredentials(src, m, idp, cfg, reason)
 		}
+		// The Token Vault reads the access token from the upstream header.
+		if idp.Type == authStrategyTypeOpenIDConnect && m.TokenVault == nil {
+			hideOIDCAccessToken(cfg)
+		}
 		plugin = kong.Plugin{Name: idp.Type, Config: cfg, Source: source("identity_provider", idp.Name, "config")}
 	}
 
@@ -338,6 +342,7 @@ func (c *Converter) mcpOIDCPlugin(
 		c.revealMCPCredentials(src, m, idp, cfg,
 			"the Token Vault needs the caller's bearer token to resolve the upstream credential")
 	}
+	hideOIDCAccessToken(cfg)
 
 	return kong.Plugin{Name: authStrategyTypeOpenIDConnect, Config: cfg}, nil
 }

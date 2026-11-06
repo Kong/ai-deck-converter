@@ -44,6 +44,7 @@ services:
                 scopes_supported:
                   - openid
                   - flights:read
+              upstream_access_token_header: null
 routes:
   - name: token-vault-callback-handler
     paths:

@@ -59,6 +59,12 @@ func (r *Reverter) policyRefs(plugins []kong.Plugin) ([]string, aigw.ACLs) {
 // references
 // before delegating the remaining plugins to policyRefs.
 func (r *Reverter) authStrategyPolicyRefs(plugins []kong.Plugin) ([]string, aigw.ACLs, []string) {
+	plugins = slices.Clone(plugins)
+	for i := range plugins {
+		if plugins[i].Name == "openid-connect" {
+			plugins[i].Config = withoutHiddenAccessTokenHeader(plugins[i].Config)
+		}
+	}
 	return r.splitAuthStrategies(plugins, func(p kong.Plugin) bool {
 		// The anonymous fallback is the forward converter's marker that an
 		// auth plugin originated from an auth strategy. A bare key-auth/OIDC

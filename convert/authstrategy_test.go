@@ -530,7 +530,11 @@ func TestAuthStrategyTokenVaultLeavesEntityPluginUnchanged(t *testing.T) {
 
 	require.Len(t, got.entity, 2)
 	for _, cfg := range got.entity {
-		require.Equal(t, map[string]any{"issuer": "https://idp.example.com", "hide_credentials": true}, cfg)
+		require.Equal(t, map[string]any{
+			"issuer":                       "https://idp.example.com",
+			"hide_credentials":             true,
+			"upstream_access_token_header": nil,
+		}, cfg)
 	}
 }
 
@@ -561,7 +565,7 @@ func TestAuthStrategyTokenVaultDisabledAddsNoRoute(t *testing.T) {
 	require.Nil(t, got.page)
 	require.Nil(t, got.login)
 	for _, cfg := range got.entity {
-		require.Equal(t, map[string]any{"issuer": "https://idp.example.com"}, cfg)
+		require.Equal(t, map[string]any{"issuer": "https://idp.example.com", "upstream_access_token_header": nil}, cfg)
 	}
 }
 
@@ -936,4 +940,88 @@ auth_strategies:
 	})
 
 	require.Empty(t, c.out.TokenVaultAuthStrategies)
+}
+
+// TestOIDCStrategyDoesNotForwardAccessToken covers FTI-8089. The
+// openid-connect default of upstream_access_token_header is
+// "authorization:bearer". That default sends the caller's token to the
+// upstream, even with hide_credentials true.
+func TestOIDCStrategyDoesNotForwardAccessToken(t *testing.T) {
+	const doc = `
+auth_strategies:
+  - name: oidc
+    type: openid-connect
+    config:
+      issuer: https://idp.example.com
+      client_id: [client]
+      auth_methods: [bearer]
+      hide_credentials: true
+%s
+agents:
+  - type: a2a
+    name: agent
+    access: {auth_strategies: [%[2]s]}
+    config:
+      url: https://agent.internal/a2a
+      route: {paths: [/agents/agent]}
+mcp_servers:
+  - type: passthrough-listener
+    name: mcp-metadata
+    upstream_url: https://mcp.example.com/mcp
+    config: {route: {paths: [/mcp/metadata]}}
+    access:
+      auth_strategies: [%[2]s]
+      metadata:
+        resource: https://kong.example.com/mcp/metadata
+        endpoint: /mcp/metadata/.well-known/oauth-protected-resource
+  - type: passthrough-listener
+    name: mcp-plain
+    upstream_url: https://mcp.example.com/mcp
+    config: {route: {paths: [/mcp/plain]}}
+    access: {auth_strategies: [%[2]s]}
+`
+	const forwarding = `
+  - name: oidc-forward
+    type: openid-connect
+    config:
+      issuer: https://idp.example.com
+      auth_methods: [bearer]
+      upstream_access_token_header: x-access-token`
+	const revealing = `
+  - name: oidc-reveal
+    type: openid-connect
+    config:
+      issuer: https://idp.example.com
+      auth_methods: [bearer]
+      hide_credentials: false`
+
+	for name, tc := range map[string]struct {
+		strategies, ref string
+		want            any
+		wantSet         bool
+	}{
+		"strategy leaves the header unset": {ref: "oidc", want: nil, wantSet: true},
+		"strategy sets the header": {
+			strategies: forwarding, ref: "oidc-forward", want: "x-access-token", wantSet: true,
+		},
+		"strategy shows credentials": {strategies: revealing, ref: "oidc-reveal"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			result, err := Convert([]byte(fmt.Sprintf(doc, tc.strategies, tc.ref)), testOptions)
+			require.NoError(t, err)
+
+			for _, service := range []string{"agent", "mcp-metadata", "mcp-plain"} {
+				var oidc *kong.Plugin
+				for _, p := range routePlugins(t, result.Output, service) {
+					if p.Name == authStrategyTypeOpenIDConnect {
+						oidc = &p
+					}
+				}
+				require.NotNil(t, oidc, service)
+				got, set := oidc.Config["upstream_access_token_header"]
+				require.Equal(t, tc.wantSet, set, service)
+				require.Equal(t, tc.want, got, service)
+			}
+		})
+	}
 }

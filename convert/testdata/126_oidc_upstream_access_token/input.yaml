@@ -1,0 +1,49 @@
+# The openid-connect default upstream_access_token_header sends the caller's
+# token upstream. An agent that hides credentials gets the header as null.
+# A model keeps the default, because its upstream can check the token. A
+# strategy value always stays.
+auth_strategies:
+  - name: okta
+    type: openid-connect
+    config:
+      issuer: https://dev-123456.okta.com/oauth2/default
+  - name: okta-no-token
+    type: openid-connect
+    config:
+      issuer: https://dev-123456.okta.com/oauth2/default
+      upstream_access_token_header: null
+agents:
+  - type: a2a
+    name: booking-agent
+    access: {auth_strategies: [okta]}
+    config:
+      url: https://booking.internal/a2a
+      route: {paths: [/agents/booking]}
+models:
+  - name: self-hosted
+    type: model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    config: {route: {paths: [/ai/self-hosted]}}
+    access: {auth_strategies: [okta]}
+    targets:
+      - name: llama
+        provider: local
+        config: {type: openai, upstream_url: https://llm.internal/v1/chat/completions}
+  - name: hidden-token
+    type: model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    config: {route: {paths: [/ai/hidden-token]}}
+    access: {auth_strategies: [okta-no-token]}
+    targets:
+      - name: gpt-5.4
+        provider: local
+        config: {type: openai}
+model_providers:
+  - name: local
+    type: openai
+    config:
+      auth:
+        type: basic
+        headers: [{name: Authorization, value: "{vault://ai/openai-token}"}]

@@ -52,3 +52,4 @@ services:
               scopes:
                 - openid
                 - profile
+              upstream_access_token_header: null
