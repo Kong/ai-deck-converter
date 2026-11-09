@@ -230,7 +230,13 @@ func TestMCPOIDCMetadataBelowGate(t *testing.T) {
 // tokenVaultMCPWithMetadata is an upstream Token Vault MCP server with
 // access.metadata. The auth plugin must keep the caller's bearer token, or
 // the Token Vault exchange has no subject token.
+//
+//nolint:gosec // G101 false positive: test fixture with no secret.
 const tokenVaultMCPWithMetadata = `
+datastores:
+  - name: tv
+    type: token-vault
+    config: {directory: d}
 auth_strategies:
   - name: okta-oidc
     type: openid-connect
@@ -243,6 +249,7 @@ mcp_servers:
     config:
       route:
         paths: [/mcp/vaulted]
+    datastores: [{name: tv}]
     token_vault:
       provider: github
       credential:
@@ -284,7 +291,7 @@ func TestMCPOAuth2PassthroughForTokenVault(t *testing.T) {
 	// passthrough_credentials.
 	out, warnings, err := convertYAML([]byte(tokenVaultMCPMetadataOnly))
 	require.NoError(t, err)
-	require.Len(t, warnings, 1, "token_vault without a datastore warns")
+	require.Empty(t, warnings)
 	s := string(out)
 	require.Contains(t, s, "passthrough_credentials: true")
 	require.Contains(t, s, "name: ai-mcp-oauth2")
@@ -317,8 +324,8 @@ func TestMCPOIDCTokenVaultForcesHideCredentials(t *testing.T) {
 // A Token Vault reads the key from the request.
 func TestMCPKeyAuthKeepsHideCredentials(t *testing.T) {
 	for _, tc := range []struct {
-		name, mcpType, server, extra string
-		wantHide                     bool
+		name, mcpType, server, extra, datastores string
+		wantHide                                 bool
 	}{
 		{
 			name: "passthrough forward_client_headers on", mcpType: "passthrough-listener",
@@ -334,11 +341,12 @@ func TestMCPKeyAuthKeepsHideCredentials(t *testing.T) {
 		},
 		{
 			name: "passthrough with token_vault", mcpType: "passthrough-listener",
-			server: "server: {timeout: 10000}", extra: "token_vault: {provider: github}", wantHide: false,
+			server: "server: {timeout: 10000}", extra: "token_vault: {provider: github}\n    datastores: [{name: tv}]",
+			datastores: "datastores: [{name: tv, type: token-vault, config: {directory: d}}]", wantHide: false,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			src := `
+			src := tc.datastores + `
 auth_strategies:
   - name: mcp-key-auth
     type: key-auth
