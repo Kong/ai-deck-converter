@@ -16,7 +16,7 @@ type Version struct {
 var SupportFloor = mustVersion("2.0")
 
 // LatestVersion is the newest AI Gateway release that the converter knows.
-var LatestVersion = mustVersion("2.3")
+var LatestVersion = mustVersion("2.4")
 
 // versionPattern is the pattern of the Konnect min_runtime_version field. It
 // also rejects leading zeros, so each version has one spelling.
