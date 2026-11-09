@@ -45,34 +45,40 @@ not supported by the targets of the model.
 
 ## Example
 
-In the below example, each route balances only over the targets that
-support its endpoint. As a result, failover can differ between routes.
+This example uses a minimum runtime version of 2.2. Each route balances
+over the targets that support its endpoint.
 
 ```yaml
 models:
-  - name: a                     # every capability except batches and files
+  - name: inference
+    type: model
     capabilities: ["*"]
     formats: [{type: "*"}]
     targets:
       - name: primary
-        provider: openai-prod   # supports skills
+        provider: openai-prod
       - name: fallback
-        provider: azure-prod    # does not support skills
-  - name: b
-    type: api                   # only batches and files
+        provider: azure-prod
+  - name: provider-api
+    type: api
     capabilities: ["*"]
     formats: [{type: cohere}, {type: openai}]
     targets:
       - name: primary
         provider: openai-prod
+      - name: fallback
+        provider: azure-prod
 ```
 
-- Model `a` gets the `openai` endpoints and the `anthropic` `messages`
-  endpoint, with no issue. Its `skills` route has only `primary`, so it
-  cannot fail over to `fallback`.
-- Model `b` gets the `openai` `batches` and `files` endpoints. No target
-  supports the explicit `cohere` format, so it gets a `CONFIG_FIELD_DROPPED`
-  warning.
+- `inference` gets the supported OpenAI inference endpoints and Anthropic
+  Messages. Its wildcard excludes `batches`, `files`, and `skills`.
+- `provider-api` gets the OpenAI `batches`, `files`, and `skills` endpoints.
+  Both targets serve batches and files. Only `primary` serves skills.
+  Neither target supports the explicit `cohere` format, so the converter
+  reports `CONFIG_FIELD_DROPPED`.
+
+The skills endpoint manages skill bundles at the provider. Inference requests
+reference an uploaded skill through OpenAI Responses or Anthropic Messages.
 
 # Reference-level explanation
 [reference-level-explanation]: #reference-level-explanation
@@ -84,7 +90,7 @@ models:
   - `capabilities` set to `["*", generate]` is equivalent to `["*"]`.
   - `formats` set to `[{type: "*"}, {type: passthrough}]` is equivalent to
     `[{type: "*"}]`.
-- An absent or empty list keeps its meaning of today.
+- In direct converter input, an absent or empty list keeps its existing meaning.
   - `formats` set to `[]` is equivalent to `[{type: openai}]`.
   - `capabilities` set to `[]` selects no capability.
 - Each format must be a value of `aimap.Formats()` or `*`.
@@ -339,9 +345,8 @@ and `llm/v1/files`. A mantle target works only in the `openai` and
 | `huggingface` | `generate`            | `llm/v1/chat`                   | `huggingface`                                                                                                                       |                                                                                               |
 | `typesafe`    | `decisions`           | `llm/v1/chat`                   | `typesafe`                                                                                                                          | ≥ 2.2. The format and the capability both have this gate                                      |
 
-The table leaves out two rules of `SupportedCapabilities`. `batches` and
-`files` are only for `type: api` models. One route label serves one genai
-category.
+Wildcard expansion reserves `batches`, `files`, and `skills` for `type: api`.
+One route label serves one genai category.
 
 ### Statistics
 
@@ -419,8 +424,8 @@ func LogStatisticsSupported(providerType string, spec EndpointSpec) bool
 target.ProviderType)` without:
 
 - capabilities with no endpoint that `TargetSupports` accepts,
-- capabilities that the model type does not allow (`type: api` gets only
-  `batches` and `files`),
+- capabilities outside the model's type (`type: api` gets only `batches`,
+  `files`, and `skills`),
 - capabilities that a `CapabilityFeature` gate leaves out,
 - capabilities whose endpoint an earlier capability of another genai
   category already uses.
@@ -535,7 +540,8 @@ Unit tests in `internal/aimap` cover:
 
 New cases in `convert/testdata`:
 
-- `87_min_runtime_wildcard_skips_gated`: a `*` model at 2.1 with no issue.
+- `87_min_runtime_wildcard_skips_gated`: the API wildcard at 2.1 serves batches
+  and files. The converter skips skills without an issue.
 - `91_wildcard_all`: each route of a `*` model has only the targets that
   support it.
 - `98_wildcard_issues`: an unknown format and a misspelled capability.
@@ -551,8 +557,8 @@ New cases in `convert/testdata`:
   `embeddings` and an `azure` target on `skills` give `BEHAVIOR_MAY_DIFFER`.
   The `skills` model is `type: api`, because a `type: model` model with
   only `skills` reverts as `type: api`.
-- `104_wildcard_capabilities_multi_format`: `*` capabilities with two
-  formats.
+- `104_wildcard_capabilities_multi_format`: the synchronous model uses two
+  formats. Each API wildcard gets a route-scoped, alias-less skills plugin.
 - `105_wildcard_bedrock_mantle`: a mantle `bedrock` target gets only the
   mantle routes.
 - `106_wildcard_bedrock_batches`: a `bedrock` target without

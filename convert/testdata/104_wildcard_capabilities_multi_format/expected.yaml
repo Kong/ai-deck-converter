@@ -59,15 +59,6 @@ services:
           - POST
           - OPTIONS
         strip_path: false
-      - name: openai-skills
-        paths:
-          - /chat/skills
-        methods:
-          - GET
-          - POST
-          - DELETE
-          - OPTIONS
-        strip_path: false
       - name: openai-videos
         paths:
           - /chat/videos
@@ -99,6 +90,15 @@ services:
           - DELETE
           - OPTIONS
         strip_path: false
+      - name: openai-skills
+        paths:
+          - /jobs-a/skills
+        methods:
+          - GET
+          - POST
+          - DELETE
+          - OPTIONS
+        strip_path: false
       - name: openai-batches-2
         paths:
           - /jobs-b/batches
@@ -110,6 +110,15 @@ services:
       - name: openai-files-2
         paths:
           - /jobs-b/files
+        methods:
+          - GET
+          - POST
+          - DELETE
+          - OPTIONS
+        strip_path: false
+      - name: openai-skills-2
+        paths:
+          - /jobs-b/skills
         methods:
           - GET
           - POST
@@ -357,25 +366,6 @@ plugins:
     route: openai-realtime
     tags:
       - ai-gateway-realtime-model:chat
-  - name: ai-proxy-advanced
-    config:
-      balancer:
-        algorithm: round-robin
-      genai_category: text/generation
-      llm_format: openai
-      model_name_header: false
-      targets:
-        - description: gpt-5.4
-          logging:
-            log_payloads: false
-            log_statistics: false
-          model:
-            model_alias: chat
-            name: gpt-5.4
-            provider: openai
-          route_type: llm/v1/skills
-    route: openai-skills
-    model: chat
   - name: ai-model-selector
     config:
       max_request_body_size: 8388608
@@ -468,6 +458,23 @@ plugins:
       llm_format: openai
       model_name_header: false
       targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: false
+          model:
+            name: gpt-5.4
+            provider: openai
+          route_type: llm/v1/skills
+    route: openai-skills
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      model_name_header: false
+      targets:
         - description: gpt-5.4-mini
           logging:
             log_payloads: false
@@ -494,6 +501,23 @@ plugins:
             provider: openai
           route_type: llm/v1/files
     route: openai-files-2
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      model_name_header: false
+      targets:
+        - description: gpt-5.4-mini
+          logging:
+            log_payloads: false
+            log_statistics: false
+          model:
+            name: gpt-5.4-mini
+            provider: openai
+          route_type: llm/v1/skills
+    route: openai-skills-2
   - name: ai-proxy-advanced
     config:
       balancer:

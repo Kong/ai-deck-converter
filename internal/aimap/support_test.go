@@ -180,15 +180,13 @@ func TestSupportedCapabilities(t *testing.T) {
 	require.Equal(t,
 		[]aigw.Capability{
 			"generate", "agentic", "audio/speech", "audio/transcription", "audio/translation",
-			"embeddings", "image", "realtime", "skills", "video",
+			"embeddings", "image", "realtime", "video",
 		},
 		SupportedCapabilities(aigw.Format{Type: "openai"}, openai, "model", LatestVersion))
+	require.Equal(t, []aigw.Capability{"batches", "files", "skills"},
+		SupportedCapabilities(aigw.Format{Type: "openai"}, openai, "api", mustVersion("2.2")))
 	require.Equal(t, []aigw.Capability{"batches", "files"},
-		SupportedCapabilities(aigw.Format{Type: "openai"}, openai, "api", LatestVersion))
-
-	// The skills gate leaves out skills below 2.2.
-	require.NotContains(t,
-		SupportedCapabilities(aigw.Format{Type: "openai"}, openai, "model", mustVersion("2.1")), "skills")
+		SupportedCapabilities(aigw.Format{Type: "openai"}, openai, "api", mustVersion("2.1")))
 	// The gemini agentic gate applies only in the gemini section.
 	require.NotContains(t,
 		SupportedCapabilities(aigw.Format{Type: "gemini"}, Target{ProviderType: "gemini"}, "model", mustVersion("2.2")),

@@ -1251,7 +1251,7 @@ func isAPIOnly(caps []string) bool {
 		return false
 	}
 	for _, c := range caps {
-		if c != "batches" && c != "files" && c != "skills" {
+		if !aimap.IsAPICapability(c) {
 			return false
 		}
 	}

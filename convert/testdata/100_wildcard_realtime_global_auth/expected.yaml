@@ -59,15 +59,6 @@ services:
           - POST
           - OPTIONS
         strip_path: false
-      - name: openai-skills
-        paths:
-          - /ai/skills
-        methods:
-          - GET
-          - POST
-          - DELETE
-          - OPTIONS
-        strip_path: false
       - name: openai-videos
         paths:
           - /ai/videos
@@ -288,25 +279,6 @@ plugins:
             provider: openai
           route_type: image/v1/images/edits
     route: openai-images-edits
-    model: everything
-  - name: ai-proxy-advanced
-    config:
-      balancer:
-        algorithm: round-robin
-      genai_category: text/generation
-      llm_format: openai
-      model_name_header: false
-      targets:
-        - description: gpt-5.4
-          logging:
-            log_payloads: false
-            log_statistics: false
-          model:
-            model_alias: everything
-            name: gpt-5.4
-            provider: openai
-          route_type: llm/v1/skills
-    route: openai-skills
     model: everything
   - name: ai-model-selector
     config:

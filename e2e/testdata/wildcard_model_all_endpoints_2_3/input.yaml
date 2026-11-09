@@ -1,6 +1,5 @@
-# A "*" model with one target of each provider type that AI Gateway 2.3
-# supports, plus a mantle bedrock target. The type api model covers batches
-# and files. The data plane must load every route.
+# The model wildcard includes a Bedrock Mantle target.
+# AI Gateway 2.3 must load skills routes under the API model's base path.
 models:
   - name: every-endpoint
     type: model

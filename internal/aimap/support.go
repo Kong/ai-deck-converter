@@ -198,6 +198,11 @@ func formatServes(format string, target Target) bool {
 	return false
 }
 
+// IsAPICapability reports whether an API model serves the capability.
+func IsAPICapability(capability aigw.Capability) bool {
+	return capability == "batches" || capability == "files" || capability == "skills"
+}
+
 // SupportedCapabilities returns the capabilities represented by "*" for a given
 // format, target, model type, and minimum runtime version.
 func SupportedCapabilities(
@@ -209,7 +214,7 @@ func SupportedCapabilities(
 	claimed := map[string]string{}
 	var out []aigw.Capability
 	for _, capability := range CapabilitiesFor(format.Type, target.ProviderType) {
-		if (modelType == "api") != (capability == "batches" || capability == "files") {
+		if (modelType == "api") != IsAPICapability(capability) {
 			continue
 		}
 		if f, gated := CapabilityFeature(section, capability); gated && !Supports(f, minRuntimeVersion) {
