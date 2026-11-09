@@ -1,5 +1,5 @@
-# From AI Gateway 2.3 an MCP server's openid-connect strategy + access.metadata
-# lowers to the openid-connect plugin itself: strategy config verbatim (the
+# An MCP server's openid-connect strategy + access.metadata lowers to the
+# openid-connect plugin itself: strategy config verbatim (the
 # principals block in particular, which ai-mcp-oauth2 cannot represent), the
 # metadata becoming the plugin's protected_resource_metadata block, and
 # auth_methods forced to bearer (ai-mcp-oauth2 parity). The strategy's full
@@ -15,7 +15,7 @@ auth_strategies:
       scopes: [openid, profile]
       # Interactive flows are warned and overridden to [bearer] on MCP routes.
       auth_methods: [authorization_code, bearer, client_credentials, password, introspection, userinfo, kong_oauth2, refresh_token, session]
-      # OIDC-only field with no ai-mcp-oauth2 target: carried verbatim here.
+      # Carried verbatim.
       cache_tokens_salt: pepper
       principals:
         enabled: true
@@ -36,7 +36,7 @@ mcp_servers:
       auth_strategies: [okta-oidc]
       metadata:
         endpoint: /mcp/flights/.well-known/oauth-protected-resource
-        # No openid-connect target on 2.3: warned and dropped.
+        # No openid-connect target: warned and dropped.
         discovery_endpoint: https://as.example.com/.well-known/oauth-protected-resource
         resource: https://api.example.com/mcp/flights
         authorization_servers:

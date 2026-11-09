@@ -60,7 +60,7 @@ var allFeatures = []Feature{
 	FeatureBedrockRuntimeResponses,
 	FeatureSagemaker,
 	FeatureAuthStrategyTokenVault,
-	FeatureMCPIdentityAuth,
+	FeatureOIDCProtectedResourceMetadata,
 }
 
 func TestFeatureTable(t *testing.T) {

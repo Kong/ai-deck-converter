@@ -1,12 +1,7 @@
 package convert
 
 import (
-	"encoding/base64"
-	"fmt"
 	"maps"
-	"net/url"
-	"strconv"
-	"strings"
 
 	"github.com/Kong/ai-deck-converter/internal/aigw"
 	"github.com/Kong/ai-deck-converter/internal/aimap"
@@ -14,9 +9,9 @@ import (
 )
 
 // mcpAuthStrategyPlugins builds the authentication plugin(s) for an MCP server's
-// access.auth_strategies / access.metadata, appending the metadata endpoint
-// path to the route when an ai-mcp-oauth2 plugin is produced. It returns nil
-// when the server declares no auth strategy or metadata access.
+// access.auth_strategies / access.metadata. It adds the metadata endpoint
+// path to the route when the server has metadata. It returns nil when the
+// server declares no auth strategy or metadata access.
 //
 // Unlike agents and models (convert/authstrategy.go), MCP auth never
 // synthesizes an anonymous consumer / request-termination: the ai-mcp-oauth2
@@ -30,9 +25,7 @@ func (c *Converter) mcpAuthStrategyPlugins(
 		return nil, nil
 	}
 
-	// Listener guard: only listener-style modes can front the ai-mcp-oauth2
-	// plugin (and its metadata endpoint). Reject rather than drop the requested
-	// authentication behavior.
+	// Only listener types accept an auth plugin and its metadata endpoint.
 	if !aimap.MCPAccessAllowed(m.Type) {
 		var fields []string
 		if len(m.Access.AuthStrategies) > 0 {
@@ -70,21 +63,24 @@ func (c *Converter) mcpAuthStrategyPlugins(
 	// are missing.
 	var plugin kong.Plugin
 	if meta != nil {
-		// From 2.3, the openid-connect plugin serves the metadata. It also
-		// resolves the Kong Identity principals of the strategy. Metadata
-		// without a strategy stays on ai-mcp-oauth2 for discovery.
-		build, source := c.mcpOAuth2Plugin, mcpOAuth2Source
-		if idp != nil && idp.Type == authStrategyTypeOpenIDConnect && c.supports(aimap.FeatureMCPIdentityAuth) {
-			build, source = c.mcpOIDCPlugin, mcpOIDCSource
+		// Metadata without a strategy has no issuer for openid-connect.
+		// It stays on ai-mcp-oauth2 for discovery.
+		if idp != nil {
+			if !c.supports(aimap.FeatureOIDCProtectedResourceMetadata) {
+				return nil, c.failUnsupported(src.at("access.metadata", mcpAuthStrategyField),
+					aimap.FeatureOIDCProtectedResourceMetadata,
+					"access.metadata with an openid-connect auth strategy")
+			}
+			plugin, err = c.mcpOIDCPlugin(src, m, idp, meta)
+		} else {
+			plugin, err = c.mcpOAuth2Plugin(src, m, meta)
 		}
-		plugin, err = build(src, m, idp, meta)
 		if err != nil {
 			return nil, err
 		}
 		if meta.Endpoint != "" {
 			route.Paths = append(route.Paths, meta.Endpoint)
 		}
-		plugin.Source = source(m, idp, meta)
 	} else {
 		cfg := make(map[string]any, len(idp.Config))
 		maps.Copy(cfg, idp.Config)
@@ -100,8 +96,9 @@ func (c *Converter) mcpAuthStrategyPlugins(
 
 	// oauth_access_token ACL subjects read the claims in
 	// kong.ctx.shared.ai_mcp_oauth2. ai-mcp-oauth2 always sets these claims.
-	// openid-connect sets them from 2.3.
-	oidcPublishesACLClaims := plugin.Name == authStrategyTypeOpenIDConnect && c.supports(aimap.FeatureMCPIdentityAuth)
+	// openid-connect sets them from the release of protected_resource_metadata.
+	oidcPublishesACLClaims := plugin.Name == authStrategyTypeOpenIDConnect &&
+		c.supports(aimap.FeatureOIDCProtectedResourceMetadata)
 	if m.Access.ACLAttributeType == "oauth_access_token" &&
 		plugin.Name != "ai-mcp-oauth2" && !oidcPublishesACLClaims {
 		c.warn(src.at("access.acl_attribute_type"), BehaviorMayDiffer,
@@ -111,32 +108,6 @@ func (c *Converter) mcpAuthStrategyPlugins(
 				"match and denies every request.", m.Name, plugin.Name)
 	}
 	return []kong.Plugin{plugin}, nil
-}
-
-func mcpOAuth2Source(
-	m *aigw.MCPServer,
-	idp *aigw.AuthStrategy,
-	meta *aigw.MCPProtectedResourceMetadata,
-) *kong.Source {
-	return source("mcp_server", m.Name, "access.metadata",
-		kong.FieldMapping{GeneratedPrefix: "config.resource", SourcePrefix: "access.metadata.resource"},
-		kong.FieldMapping{
-			GeneratedPrefix: "config.authorization_servers",
-			SourcePrefix:    authorizationServersSource(idp, meta),
-		},
-		kong.FieldMapping{
-			GeneratedPrefix: "config.scopes_supported",
-			SourcePrefix:    scopesSupportedSource(idp, meta),
-		},
-		kong.FieldMapping{GeneratedPrefix: "config.metadata_endpoint", SourcePrefix: "access.metadata.endpoint"},
-		kong.FieldMapping{
-			GeneratedPrefix: "config.metadata_discovery_endpoint",
-			SourcePrefix:    "access.metadata.discovery_endpoint",
-		},
-		kong.FieldMapping{GeneratedPrefix: "config.client_id", SourcePrefix: "access.auth_strategies"},
-		kong.FieldMapping{GeneratedPrefix: "config.client_secret", SourcePrefix: "access.auth_strategies"},
-		kong.FieldMapping{GeneratedPrefix: "config.ssl_verify", SourcePrefix: "access.auth_strategies"},
-	)
 }
 
 // mcpAuthStrategyField is the path of the auth strategy of an MCP server.
@@ -159,6 +130,13 @@ func (c *Converter) mcpAccessAuthStrategy(
 	}
 	if err := c.checkAuthStrategyType(src, mcpAuthStrategyField, idp); err != nil {
 		return nil, err
+	}
+	// The openid-connect plugin requires an issuer.
+	if idp.Type == authStrategyTypeOpenIDConnect && firstConfigString(idp.Config, "issuer") == "" {
+		return nil, c.fail(src.at(mcpAuthStrategyField), MissingRequiredConfigField,
+			"MCP server %q references openid-connect auth strategy %q without config.issuer; "+
+				"the openid-connect plugin requires one",
+			m.Name, idp.Name)
 	}
 	return idp, nil
 }
@@ -206,107 +184,57 @@ func mcpEffectiveScopes(
 	return meta.ScopesSupported
 }
 
-// mcpOAuth2Plugin builds an ai-mcp-oauth2 plugin from an MCP server's Protected
-// Resource Metadata and (optional) openid-connect auth strategy. Required
-// plugin fields are resource and authorization_servers; the metadata is the
-// primary source, with the OIDC issuer/scopes filling in when the metadata
-// omits them.
+// mcpOAuth2Plugin makes the ai-mcp-oauth2 plugin for an MCP server with
+// metadata and no auth strategy.
 func (c *Converter) mcpOAuth2Plugin(
-	src ConversionIssueSource, m *aigw.MCPServer, idp *aigw.AuthStrategy, meta *aigw.MCPProtectedResourceMetadata,
+	src ConversionIssueSource, m *aigw.MCPServer, meta *aigw.MCPProtectedResourceMetadata,
 ) (kong.Plugin, error) {
-	cfg := map[string]any{}
-
-	resource, authServers, err := c.mcpProtectedResource(src, m, idp, meta)
+	resource, authServers, err := c.mcpProtectedResource(src, m, nil, meta)
 	if err != nil {
 		return kong.Plugin{}, err
 	}
-	cfg["resource"] = resource
-	cfg["authorization_servers"] = authServers
-
-	if scopes := mcpEffectiveScopes(meta, idp); len(scopes) > 0 {
-		cfg["scopes_supported"] = scopes
+	cfg := map[string]any{
+		"resource":              resource,
+		"authorization_servers": authServers,
 	}
-
+	if len(meta.ScopesSupported) > 0 {
+		cfg["scopes_supported"] = meta.ScopesSupported
+	}
 	setIfNotEmpty(cfg, "metadata_endpoint", meta.Endpoint)
 	setIfNotEmpty(cfg, "metadata_discovery_endpoint", meta.DiscoveryEndpoint)
-	if idp != nil {
-		// ai-mcp-oauth2 cannot represent token_exchange. Without the exchange,
-		// the caller's token goes to the upstream unchanged. The openid-connect
-		// lowering keeps token_exchange.
-		if te, ok := idp.Config["token_exchange"]; ok && !isEmptyConfigValue(te) {
-			return kong.Plugin{}, c.fail(src.at(mcpAuthStrategyField), ConfigFieldInvalid,
-				"MCP server %q auth strategy %q sets config.token_exchange, which ai-mcp-oauth2 "+
-					"cannot represent; the token exchange would NOT be applied and the caller's token "+
-					"forwarded verbatim. Remove access.metadata to keep an openid-connect plugin, "+
-					"or drop token_exchange from the strategy.",
-				m.Name, idp.Name)
-		}
-		applyOIDCFieldsToOAuth2(cfg, idp.Config)
-		// The gateway rejects client_id without a client credential.
-		// client_secret is the only credential that maps onto the plugin.
-		// A client_id without a secret is left out.
-		if firstConfigString(idp.Config, "client_id") != "" &&
-			firstConfigString(idp.Config, "client_secret") == "" {
-			delete(cfg, "client_id")
-			c.warn(src.at(mcpAuthStrategyField), ConfigFieldIgnored,
-				"MCP server %q auth strategy %q sets client_id but no client_secret. "+
-					"The gateway requires a client credential with client_id, so the plugin "+
-					"leaves client_id out. Token validation does not use it.",
-				m.Name, idp.Name)
-		}
-		proxyConfig, err := oidcProxyConfig(idp.Config)
-		if err != nil {
-			return kong.Plugin{}, c.fail(src.at(mcpAuthStrategyField), ConfigFieldInvalid,
-				"MCP server %q references an auth strategy with unsupported proxy configuration: %s",
-				m.Name, err)
-		}
-		if proxyConfig != nil {
-			cfg["proxy_config"] = proxyConfig
-		}
-		// passthrough_credentials is the inverse of the provider's
-		// hide_credentials (OIDC default true); only the non-default
-		// (hide_credentials: false) is carried, as passthrough_credentials: true.
-		if hide, ok := idp.Config["hide_credentials"].(bool); ok && !hide {
-			cfg["passthrough_credentials"] = true
-		}
-	}
 
-	// The Token Vault auth provider exchanges the caller's bearer token for
-	// the upstream credential. ai-mcp-oauth2 clears the Authorization header
-	// by default, and the exchange then fails. passthrough_credentials keeps
-	// the token; the Token Vault auth provider removes it before proxying.
-	// With token_vault, only a server without a strategy gets this plugin.
-	// There is no strategy hide_credentials to override.
+	// ai-mcp-oauth2 clears the Authorization header by default.
+	// The Token Vault needs the caller's bearer token for its exchange.
 	if m.TokenVault != nil {
 		cfg["passthrough_credentials"] = true
 	}
+	// No strategy requires an audience.
+	cfg["insecure_relaxed_audience_validation"] = true
 
-	// expected_audience carries the literal audience value. ai-mcp-oauth2
-	// validates a single audience; a provider with more than one
-	// audience_required value keeps only the first and warns.
-	// insecure_relaxed_audience_validation mirrors the provider's audience
-	// enforcement: AI Gateway validates the audience only when audience_required
-	// is set, so the plugin relaxes validation (true) unless the provider
-	// required one. Always emitted (see aimap.OIDCToMCPOAuth2Fields doc).
-	auds := oidcAudienceRequired(idp)
-	if len(auds) > 0 {
-		cfg["expected_audience"] = auds[0]
-		if len(auds) > 1 {
-			c.warn(src.at(mcpAuthStrategyField), ConfigFieldIgnored,
-				"MCP server %q auth strategy %q sets %d values in config.audience_required. "+
-					"ai-mcp-oauth2 validates a single config.expected_audience, so only %q is kept.",
-				m.Name, idp.Name, len(auds), auds[0])
-		}
-	}
-	cfg["insecure_relaxed_audience_validation"] = len(auds) == 0
-
-	return kong.Plugin{Name: "ai-mcp-oauth2", Config: cfg}, nil
+	return kong.Plugin{
+		Name:   "ai-mcp-oauth2",
+		Config: cfg,
+		Source: source("mcp_server", m.Name, "access.metadata",
+			kong.FieldMapping{GeneratedPrefix: "config.resource", SourcePrefix: "access.metadata.resource"},
+			kong.FieldMapping{
+				GeneratedPrefix: "config.authorization_servers",
+				SourcePrefix:    "access.metadata.authorization_servers",
+			},
+			kong.FieldMapping{
+				GeneratedPrefix: "config.scopes_supported",
+				SourcePrefix:    "access.metadata.scopes_supported",
+			},
+			kong.FieldMapping{GeneratedPrefix: "config.metadata_endpoint", SourcePrefix: "access.metadata.endpoint"},
+			kong.FieldMapping{
+				GeneratedPrefix: "config.metadata_discovery_endpoint",
+				SourcePrefix:    "access.metadata.discovery_endpoint",
+			},
+		),
+	}, nil
 }
 
-// mcpOIDCPlugin makes the 2.3 openid-connect plugin for an MCP server with
-// metadata. It copies the strategy config without the field changes of
-// mcpOAuth2Plugin. auth_methods is always bearer, the only method of
-// ai-mcp-oauth2.
+// mcpOIDCPlugin makes the openid-connect plugin for an MCP server with an
+// auth strategy and metadata. auth_methods is always bearer.
 func (c *Converter) mcpOIDCPlugin(
 	src ConversionIssueSource, m *aigw.MCPServer, idp *aigw.AuthStrategy, meta *aigw.MCPProtectedResourceMetadata,
 ) (kong.Plugin, error) {
@@ -357,10 +285,14 @@ func (c *Converter) mcpOIDCPlugin(
 	}
 	hideOIDCAccessToken(cfg)
 
-	return kong.Plugin{Name: authStrategyTypeOpenIDConnect, Config: cfg}, nil
+	return kong.Plugin{
+		Name:   authStrategyTypeOpenIDConnect,
+		Config: cfg,
+		Source: mcpOIDCSource(m, idp, meta),
+	}, nil
 }
 
-// mcpOIDCSource is mcpOAuth2Source for the fields of mcpOIDCPlugin.
+// mcpOIDCSource gives the source of each field of mcpOIDCPlugin.
 func mcpOIDCSource(
 	m *aigw.MCPServer,
 	idp *aigw.AuthStrategy,
@@ -411,147 +343,8 @@ func scopesSupportedSource(
 	return "access.metadata.scopes_supported"
 }
 
-// oidcProxyConfig lowers openid-connect's legacy flat proxy fields into the
-// proxy_config record used by ai-mcp-oauth2. The target has one proxy scheme
-// and one Basic-auth credential pair shared by both HTTP and HTTPS proxies, so
-// configurations that require distinct schemes or credentials are rejected
-// rather than silently changed.
-func oidcProxyConfig(oidc map[string]any) (map[string]any, error) {
-	httpProxy, err := oidcProxyEndpoint(configString(oidc, "http_proxy"))
-	if err != nil {
-		return nil, fmt.Errorf("http_proxy: %w", err)
-	}
-	httpsProxy, err := oidcProxyEndpoint(configString(oidc, "https_proxy"))
-	if err != nil {
-		return nil, fmt.Errorf("https_proxy: %w", err)
-	}
-
-	httpAuth := configString(oidc, "http_proxy_authorization")
-	httpsAuth := configString(oidc, "https_proxy_authorization")
-	if httpAuth != "" && httpProxy == nil {
-		return nil, fmt.Errorf("http_proxy_authorization requires http_proxy")
-	}
-	if httpsAuth != "" && httpsProxy == nil {
-		return nil, fmt.Errorf("https_proxy_authorization requires https_proxy")
-	}
-	if httpProxy != nil && httpsProxy != nil {
-		if httpProxy.scheme != httpsProxy.scheme {
-			return nil, fmt.Errorf("http_proxy and https_proxy must use the same scheme")
-		}
-		if (httpAuth == "") != (httpsAuth == "") || (httpAuth != "" && httpAuth != httpsAuth) {
-			return nil, fmt.Errorf("http_proxy and https_proxy must use the same authorization")
-		}
-	}
-
-	if httpProxy == nil && httpsProxy == nil && httpAuth == "" &&
-		httpsAuth == "" && configString(oidc, "no_proxy") == "" {
-		return nil, nil
-	}
-
-	proxyConfig := map[string]any{}
-	if httpProxy != nil {
-		proxyConfig["http_proxy_host"] = httpProxy.host
-		if httpProxy.port != nil {
-			proxyConfig["http_proxy_port"] = *httpProxy.port
-		}
-		proxyConfig["proxy_scheme"] = httpProxy.scheme
-	}
-	if httpsProxy != nil {
-		proxyConfig["https_proxy_host"] = httpsProxy.host
-		if httpsProxy.port != nil {
-			proxyConfig["https_proxy_port"] = *httpsProxy.port
-		}
-		if _, exists := proxyConfig["proxy_scheme"]; !exists {
-			proxyConfig["proxy_scheme"] = httpsProxy.scheme
-		}
-	}
-	setIfNotEmpty(proxyConfig, "no_proxy", configString(oidc, "no_proxy"))
-
-	authorization := httpAuth
-	if authorization == "" {
-		authorization = httpsAuth
-	}
-	if authorization != "" {
-		username, password, err := basicProxyCredentials(authorization)
-		if err != nil {
-			return nil, err
-		}
-		proxyConfig["auth_username"] = username
-		proxyConfig["auth_password"] = password
-	}
-
-	return proxyConfig, nil
-}
-
-type oidcProxyEndpointConfig struct {
-	host   string
-	port   *int
-	scheme string
-}
-
-func oidcProxyEndpoint(raw string) (*oidcProxyEndpointConfig, error) {
-	if raw == "" {
-		return nil, nil
-	}
-	u, err := url.Parse(raw)
-	if err != nil || u.Scheme == "" || u.Host == "" {
-		return nil, fmt.Errorf("must be an absolute URL")
-	}
-	if u.User != nil || (u.Path != "" && u.Path != "/") || u.RawQuery != "" || u.Fragment != "" {
-		return nil, fmt.Errorf("must not include user info, a path, a query, or a fragment")
-	}
-	if u.Scheme != "http" && u.Scheme != "https" {
-		return nil, fmt.Errorf("scheme must be http or https")
-	}
-
-	endpoint := &oidcProxyEndpointConfig{host: u.Hostname(), scheme: u.Scheme}
-	if rawPort := u.Port(); rawPort != "" {
-		port, err := strconv.Atoi(rawPort)
-		if err != nil || port < 1 || port > 65535 {
-			return nil, fmt.Errorf("has an invalid port")
-		}
-		endpoint.port = &port
-	}
-	return endpoint, nil
-}
-
-func basicProxyCredentials(authorization string) (string, string, error) {
-	parts := strings.Fields(authorization)
-	if len(parts) != 2 || !strings.EqualFold(parts[0], "Basic") {
-		return "", "", fmt.Errorf("proxy authorization must use the Basic scheme")
-	}
-
-	decoded, err := base64.StdEncoding.DecodeString(parts[1])
-	if err != nil {
-		decoded, err = base64.RawStdEncoding.DecodeString(parts[1])
-	}
-	if err != nil {
-		return "", "", fmt.Errorf("proxy authorization has invalid Basic credentials")
-	}
-	username, password, found := strings.Cut(string(decoded), ":")
-	if !found {
-		return "", "", fmt.Errorf("proxy authorization Basic credentials must contain a username and password")
-	}
-	return username, password, nil
-}
-
-func configString(config map[string]any, key string) string {
-	v, _ := config[key].(string)
-	return v
-}
-
-// oidcAudienceRequired returns an openid-connect auth strategy's
-// audience_required values, or nil when idp is nil or the field is unset.
-func oidcAudienceRequired(idp *aigw.AuthStrategy) []string {
-	if idp == nil {
-		return nil
-	}
-	return configStrings(idp.Config, "audience_required")
-}
-
 // isEmptyConfigValue reports whether a decoded config value carries no data:
-// nil, or an empty map/slice. Used to tell "token_exchange present" from an
-// absent or blank block so the drop warning only fires when a control is real.
+// nil, or an empty map/slice.
 func isEmptyConfigValue(v any) bool {
 	switch t := v.(type) {
 	case nil:
@@ -562,35 +355,6 @@ func isEmptyConfigValue(v any) bool {
 		return len(t) == 0
 	default:
 		return false
-	}
-}
-
-// applyOIDCFieldsToOAuth2 lowers an openid-connect auth strategy's config
-// fields onto an ai-mcp-oauth2 plugin config, following aimap's shared field
-// table so the forward and reverse mappings cannot drift. Fields absent from
-// the provider config (and empty scalars for the array-first kinds) are left
-// off the plugin entirely.
-func applyOIDCFieldsToOAuth2(cfg, oidc map[string]any) {
-	for _, f := range aimap.OIDCToMCPOAuth2Fields {
-		switch f.Kind {
-		case aimap.OAuth2Passthrough:
-			if v, ok := oidc[f.OIDCKey]; ok {
-				cfg[f.OAuth2Key] = v
-			}
-		case aimap.OAuth2FirstOfArray:
-			setIfNotEmpty(cfg, f.OAuth2Key, firstConfigString(oidc, f.OIDCKey))
-		case aimap.OAuth2FirstOfPaths:
-			if p := firstConfigPath(oidc, f.OIDCKey); len(p) > 0 {
-				cfg[f.OAuth2Key] = p
-			}
-		}
-	}
-
-	// ai-mcp-oauth2 has only the single-path credential_claim.
-	// The first credential_claims path wins over credential_claim.
-	// Revert gives back credential_claim only.
-	if p := firstConfigPath(oidc, "credential_claims"); len(p) > 0 {
-		cfg["credential_claim"] = p
 	}
 }
 
@@ -612,28 +376,6 @@ func firstConfigString(config map[string]any, key string) string {
 		}
 	}
 	return ""
-}
-
-// firstConfigPath reads config[key] as an array-of-paths ([][]string) and
-// returns its first path as a []any (the openid-connect consumer_claims shape
-// lowered onto the ai-mcp-oauth2 single-path consumer_claim). It tolerates
-// []any or []string path elements.
-func firstConfigPath(config map[string]any, key string) []any {
-	arr, ok := config[key].([]any)
-	if !ok || len(arr) == 0 {
-		return nil
-	}
-	switch p := arr[0].(type) {
-	case []any:
-		return p
-	case []string:
-		out := make([]any, len(p))
-		for i, s := range p {
-			out[i] = s
-		}
-		return out
-	}
-	return nil
 }
 
 // configStrings reads config[key] as a []string, accepting []any or []string.

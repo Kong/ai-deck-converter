@@ -88,34 +88,36 @@ const (
 	FeatureBaseten                    Feature = "baseten"
 	FeatureSagemaker                  Feature = "sagemaker"
 	FeatureAuthStrategyTokenVault     Feature = "auth-strategy-token-vault"
-	FeatureMCPIdentityAuth            Feature = "mcp-identity-auth"
+	// FeatureOIDCProtectedResourceMetadata is the openid-connect plugin field
+	// protected_resource_metadata. It is a plugin schema gate, not an API field.
+	FeatureOIDCProtectedResourceMetadata Feature = "oidc-protected-resource-metadata"
 )
 
 // featureSince maps each feature to its first AI Gateway release. The source
 // is the x-min-runtime-version annotations of the Konnect AI Gateway API spec.
 var featureSince = map[Feature]Version{
-	FeatureTargetCostList:             mustVersion("2.1"),
-	FeaturePolicyCondition:            mustVersion("2.1"),
-	FeaturePolicyExpressions:          mustVersion("2.3"),
-	FeatureMCPUpstreamProtocolVersion: mustVersion("2.1"),
-	FeatureACLWhen:                    mustVersion("2.2"),
-	FeaturePassthroughFormat:          mustVersion("2.2"),
-	FeatureTypesafe:                   mustVersion("2.2"),
-	FeatureDecisionsCapability:        mustVersion("2.2"),
-	FeatureSkillsCapability:           mustVersion("2.2"),
-	FeatureFailoverHTTPCodes:          mustVersion("2.3"),
-	FeatureBedrockVPCEndpoint:         mustVersion("2.3"),
-	FeatureBedrockEndpointType:        mustVersion("2.3"),
-	FeatureMCPTokenVault:              mustVersion("2.3"),
-	FeatureProviderTokenVault:         mustVersion("2.3"),
-	FeatureMCPRateLimiting:            mustVersion("2.3"),
-	FeatureMCPACLWhen:                 mustVersion("2.3"),
-	FeatureGeminiAgenticCapability:    mustVersion("2.3"),
-	FeatureBedrockRuntimeResponses:    mustVersion("2.3"),
-	FeatureBaseten:                    mustVersion("2.3"),
-	FeatureSagemaker:                  mustVersion("2.1"),
-	FeatureAuthStrategyTokenVault:     mustVersion("2.3"),
-	FeatureMCPIdentityAuth:            mustVersion("2.3"),
+	FeatureTargetCostList:                mustVersion("2.1"),
+	FeaturePolicyCondition:               mustVersion("2.1"),
+	FeaturePolicyExpressions:             mustVersion("2.3"),
+	FeatureMCPUpstreamProtocolVersion:    mustVersion("2.1"),
+	FeatureACLWhen:                       mustVersion("2.2"),
+	FeaturePassthroughFormat:             mustVersion("2.2"),
+	FeatureTypesafe:                      mustVersion("2.2"),
+	FeatureDecisionsCapability:           mustVersion("2.2"),
+	FeatureSkillsCapability:              mustVersion("2.2"),
+	FeatureFailoverHTTPCodes:             mustVersion("2.3"),
+	FeatureBedrockVPCEndpoint:            mustVersion("2.3"),
+	FeatureBedrockEndpointType:           mustVersion("2.3"),
+	FeatureMCPTokenVault:                 mustVersion("2.3"),
+	FeatureProviderTokenVault:            mustVersion("2.3"),
+	FeatureMCPRateLimiting:               mustVersion("2.3"),
+	FeatureMCPACLWhen:                    mustVersion("2.3"),
+	FeatureGeminiAgenticCapability:       mustVersion("2.3"),
+	FeatureBedrockRuntimeResponses:       mustVersion("2.3"),
+	FeatureBaseten:                       mustVersion("2.3"),
+	FeatureSagemaker:                     mustVersion("2.1"),
+	FeatureAuthStrategyTokenVault:        mustVersion("2.3"),
+	FeatureOIDCProtectedResourceMetadata: mustVersion("2.3"),
 }
 
 // Since returns the first AI Gateway release that has f. It panics for an

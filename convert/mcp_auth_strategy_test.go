@@ -4,23 +4,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Kong/ai-deck-converter/internal/aimap"
 	"github.com/Kong/ai-deck-converter/internal/kong"
 	"github.com/stretchr/testify/require"
 )
-
-// convertYAMLBelow23 converts with min_runtime_version 2.2. Below 2.3, an
-// openid-connect strategy lowers to ai-mcp-oauth2.
-func convertYAMLBelow23(src []byte) ([]byte, []string, error) {
-	opts := testOptions
-	opts.MinRuntimeVersion = aimap.Version{Major: 2, Minor: 2}.String()
-	result, err := Convert(src, opts)
-	if err != nil {
-		return nil, nil, err
-	}
-	data, err := result.Output.ToYAML()
-	return data, reasons(result.Issues), err
-}
 
 // keyAuthWithMetadata references a key-auth auth strategy together with
 // access.metadata, which is unsupported (OAuth Protected Resource Metadata
@@ -96,6 +82,39 @@ func TestMCPAuthStrategyUnsupportedListenerIsHardError(t *testing.T) {
 	require.Contains(t, issue.Reason, "only supported for listener, conversion-listener, and passthrough-listener")
 }
 
+// TestMCPOIDCWithoutIssuerIsHardError checks that an openid-connect strategy
+// without an issuer leaves out the MCP server, with and without metadata.
+func TestMCPOIDCWithoutIssuerIsHardError(t *testing.T) {
+	const metadata = `
+      metadata:
+        resource: https://api.example.com/mcp
+        authorization_servers: [https://issuer.example.com]`
+	for name, access := range map[string]string{"with metadata": metadata, "without metadata": ""} {
+		t.Run(name, func(t *testing.T) {
+			result, err := Convert([]byte(`
+auth_strategies:
+  - name: no-issuer
+    type: openid-connect
+    config: {client_id: [mcp-client], client_secret: [secret]}
+mcp_servers:
+  - type: listener
+    name: no-issuer-mcp
+    config:
+      route: {paths: [/mcp/no-issuer]}
+    access:
+      auth_strategies: [no-issuer]`+access+`
+    tools:
+      - {name: ping, description: Ping, method: GET, path: /ping, scheme: https, host: ping.internal}
+`), testOptions)
+			require.NoError(t, err)
+			issue := requireIssue(t, result.Issues, Error, MissingRequiredConfigField,
+				kindMCPServer, "no-issuer-mcp", "access.auth_strategies[0]")
+			require.Contains(t, issue.Reason, "config.issuer")
+			require.Empty(t, result.Output.Services, "the MCP server is left out")
+		})
+	}
+}
+
 // oidcMetadataWithoutAuthServers omits metadata.authorization_servers so the
 // OIDC issuer is used as the fallback.
 const oidcMetadataWithoutAuthServers = `
@@ -124,218 +143,21 @@ mcp_servers:
         host: fallback.internal
 `
 
-func TestMCPOAuth2FallsBackToIssuerForAuthServers(t *testing.T) {
-	out, warnings, err := convertYAMLBelow23([]byte(oidcMetadataWithoutAuthServers))
+func TestMCPOIDCFallsBackToIssuerForAuthServers(t *testing.T) {
+	out, warnings, err := convertYAML([]byte(oidcMetadataWithoutAuthServers))
 	require.NoError(t, err)
 	require.Empty(t, warnings)
 	s := string(out)
-	require.Contains(t, s, "ai-mcp-oauth2")
+	require.Contains(t, s, "name: openid-connect")
+	require.NotContains(t, s, "ai-mcp-oauth2")
 	require.Contains(t, s, "authorization_servers")
 	require.Contains(t, s, "https://issuer.example.com/oauth2",
 		"issuer should populate authorization_servers when metadata omits them")
 }
 
-// oidcWithMappedFields carries a spread of the Gap 1 & 2 auth strategy fields plus
-// an OIDC-only field (cache_tokens_salt) that has no ai-mcp-oauth2 target.
-const oidcWithMappedFields = `
-auth_strategies:
-  - name: okta-oidc
-    type: openid-connect
-    config:
-      issuer: https://issuer.example.com
-      client_auth: [client_secret_post, none]
-      client_alg: [RS256]
-      cache_introspection: true
-      introspection_endpoint: https://issuer.example.com/introspect
-      leeway: 30
-      timeout: 5000
-      http_proxy: http://proxy.example.com:8080
-      http_proxy_authorization: Basic dGVzdDpwYXNz
-      https_proxy: http://secure-proxy.example.com:8443
-      https_proxy_authorization: Basic dGVzdDpwYXNz
-      no_proxy: localhost,.example.com
-      consumer_by: [username]
-      consumer_claims: [[sub], [email]]
-      upstream_headers:
-        - header: X-User-ID
-          path: [user, id]
-      cache_tokens_salt: pepper
-mcp_servers:
-  - type: listener
-    name: mapped-mcp
-    config:
-      route:
-        paths: [/mcp/mapped]
-    access:
-      auth_strategies: [okta-oidc]
-      metadata:
-        endpoint: /mcp/mapped/.well-known/oauth-protected-resource
-        resource: https://api.example.com/mcp/mapped
-        authorization_servers: [https://issuer.example.com]
-    tools:
-      - name: ping
-        description: Ping
-        method: GET
-        path: /ping
-        scheme: https
-        host: mapped.internal
-`
-
-func TestMCPOAuth2MapsAuthStrategyFields(t *testing.T) {
-	out, warnings, err := convertYAMLBelow23([]byte(oidcWithMappedFields))
-	require.NoError(t, err)
-	require.Empty(t, warnings)
-	s := string(out)
-	// Passthrough (verbatim) and rename.
-	require.Contains(t, s, "cache_introspection: true")
-	require.Contains(t, s, "introspection_endpoint: https://issuer.example.com/introspect")
-	require.Contains(t, s, "timeout: 5000")
-	require.Contains(t, s, "proxy_config:")
-	require.Contains(t, s, "auth_username: test")
-	require.Contains(t, s, "auth_password: pass")
-	require.Contains(t, s, "http_proxy_host: proxy.example.com")
-	require.Contains(t, s, "http_proxy_port: 8080")
-	require.Contains(t, s, "https_proxy_host: secure-proxy.example.com")
-	require.Contains(t, s, "https_proxy_port: 8443")
-	require.Contains(t, s, "proxy_scheme: http")
-	require.Contains(t, s, "no_proxy: localhost,.example.com")
-	require.Contains(t, s, "upstream_headers:")
-	require.Contains(t, s, "header: X-User-ID")
-	require.Contains(t, s, "path:\n                    - user\n                    - id")
-	require.Contains(t, s, "jwt_claims_leeway: 30", "leeway renames to jwt_claims_leeway")
-	// FirstOfArray: OIDC array collapses to a single plugin scalar (element 0).
-	require.Contains(t, s, "client_auth: client_secret_post")
-	require.Contains(t, s, "client_alg: RS256")
-	require.NotContains(t, s, "none", "only the first client_auth element is mapped")
-	// FirstOfPaths: only the first consumer claim path survives.
-	require.Contains(t, s, "consumer_claim:")
-	require.NotContains(t, s, "email", "only the first consumer_claims path is mapped")
-	// OIDC-only field with no target must be dropped.
-	require.NotContains(t, s, "cache_tokens_salt")
-	// No audience_required on this provider => relaxed validation by default.
-	require.Contains(t, s, "insecure_relaxed_audience_validation: true")
-}
-
-func TestApplyOIDCFieldsToOAuth2CredentialClaim(t *testing.T) {
-	tests := []struct {
-		name     string
-		oidc     map[string]any
-		expected any
-	}{
-		{
-			name: "both fields absent",
-			oidc: map[string]any{},
-		},
-		{
-			name:     "credential_claim only",
-			oidc:     map[string]any{"credential_claim": []any{"user", "id"}},
-			expected: []any{"user", "id"},
-		},
-		{
-			name: "credential_claims only",
-			oidc: map[string]any{
-				"credential_claims": []any{[]any{"user", "id"}, []any{"email"}},
-			},
-			expected: []any{"user", "id"},
-		},
-		{
-			name: "credential_claims wins over credential_claim",
-			oidc: map[string]any{
-				"credential_claim":  []any{"sub"},
-				"credential_claims": []any{[]any{"user", "id"}},
-			},
-			expected: []any{"user", "id"},
-		},
-		{
-			name: "empty credential_claims keeps credential_claim",
-			oidc: map[string]any{
-				"credential_claim":  []any{"sub"},
-				"credential_claims": []any{},
-			},
-			expected: []any{"sub"},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cfg := map[string]any{}
-			applyOIDCFieldsToOAuth2(cfg, tt.oidc)
-
-			require.NotContains(t, cfg, "credential_claims")
-			if tt.expected == nil {
-				require.NotContains(t, cfg, "credential_claim")
-				return
-			}
-			require.Equal(t, tt.expected, cfg["credential_claim"])
-		})
-	}
-}
-
-func TestOIDCProxyConfigRejectsDistinctProxyAuthorization(t *testing.T) {
-	_, err := oidcProxyConfig(map[string]any{
-		"http_proxy":                "http://proxy.example.com:8080",
-		"http_proxy_authorization":  "Basic dGVzdDpwYXNz",
-		"https_proxy":               "http://secure-proxy.example.com:8443",
-		"https_proxy_authorization": "Basic c2VjdXJlOnBhc3M=",
-	})
-	require.EqualError(t, err, "http_proxy and https_proxy must use the same authorization")
-}
-
-func TestBasicProxyCredentialsAcceptsUnpaddedBase64AndWhitespace(t *testing.T) {
-	username, password, err := basicProxyCredentials("Basic\tdXNlcjpwdw")
-	require.NoError(t, err)
-	require.Equal(t, "user", username)
-	require.Equal(t, "pw", password)
-}
-
-// oidcWithAudienceAndPassthrough exercises the two derived fields: a provider
-// that disables hide_credentials and requires an audience.
-const oidcWithAudienceAndPassthrough = `
-auth_strategies:
-  - name: okta-oidc
-    type: openid-connect
-    config:
-      issuer: https://issuer.example.com
-      hide_credentials: false
-      audience_required: [https://api.example.com/mcp]
-mcp_servers:
-  - type: listener
-    name: secure-mcp
-    config:
-      route:
-        paths: [/mcp/secure]
-    access:
-      auth_strategies: [okta-oidc]
-      metadata:
-        endpoint: /mcp/secure/.well-known/oauth-protected-resource
-        resource: https://api.example.com/mcp/secure
-        authorization_servers: [https://issuer.example.com]
-    tools:
-      - name: ping
-        description: Ping
-        method: GET
-        path: /ping
-        scheme: https
-        host: secure.internal
-`
-
-func TestMCPOAuth2DerivesAudienceAndPassthrough(t *testing.T) {
-	out, warnings, err := convertYAMLBelow23([]byte(oidcWithAudienceAndPassthrough))
-	require.NoError(t, err)
-	require.Empty(t, warnings)
-	s := string(out)
-	// hide_credentials: false -> passthrough_credentials: true.
-	require.Contains(t, s, "passthrough_credentials: true")
-	// audience_required set -> validation enforced.
-	require.Contains(t, s, "insecure_relaxed_audience_validation: false")
-	// audience_required is only a signal; its value is not carried to the plugin.
-	require.NotContains(t, s, "audience_required")
-}
-
-// input: one openid-connect strategy carrying token_exchange, referenced by an
-// MCP server WITH access.metadata (which lowers to ai-mcp-oauth2, a plugin that
-// cannot represent token_exchange). The control must not be dropped silently.
-const mcpTokenExchangeDropInput = `
+// mcpTokenExchangeInput is an openid-connect strategy with token_exchange on
+// an MCP server with access.metadata.
+const mcpTokenExchangeInput = `
 auth_strategies:
   - display_name: Okta OIDC
     name: okta-oidc-te
@@ -379,33 +201,35 @@ mcp_servers:
         host: httpbin.internal
 `
 
-// TestMCPMetadataDropsTokenExchange checks that token_exchange below 2.3 fails
-// the server. ai-mcp-oauth2 cannot represent token_exchange. From 2.3, the
-// openid-connect plugin keeps token_exchange.
-func TestMCPMetadataDropsTokenExchange(t *testing.T) {
-	t.Run("fails below 2.3 (ai-mcp-oauth2 cannot represent it)", func(t *testing.T) {
-		opts := testOptions
-		opts.MinRuntimeVersion = aimap.Version{Major: 2, Minor: 2}.String()
-		result, err := Convert([]byte(mcpTokenExchangeDropInput), opts)
-		require.NoError(t, err)
-		issue := requireIssue(t, result.Issues, Error, ConfigFieldInvalid,
-			kindMCPServer, "mcp-with-metadata", "access.auth_strategies[0]")
-		require.Contains(t, issue.Reason, "token_exchange")
-	})
+// TestMCPMetadataKeepsTokenExchange checks that the openid-connect plugin
+// keeps token_exchange.
+func TestMCPMetadataKeepsTokenExchange(t *testing.T) {
+	result, err := Convert([]byte(mcpTokenExchangeInput), testOptions)
+	require.NoError(t, err)
+	require.Empty(t, result.Issues)
+	s, err := result.Output.ToYAML()
+	require.NoError(t, err)
+	require.Contains(t, string(s), "name: openid-connect")
+	require.Contains(t, string(s), "token_exchange:")
+	require.NotContains(t, string(s), "ai-mcp-oauth2")
+}
 
-	t.Run("carries verbatim from 2.3 (openid-connect represents it)", func(t *testing.T) {
-		result, err := Convert([]byte(mcpTokenExchangeDropInput), testOptions)
-		require.NoError(t, err)
-		s, err := result.Output.ToYAML()
-		require.NoError(t, err)
-		require.Contains(t, string(s), "name: openid-connect")
-		require.Contains(t, string(s), "token_exchange:")
-	})
+// TestMCPOIDCMetadataBelowGate checks that an openid-connect strategy with
+// metadata leaves out the MCP server below 2.3.
+func TestMCPOIDCMetadataBelowGate(t *testing.T) {
+	opts := testOptions
+	opts.MinRuntimeVersion = "2.2"
+	result, err := Convert([]byte(mcpTokenExchangeInput), opts)
+	require.NoError(t, err)
+	issue := requireIssue(t, result.Issues, Error, UnsupportedInMinRuntimeVersion,
+		kindMCPServer, "mcp-with-metadata", "access.metadata", "access.auth_strategies[0]")
+	require.Contains(t, issue.Reason, `requires minimum runtime version "2.3"`)
+	require.Empty(t, result.Output.Services, "the MCP server is left out")
 }
 
 // tokenVaultMCPWithMetadata is an upstream Token Vault MCP server with
-// access.metadata. ai-mcp-oauth2 must keep the caller's bearer token, or the
-// Token Vault exchange has no subject token.
+// access.metadata. The auth plugin must keep the caller's bearer token, or
+// the Token Vault exchange has no subject token.
 const tokenVaultMCPWithMetadata = `
 auth_strategies:
   - name: okta-oidc
@@ -442,7 +266,7 @@ mcp_servers:
 `
 
 // tokenVaultMCPMetadataOnly is tokenVaultMCPWithMetadata without the auth
-// strategy. From 2.3, only this shape lowers to ai-mcp-oauth2 with token_vault.
+// strategy. Only this shape lowers to ai-mcp-oauth2.
 var tokenVaultMCPMetadataOnly = func() string {
 	const strategyRef = "      auth_strategies: [okta-oidc]\n"
 	const strategyBlock = `auth_strategies:
@@ -466,7 +290,7 @@ func TestMCPOAuth2PassthroughForTokenVault(t *testing.T) {
 	require.Contains(t, s, "name: ai-mcp-oauth2")
 }
 
-// TestMCPOIDCTokenVaultForcesHideCredentials checks that the 2.3 openid-connect
+// TestMCPOIDCTokenVaultForcesHideCredentials checks that the openid-connect
 // plugin gets hide_credentials false with token_vault. The Token Vault needs
 // the caller's bearer token.
 func TestMCPOIDCTokenVaultForcesHideCredentials(t *testing.T) {

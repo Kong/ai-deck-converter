@@ -1,0 +1,3 @@
+# Below 2.3, the openid-connect plugin has no protected_resource_metadata.
+# MCP servers with an openid-connect strategy and metadata are left out.
+min_runtime_version: "2.2"

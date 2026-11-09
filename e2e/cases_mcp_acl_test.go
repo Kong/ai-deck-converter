@@ -257,7 +257,7 @@ func testMCPServerACLWhen(t *testing.T, license string) {
 	}
 }
 
-// testMCPOIDCServerACLs proves the 2.3 openid-connect lowering of MCP access.
+// testMCPOIDCServerACLs proves the openid-connect lowering of MCP access.
 // Its authenticated groups decide the Kong acl plugin. Its token claims decide
 // the oauth_access_token tool ACLs.
 func testMCPOIDCServerACLs(t *testing.T, license string) {

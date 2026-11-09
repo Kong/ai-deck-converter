@@ -997,22 +997,21 @@ auth_strategies:
         authorization_servers: ["https://idp.example.com"]
         endpoint: /mcp/guarded/.well-known/oauth-protected-resource`
 	cases := []struct {
-		name    string
-		version string
-		access  string
-		global  string
-		warns   bool
+		name   string
+		access string
+		global string
+		warns  bool
 	}{
 		{name: "no auth", access: "", warns: true},
 		{name: "metadata only", access: metadata, warns: true},
 		{name: "key-auth", access: "\n      auth_strategies: [mcp-key-auth]"},
 		{name: "openid-connect", access: "\n      auth_strategies: [mcp-oidc]", warns: true},
 		{
-			name: "ai-mcp-oauth2 without consumer mapping", version: "2.2",
+			name:   "openid-connect with metadata",
 			access: "\n      auth_strategies: [mcp-oidc]" + metadata, warns: true,
 		},
 		{
-			name: "ai-mcp-oauth2 with consumer mapping", version: "2.2",
+			name:   "openid-connect with metadata and consumer mapping",
 			access: "\n      auth_strategies: [mcp-oidc-consumer]" + metadata,
 		},
 		{
@@ -1028,10 +1027,6 @@ policies:
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			version := tc.version
-			if version == "" {
-				version = aimap.LatestVersion.String()
-			}
 			result, err := Convert([]byte(strategies+tc.global+`
 mcp_servers:
   - type: listener
@@ -1041,7 +1036,7 @@ mcp_servers:
     access:
       acls:
         allow: [partners]`+tc.access+`
-`), Options{MinRuntimeVersion: version})
+`), Options{MinRuntimeVersion: aimap.LatestVersion.String()})
 			require.NoError(t, err)
 			var found bool
 			for _, issue := range result.Issues {

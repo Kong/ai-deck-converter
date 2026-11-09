@@ -1,0 +1,18 @@
+- code: UNSUPPORTED_IN_MIN_RUNTIME_VERSION
+  reason: access.metadata with an openid-connect auth strategy requires minimum runtime version "2.3", but the configured minimum is "2.2"
+  source:
+    kind: mcp_server
+    name: secure-flights-mcp
+    fields:
+      - access.metadata
+      - access.auth_strategies[0]
+  severity: ERROR
+- code: UNSUPPORTED_IN_MIN_RUNTIME_VERSION
+  reason: access.metadata with an openid-connect auth strategy requires minimum runtime version "2.3", but the configured minimum is "2.2"
+  source:
+    kind: mcp_server
+    name: vendor-proxy-mcp
+    fields:
+      - access.metadata
+      - access.auth_strategies[0]
+  severity: ERROR
