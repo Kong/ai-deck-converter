@@ -2,6 +2,7 @@ package convert
 
 import (
 	"fmt"
+	"slices"
 	"testing"
 
 	"github.com/Kong/ai-deck-converter/internal/aimap"
