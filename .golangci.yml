@@ -12,7 +12,7 @@ linters:
     - errorlint
     - exhaustive
     - gochecknoinits
-    - gomodguard
+    - gomodguard_v2
     - gosec
     - importas
     - lll
