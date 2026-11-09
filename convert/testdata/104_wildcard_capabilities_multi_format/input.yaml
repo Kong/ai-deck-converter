@@ -1,7 +1,5 @@
-# "*" capabilities with two explicit formats. The anthropic format gives
-# only the messages endpoint for an openai target.
-# The two type api models each make two alias-less routes, batches and
-# files. Each reverts to one model.
+# Each API model needs its own route for batches, files, and skills.
+# The reverter must recover both API models from routes without model aliases.
 models:
   - name: chat
     type: model

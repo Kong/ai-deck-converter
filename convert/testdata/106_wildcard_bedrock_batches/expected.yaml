@@ -28,6 +28,15 @@ services:
           - DELETE
           - OPTIONS
         strip_path: false
+      - name: openai-skills
+        paths:
+          - /without-prefix/skills
+        methods:
+          - GET
+          - POST
+          - DELETE
+          - OPTIONS
+        strip_path: false
       - name: openai-batches-2
         paths:
           - /explicit/batches
@@ -95,6 +104,23 @@ plugins:
             provider: openai
           route_type: llm/v1/files
     route: openai-files
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      model_name_header: false
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: false
+          model:
+            name: gpt-5.4
+            provider: openai
+          route_type: llm/v1/skills
+    route: openai-skills
   - name: ai-proxy-advanced
     config:
       balancer:

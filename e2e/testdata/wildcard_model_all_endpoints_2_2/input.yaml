@@ -1,6 +1,5 @@
-# A "*" model with one target of each provider type that AI Gateway 2.2
-# supports. The type api model covers batches and files. The data plane
-# must load every route.
+# The inference model has one target for each provider type in AI Gateway 2.2.
+# AI Gateway 2.2 must load skills routes under the API model's base path.
 models:
   - name: every-endpoint
     type: model

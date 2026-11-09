@@ -761,10 +761,11 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 				// request presents that alias (its body model, or the model segment of
 				// a native URL). type:model requests always carry the model, so their
 				// targets must be aliased or a request lands in an empty "<default>"
-				// pool (404 "no model matched this request"). type:api (files/batches)
-				// requests carry no model, so their targets must stay alias-less to
-				// remain in the "<default>" pool they fall back to (else the balancer
-				// has no pool for the request: 500 "failed to get balancer instance").
+				// pool (404 "no model matched this request"). type:api
+				// (files/batches/skills) requests carry no model, so their targets
+				// must stay alias-less to remain in the "<default>" pool they fall
+				// back to (else the balancer has no pool for the request: 500
+				// "failed to get balancer instance").
 				// The alias itself is baked in per plugin copy at emission time (see
 				// withModelAlias), since a type:model target list is cloned once per
 				// alias.
@@ -1950,8 +1951,9 @@ func selectorShapes(selectors []map[string]any) []string {
 }
 
 // isModelType reports whether a model is a synchronous "model" entity (as
-// opposed to an "api" entity for files/batches). An empty type defaults to
-// "model", the discriminator default and the common synchronous case.
+// opposed to an "api" entity for files/batches/skills). An empty type
+// defaults to "model", the discriminator default and the common synchronous
+// case.
 func isModelType(m *aigw.Model) bool { return m.Type != "api" }
 
 // extractModelAliases returns the source model's authored aliases, or its name

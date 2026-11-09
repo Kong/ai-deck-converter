@@ -1,6 +1,4 @@
-# At 2.1, "*" leaves out the skills capability and the typesafe format,
-# which need 2.2. The converter gives no issue, because "*" causes the
-# result.
+# Runtime 2.1 leaves skills out of the API wildcard.
 models:
   - name: everything
     type: model
@@ -8,6 +6,15 @@ models:
     formats: [{type: "*"}]
     config:
       route: {paths: [/ai]}
+    targets:
+      - name: gpt-5.4
+        provider: openai-prod
+  - name: jobs
+    type: api
+    capabilities: ["*"]
+    formats: [{type: "*"}]
+    config:
+      route: {paths: [/jobs]}
     targets:
       - name: gpt-5.4
         provider: openai-prod

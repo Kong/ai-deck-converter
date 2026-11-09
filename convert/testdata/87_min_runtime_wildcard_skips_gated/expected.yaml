@@ -73,6 +73,23 @@ services:
           - POST
           - OPTIONS
         strip_path: false
+      - name: openai-batches
+        paths:
+          - /jobs/batches
+        methods:
+          - GET
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-files
+        paths:
+          - /jobs/files
+        methods:
+          - GET
+          - POST
+          - DELETE
+          - OPTIONS
+        strip_path: false
       - name: openai-videos-lifecycle
         paths:
           - /ai/videos
@@ -368,6 +385,40 @@ plugins:
     config:
       balancer:
         algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      model_name_header: false
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: false
+          model:
+            name: gpt-5.4
+            provider: openai
+          route_type: llm/v1/batches
+    route: openai-batches
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      model_name_header: false
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: gpt-5.4
+            provider: openai
+          route_type: llm/v1/files
+    route: openai-files
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
       genai_category: video/generation
       llm_format: openai
       model_name_header: false
@@ -383,3 +434,4 @@ plugins:
     route: openai-videos-lifecycle
 ai_models:
   - name: everything
+  - name: jobs

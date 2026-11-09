@@ -59,15 +59,6 @@ services:
           - POST
           - OPTIONS
         strip_path: false
-      - name: openai-skills
-        paths:
-          - /two/skills
-        methods:
-          - GET
-          - POST
-          - DELETE
-          - OPTIONS
-        strip_path: false
       - name: openai-videos
         paths:
           - /two/videos
@@ -129,15 +120,6 @@ services:
           - /one/images/edits
         methods:
           - POST
-          - OPTIONS
-        strip_path: false
-      - name: openai-skills-2
-        paths:
-          - /one/skills
-        methods:
-          - GET
-          - POST
-          - DELETE
           - OPTIONS
         strip_path: false
       - name: openai-videos-2
@@ -385,25 +367,6 @@ plugins:
           route_type: image/v1/images/edits
     route: openai-images-edits
     model: two-strategies
-  - name: ai-proxy-advanced
-    config:
-      balancer:
-        algorithm: round-robin
-      genai_category: text/generation
-      llm_format: openai
-      model_name_header: false
-      targets:
-        - description: gpt-5.4
-          logging:
-            log_payloads: false
-            log_statistics: false
-          model:
-            model_alias: two-strategies
-            name: gpt-5.4
-            provider: openai
-          route_type: llm/v1/skills
-    route: openai-skills
-    model: two-strategies
   - name: ai-model-selector
     config:
       max_request_body_size: 8388608
@@ -650,25 +613,6 @@ plugins:
     route: openai-realtime
     tags:
       - ai-gateway-realtime-model:one-strategy
-  - name: ai-proxy-advanced
-    config:
-      balancer:
-        algorithm: round-robin
-      genai_category: text/generation
-      llm_format: openai
-      model_name_header: false
-      targets:
-        - description: gpt-5.4
-          logging:
-            log_payloads: false
-            log_statistics: false
-          model:
-            model_alias: one-strategy
-            name: gpt-5.4
-            provider: openai
-          route_type: llm/v1/skills
-    route: openai-skills-2
-    model: one-strategy
   - name: ai-model-selector
     config:
       max_request_body_size: 8388608
@@ -835,17 +779,6 @@ plugins:
     config:
       anonymous: anonymous
       issuer: https://dev-123456.okta.com/oauth2/default
-    route: openai-skills
-  - name: key-auth
-    config:
-      anonymous: anonymous
-      key_names:
-        - x-api-key
-    route: openai-skills
-  - name: openid-connect
-    config:
-      anonymous: anonymous
-      issuer: https://dev-123456.okta.com/oauth2/default
     route: openai-videos
   - name: key-auth
     config:
@@ -892,10 +825,6 @@ plugins:
     config:
       issuer: https://dev-123456.okta.com/oauth2/default
     route: openai-realtime
-  - name: openid-connect
-    config:
-      issuer: https://dev-123456.okta.com/oauth2/default
-    route: openai-skills-2
   - name: openid-connect
     config:
       issuer: https://dev-123456.okta.com/oauth2/default

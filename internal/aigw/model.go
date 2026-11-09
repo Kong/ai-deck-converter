@@ -2,9 +2,7 @@ package aigw
 
 import "gopkg.in/yaml.v3"
 
-// Model is an AI Gateway model. The discriminator `type` is either "model"
-// (synchronous generative APIs) or "api" (files/batches); both share the same
-// shape and differ only in their allowed capabilities, so one struct covers both.
+// Model holds the configuration for a synchronous model or a provider API.
 type Model struct {
 	ID           string         `yaml:"id,omitempty"`
 	Type         string         `yaml:"type,omitempty"`
