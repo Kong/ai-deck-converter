@@ -86,5 +86,6 @@ func aclPlugin(acls aigw.ACLs) kong.Plugin {
 		config = map[string]any{}
 	}
 	config["include_consumer_groups"] = true
+	config["always_use_authenticated_groups"] = true
 	return kong.Plugin{Name: "acl", Config: config}
 }

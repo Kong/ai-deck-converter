@@ -47,6 +47,7 @@ plugins:
     config:
       allow_when:
         - principal.metadata.admin == 'true'
+      always_use_authenticated_groups: true
       include_consumer_groups: true
     route: openai-chat
     model: gpt-5-2

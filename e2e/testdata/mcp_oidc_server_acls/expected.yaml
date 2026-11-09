@@ -70,6 +70,7 @@ plugins:
     config:
       allow:
         - mcp-allowed
+      always_use_authenticated_groups: true
       include_consumer_groups: true
     route:
       id: 1949b1d0-ad0e-51d8-8006-2fd707e7eb2f

@@ -45,6 +45,7 @@ plugins:
     model: gpt-5-2
   - name: acl
     config:
+      always_use_authenticated_groups: true
       deny_when:
         - principal.metadata.admin != 'true'
       include_consumer_groups: true

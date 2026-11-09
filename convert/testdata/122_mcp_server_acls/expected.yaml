@@ -35,6 +35,7 @@ services:
             config:
               allow:
                 - partners
+              always_use_authenticated_groups: true
               include_consumer_groups: true
   - name: vendor-mcp
     url: https://vendor.example.com/mcp
@@ -58,6 +59,7 @@ services:
               tools: []
           - name: acl
             config:
+              always_use_authenticated_groups: true
               deny_when:
                 - has(principal.metadata.status) && principal.metadata.status == 'suspended'
               include_consumer_groups: true

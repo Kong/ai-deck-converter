@@ -356,6 +356,60 @@ func testMCPOIDCServerACLs(t *testing.T, license string) {
 	t.Logf("PASS: %s runs a conversion-listener tool through the openid-connect route", who)
 }
 
+// testMCPOIDCConsumerACL proves that a consumer resolved by openid-connect
+// passes the server ACL allow list on a token group or on its consumer group.
+func testMCPOIDCConsumerACL(t *testing.T, license string) {
+	idp := startIDPMock(t)
+	mcp := startMCPUpstream(t)
+	configPath := convertCase(t, "mcp_oidc_consumer_acl", "2.0",
+		patchAll(patchMCPPort(18087, mcp.Port), patchIssuer(18090, idp.Port)))
+
+	gateway := startGateway(t, GatewayOptions{
+		Image:  gatewayImage(t, "kong/kong-ai-gateway:2.0.2"),
+		Config: configPath,
+		Env:    []string{licenseEnv(license)},
+	})
+	gateway.waitReady()
+
+	vendorURL := gateway.ProxyURL() + "/mcp/vendor"
+	bearer := func(claims map[string]any) map[string]string {
+		claims["iss"] = idp.URL
+		claims["iat"] = time.Now().Unix()
+		claims["exp"] = time.Now().Add(time.Hour).Unix()
+		h := mcpHeaders("", "")
+		h["Authorization"] = "Bearer " + idp.jwt(t, claims)
+		return h
+	}
+	requireReachesUpstream := func(who string, headers map[string]string) {
+		t.Helper()
+		h := withSession(headers, mcpOpenSession(t, vendorURL, headers, who))
+		requireTools(t, mcpToolsList(t, vendorURL, h, who), who, []string{"flights-search"}, nil)
+		resp := httpPost(t, vendorURL, h, toolsCallBody(3, "flights-search"))
+		requireStatus(t, resp, 200, who+": tools/call flights-search")
+		if !strings.Contains(resp.Body, "flights-search ok") {
+			t.Fatalf("%s: flights-search did not reach the upstream MCP server\nresponse body:\n%s", who, resp.Body)
+		}
+	}
+
+	who := "token-client: token groups [other, mcp-allowed], no consumer group"
+	requireReachesUpstream(who, bearer(map[string]any{
+		"sub": "token-client", "groups": []string{"other", "mcp-allowed"},
+	}))
+	t.Logf("PASS: %s passes the server ACL on the token group alone", who)
+
+	who = "grouped-client: no groups claim, member of mcp-allowed"
+	requireReachesUpstream(who, bearer(map[string]any{"sub": "grouped-client"}))
+	t.Logf("PASS: %s passes the server ACL on its consumer group", who)
+
+	requireMCPServerACLDenies(t, vendorURL,
+		bearer(map[string]any{"sub": "token-client", "groups": []string{"other"}}), mcp,
+		"token-client: token groups [other], no consumer group")
+	requireMCPServerACLDenies(t, vendorURL,
+		bearer(map[string]any{"sub": "token-client"}), mcp,
+		"token-client: no groups claim, no consumer group")
+	t.Log("PASS: a consumer with neither the token group nor the consumer group gets 403 for every MCP operation")
+}
+
 func countToolCalls(upstream *mockUpstream) int {
 	var n int
 	for _, hit := range upstream.hits() {

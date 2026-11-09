@@ -1017,6 +1017,8 @@ model_providers:
 	require.NotNil(t, acl, "expected an acl plugin in the output")
 	require.Equal(t, true, acl.Config["include_consumer_groups"],
 		"acl plugin must set include_consumer_groups so consumer_groups-based allow/deny actually works")
+	require.Equal(t, true, acl.Config["always_use_authenticated_groups"],
+		"acl plugin must set always_use_authenticated_groups")
 }
 
 // ai-mcp-proxy has the identical include_consumer_groups gap as the Kong acl
