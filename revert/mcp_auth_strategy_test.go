@@ -65,7 +65,7 @@ services:
               metadata_discovery_endpoint: https://issuer.example.com/.well-known/openid-configuration
 `
 
-// mcpOIDCProtectedResource is an MCP route with the 2.3 openid-connect plugin.
+// mcpOIDCProtectedResource is an MCP route with the openid-connect plugin.
 // It has a protected_resource_metadata block, principals, and auth_methods
 // ["bearer"].
 const mcpOIDCProtectedResource = `

@@ -1,4 +1,4 @@
-# The 2.3 openid-connect MCP auth lowering, reverted: an openid-connect plugin
+# The openid-connect MCP auth lowering, reverted: an openid-connect plugin
 # carrying a protected_resource_metadata block (and the strategy's principals,
 # lifted verbatim) reconstructs access.metadata plus an auth strategy. A
 # second, PRM-less openid-connect plugin keeps reverting as a plain strategy

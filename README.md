@@ -162,7 +162,7 @@ See `convert/testdata/*/input.yaml` for worked examples.
 |---|---|
 | Model | One **route per (provider endpoint, capability)** under a single shared `ai-gateway` Service, with the path derived from each of the model's `formats` (llm_format) + capability via the endpoint table. Routes follow the pair order: `openai` first, then the other formats sorted, and `generate` first in each format. A route carries only the targets that the data plane accepts on it (`aimap.TargetSupports`). Each route gets an `ai-proxy-advanced` plugin (`route:` FK) — models that resolve to the same endpoint share one route, contributing one `targets[]` entry each. Body-model routes also get an `ai-model-selector` plugin. One `ai-models` entry (`name` + `alias`) is emitted per model — one per `config.route.model.values` entry when the model declares several aliases, each with its own `ai-proxy-advanced` (and policy/ACL) copy scoped to that alias, so requests naming any alias select the model. |
 | Provider | Not a standalone entity. Its `type` and `config.auth` populate each referencing target's `model.provider`, `model.options`, and `auth`. |
-| MCP Server | Service + Route + `ai-mcp-proxy` (`config.mode` = source type). `access.acls` adds a Kong `acl` plugin on the route (listener / conversion-listener / passthrough-listener only). It permits exactly one of `allow`, `deny`, `allow_when`, or `deny_when`, and `allow_when`/`deny_when` require `min_runtime_version` 2.3. The acl plugin matches consumers, consumer groups, and authenticated groups, not `acl_attribute_type`. A `BEHAVIOR_MAY_DIFFER` warning flags `access.acls` on a route where no plugin identifies the caller, and `allow`/`deny` lists on an `oauth_access_token` server, where claim values match no caller. `access.default_tool_acls` and per-tool `access.acls` are written into the plugin config (`default_acl`, `tools[].acl`). `access.auth_strategies` + `access.metadata` (openid-connect) add an auth plugin and append `metadata.endpoint` to the route (listener / conversion-listener / passthrough-listener only); a `key-auth` strategy adds a `key-auth` plugin (and is rejected if `metadata` is set). With `min_runtime_version` of 2.3 or later, the openid-connect strategy lowers to the `openid-connect` plugin itself. The strategy config is carried verbatim (`principals` included), the metadata becomes the plugin's `protected_resource_metadata` block, and `auth_methods` is forced to `[bearer]` to match `ai-mcp-oauth2` (MCP routes validate bearer tokens only). Metadata without a strategy, and every `min_runtime_version` below 2.3, keeps the `ai-mcp-oauth2` plugin (the pre-2.3 field-map lowering). `config.upstream.auth` (AWS SigV4) and the top-level `token_vault` lower to the plugin's `auth` record (mutually exclusive). A `conversion-only` server serves no MCP traffic of its own and cannot declare `access` itself, so its route gets a `pre-function` gate (tagged `aigw-generated:mcp-toolset-gate`) that answers 404 to any request not arriving over the unix socket `ai-mcp-proxy` re-enters Kong through to execute a listener's tool call: its tools are reachable only through the listeners that name it in `config.sources`, on their access terms. The gate is dropped again on revert. A `conversion-only` server that no listener names is dropped entirely, with a warning: it reaches no client. `key-auth` access on an MCP server keeps the strategy's `hide_credentials`, so a strategy that hides the key stops it at the gateway. A `conversion-listener` server and an MCP server with `token_vault` are the exceptions: their `key-auth` plugin always gets `hide_credentials: false` (a `CONFIG_FIELD_OVERRIDDEN` warning when the strategy set `true`). A `conversion-listener` server behind a `key-auth` strategy also always gets `config.server.forward_client_headers: true`, because `ai-mcp-proxy` sends each tool call back through the server's own route, where key-auth needs the client's key (a `CONFIG_FIELD_OVERRIDDEN` warning when the server set `false`). An MCP server with `token_vault` needs the caller's bearer token (the Token Vault auth provider exchanges it for the upstream credential): the generated `ai-mcp-oauth2` plugin gets `passthrough_credentials: true` (the plugin clears the header by default), and the 2.3 `openid-connect` plugin gets `hide_credentials: false` (warned when the strategy set `true`). |
+| MCP Server | Service + Route + `ai-mcp-proxy` (`config.mode` = source type). `access.acls` adds a Kong `acl` plugin on the route (listener / conversion-listener / passthrough-listener only). It permits exactly one of `allow`, `deny`, `allow_when`, or `deny_when`, and `allow_when`/`deny_when` require `min_runtime_version` 2.3. The acl plugin matches consumers, consumer groups, and authenticated groups, not `acl_attribute_type`. A `BEHAVIOR_MAY_DIFFER` warning flags `access.acls` on a route where no plugin identifies the caller, and `allow`/`deny` lists on an `oauth_access_token` server, where claim values match no caller. `access.default_tool_acls` and per-tool `access.acls` are written into the plugin config (`default_acl`, `tools[].acl`). `access.auth_strategies` + `access.metadata` (openid-connect) add an auth plugin and append `metadata.endpoint` to the route (listener / conversion-listener / passthrough-listener only); a `key-auth` strategy adds a `key-auth` plugin (and is rejected if `metadata` is set). The openid-connect strategy lowers to the `openid-connect` plugin itself. The strategy config is carried verbatim (`principals` included), the metadata becomes the plugin's `protected_resource_metadata` block, and `auth_methods` is forced to `[bearer]` (MCP routes validate bearer tokens only). The block requires `min_runtime_version` 2.3; below it the MCP server is left out with an `UNSUPPORTED_IN_MIN_RUNTIME_VERSION` error. Only metadata without a strategy lowers to the `ai-mcp-oauth2` plugin. `config.upstream.auth` (AWS SigV4) and the top-level `token_vault` lower to the plugin's `auth` record (mutually exclusive). A `conversion-only` server serves no MCP traffic of its own and cannot declare `access` itself, so its route gets a `pre-function` gate (tagged `aigw-generated:mcp-toolset-gate`) that answers 404 to any request not arriving over the unix socket `ai-mcp-proxy` re-enters Kong through to execute a listener's tool call: its tools are reachable only through the listeners that name it in `config.sources`, on their access terms. The gate is dropped again on revert. A `conversion-only` server that no listener names is dropped entirely, with a warning: it reaches no client. `key-auth` access on an MCP server keeps the strategy's `hide_credentials`, so a strategy that hides the key stops it at the gateway. A `conversion-listener` server and an MCP server with `token_vault` are the exceptions: their `key-auth` plugin always gets `hide_credentials: false` (a `CONFIG_FIELD_OVERRIDDEN` warning when the strategy set `true`). A `conversion-listener` server behind a `key-auth` strategy also always gets `config.server.forward_client_headers: true`, because `ai-mcp-proxy` sends each tool call back through the server's own route, where key-auth needs the client's key (a `CONFIG_FIELD_OVERRIDDEN` warning when the server set `false`). An MCP server with `token_vault` needs the caller's bearer token (the Token Vault auth provider exchanges it for the upstream credential): the `openid-connect` plugin gets `hide_credentials: false` (warned when the strategy set `true`), and a metadata-only `ai-mcp-oauth2` plugin gets `passthrough_credentials: true` (the plugin clears the header by default). |
 | Agent (`a2a`) | Service (`config.url`) + Route + `ai-a2a-proxy` plugin (logging). `config.upstream.auth` (AWS SigV4) lowers to the plugin's `auth` record, and `config.proxy` to `proxy_config`. |
 | Agent (`http`) | Service (`config.url`) + Route, no AI plugin. |
 | MCP Server / Agent `config.certificates`, `config.ca_certificates` | Set the generated Service's `client_certificate` and `ca_certificates` to the IDs of the named Certificate and CA Certificates. A Service presents one client certificate, so only the first entry of `certificates` is used. A referenced entity without an `id` gets the `id` that `db-less` mode derives for it. The fields are ignored with a warning if the Service URL is not `https`, because Kong rejects them there. An unknown name warns and is dropped; `-strict` makes it an error. |
@@ -236,7 +236,7 @@ How Kong entities come back:
   plugin → `access.metadata` + a synthesized openid-connect auth strategy (the
   `.well-known` path is stripped back off the route). An `openid-connect`
   plugin carrying a `protected_resource_metadata` block → `access.metadata` +
-  a synthesized strategy lifted verbatim (the 2.3 lowering, reverted by the
+  a synthesized strategy lifted verbatim (the forward lowering, reverted by the
   block's presence; the converter-forced `auth_methods: [bearer]` is omitted).
   Plain `key-auth` / `openid-connect` → `access.auth_strategies`.
 - **`key-auth` / `openid-connect` plugins → Auth Strategies**, deduped by
@@ -472,62 +472,45 @@ and `formats` beyond the first.
   with an error, and revert drops the field with a warning. The plugin
   validates the values.
 - **MCP OAuth2.** MCP `access.auth_strategies` / `access.metadata` round-trips
-  in both directions. With `min_runtime_version` of 2.3 or later, an
-  openid-connect strategy attached to an MCP server with metadata lowers to the
-  `openid-connect` plugin itself: the strategy config is carried verbatim (the
+  in both directions. An openid-connect strategy attached to an MCP server with
+  metadata lowers to the `openid-connect` plugin itself. It requires
+  `min_runtime_version` 2.3, the first release whose `openid-connect` plugin
+  has `protected_resource_metadata`. Below 2.3 the MCP server is left out with
+  an `UNSUPPORTED_IN_MIN_RUNTIME_VERSION` error. The strategy config is carried verbatim (the
   `principals` block included, so Kong Identity principal lookup reaches the
   MCP ACLs), the metadata becomes the plugin's `protected_resource_metadata`
   block (which the plugin serves as RFC 9728 discovery), and `auth_methods` is
-  forced to `[bearer]` (warned when the strategy asks for more; ai-mcp-oauth2
-  is bearer-only, so interactive flows were never live on MCP routes).
-  Metadata without a strategy keeps the `ai-mcp-oauth2` plugin on every
-  version, so discovery is served in all cases. Below `min_runtime_version`
-  2.3 the lowering is unchanged. An MCP server whose ACL attribute type is
-  `oauth_access_token` works with the 2.3 lowering: that ACL subject type
-  reads the token claims under `kong.ctx.shared.ai_mcp_oauth2`, which the
-  `openid-connect` plugin publishes from 2.3, as `ai-mcp-oauth2` always does.
+  forced to `[bearer]` (warned when the strategy asks for more; interactive
+  flows would break the MCP authorization challenge). Metadata without a
+  strategy keeps the `ai-mcp-oauth2` plugin, so discovery is served in all
+  cases. An MCP server whose ACL attribute type is `oauth_access_token` reads
+  the token claims under `kong.ctx.shared.ai_mcp_oauth2`, which
+  `ai-mcp-oauth2` always publishes and `openid-connect` publishes from 2.3.
   When the route's auth plugin is neither of these, for example `key-auth` or
   a plain `openid-connect` plugin below 2.3, the server converts with a
   `BEHAVIOR_MAY_DIFFER` warning: the ACL has no claims to match and denies
-  every request. Under `token_vault` the 2.3 plugin gets `hide_credentials:
-  false` (warned when the strategy set `true`), replacing the ai-mcp-oauth2
-  path's forced `passthrough_credentials: true`.
-- **MCP OAuth2 below 2.3.** An openid-connect auth strategy lowers its client credentials
-  plus the identically-typed / unambiguous fields onto the `ai-mcp-oauth2`
-  plugin: `client_alg`, `client_auth`, `introspection_endpoint`,
+  every request. Under `token_vault` the plugin gets `hide_credentials: false`
+  (warned when the strategy set `true`).
+- **Reverting `ai-mcp-oauth2`.** Convert lowers an auth strategy only onto
+  `openid-connect`, but revert still lifts a hand-written `ai-mcp-oauth2`
+  plugin into `access.metadata` plus a synthesized openid-connect strategy.
+  These plugin fields go back onto the strategy: `client_id`,
+  `client_secret`, `client_alg`, `client_auth`, `introspection_endpoint`,
   `mtls_introspection_endpoint`, `cache_introspection`, `jwks_endpoint`,
-  `leeway` (→ `jwt_claims_leeway`), `ssl_verify`, `consumer_by`,
-  `consumer_claims` (→ `consumer_claim`), `consumer_optional`,
+  `jwt_claims_leeway` (→ `leeway`), `ssl_verify`, `consumer_by`,
+  `consumer_claim` (→ `consumer_claims`), `consumer_optional`,
   `consumer_groups_claim`, `consumer_groups_optional`, `credential_claim`,
-  `keepalive`, `timeout`, and `http_version`. The plugin has only the
-  single-path `credential_claim`. The first `credential_claims` path wins over
-  `credential_claim`. The reverse gives back `credential_claim` only. OIDC's flat `http(s)_proxy*` /
-  `no_proxy` fields lower to the plugin's structured `proxy_config` record;
-  this requires a shared proxy scheme and Basic credentials, because the target
-  has one shared credential pair. The reverse reconstructs an equivalent OIDC
-  proxy configuration. The reverse synthesizes an openid-connect provider carrying exactly
-  those fields; array-valued OIDC fields collapsed to a plugin scalar
-  (`client_id`, `client_secret`, `client_alg`, `client_auth`) or single path
-  (`consumer_claim`) are re-wrapped into a one-element array, so a multi-element
-  source is lossy in the intermediate model but re-converts byte-identically.
-  Two further fields map by semantic derivation rather than a plain copy:
-  the provider's `hide_credentials: false` becomes the plugin's
-  `passthrough_credentials: true` (logical inverse; defaults agree, so only the
-  non-default is emitted), and `insecure_relaxed_audience_validation` is
-  **always** emitted to mirror OIDC audience enforcement — `false` when the
-  provider's `audience_required` is set, `true` otherwise (the reverse
-  reconstructs `audience_required` from the metadata `resource`, its RFC 8707
-  audience, when the flag is `false`). Deliberately **not** mapped (documented
-  non-conversions): `token_exchange`
-  (a false friend — OIDC's legacy grant vs the plugin's RFC-8693 upstream
-  exchange object), `client_jwk` (OIDC JWK object array vs plugin serialized
-  string), `introspection_endpoint_auth_method` (would collide with
-  `client_auth`), the downstream/upstream header-mapping fields,
-  `tls_client_auth_cert_id` (cert-entity UUID vs inline PEM), and
-  `extra_jwks_uris` (no plugin target). Provider config the plugin doesn't carry
-  (e.g. `cache_tokens_salt`, `auth_methods`) is not recovered, and
-  `authorization_servers`/`scopes_supported` are always attributed to the
-  metadata rather than the provider's issuer/scopes.
+  `keepalive`, `timeout`, `http_version`, and `upstream_headers`. Plugin scalars are re-wrapped
+  into one-element arrays. The structured `proxy_config` record goes back to
+  OIDC's flat `http(s)_proxy*` / `no_proxy` fields.
+  `passthrough_credentials: true` becomes `hide_credentials: false`, and
+  `insecure_relaxed_audience_validation: false` becomes `audience_required`
+  (`expected_audience`, else the `resource`). `authorization_servers` and
+  `scopes_supported` are always attributed to the metadata. The plugin has no
+  issuer, so the synthesized strategy has none. Add `issuer` before
+  re-converting: convert leaves out an MCP server whose openid-connect strategy
+  has no `issuer` (`MISSING_REQUIRED_CONFIG_FIELD`), and otherwise gives an
+  `openid-connect` plugin, not `ai-mcp-oauth2`.
 - **Labels** are lossy as tags when a value contains `:`.
 - **Passthrough models.** A passthrough model cannot share its base path with
   another passthrough model, be combined with another format, or use the

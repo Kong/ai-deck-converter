@@ -159,8 +159,7 @@ type RedisCloudAuthentication struct {
 // MCPAccess is the access-control configuration for an MCP Server: the ACL
 // attribute config, consumer/group ACLs, and the default ACL applied to every
 // tool. It also carries the auth-strategy reference and OAuth 2.0 Protected
-// Resource Metadata used to protect the MCP server (lowered into an
-// ai-mcp-oauth2 plugin).
+// Resource Metadata used to protect the MCP server.
 type MCPAccess struct {
 	// ACLAttributeType / AccessTokenClaimField map to the ai-mcp-proxy plugin's
 	// fields of the same name; the ACLs lower into its default_acl.
@@ -169,12 +168,12 @@ type MCPAccess struct {
 	ACLs                  ACLs   `yaml:"acls,omitempty"`
 	DefaultToolACLs       ACLs   `yaml:"default_tool_acls,omitempty"`
 	// AuthStrategies references an auth strategy (at most one) by name.
-	// A key-auth strategy becomes a key-auth plugin; an openid-connect strategy
-	// combined with Metadata becomes an ai-mcp-oauth2 plugin.
+	// A key-auth strategy becomes a key-auth plugin.
+	// An openid-connect strategy becomes an openid-connect plugin.
 	AuthStrategies []string `yaml:"auth_strategies,omitempty"`
 	// Metadata is the OAuth 2.0 Protected Resource Metadata advertised for this
-	// MCP server. When set (with an openid-connect provider), it lowers into an
-	// ai-mcp-oauth2 plugin.
+	// MCP server. Without an auth strategy, it lowers into an ai-mcp-oauth2
+	// plugin.
 	Metadata *MCPProtectedResourceMetadata `yaml:"metadata,omitempty"`
 }
 
@@ -197,8 +196,7 @@ func (a *MCPAccess) UnmarshalYAML(node *yaml.Node) error {
 
 // MCPProtectedResourceMetadata is the OAuth 2.0 Protected Resource Metadata
 // (RFC 9728) advertised for an MCP server, allowing clients to discover the
-// authorization servers that protect it. It maps to the ai-mcp-oauth2 plugin's
-// resource / authorization_servers / scopes_supported / metadata_endpoint.
+// authorization servers that protect it.
 type MCPProtectedResourceMetadata struct {
 	DiscoveryEndpoint    string   `yaml:"discovery_endpoint,omitempty"`
 	Endpoint             string   `yaml:"endpoint,omitempty"`

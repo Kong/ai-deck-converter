@@ -1,9 +1,7 @@
 package aimap
 
-// OAuth2FieldKind describes how an openid-connect auth-strategy config
-// value is reshaped when it is lowered onto an ai-mcp-oauth2 plugin config
-// value (and lifted back). The kind fully determines both the forward and the
-// reverse transform, so the two directions cannot drift.
+// OAuth2FieldKind tells how revert changes an ai-mcp-oauth2 plugin config
+// value into an openid-connect auth strategy config value.
 type OAuth2FieldKind int
 
 const (
@@ -28,11 +26,9 @@ type OAuth2FieldMap struct {
 	Kind      OAuth2FieldKind
 }
 
-// OIDCToMCPOAuth2Fields is the shared source of truth for lowering an
-// openid-connect auth strategy's config onto an ai-mcp-oauth2 plugin (and
-// lifting it back). It is the "clean subset" of the openid-connect ->
-// ai-mcp-oauth2 field overlap: fields with an unambiguous, round-trip-safe
-// mapping.
+// OIDCToMCPOAuth2Fields lists the ai-mcp-oauth2 fields that revert lifts onto
+// an openid-connect auth strategy. Convert never lowers a strategy onto
+// ai-mcp-oauth2.
 //
 // client_id, client_secret, ssl_verify are handled here too (client_id /
 // client_secret are FirstOfArray; ssl_verify is Passthrough). The
@@ -77,29 +73,14 @@ var OIDCToMCPOAuth2Fields = []OAuth2FieldMap{
 	{OIDCKey: "upstream_headers", OAuth2Key: "upstream_headers", Kind: OAuth2Passthrough},
 }
 
-// Two further openid-connect fields map onto ai-mcp-oauth2 by semantic
-// derivation rather than a plain field copy, so they live as explicit,
-// mirrored logic in convert/mcp_auth_strategy.go and revert/mcp_auth_strategy.go rather
-// than in OIDCToMCPOAuth2Fields. The behavioral contract is specified here so
-// the two directions share one definition:
+// Revert lifts two further ai-mcp-oauth2 fields in
+// revert/mcp_auth_strategy.go:
 //
-//   - passthrough_credentials (plugin) is the logical inverse of
-//     hide_credentials (OIDC, default true). Only the non-default source
-//     (hide_credentials: false) is carried, as passthrough_credentials: true;
-//     the reverse maps passthrough_credentials: true back to
-//     hide_credentials: false. Both defaults (hide=true / passthrough=false)
-//     agree, so the defaulted case is emitted on neither side.
+//   - passthrough_credentials: true becomes hide_credentials: false.
 //
-//   - audience_required (OIDC array) maps to expected_audience (plugin single
-//     string): the converter carries the first value and warns when more than
-//     one is set, since the plugin validates one audience. insecure_relaxed_
-//     audience_validation mirrors whether audience_required is set at all: the
-//     converter ALWAYS emits the flag — false when audience_required is set,
-//     true otherwise (overriding the plugin's own false default). The reverse
-//     reconstructs audience_required from expected_audience when the flag is
-//     false; a hand-authored plugin config without expected_audience falls
-//     back to the resource, matching the plugin's own default.
+//   - insecure_relaxed_audience_validation: false becomes audience_required.
+//     The value is expected_audience, or else the resource.
 //
-// The 2.3 openid-connect lowering in mcpOIDCPlugin always writes auth_methods
+// The openid-connect lowering in mcpOIDCPlugin always writes auth_methods
 // ["bearer"]. Revert leaves out exactly ["bearer"] from the strategy. It lifts
 // any other list unchanged.

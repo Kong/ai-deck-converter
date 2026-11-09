@@ -32,9 +32,8 @@ func (r *Reverter) revertMCPAccess(m *aigw.MCPServer, plugins []kong.Plugin) []k
 		case "ai-mcp-oauth2":
 			r.applyMCPOAuth2(m, p)
 		case "key-auth", "openid-connect":
-			// The 2.3 MCP lowering has a protected_resource_metadata block. A
-			// plain openid-connect plugin has none. Revert does not know the
-			// runtime version.
+			// The MCP lowering has a protected_resource_metadata block. A
+			// plain openid-connect plugin has none.
 			if p.Name == "openid-connect" {
 				if prm := getMap(p.Config, "protected_resource_metadata"); getStr(prm, "resource") != "" {
 					r.applyMCPOIDCProtectedResource(m, p, prm)
@@ -59,7 +58,7 @@ func stripMetadataEndpointPath(m *aigw.MCPServer, meta *aigw.MCPProtectedResourc
 	}
 }
 
-// applyMCPOIDCProtectedResource changes the 2.3 openid-connect MCP plugin back
+// applyMCPOIDCProtectedResource changes the openid-connect MCP plugin back
 // into access.metadata and an auth strategy. The strategy gets the plugin
 // config unchanged. Only auth_methods ["bearer"] from convert is left out.
 func (r *Reverter) applyMCPOIDCProtectedResource(
@@ -90,12 +89,9 @@ func (r *Reverter) applyMCPOIDCProtectedResource(
 // access.metadata and (when the plugin carries client credentials) a
 // synthesized openid-connect auth strategy.
 //
-// The forward converter can source authorization_servers/scopes_supported from
-// either the metadata or the OIDC provider (issuer/scopes fallback); the
-// reverse consistently attributes them to the metadata so re-conversion
-// reproduces the same plugin. Consequently the synthesized provider is minimal
-// (client credentials only) — full provider fidelity is not round-tripped, but
-// the decK output is byte-identical.
+// authorization_servers and scopes_supported always go to the metadata.
+// The plugin has no issuer, so the synthesized strategy has none.
+// Convert leaves out an MCP server whose openid-connect strategy has no issuer.
 func (r *Reverter) applyMCPOAuth2(m *aigw.MCPServer, p kong.Plugin) {
 	cfg := p.Config
 
@@ -119,12 +115,9 @@ func (r *Reverter) applyMCPOAuth2(m *aigw.MCPServer, p kong.Plugin) {
 	m.Access.AuthStrategies = append(m.Access.AuthStrategies, idp.Name)
 }
 
-// oidcConfigFromOAuth2 lifts an ai-mcp-oauth2 plugin config back into an
-// openid-connect auth strategy config, inverting
-// convert's applyOIDCFieldsToOAuth2 via aimap's shared field table. The array-
-// first kinds re-wrap the plugin's scalar/path into the one-element array the
-// forward converter collapses; this is lossy for multi-element sources but
-// re-converts to the same plugin (see revert/roundtrip_test.go).
+// oidcConfigFromOAuth2 changes an ai-mcp-oauth2 plugin config into an
+// openid-connect auth strategy config with aimap's field table.
+// Plugin scalars and paths become one-element arrays.
 func oidcConfigFromOAuth2(cfg map[string]any) map[string]any {
 	oidcCfg := map[string]any{}
 	for _, f := range aimap.OIDCToMCPOAuth2Fields {

@@ -1,0 +1,28 @@
+_format_version: "3.0"
+services:
+  - name: keyed-mcp
+    host: localhost
+    routes:
+      - name: keyed-mcp-route
+        paths:
+          - /mcp/keyed
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              include_consumer_groups: true
+              logging:
+                log_audits: false
+                log_payloads: false
+                log_statistics: true
+              mode: listener
+              tools:
+                - description: Ping the server
+                  host: keyed.internal
+                  method: GET
+                  name: ping
+                  path: /ping
+                  scheme: https
+          - name: key-auth
+            config:
+              key_names:
+                - apikey

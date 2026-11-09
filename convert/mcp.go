@@ -106,11 +106,9 @@ func (c *Converter) convertMCPServer(
 	guard = sourceScopedPlugins(guard, "mcp_server", m.Name)
 	route.Plugins = append(route.Plugins, guard...)
 
-	// Auth-strategy / OAuth 2.0 Protected Resource Metadata access.
-	// Emits an ai-mcp-oauth2 plugin (openid-connect + metadata) or a plain
-	// auth plugin (no metadata), and appends the metadata endpoint path to
-	// the route so one route serves both MCP traffic and the .well-known
-	// metadata.
+	// Metadata with a strategy gives openid-connect with
+	// protected_resource_metadata. Metadata without a strategy gives
+	// ai-mcp-oauth2. The route also serves the metadata endpoint path.
 	authPlugins, err := c.mcpAuthStrategyPlugins(src, m, &route)
 	if err != nil {
 		return kong.Service{}, err

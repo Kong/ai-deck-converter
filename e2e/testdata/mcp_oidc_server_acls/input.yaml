@@ -1,4 +1,4 @@
-# From 2.3, an MCP server's openid-connect strategy with access.metadata
+# An MCP server's openid-connect strategy with access.metadata
 # becomes the openid-connect plugin itself. Its authenticated groups feed the
 # Kong acl plugin from access.acls. It also publishes the token claims that
 # oauth_access_token tool ACLs in ai-mcp-proxy read.

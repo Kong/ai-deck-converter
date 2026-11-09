@@ -238,6 +238,11 @@ from the plugin schemas of each release.
 - `FeatureMCPToolsetGate`: the `pre-function` gate on conversion-only MCP
   routes.
 - The WebSocket plugin list of `SupportsWebSocket`.
+- `FeatureOIDCProtectedResourceMetadata` (`2.3`): the `openid-connect` field
+  `protected_resource_metadata`. An MCP server with an openid-connect auth
+  strategy and `access.metadata` is absent with an `error`. Below the gate,
+  `openid-connect` also does not publish the token claims that an
+  `oauth_access_token` ACL reads, so that pairing gives a `warning`.
 
 ## Additional implementation details
 
