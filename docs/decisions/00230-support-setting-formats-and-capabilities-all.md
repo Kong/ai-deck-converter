@@ -16,6 +16,9 @@ Today the user must write each capability and format of a model. A release
 that adds one needs a change of these lists. Users ask for a `*` value that
 selects all endpoints that the targets of the model support.
 
+Use the [capability crosscheck procedure](../ai-gateway-capability-crosscheck.md)
+to update the tables when an upstream changes endpoint support.
+
 # Scope
 [scope]: #scope
 
