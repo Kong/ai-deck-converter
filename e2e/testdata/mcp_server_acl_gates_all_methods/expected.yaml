@@ -95,6 +95,7 @@ plugins:
     config:
       allow:
         - mcp-allowed
+      always_use_authenticated_groups: true
       include_consumer_groups: true
     route:
       id: ec9415ea-8a9e-54c0-98f8-ccf706691acd
@@ -121,6 +122,7 @@ plugins:
   - id: 414d6db3-7deb-5f03-9895-57ef8bdb4ff4
     name: acl
     config:
+      always_use_authenticated_groups: true
       deny:
         - mcp-blocked
       include_consumer_groups: true

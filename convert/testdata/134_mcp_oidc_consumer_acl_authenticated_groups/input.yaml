@@ -1,0 +1,22 @@
+# An openid-connect strategy that resolves a consumer and reads groups into
+# authenticated groups, in front of a server access.acls allow list. The acl
+# plugin sets always_use_authenticated_groups, so those groups still match.
+auth_strategies:
+  - name: okta-oidc
+    type: openid-connect
+    config:
+      issuer: https://dev-123456.okta.com/oauth2/default
+      authenticated_groups_claim: [groups]
+      consumer_by: [username]
+      consumer_claims: [[sub]]
+mcp_servers:
+  - type: passthrough-listener
+    name: flights-mcp
+    upstream_url: https://vendor.example.com/mcp
+    config:
+      route:
+        paths: [/mcp/flights]
+    access:
+      auth_strategies: [okta-oidc]
+      acls:
+        allow: [partners]

@@ -102,6 +102,7 @@ plugins:
     config:
       allow:
         - premium-users
+      always_use_authenticated_groups: true
       include_consumer_groups: true
     route:
       id: 8ae36805-da7a-55b9-b056-72bde6bb937d
@@ -115,6 +116,7 @@ plugins:
     config:
       allow:
         - premium-users
+      always_use_authenticated_groups: true
       include_consumer_groups: true
     route:
       id: b2ed74bc-70de-5c05-98a5-1ff4f804ad51

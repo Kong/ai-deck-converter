@@ -11,6 +11,7 @@ services:
             config:
               allow:
                 - allowed-group
+              always_use_authenticated_groups: true
               include_consumer_groups: true
           - name: key-auth
             config:

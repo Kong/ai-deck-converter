@@ -22,6 +22,7 @@ services:
                   path: /flights
           - name: acl
             config:
+              always_use_authenticated_groups: true
               deny:
                 - interns
               include_consumer_groups: true

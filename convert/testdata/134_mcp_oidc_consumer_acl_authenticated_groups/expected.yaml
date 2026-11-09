@@ -1,0 +1,34 @@
+_format_version: "3.0"
+services:
+  - name: flights-mcp
+    url: https://vendor.example.com/mcp
+    routes:
+      - name: flights-mcp-route
+        paths:
+          - /mcp/flights
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              include_consumer_groups: true
+              logging:
+                log_audits: false
+                log_payloads: false
+                log_statistics: true
+              mode: passthrough-listener
+              tools: []
+          - name: acl
+            config:
+              allow:
+                - partners
+              always_use_authenticated_groups: true
+              include_consumer_groups: true
+          - name: openid-connect
+            config:
+              authenticated_groups_claim:
+                - groups
+              consumer_by:
+                - username
+              consumer_claims:
+                - - sub
+              issuer: https://dev-123456.okta.com/oauth2/default
+              upstream_access_token_header: null

@@ -139,6 +139,7 @@ plugins:
     config:
       allow:
         - premium-users
+      always_use_authenticated_groups: true
       include_consumer_groups: true
     route: openai-chat
     model: mixed-realtime
@@ -146,6 +147,7 @@ plugins:
     config:
       allow:
         - premium-users
+      always_use_authenticated_groups: true
       include_consumer_groups: true
     route: openai-chat
     model: mixed-realtime-alias
@@ -163,6 +165,7 @@ plugins:
     config:
       allow:
         - premium-users
+      always_use_authenticated_groups: true
       include_consumer_groups: true
     route: openai-realtime
   - name: openid-connect

@@ -1,0 +1,68 @@
+_format_version: "3.0"
+_transform: false
+services:
+  - id: 241af9b7-9306-529b-997b-c86240493d60
+    name: vendor
+    url: http://host.docker.internal:18087/mcp
+    host: host.docker.internal
+    port: 18087
+    protocol: http
+    path: /mcp
+routes:
+  - id: 1949b1d0-ad0e-51d8-8006-2fd707e7eb2f
+    name: vendor-route
+    service:
+      id: 241af9b7-9306-529b-997b-c86240493d60
+    paths:
+      - /mcp/vendor
+    protocols:
+      - http
+      - https
+consumers:
+  - id: ae6d9ce5-fa6d-50b9-ba0c-f478730ce581
+    username: token-client
+  - id: fdebbd9f-eefe-58f2-8daa-77d5cc4512c4
+    username: grouped-client
+consumer_groups:
+  - id: 5b12935c-9bf0-5168-9eb2-87532742a448
+    name: mcp-allowed
+consumer_group_consumers:
+  - consumer: fdebbd9f-eefe-58f2-8daa-77d5cc4512c4
+    consumer_group: 5b12935c-9bf0-5168-9eb2-87532742a448
+plugins:
+  - id: 85c0bd6c-91d6-515f-80d0-d1fabd279191
+    name: ai-mcp-proxy
+    config:
+      include_consumer_groups: true
+      logging:
+        log_audits: false
+        log_payloads: false
+        log_statistics: true
+      mode: passthrough-listener
+      tools: []
+    route:
+      id: 1949b1d0-ad0e-51d8-8006-2fd707e7eb2f
+  - id: 414d6db3-7deb-5f03-9895-57ef8bdb4ff4
+    name: acl
+    config:
+      allow:
+        - mcp-allowed
+      always_use_authenticated_groups: true
+      include_consumer_groups: true
+    route:
+      id: 1949b1d0-ad0e-51d8-8006-2fd707e7eb2f
+  - id: f9517cee-088d-559f-8598-9ed32a347924
+    name: openid-connect
+    config:
+      auth_methods:
+        - bearer
+      authenticated_groups_claim:
+        - groups
+      consumer_by:
+        - username
+      consumer_claims:
+        - - sub
+      issuer: http://host.docker.internal:18090
+      upstream_access_token_header: null
+    route:
+      id: 1949b1d0-ad0e-51d8-8006-2fd707e7eb2f

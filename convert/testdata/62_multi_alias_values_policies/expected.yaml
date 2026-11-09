@@ -76,6 +76,7 @@ plugins:
     config:
       allow:
         - premium-users
+      always_use_authenticated_groups: true
       include_consumer_groups: true
     route: openai-chat
     model: '@kong/gpt-4o'
@@ -83,6 +84,7 @@ plugins:
     config:
       allow:
         - premium-users
+      always_use_authenticated_groups: true
       include_consumer_groups: true
     route: openai-chat
     model: '@kong/gpt-4o-alias'

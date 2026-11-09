@@ -1,0 +1,35 @@
+# A request whose token maps to a consumer gets through the server access.acls
+# allow list if the token has an allowed group or the consumer is in an allowed
+# consumer group.
+auth_strategies:
+  - name: idp-oidc
+    type: openid-connect
+    config:
+      issuer: http://host.docker.internal:18090
+      auth_methods: [bearer]
+      authenticated_groups_claim: [groups]
+      consumer_by: [username]
+      consumer_claims: [[sub]]
+
+mcp_servers:
+  - type: passthrough-listener
+    name: vendor
+    upstream_url: http://host.docker.internal:18087/mcp
+    config:
+      route: {paths: [/mcp/vendor]}
+    access:
+      auth_strategies: [idp-oidc]
+      acls:
+        allow: [mcp-allowed]
+
+consumer_groups:
+  - name: mcp-allowed
+
+consumers:
+  # In no consumer group.
+  - name: token-client
+    type: oauth
+  # A member of the mcp-allowed consumer group.
+  - name: grouped-client
+    type: oauth
+    consumer_groups: [mcp-allowed]

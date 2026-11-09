@@ -33,4 +33,5 @@ services:
             config:
               allow:
                 - forecast-users
+              always_use_authenticated_groups: true
               include_consumer_groups: true

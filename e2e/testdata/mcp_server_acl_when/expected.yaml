@@ -78,6 +78,7 @@ plugins:
     config:
       allow_when:
         - consumer_group.names != null && 'gold' in consumer_group.names
+      always_use_authenticated_groups: true
       include_consumer_groups: true
     route:
       id: 6cc92280-4783-52a1-a35f-49658e3de9d5
@@ -104,6 +105,7 @@ plugins:
   - id: 414d6db3-7deb-5f03-9895-57ef8bdb4ff4
     name: acl
     config:
+      always_use_authenticated_groups: true
       deny_when:
         - consumer.username == 'suspended-client'
       include_consumer_groups: true

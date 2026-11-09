@@ -534,8 +534,9 @@ func TestMCPACLWhenConverts(t *testing.T) {
 		"allow_when": []string{"principal.metadata.admin == 'true'"},
 	}, tools[0]["acl"])
 	require.Equal(t, map[string]any{
-		"allow_when":              []string{"principal.metadata.tier == 'partner'"},
-		"include_consumer_groups": true,
+		"allow_when":                      []string{"principal.metadata.tier == 'partner'"},
+		"include_consumer_groups":         true,
+		"always_use_authenticated_groups": true,
 	}, aclPluginConfig(t, plugins))
 }
 

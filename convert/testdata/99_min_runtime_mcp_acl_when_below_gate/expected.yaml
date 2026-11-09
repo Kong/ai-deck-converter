@@ -24,4 +24,5 @@ services:
             config:
               allow:
                 - partners
+              always_use_authenticated_groups: true
               include_consumer_groups: true
