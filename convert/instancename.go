@@ -1,6 +1,7 @@
 package convert
 
 import (
+	"cmp"
 	"fmt"
 	"regexp"
 	"strings"
@@ -94,7 +95,8 @@ func (c *Converter) outputPlugins() []namedPlugin {
 		nested(doc.Routes[ri].Plugins, "route", doc.Routes[ri].Name)
 	}
 	for ci := range doc.Consumers {
-		nested(doc.Consumers[ci].Plugins, "consumer", doc.Consumers[ci].Username)
+		consumer := &doc.Consumers[ci]
+		nested(consumer.Plugins, "consumer", cmp.Or(consumer.Username, consumer.CustomID))
 	}
 	for gi := range doc.ConsumerGroups {
 		nested(doc.ConsumerGroups[gi].Plugins, "consumer group", doc.ConsumerGroups[gi].Name)

@@ -71,6 +71,35 @@ models:
 	require.Equal(t, ConversionIssueSource{Kind: kindModel, Name: "b"}, dropped[0].Source)
 }
 
+func TestPluginInstanceNamesConsumerCustomID(t *testing.T) {
+	src := []byte(`
+policies:
+  - type: http-log
+    name: audit-logging
+    config: {http_endpoint: https://logs.internal/ingest}
+consumers:
+  - custom_id: dev-001
+    policies: [audit-logging]
+  - custom_id: dev-002
+    policies: [audit-logging]
+`)
+	opts := testOptions
+	opts.PluginInstanceNames = true
+	result, err := Convert(src, opts)
+	require.NoError(t, err)
+
+	var names []string
+	for _, consumer := range result.Output.Consumers {
+		for _, p := range consumer.Plugins {
+			names = append(names, p.InstanceName)
+		}
+	}
+	require.Equal(t, []string{"http-log.dev-001", "http-log.dev-002"}, names)
+	for _, issue := range result.Issues {
+		require.NotEqual(t, ConfigFieldDropped, issue.Code, issue.Reason)
+	}
+}
+
 func TestInstanceNameIssueSource(t *testing.T) {
 	cases := []struct {
 		source *kong.Source

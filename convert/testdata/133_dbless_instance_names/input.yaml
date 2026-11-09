@@ -1,6 +1,6 @@
-# db-less output flows through a separate DBLessPlugin struct and an explicit
-# field-by-field copy (convert/dbless.go toDBLessPlugin); this is the easiest
-# place to silently drop instance_name, and it's the mode Konnect uses.
+# toDBLessPlugin in internal/kong/to_dbless.go copies each plugin field.
+# DBLessPlugin in internal/kong/dbless.go holds the copy.
+# This case checks that the db-less output keeps instance_name.
 model_providers:
   - name: openai-prod
     type: openai
