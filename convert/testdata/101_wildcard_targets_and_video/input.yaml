@@ -1,6 +1,6 @@
-# Model a is the guide model: azure does not support skills, so the skills
-# route has only primary. Its video lifecycle route has two targets, but
-# video comes from "*", so it gives no warning.
+# Model a is the guide model. A type: model wildcard keeps skills off the
+# model. Its video lifecycle route has two targets, but video comes from
+# "*", so it gives no warning.
 # Model b lists video and shares the lifecycle route of model a. Only
 # model b gets the routing conflict warning.
 models:

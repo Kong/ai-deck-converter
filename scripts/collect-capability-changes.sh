@@ -30,8 +30,11 @@ collect() {
   old=-
   mode=inventory
   if [ -n "$previous" ]; then
-    old=$(cat "$previous/$key.sha")
-    if git -C "$repo" merge-base --is-ancestor "$old" "$head" 2>/dev/null; then
+    old=$(cat "$previous/$key.sha" 2>/dev/null || true)
+    if [ -z "$old" ]; then
+      old=-
+      mode=rebaseline
+    elif git -C "$repo" merge-base --is-ancestor "$old" "$head" 2>/dev/null; then
       mode=delta
     else
       mode=rebaseline
