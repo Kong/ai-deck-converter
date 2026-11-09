@@ -44,3 +44,10 @@ func TestCheckMinRuntimeVersion(t *testing.T) {
 		require.ErrorContains(t, err, tc.wantErr, "%s %q", tc.dir, tc.version)
 	}
 }
+
+func TestCheckPluginInstanceNames(t *testing.T) {
+	require.NoError(t, checkPluginInstanceNames("to-deck", true))
+	require.NoError(t, checkPluginInstanceNames("to-dbless", true))
+	require.NoError(t, checkPluginInstanceNames("from-deck", false))
+	require.ErrorContains(t, checkPluginInstanceNames("from-deck", true), "not valid with from-deck")
+}

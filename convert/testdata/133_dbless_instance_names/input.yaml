@@ -1,0 +1,21 @@
+# toDBLessPlugin in internal/kong/to_dbless.go copies each plugin field.
+# DBLessPlugin in internal/kong/dbless.go holds the copy.
+# This case checks that the db-less output keeps instance_name.
+model_providers:
+  - name: openai-prod
+    type: openai
+    config:
+      auth:
+        type: basic
+        headers: [{name: Authorization, value: "{vault://env/openai-token}"}]
+models:
+  - name: gpt-4o-mini
+    type: model
+    capabilities: [chat]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/ai], model: {values: ["@openai/gpt-4o-mini"]}}
+    targets:
+      - name: gpt-4o-mini
+        provider: openai-prod
+        config: {type: openai}

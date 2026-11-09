@@ -1,0 +1,2 @@
+output_mode: db-less
+plugin_instance_names: true
