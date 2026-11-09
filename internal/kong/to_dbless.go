@@ -233,6 +233,7 @@ func toDBLessPlugin(plugin Plugin, id string, scope scopeRef) DBLessPlugin {
 	return DBLessPlugin{
 		ID:            id,
 		Name:          plugin.Name,
+		InstanceName:  plugin.InstanceName,
 		Enabled:       plugin.Enabled,
 		Protocols:     plugin.Protocols,
 		Condition:     plugin.Condition,

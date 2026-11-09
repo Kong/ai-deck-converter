@@ -43,6 +43,8 @@ func run() error {
 		minRuntimeVersion = flag.String("min-runtime-version", "",
 			"oldest AI Gateway release (MAJOR.MINOR, e.g. 2.1) that must run the output; "+
 				"required for to-deck and to-dbless")
+		pluginInstanceNames = flag.Bool("plugin-instance-names", false,
+			"give each generated plugin a deterministic instance_name (to-deck and to-dbless)")
 	)
 	flag.Parse()
 
@@ -62,6 +64,9 @@ func run() error {
 	if err := checkMinRuntimeVersion(dir, *minRuntimeVersion); err != nil {
 		return err
 	}
+	if err := checkPluginInstanceNames(dir, *pluginInstanceNames); err != nil {
+		return err
+	}
 
 	var out []byte
 	failed := false
@@ -69,8 +74,9 @@ func run() error {
 	case "to-deck", "to-dbless":
 		var issues []convert.ConversionIssue
 		out, issues, err = convertToYAML(in, convert.Options{
-			LabelTagPrefix:    *tagPrefix,
-			MinRuntimeVersion: *minRuntimeVersion,
+			LabelTagPrefix:      *tagPrefix,
+			MinRuntimeVersion:   *minRuntimeVersion,
+			PluginInstanceNames: *pluginInstanceNames,
 		}, dir == "to-dbless")
 		if err != nil {
 			return err
@@ -113,6 +119,13 @@ func checkMinRuntimeVersion(dir, version string) error {
 			"for example -min-runtime-version 2.1")
 	case dir == "from-deck" && version != "":
 		return errors.New("-min-runtime-version is not valid with from-deck")
+	}
+	return nil
+}
+
+func checkPluginInstanceNames(dir string, enabled bool) error {
+	if dir == "from-deck" && enabled {
+		return errors.New("-plugin-instance-names is not valid with from-deck")
 	}
 	return nil
 }

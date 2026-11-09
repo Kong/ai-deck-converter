@@ -1,0 +1,54 @@
+# Two no-model-FK fallbacks in one document:
+#  - `type: api` models produce an ai-proxy-advanced with no `model:` FK at
+#    all (isModelType is false for them), so its instance_name falls back to
+#    the route alone. A policy scoped to one of them inherits the same
+#    fallback -- it gets no `model:` FK either.
+#  - a global policy plugin has neither a `model:` nor a `route:` FK (it isn't
+#    scoped to anything), so its instance_name is just the bare plugin name
+#    (Kong allows only one global instance per plugin type, so that's already
+#    unique, and it's also all a reverted document could ever reconstruct).
+# Both models stay alias-less (the AI Gateway 2.0 convention for type: api)
+# so the pair round-trips through revert the same way 20_openai_api_models
+# does.
+models:
+  - name: openai-batch-api
+    type: api
+    capabilities: [batches]
+    formats: [{type: openai}]
+    targets:
+      - name: batch-api
+        provider: openai-prod
+        config: {type: openai}
+    config:
+      route: {paths: [/ai]}
+      model: {}
+  - name: openai-files-api
+    type: api
+    capabilities: [files]
+    formats: [{type: openai}]
+    targets:
+      - name: files-api
+        provider: openai-prod
+        config: {type: openai}
+    policies: [pii-sanitizer]
+    config:
+      route: {paths: [/ai]}
+      model: {}
+model_providers:
+  - name: openai-prod
+    type: openai
+    config:
+      auth:
+        type: basic
+        headers: [{name: Authorization, value: "{vault://env/openai-key}"}]
+policies:
+  - type: ai-prompt-guard
+    name: pii-sanitizer
+    config:
+      allow_patterns: ["^safe"]
+  - type: rate-limiting
+    name: org-wide-limit
+    global: true
+    config:
+      minute: 1000
+      policy: local

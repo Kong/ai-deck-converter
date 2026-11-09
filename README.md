@@ -48,6 +48,7 @@ cat input.yaml | ./ai-deck-converter -min-runtime-version 2.1 -
 | `-direction` | `auto` | Conversion direction: `auto`, `to-deck` (AI Gateway → decK), `to-dbless` (AI Gateway → db-less), or `from-deck` (decK → AI Gateway). Auto-detection keys off `_format_version`, which only decK documents carry. |
 | `-strict` | `false` | Exit non-zero on warnings too. For `to-deck`/`to-dbless`, any issue fails the run. For `from-deck`, unresolved references and unconvertible entities become errors. |
 | `-label-tag-prefix` | `""` | Prefix for label-derived tags, e.g. `aigw/` (prepended when converting to decK, stripped when reverting). |
+| `-plugin-instance-names` | `false` | Give each generated plugin a deterministic `instance_name`, e.g. `ai-proxy-advanced.openai-gpt-4o-mini.openai-chat`, so Kong Manager and the Admin API can tell plugins of the same type apart. The name comes from the plugin type, its `ai_models` entry, and the name of its route, service, consumer, or consumer group. A route name can carry an order-based counter (e.g. `openai-chat-2`) when models split across routes, so adding a model can change the names on later routes. When two plugins get the same name, the later one gets no `instance_name` and a `CONFIG_FIELD_DROPPED` warning. Off by default because it changes the output. Not valid with `from-deck`; revert ignores `instance_name`. |
 
 Conversion issues are printed to stderr, one per line, as
 `SEVERITY CODE kind "name" [fields]: reason`. The converted config always goes

@@ -24,6 +24,10 @@ type Options struct {
 	// output, in the form MAJOR.MINOR. It is required. It has the meaning of
 	// the min_runtime_version field of the Konnect AI Gateway API.
 	MinRuntimeVersion string `yaml:"min_runtime_version"`
+
+	// PluginInstanceNames gives each output plugin a deterministic
+	// instance_name. It is off by default because it changes the output.
+	PluginInstanceNames bool `yaml:"plugin_instance_names"`
 }
 
 // Convert parses a YAML AI Gateway document and returns the Kong decK document
@@ -156,4 +160,7 @@ func (c *Converter) run() {
 	c.secureTokenVaultCallbackRoute()
 	c.revealTokenVaultCredentials()
 	c.lint()
+	if c.opts.PluginInstanceNames {
+		c.applyPluginInstanceNames()
+	}
 }

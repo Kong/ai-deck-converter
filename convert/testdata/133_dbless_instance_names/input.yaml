@@ -1,0 +1,21 @@
+# db-less output flows through a separate DBLessPlugin struct and an explicit
+# field-by-field copy (convert/dbless.go toDBLessPlugin); this is the easiest
+# place to silently drop instance_name, and it's the mode Konnect uses.
+model_providers:
+  - name: openai-prod
+    type: openai
+    config:
+      auth:
+        type: basic
+        headers: [{name: Authorization, value: "{vault://env/openai-token}"}]
+models:
+  - name: gpt-4o-mini
+    type: model
+    capabilities: [chat]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/ai], model: {values: ["@openai/gpt-4o-mini"]}}
+    targets:
+      - name: gpt-4o-mini
+        provider: openai-prod
+        config: {type: openai}
