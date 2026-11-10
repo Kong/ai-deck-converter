@@ -90,6 +90,7 @@ const (
 	FeatureTogetherai                 Feature = "togetherai"
 	FeatureSagemaker                  Feature = "sagemaker"
 	FeatureAuthStrategyTokenVault     Feature = "auth-strategy-token-vault"
+	FeatureMeta                       Feature = "meta"
 	FeatureAgentTargets               Feature = "agent-targets"
 	// FeatureProviderBodySize gives a model without max_request_body_size the
 	// limit of its providers. Older releases keep the plugin default.
@@ -152,6 +153,7 @@ var featureSince = map[Feature]Version{
 	FeatureClonedPlugins:                 mustVersion("2.1"),
 	FeatureSessionAffinity:               mustVersion("2.4"),
 	FeatureIntelligentBalancer:           mustVersion("2.5"),
+	FeatureMeta:                          mustVersion("2.4"),
 }
 
 // Since returns the first AI Gateway release that has f. It panics for an
@@ -196,6 +198,8 @@ const (
 	TogetheraiProviderType = "togetherai"
 	// SagemakerProviderType is the provider type that FeatureSagemaker gates.
 	SagemakerProviderType = "sagemaker"
+	// MetaProviderType is the provider type that FeatureMeta gates.
+	MetaProviderType = "meta"
 )
 
 var formatFeatures = map[string]Feature{
@@ -210,11 +214,12 @@ func FormatFeature(format string) (Feature, bool) {
 }
 
 var providerFeatures = map[string]Feature{
-	TypesafeProviderType:   FeatureTypesafe,
-	BasetenProviderType:    FeatureBaseten,
-	FireworksProviderType:  FeatureFireworks,
+	TypesafeProviderType:  FeatureTypesafe,
+	BasetenProviderType:   FeatureBaseten,
+	FireworksProviderType: FeatureFireworks,
+	SagemakerProviderType: FeatureSagemaker,
+	MetaProviderType:      FeatureMeta,
 	TogetheraiProviderType: FeatureTogetherai,
-	SagemakerProviderType:  FeatureSagemaker,
 }
 
 // ProviderFeature returns the feature that gates the provider type.

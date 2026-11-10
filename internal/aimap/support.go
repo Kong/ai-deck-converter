@@ -34,7 +34,7 @@ var supportedRouteTypes = map[string][]string{
 	"llm/v1/chat": {
 		"openai", "azure", "anthropic", "cohere", "mistral", "llama2", "gemini", "bedrock",
 		"databricks", "huggingface", "dashscope", "xai", "cerebras", "vllm", "deepseek",
-		"ollama", "kimi", "vercel", "sagemaker", "typesafe", "baseten", "fireworks",
+		"ollama", "kimi", "vercel", "sagemaker", "typesafe", "baseten", "fireworks","meta",
 		"togetherai",
 	},
 	"llm/v1/completions": {
@@ -45,7 +45,7 @@ var supportedRouteTypes = map[string][]string{
 		"openai", "azure", "cohere", "mistral", "llama2", "gemini", "bedrock", "databricks",
 		"huggingface", "dashscope", "ollama", "vercel",
 	},
-	"llm/v1/responses":              {"openai", "azure", "xai", "vercel", "bedrock", "fireworks", "togetherai"},
+	"llm/v1/responses":              {"openai", "azure", "xai", "vercel", "bedrock", "fireworks", "meta", "togetherai"},
 	"llm/v1/assistants":             {"openai", "azure"},
 	"llm/v1/batches":                {"openai", "azure", "bedrock", "anthropic", "gemini", "kimi"},
 	"llm/v1/files":                  {"openai", "azure", "kimi"},
