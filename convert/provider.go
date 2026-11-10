@@ -116,13 +116,9 @@ func resolveAuth(p *aigw.Provider, allowOverride *bool) map[string]any {
 	return auth
 }
 
-// resolveEmbeddings lowers a model's embeddings block into the ai-proxy-advanced
-// embeddings shape. When `embeddings.provider` names a top-level provider entity,
-// its auth is resolved via resolveAuth and merged into `embeddings.auth` (any
-// explicitly configured auth keys win), then the provider reference is dropped —
-// the ai-proxy-advanced embeddings schema has no top-level provider field. The
-// embeddings model's `config` block is lowered regardless of whether a provider
-// entity is referenced.
+// resolveEmbeddings changes a model's embeddings block to the ai-proxy-advanced
+// shape. Keys set in `embeddings.auth` win over the auth of `embeddings.provider`.
+// A client-key Bedrock provider always sets allow_override to true.
 //
 // It works on a copy. A model pass can run more than once over the source.
 func (c *Converter) resolveEmbeddings(src ConversionIssueSource, raw any) (any, error) {
@@ -164,7 +160,6 @@ func (c *Converter) resolveEmbeddings(src ConversionIssueSource, raw any) (any, 
 		return emb, nil
 	}
 	for k, v := range resolved {
-		// Only a client auth provider resolves allow_override. It wins over the stored value.
 		if _, set := existing[k]; !set || k == "allow_override" {
 			existing[k] = v
 		}
