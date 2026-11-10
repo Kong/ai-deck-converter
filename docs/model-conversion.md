@@ -215,7 +215,7 @@ if opts := mapOptions(tm.Config.Options, providerType, provider); opts != nil {
     model["options"] = opts
 }
 target := map[string]any{"route_type": routeType, "model": model}
-if auth := resolveAuth(provider, tm.AllowAuthOverride); auth != nil {
+if auth := resolveAuth(provider, cmp.Or(clientAuthOverride(provider), tm.AllowAuthOverride)); auth != nil {
     target["auth"] = auth
 }
 // weight, description added when present
@@ -224,6 +224,12 @@ if auth := resolveAuth(provider, tm.AllowAuthOverride); auth != nil {
 **`resolveAuth`** (`convert/provider.go`) flattens a provider's auth union into
 the target `auth` block — header/param auth, plus AWS / Azure / GCP variants
 (`header_name`, `aws_access_key_id`, `azure_client_id`, `gcp_service_account_json`, …).
+
+**`clientAuthOverride`** (`convert/provider.go`) returns `true` for a Bedrock
+provider with `basic` auth, no header, no param, and no `token_vault`. Clients of
+such a provider send their own key. The data plane rejects that key unless
+`allow_override` is `true`, so the value replaces the target's `allow_auth_override`.
+Embeddings get the same value.
 
 **`mapOptions`** translates the free-form options map, renaming/nesting
 provider-specific keys:

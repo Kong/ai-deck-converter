@@ -1,0 +1,263 @@
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: openai-chat
+        paths:
+          - /client/v1/chat/completions
+          - /client/openai/v1/chat/completions
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: bedrock-converse
+        paths:
+          - ~/gateway/model/(?<model_name>[^/]+)/converse(?:-stream)?
+        methods:
+          - GET
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: bedrock-invoke
+        paths:
+          - ~/gateway/model/(?<model_name>[^/]+)/invoke(?:-with-response-stream)?
+        methods:
+          - GET
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: bedrock-chat
+        paths:
+          - /gateway/openai/v1/chat/completions
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: bedrock-messages
+        paths:
+          - /gateway/anthropic/v1/messages
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+plugins:
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-chat
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            allow_override: true
+          description: openai.gpt-oss-20b
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: client-key-mantle
+            name: openai.gpt-oss-20b
+            options:
+              bedrock:
+                aws_region: us-east-1
+                endpoint_type: mantle
+                mantle_openai_path_prefix: /v1
+            provider: bedrock
+          route_type: llm/v1/chat
+    route: openai-chat
+    model: client-key-mantle
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - path_pattern: model/([^/]+)/
+          source: path
+    route: bedrock-converse
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: bedrock
+      targets:
+        - auth:
+            allow_override: false
+            header_name: Authorization
+            header_value: '{vault://env/bedrock-key}'
+          description: anthropic.claude-3-5-sonnet
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: gateway-credentials
+            name: anthropic.claude-3-5-sonnet
+            options:
+              anthropic_version: bedrock-2023-05-31
+              bedrock:
+                aws_region: us-east-1
+            provider: bedrock
+          route_type: llm/v1/chat
+        - description: anthropic.claude-3-5-haiku
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: gateway-credentials
+            name: anthropic.claude-3-5-haiku
+            options:
+              anthropic_version: bedrock-2023-05-31
+              bedrock:
+                aws_region: us-east-1
+            provider: bedrock
+          route_type: llm/v1/chat
+    route: bedrock-converse
+    model: gateway-credentials
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - path_pattern: model/([^/]+)/
+          source: path
+    route: bedrock-invoke
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: bedrock
+      targets:
+        - auth:
+            allow_override: false
+            header_name: Authorization
+            header_value: '{vault://env/bedrock-key}'
+          description: anthropic.claude-3-5-sonnet
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: gateway-credentials
+            name: anthropic.claude-3-5-sonnet
+            options:
+              anthropic_version: bedrock-2023-05-31
+              bedrock:
+                aws_region: us-east-1
+            provider: bedrock
+          route_type: llm/v1/chat
+        - description: anthropic.claude-3-5-haiku
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: gateway-credentials
+            name: anthropic.claude-3-5-haiku
+            options:
+              anthropic_version: bedrock-2023-05-31
+              bedrock:
+                aws_region: us-east-1
+            provider: bedrock
+          route_type: llm/v1/chat
+    route: bedrock-invoke
+    model: gateway-credentials
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: bedrock-chat
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: bedrock
+      targets:
+        - auth:
+            allow_override: false
+            header_name: Authorization
+            header_value: '{vault://env/bedrock-key}'
+          description: anthropic.claude-3-5-sonnet
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: gateway-credentials
+            name: anthropic.claude-3-5-sonnet
+            options:
+              anthropic_version: bedrock-2023-05-31
+              bedrock:
+                aws_region: us-east-1
+            provider: bedrock
+          route_type: llm/v1/chat
+        - description: anthropic.claude-3-5-haiku
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: gateway-credentials
+            name: anthropic.claude-3-5-haiku
+            options:
+              anthropic_version: bedrock-2023-05-31
+              bedrock:
+                aws_region: us-east-1
+            provider: bedrock
+          route_type: llm/v1/chat
+    route: bedrock-chat
+    model: gateway-credentials
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: bedrock-messages
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: bedrock
+      targets:
+        - auth:
+            allow_override: false
+            header_name: Authorization
+            header_value: '{vault://env/bedrock-key}'
+          description: anthropic.claude-3-5-sonnet
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: gateway-credentials
+            name: anthropic.claude-3-5-sonnet
+            options:
+              anthropic_version: bedrock-2023-05-31
+              bedrock:
+                aws_region: us-east-1
+            provider: bedrock
+          route_type: llm/v1/chat
+        - description: anthropic.claude-3-5-haiku
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: gateway-credentials
+            name: anthropic.claude-3-5-haiku
+            options:
+              anthropic_version: bedrock-2023-05-31
+              bedrock:
+                aws_region: us-east-1
+            provider: bedrock
+          route_type: llm/v1/chat
+    route: bedrock-messages
+    model: gateway-credentials
+ai_models:
+  - name: client-key-mantle
+  - name: gateway-credentials
