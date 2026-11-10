@@ -8,6 +8,17 @@ import (
 	"github.com/Kong/ai-deck-converter/internal/aimap"
 )
 
+// clientAuthOverride returns true for a Bedrock provider whose clients send their
+// own key. Such a provider has basic auth with no header, no param, and no token
+// vault. The data plane rejects a client key unless allow_override is true.
+func clientAuthOverride(p *aigw.Provider) *bool {
+	if p == nil || p.Type != "bedrock" || p.TokenVault != nil || p.Config.Auth.Type != "basic" ||
+		len(p.Config.Auth.Headers) > 0 || len(p.Config.Auth.Params) > 0 {
+		return nil
+	}
+	return new(true)
+}
+
 // resolveAuth folds a provider's auth configuration into an ai-proxy-advanced
 // target `auth` block. Returns nil when there is nothing to emit.
 func resolveAuth(p *aigw.Provider, allowOverride *bool) map[string]any {
@@ -143,7 +154,7 @@ func (c *Converter) resolveEmbeddings(src ConversionIssueSource, raw any) (any, 
 	if provider == nil {
 		return emb, nil
 	}
-	resolved := resolveAuth(provider, nil)
+	resolved := resolveAuth(provider, clientAuthOverride(provider))
 	if resolved == nil {
 		return emb, nil
 	}
@@ -153,7 +164,8 @@ func (c *Converter) resolveEmbeddings(src ConversionIssueSource, raw any) (any, 
 		return emb, nil
 	}
 	for k, v := range resolved {
-		if _, set := existing[k]; !set {
+		// Only a client auth provider resolves allow_override. It wins over the stored value.
+		if _, set := existing[k]; !set || k == "allow_override" {
 			existing[k] = v
 		}
 	}

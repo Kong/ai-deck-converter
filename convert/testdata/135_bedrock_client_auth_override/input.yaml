@@ -1,0 +1,61 @@
+models:
+  - type: model
+    display_name: Client key on Bedrock Mantle
+    name: client-key-mantle
+    capabilities: [generate]
+    formats:
+      - type: openai
+    targets:
+      - name: openai.gpt-oss-20b
+        provider: bedrock-client
+        allow_auth_override: false
+        config:
+          type: bedrock
+          region: us-east-1
+          endpoint_type: mantle
+    config:
+      route:
+        paths: [/client]
+  - type: model
+    display_name: Gateway credentials on Bedrock
+    name: gateway-credentials
+    capabilities: [generate]
+    formats:
+      - type: bedrock
+    targets:
+      - name: anthropic.claude-3-5-sonnet
+        provider: bedrock-key
+        allow_auth_override: false
+        config:
+          type: bedrock
+          region: us-east-1
+      - name: anthropic.claude-3-5-haiku
+        provider: bedrock-iam
+        config:
+          type: bedrock
+          region: us-east-1
+    config:
+      route:
+        paths: [/gateway]
+model_providers:
+  - type: bedrock
+    display_name: Bedrock client key
+    name: bedrock-client
+    config:
+      auth:
+        type: basic
+  - type: bedrock
+    display_name: Bedrock gateway key
+    name: bedrock-key
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://env/bedrock-key}"
+  - type: bedrock
+    display_name: Bedrock IAM role
+    name: bedrock-iam
+    config:
+      auth:
+        type: aws
