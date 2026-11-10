@@ -1,0 +1,113 @@
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: openai-chat
+        paths:
+          - /meta/chat/completions
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-responses
+        paths:
+          - /meta/responses
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: anthropic-messages
+        paths:
+          - /meta/v1/messages
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+plugins:
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-chat
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: Bearer {vault://ai/meta-token}
+          description: muse-spark-1.3
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: muse-spark
+            name: muse-spark-1.3
+            provider: meta
+          route_type: llm/v1/chat
+    route: openai-chat
+    model: muse-spark
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-responses
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: Bearer {vault://ai/meta-token}
+          description: muse-spark-1.3
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: muse-spark
+            name: muse-spark-1.3
+            provider: meta
+          route_type: llm/v1/responses
+    route: openai-responses
+    model: muse-spark
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: anthropic-messages
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: Bearer {vault://ai/meta-token}
+          description: muse-spark-1.3
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: muse-spark
+            name: muse-spark-1.3
+            provider: meta
+          route_type: llm/v1/chat
+    route: anthropic-messages
+    model: muse-spark
+ai_models:
+  - name: muse-spark

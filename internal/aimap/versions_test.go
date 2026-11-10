@@ -61,6 +61,7 @@ var allFeatures = []Feature{
 	FeatureSagemaker,
 	FeatureAuthStrategyTokenVault,
 	FeatureOIDCProtectedResourceMetadata,
+	FeatureMeta,
 }
 
 func TestFeatureTable(t *testing.T) {
@@ -109,6 +110,9 @@ func TestFeatureLookups(t *testing.T) {
 	f, ok = ProviderFeature("sagemaker")
 	require.True(t, ok)
 	require.Equal(t, FeatureSagemaker, f)
+	f, ok = ProviderFeature("meta")
+	require.True(t, ok)
+	require.Equal(t, FeatureMeta, f)
 	_, ok = ProviderFeature("cerebras")
 	require.False(t, ok)
 

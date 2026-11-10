@@ -88,6 +88,7 @@ const (
 	FeatureBaseten                    Feature = "baseten"
 	FeatureSagemaker                  Feature = "sagemaker"
 	FeatureAuthStrategyTokenVault     Feature = "auth-strategy-token-vault"
+	FeatureMeta                       Feature = "meta"
 	// FeatureOIDCProtectedResourceMetadata is the openid-connect plugin field
 	// protected_resource_metadata. It is a plugin schema gate, not an API field.
 	FeatureOIDCProtectedResourceMetadata Feature = "oidc-protected-resource-metadata"
@@ -118,6 +119,7 @@ var featureSince = map[Feature]Version{
 	FeatureSagemaker:                     mustVersion("2.1"),
 	FeatureAuthStrategyTokenVault:        mustVersion("2.3"),
 	FeatureOIDCProtectedResourceMetadata: mustVersion("2.3"),
+	FeatureMeta:                          mustVersion("2.4"),
 }
 
 // Since returns the first AI Gateway release that has f. It panics for an
@@ -158,6 +160,8 @@ const (
 	BasetenProviderType = "baseten"
 	// SagemakerProviderType is the provider type that FeatureSagemaker gates.
 	SagemakerProviderType = "sagemaker"
+	// MetaProviderType is the provider type that FeatureMeta gates.
+	MetaProviderType = "meta"
 )
 
 var formatFeatures = map[string]Feature{
@@ -175,6 +179,7 @@ var providerFeatures = map[string]Feature{
 	TypesafeProviderType:  FeatureTypesafe,
 	BasetenProviderType:   FeatureBaseten,
 	SagemakerProviderType: FeatureSagemaker,
+	MetaProviderType:      FeatureMeta,
 }
 
 // ProviderFeature returns the feature that gates the provider type.
