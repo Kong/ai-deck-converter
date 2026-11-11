@@ -192,9 +192,10 @@ func TestSupportedCapabilities(t *testing.T) {
 		SupportedCapabilities(aigw.Format{Type: "gemini"}, Target{ProviderType: "gemini"}, "model", mustVersion("2.2")),
 		"agentic")
 
-	// generate claims the invoke route first, so the other genai categories
-	// lose it, and invoke is their only endpoint.
-	require.Equal(t, []aigw.Capability{"generate", "agentic", "audio/speech", "rerank"},
+	// generate claims the invoke route first. Embeddings and image lose it,
+	// because invoke is their only endpoint. Video has its own async-invoke
+	// route.
+	require.Equal(t, []aigw.Capability{"generate", "agentic", "audio/speech", "rerank", "video"},
 		SupportedCapabilities(aigw.Format{Type: "bedrock"}, Target{ProviderType: "bedrock"}, "model", LatestVersion))
 }
 

@@ -11,6 +11,21 @@ services:
           - POST
           - OPTIONS
         strip_path: false
+      - name: bedrock-async-invoke
+        paths:
+          - /ai/async-invoke
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: bedrock-async-invoke-lifecycle
+        paths:
+          - /ai/async-invoke
+        methods:
+          - GET
+        strip_path: false
+        tags:
+          - aigw:video-lifecycle
 plugins:
   - name: ai-model-selector
     config:
@@ -92,6 +107,13 @@ plugins:
           route_type: llm/v1/chat
     route: bedrock-invoke
     model: nova-sonic-audio
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: modelId
+          source: body
+    route: bedrock-async-invoke
   - name: ai-proxy-advanced
     config:
       balancer:
@@ -115,8 +137,32 @@ plugins:
                 video_output_s3_uri: s3://kong/nova-reel/
             provider: bedrock
           route_type: video/v1/videos/generations
-    route: bedrock-invoke
+    route: bedrock-async-invoke
     model: nova-reel-video
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: video/generation
+      llm_format: bedrock
+      model_name_header: false
+      targets:
+        - auth:
+            aws_access_key_id: '{vault://ai/aws-access-key-id}'
+            aws_secret_access_key: '{vault://ai/aws-secret-access-key}'
+          description: amazon.nova-reel-v1:1
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: amazon.nova-reel-v1:1
+            options:
+              bedrock:
+                aws_region: us-east-1
+                video_output_s3_uri: s3://kong/nova-reel/
+            provider: bedrock
+          route_type: video/v1/videos/generations
+    route: bedrock-async-invoke-lifecycle
 ai_models:
   - name: titan-embed-text-v2
   - name: nova-canvas-image

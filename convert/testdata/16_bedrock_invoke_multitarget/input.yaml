@@ -1,5 +1,6 @@
-# Four Bedrock models whose capabilities (embeddings/image/audio/video) all map
-# to the shared /invoke endpoint -> one bedrock-invoke route with four targets.
+# Four Bedrock models. Embeddings, image and audio share the invoke endpoint.
+# They share one bedrock-invoke route with three targets. Video has its own
+# bedrock-async-invoke route and a companion poll route.
 model_providers:
   - name: bedrock-prod
     type: bedrock

@@ -286,6 +286,13 @@ var bedrockPathModelSelectorConfig = map[string]any{
 	"path_pattern": BedrockDefaultPathPattern,
 }
 
+// bedrockVideoModelSelectorConfig reads the model from the async-invoke body.
+// AWS carries the model id there, not in the path.
+var bedrockVideoModelSelectorConfig = map[string]any{
+	"source":    "body",
+	"body_path": "modelId",
+}
+
 // bedrockInvokeChatSpec is bedrock's InvokeModel endpoint as seen by its
 // llm/v1/chat-typed capabilities: audio/speech's only endpoint, and the
 // endpoint "generate" is also reachable through besides Converse. Defined
@@ -454,10 +461,12 @@ var EndpointTable = map[string]map[string]EndpointEntry{
 			},
 		},
 		"audio/speech": {Primary: bedrockInvokeChatSpec},
+		// AWS starts the job with POST /async-invoke. The body carries the model
+		// id. The path carries no model. The poll is a companion route.
 		"video": {
 			Primary: EndpointSpec{
-				"invoke", "model/(?<model_name>[^/]+)/invoke(?:-with-response-stream)?",
-				true, mGetPost, "video/v1/videos/generations", catVideo, &bedrockPathModelSelectorConfig, true,
+				"async-invoke", "/async-invoke",
+				false, mPost, "video/v1/videos/generations", catVideo, &bedrockVideoModelSelectorConfig, true,
 			},
 		},
 		"rerank": {
@@ -619,6 +628,28 @@ func SectionEndpoints(section string) []CapabilityEndpoint {
 		}
 	}
 	return out
+}
+
+// VideoLifecycleRoute describes the companion route that serves the video job
+// status requests of a section. Such a request carries no model. The route
+// therefore carries no ai-model-selector.
+type VideoLifecycleRoute struct {
+	Label   string   // route-name suffix, after the section
+	Methods []string // route methods
+}
+
+// videoLifecycleRoutes holds the companion route of each section that needs
+// one. A section with no row serves its status requests on the video route.
+var videoLifecycleRoutes = map[string]VideoLifecycleRoute{
+	"openai":  {"videos-lifecycle", []string{"GET", "DELETE"}},
+	"bedrock": {"async-invoke-lifecycle", []string{"GET"}},
+}
+
+// VideoLifecycleRouteFor returns the companion video route of section. The
+// route path is the path of the section's video endpoint.
+func VideoLifecycleRouteFor(section string) (VideoLifecycleRoute, bool) {
+	r, ok := videoLifecycleRoutes[section]
+	return r, ok
 }
 
 // CapabilityAliases maps loose capability spellings to canonical keys.
