@@ -1,0 +1,22 @@
+# fireworks serves chat, responses and embeddings in the openai format, and
+# Messages in the anthropic format. Fireworks model IDs stay as written.
+model_providers:
+  - name: fireworks-prod
+    type: fireworks
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "Bearer {vault://ai/fireworks-token}"
+models:
+  - name: fireworks-llama
+    type: model
+    capabilities: [generate, agentic, embeddings]
+    formats: [{type: openai}, {type: anthropic}]
+    config:
+      route: {paths: [/fireworks]}
+    targets:
+      - name: accounts/fireworks/models/llama-v3p1-8b-instruct
+        provider: fireworks-prod
+        config: {type: fireworks}

@@ -33,6 +33,7 @@ func TestTargetSupportsConditions(t *testing.T) {
 	openai := Target{ProviderType: "openai"}
 	azure := Target{ProviderType: "azure"}
 	anthropic := Target{ProviderType: "anthropic"}
+	fireworks := Target{ProviderType: "fireworks"}
 	bedrock := Target{ProviderType: "bedrock"}
 	gemini := Target{ProviderType: "gemini"}
 	cases := []struct {
@@ -96,7 +97,14 @@ func TestTargetSupportsConditions(t *testing.T) {
 			Target{ProviderType: "llama2", Llama2RawFormat: true},
 			spec(t, "openai", "generate"), true,
 		},
-		// 8. The bedrock-runtime Responses API keeps the bedrock format.
+		// 8. A fireworks target serves chat, responses and embeddings, and
+		// Messages in the anthropic format.
+		{"fireworks chat", "openai", fireworks, spec(t, "openai", "generate"), true},
+		{"fireworks responses", "openai", fireworks, spec(t, "openai", "agentic"), true},
+		{"fireworks embeddings", "openai", fireworks, spec(t, "openai", "embeddings"), true},
+		{"fireworks messages", "anthropic", fireworks, spec(t, "anthropic", "generate"), true},
+		{"fireworks images", "openai", fireworks, spec(t, "openai", "image"), false},
+		// 9. The bedrock-runtime Responses API keeps the bedrock format.
 		{
 			"bedrock runtime responses in bedrock format", "bedrock", bedrock,
 			agenticSpec(t, "responses"), true,
