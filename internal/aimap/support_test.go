@@ -111,6 +111,22 @@ func TestTargetSupportsConditions(t *testing.T) {
 			agenticSpec(t, "responses"), false,
 		},
 		{
+			"bedrock mantle responses in openai format", "openai",
+			Target{ProviderType: "bedrock", Mantle: true},
+			agenticSpec(t, "responses"), true,
+		},
+		// The rule follows the route type, so the openai section's own
+		// responses spec rejects a bedrock runtime target too.
+		{
+			"bedrock runtime responses on the openai section spec", "openai", bedrock,
+			spec(t, "openai", "agentic"), false,
+		},
+		// The rule applies to bedrock alone.
+		{
+			"azure responses stay accepted", "openai", azure,
+			spec(t, "openai", "agentic"), true,
+		},
+		{
 			"bedrock retrieve stays on chat", "bedrock", bedrock,
 			agenticSpec(t, "retrieve"), true,
 		},

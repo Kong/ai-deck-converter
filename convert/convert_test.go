@@ -613,6 +613,64 @@ models:
 		"the skipped image capability must not leak a target into the output")
 }
 
+// A bedrock runtime target serves the Responses API only on the native path,
+// which the bedrock format selects.
+func TestConvertRejectsBedrockRuntimeAgenticInOpenAIFormat(t *testing.T) {
+	src := []byte(`
+model_providers:
+  - name: bedrock-prod
+    type: bedrock
+models:
+  - type: model
+    name: claude-bedrock
+    capabilities: [agentic]
+    formats: [{type: openai}]
+    targets:
+      - name: anthropic.claude-3-5-sonnet
+        provider: bedrock-prod
+        config: {type: bedrock, region: us-east-1}
+    policies: []
+    access:
+      acls: {allow: [], deny: []}
+    config:
+      route: {paths: [/ai]}
+`)
+	_, _, err := convertDoc(src, false)
+	require.Error(t, err, "an openai-format agentic capability has no endpoint here")
+	require.Contains(t, err.Error(), `no target can serve capability "agentic"`)
+}
+
+// A mantle target keeps the openai format, so it reaches the Responses API
+// there.
+func TestConvertAcceptsBedrockMantleAgenticInOpenAIFormat(t *testing.T) {
+	src := []byte(`
+model_providers:
+  - name: bedrock-prod
+    type: bedrock
+models:
+  - type: model
+    name: gpt-oss
+    capabilities: [agentic]
+    formats: [{type: openai}]
+    targets:
+      - name: openai.gpt-oss-120b
+        provider: bedrock-prod
+        config: {type: bedrock, region: us-east-1, endpoint_type: mantle}
+    policies: []
+    access:
+      acls: {allow: [], deny: []}
+    config:
+      route: {paths: [/ai]}
+`)
+	doc, warnings, err := convertDoc(src, false)
+	require.NoError(t, err)
+	require.Empty(t, warnings)
+	out, err := doc.ToYAML()
+	require.NoError(t, err)
+	require.Contains(t, string(out), "route_type: llm/v1/responses")
+	require.Contains(t, string(out), "llm_format: openai")
+}
+
 // A Kong acl plugin permits exactly one of config.allow / config.deny
 // (only_one_of in its schema). An AI Gateway acl that sets both is not
 // representable as a single valid acl plugin, so the converter must reject it
