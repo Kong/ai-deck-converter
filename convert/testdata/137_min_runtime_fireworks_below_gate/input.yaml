@@ -1,0 +1,43 @@
+# fireworks needs 2.4. At 2.3:
+# - a fireworks target on another model is absent with a warning;
+# - a model whose only target is fireworks is absent with an error.
+model_providers:
+  - name: fireworks-prod
+    type: fireworks
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "Bearer {vault://ai/fireworks-token}"
+  - name: openai-prod
+    type: openai
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://ai/openai-token}"
+models:
+  - name: mixed-chat
+    type: model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/mixed]}
+    targets:
+      - name: gpt-4o
+        provider: openai-prod
+        config: {type: openai}
+      - name: accounts/fireworks/models/llama-v3p1-8b-instruct
+        provider: fireworks-prod
+        config: {type: fireworks}
+  - name: only-fireworks
+    type: model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/only]}
+    targets:
+      - name: accounts/fireworks/models/llama-v3p1-8b-instruct
+        provider: fireworks-prod

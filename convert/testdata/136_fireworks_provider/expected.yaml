@@ -1,0 +1,148 @@
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: openai-chat
+        paths:
+          - /fireworks/chat/completions
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-responses
+        paths:
+          - /fireworks/responses
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-embeddings
+        paths:
+          - /fireworks/embeddings
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: anthropic-messages
+        paths:
+          - /fireworks/v1/messages
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+plugins:
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-chat
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: Bearer {vault://ai/fireworks-token}
+          description: accounts/fireworks/models/llama-v3p1-8b-instruct
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: fireworks-llama
+            name: accounts/fireworks/models/llama-v3p1-8b-instruct
+            provider: fireworks
+          route_type: llm/v1/chat
+    route: openai-chat
+    model: fireworks-llama
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-responses
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: Bearer {vault://ai/fireworks-token}
+          description: accounts/fireworks/models/llama-v3p1-8b-instruct
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: fireworks-llama
+            name: accounts/fireworks/models/llama-v3p1-8b-instruct
+            provider: fireworks
+          route_type: llm/v1/responses
+    route: openai-responses
+    model: fireworks-llama
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-embeddings
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/embeddings
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: Bearer {vault://ai/fireworks-token}
+          description: accounts/fireworks/models/llama-v3p1-8b-instruct
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: fireworks-llama
+            name: accounts/fireworks/models/llama-v3p1-8b-instruct
+            provider: fireworks
+          route_type: llm/v1/embeddings
+    route: openai-embeddings
+    model: fireworks-llama
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: anthropic-messages
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: Bearer {vault://ai/fireworks-token}
+          description: accounts/fireworks/models/llama-v3p1-8b-instruct
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: fireworks-llama
+            name: accounts/fireworks/models/llama-v3p1-8b-instruct
+            provider: fireworks
+          route_type: llm/v1/chat
+    route: anthropic-messages
+    model: fireworks-llama
+ai_models:
+  - name: fireworks-llama

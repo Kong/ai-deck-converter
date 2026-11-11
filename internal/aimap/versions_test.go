@@ -69,6 +69,7 @@ var allFeatures = []Feature{
 	FeatureClonedPlugins,
 	FeatureSessionAffinity,
 	FeatureIntelligentBalancer,
+	FeatureFireworks,
 }
 
 func TestFeatureTable(t *testing.T) {
@@ -117,6 +118,9 @@ func TestFeatureLookups(t *testing.T) {
 	f, ok = ProviderFeature("sagemaker")
 	require.True(t, ok)
 	require.Equal(t, FeatureSagemaker, f)
+	f, ok = ProviderFeature("fireworks")
+	require.True(t, ok)
+	require.Equal(t, FeatureFireworks, f)
 	_, ok = ProviderFeature("cerebras")
 	require.False(t, ok)
 
