@@ -58,6 +58,20 @@ plugins:
             name: accounts/fireworks/models/llama-v3p1-8b-instruct
             provider: fireworks
           route_type: llm/v1/chat
+        - auth:
+            header_name: Authorization
+            header_value: Bearer {vault://ai/fireworks-token}
+          description: accounts/fireworks/models/llama-v3p1-70b-instruct
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: fireworks-llama
+            name: accounts/fireworks/models/llama-v3p1-70b-instruct
+            options:
+              upstream_url: https://us.api.fireworks.ai/inference/v1
+            provider: fireworks
+          route_type: llm/v1/chat
     route: openai-chat
     model: fireworks-llama
   - name: ai-model-selector
@@ -84,6 +98,20 @@ plugins:
           model:
             model_alias: fireworks-llama
             name: accounts/fireworks/models/llama-v3p1-8b-instruct
+            provider: fireworks
+          route_type: llm/v1/responses
+        - auth:
+            header_name: Authorization
+            header_value: Bearer {vault://ai/fireworks-token}
+          description: accounts/fireworks/models/llama-v3p1-70b-instruct
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: fireworks-llama
+            name: accounts/fireworks/models/llama-v3p1-70b-instruct
+            options:
+              upstream_url: https://us.api.fireworks.ai/inference/v1
             provider: fireworks
           route_type: llm/v1/responses
     route: openai-responses
@@ -114,6 +142,20 @@ plugins:
             name: accounts/fireworks/models/llama-v3p1-8b-instruct
             provider: fireworks
           route_type: llm/v1/embeddings
+        - auth:
+            header_name: Authorization
+            header_value: Bearer {vault://ai/fireworks-token}
+          description: accounts/fireworks/models/llama-v3p1-70b-instruct
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: fireworks-llama
+            name: accounts/fireworks/models/llama-v3p1-70b-instruct
+            options:
+              upstream_url: https://us.api.fireworks.ai/inference/v1
+            provider: fireworks
+          route_type: llm/v1/embeddings
     route: openai-embeddings
     model: fireworks-llama
   - name: ai-model-selector
@@ -140,6 +182,20 @@ plugins:
           model:
             model_alias: fireworks-llama
             name: accounts/fireworks/models/llama-v3p1-8b-instruct
+            provider: fireworks
+          route_type: llm/v1/chat
+        - auth:
+            header_name: Authorization
+            header_value: Bearer {vault://ai/fireworks-token}
+          description: accounts/fireworks/models/llama-v3p1-70b-instruct
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: fireworks-llama
+            name: accounts/fireworks/models/llama-v3p1-70b-instruct
+            options:
+              upstream_url: https://us.api.fireworks.ai/inference/v1
             provider: fireworks
           route_type: llm/v1/chat
     route: anthropic-messages

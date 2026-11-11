@@ -1,6 +1,7 @@
 # fireworks needs 2.4. At 2.3:
 # - a fireworks target on another model is absent with a warning;
-# - a model whose only target is fireworks is absent with an error.
+# - a model whose only target is fireworks is absent with an error. This
+#   includes a System One decisions model.
 model_providers:
   - name: fireworks-prod
     type: fireworks
@@ -41,3 +42,13 @@ models:
     targets:
       - name: accounts/fireworks/models/llama-v3p1-8b-instruct
         provider: fireworks-prod
+  - name: only-fireworks-decisions
+    type: model
+    capabilities: [decisions]
+    formats: [{type: typesafe}]
+    config:
+      route: {paths: [/decisions]}
+    targets:
+      - name: accounts/fireworks/models/rune
+        provider: fireworks-prod
+        config: {type: fireworks}
