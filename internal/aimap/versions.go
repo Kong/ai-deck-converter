@@ -86,6 +86,7 @@ const (
 	FeatureGeminiAgenticCapability    Feature = "gemini-agentic-capability"
 	FeatureBedrockRuntimeResponses    Feature = "bedrock-runtime-responses"
 	FeatureBaseten                    Feature = "baseten"
+	FeatureFireworks                  Feature = "fireworks"
 	FeatureSagemaker                  Feature = "sagemaker"
 	FeatureAuthStrategyTokenVault     Feature = "auth-strategy-token-vault"
 	// FeatureOIDCProtectedResourceMetadata is the openid-connect plugin field
@@ -115,6 +116,7 @@ var featureSince = map[Feature]Version{
 	FeatureGeminiAgenticCapability:       mustVersion("2.3"),
 	FeatureBedrockRuntimeResponses:       mustVersion("2.3"),
 	FeatureBaseten:                       mustVersion("2.3"),
+	FeatureFireworks:                     mustVersion("2.4"),
 	FeatureSagemaker:                     mustVersion("2.1"),
 	FeatureAuthStrategyTokenVault:        mustVersion("2.3"),
 	FeatureOIDCProtectedResourceMetadata: mustVersion("2.3"),
@@ -156,6 +158,8 @@ const (
 	TypesafeProviderType = "typesafe"
 	// BasetenProviderType is the provider type that FeatureBaseten gates.
 	BasetenProviderType = "baseten"
+	// FireworksProviderType is the provider type that FeatureFireworks gates.
+	FireworksProviderType = "fireworks"
 	// SagemakerProviderType is the provider type that FeatureSagemaker gates.
 	SagemakerProviderType = "sagemaker"
 )
@@ -174,6 +178,7 @@ func FormatFeature(format string) (Feature, bool) {
 var providerFeatures = map[string]Feature{
 	TypesafeProviderType:  FeatureTypesafe,
 	BasetenProviderType:   FeatureBaseten,
+	FireworksProviderType: FeatureFireworks,
 	SagemakerProviderType: FeatureSagemaker,
 }
 
