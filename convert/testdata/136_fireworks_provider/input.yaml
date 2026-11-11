@@ -1,5 +1,7 @@
 # fireworks serves chat, responses and embeddings in the openai format, and
-# Messages in the anthropic format. Fireworks model IDs stay as written.
+# Messages in the anthropic format. Fireworks model IDs stay as written. A
+# target without upstream_url uses the default base URL. The US-only region
+# sets upstream_url.
 model_providers:
   - name: fireworks-prod
     type: fireworks
@@ -20,3 +22,8 @@ models:
       - name: accounts/fireworks/models/llama-v3p1-8b-instruct
         provider: fireworks-prod
         config: {type: fireworks}
+      - name: accounts/fireworks/models/llama-v3p1-70b-instruct
+        provider: fireworks-prod
+        config:
+          type: fireworks
+          upstream_url: https://us.api.fireworks.ai/inference/v1

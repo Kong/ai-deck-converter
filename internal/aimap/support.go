@@ -79,6 +79,7 @@ func TargetSupports(format string, target Target, spec EndpointSpec) bool {
 	switch {
 	case format == "openai", format == provider:
 	case format == "anthropic" && routeType == "llm/v1/chat":
+	case FireworksSystemOne(format, provider):
 	default:
 		return false
 	}
@@ -119,6 +120,13 @@ func TargetSupports(format string, target Target, spec EndpointSpec) bool {
 // which only the gemini format serves.
 func GeminiInteractions(format, provider, routeType string) bool {
 	return format == "gemini" && provider == "gemini" && routeType == "llm/v1/responses"
+}
+
+
+// FireworksSystemOne reports whether the pair is Fireworks System One. The
+// data plane serves it as a TypeSafe-compatible provider.
+func FireworksSystemOne(format, provider string) bool {
+	return format == "typesafe" && provider == "fireworks"
 }
 
 // LogStatisticsSupported reports whether the data plane accepts

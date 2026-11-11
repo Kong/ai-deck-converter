@@ -98,12 +98,18 @@ func TestTargetSupportsConditions(t *testing.T) {
 			spec(t, "openai", "generate"), true,
 		},
 		// 8. A fireworks target serves chat, responses and embeddings, and
-		// Messages in the anthropic format.
+		// Messages in the anthropic format. It serves System One decisions
+		// in the typesafe format.
 		{"fireworks chat", "openai", fireworks, spec(t, "openai", "generate"), true},
 		{"fireworks responses", "openai", fireworks, spec(t, "openai", "agentic"), true},
 		{"fireworks embeddings", "openai", fireworks, spec(t, "openai", "embeddings"), true},
 		{"fireworks messages", "anthropic", fireworks, spec(t, "anthropic", "generate"), true},
 		{"fireworks images", "openai", fireworks, spec(t, "openai", "image"), false},
+		{"fireworks decisions", "typesafe", fireworks, spec(t, "typesafe", "decisions"), true},
+		{
+			"openai decisions", "typesafe", Target{ProviderType: "openai"},
+			spec(t, "typesafe", "decisions"), false,
+		},
 		// 9. The bedrock-runtime Responses API keeps the bedrock format.
 		{
 			"bedrock runtime responses in bedrock format", "bedrock", bedrock,
