@@ -92,9 +92,6 @@ models:
       route:
         paths:
           - /ai
-        methods:
-          - GET
-          - POST
         model:
           values:
             - '@bedrock/nova-reel'

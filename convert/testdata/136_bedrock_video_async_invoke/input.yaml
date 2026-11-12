@@ -1,0 +1,27 @@
+# Bedrock video generation runs on async-invoke. POST starts the job and reads
+# the model id from the body. A tagged companion route serves the GET poll,
+# which carries no model.
+model_providers:
+  - name: bedrock-prod
+    type: bedrock
+    display_name: Bedrock Prod
+    config:
+      auth:
+        type: aws
+        access_key_id: "{vault://ai/aws-access-key-id}"
+        secret_access_key: "{vault://ai/aws-secret-access-key}"
+models:
+  - display_name: Nova Reel
+    name: nova-reel
+    type: model
+    capabilities: [video]
+    formats: [{type: bedrock}]
+    config:
+      route: {paths: [/ai]}
+    targets:
+      - name: amazon.nova-reel-v1:1
+        provider: bedrock-prod
+        config: {type: bedrock, region: us-east-1, video_output_s3_uri: "s3://kong/nova-reel/"}
+    policies: []
+    access:
+      acls: {allow: [], deny: []}

@@ -27,7 +27,8 @@ type Target struct {
 
 // supportedRouteTypes copies SUPPORTED_ROUTE_TYPES of
 // kong/llm/schemas/init.lua for AI Gateway 2.3. A route type with no row
-// accepts every provider.
+// accepts every provider. The Responses row also needs the format rule in
+// TargetSupports. Gemini reaches it through GeminiInteractions.
 var supportedRouteTypes = map[string][]string{
 	"llm/v1/chat": {
 		"openai", "azure", "anthropic", "cohere", "mistral", "llama2", "gemini", "bedrock",
@@ -42,7 +43,7 @@ var supportedRouteTypes = map[string][]string{
 		"openai", "azure", "cohere", "mistral", "llama2", "gemini", "bedrock", "databricks",
 		"huggingface", "dashscope", "ollama", "vercel",
 	},
-	"llm/v1/responses":              {"openai", "azure", "xai", "vercel"},
+	"llm/v1/responses":              {"openai", "azure", "xai", "vercel", "bedrock"},
 	"llm/v1/assistants":             {"openai", "azure"},
 	"llm/v1/batches":                {"openai", "azure", "bedrock", "anthropic", "gemini", "kimi"},
 	"llm/v1/files":                  {"openai", "azure", "kimi"},
@@ -87,8 +88,12 @@ func TargetSupports(format string, target Target, spec EndpointSpec) bool {
 			return false
 		}
 	} else if providers, ok := supportedRouteTypes[routeType]; ok && !slices.Contains(providers, provider) &&
-		!GeminiInteractions(format, provider, routeType) &&
-		!BedrockRuntimeResponses(format, provider, routeType) {
+		!GeminiInteractions(format, provider, routeType) {
+		return false
+	}
+	// The bedrock runtime host answers Responses only on the native
+	// /openai/v1/responses path. The bedrock format selects that path.
+	if provider == "bedrock" && routeType == "llm/v1/responses" && !target.Mantle && format != "bedrock" {
 		return false
 	}
 	if provider == "gemini" && routeType == RealtimeRouteType && format != "gemini" {
@@ -110,18 +115,10 @@ func TargetSupports(format string, target Target, spec EndpointSpec) bool {
 	return true
 }
 
-// GeminiInteractions reports whether the pair is the Gemini Interactions API.
-// The 2.3 route type table has no gemini row for llm/v1/responses, but
-// FeatureGeminiAgenticCapability serves it in the gemini format.
+// GeminiInteractions reports whether the pair is the Gemini Interactions API,
+// which only the gemini format serves.
 func GeminiInteractions(format, provider, routeType string) bool {
 	return format == "gemini" && provider == "gemini" && routeType == "llm/v1/responses"
-}
-
-// BedrockRuntimeResponses reports whether the pair is the bedrock-runtime
-// OpenAI-compatible Responses API. The route type table has no bedrock row, but
-// the /openai/v1/responses path serves it in the bedrock format.
-func BedrockRuntimeResponses(format, provider, routeType string) bool {
-	return format == "bedrock" && provider == "bedrock" && routeType == "llm/v1/responses"
 }
 
 // LogStatisticsSupported reports whether the data plane accepts

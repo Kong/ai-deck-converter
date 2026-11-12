@@ -128,12 +128,27 @@ services:
           - POST
           - OPTIONS
         strip_path: false
+      - name: bedrock-async-invoke
+        paths:
+          - /ai/async-invoke
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
       - name: openai-videos-lifecycle
         paths:
           - /ai/videos
         methods:
           - GET
           - DELETE
+        strip_path: false
+        tags:
+          - aigw:video-lifecycle
+      - name: bedrock-async-invoke-lifecycle
+        paths:
+          - /ai/async-invoke
+        methods:
+          - GET
         strip_path: false
         tags:
           - aigw:video-lifecycle
@@ -726,6 +741,37 @@ plugins:
           route_type: llm/v1/chat
     route: bedrock-rerank
     model: everything
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: modelId
+          source: body
+    route: bedrock-async-invoke
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: video/generation
+      llm_format: bedrock
+      targets:
+        - auth:
+            aws_access_key_id: '{vault://ai/aws-access-key-id}'
+            aws_secret_access_key: '{vault://ai/aws-secret-access-key}'
+          description: amazon.nova-pro-v1:0
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: everything
+            name: amazon.nova-pro-v1:0
+            options:
+              bedrock:
+                aws_region: us-east-1
+            provider: bedrock
+          route_type: video/v1/videos/generations
+    route: bedrock-async-invoke
+    model: everything
   - name: ai-proxy-advanced
     config:
       balancer:
@@ -757,5 +803,28 @@ plugins:
             provider: bedrock
           route_type: video/v1/videos/generations
     route: openai-videos-lifecycle
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: video/generation
+      llm_format: bedrock
+      model_name_header: false
+      targets:
+        - auth:
+            aws_access_key_id: '{vault://ai/aws-access-key-id}'
+            aws_secret_access_key: '{vault://ai/aws-secret-access-key}'
+          description: amazon.nova-pro-v1:0
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: amazon.nova-pro-v1:0
+            options:
+              bedrock:
+                aws_region: us-east-1
+            provider: bedrock
+          route_type: video/v1/videos/generations
+    route: bedrock-async-invoke-lifecycle
 ai_models:
   - name: everything

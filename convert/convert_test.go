@@ -373,6 +373,140 @@ models:
 	t.Fatal("expected route-scoped OpenAI video lifecycle plugin")
 }
 
+// Bedrock video uses the AWS async-invoke shape. The model id travels in the
+// body. A tagged companion route serves the job poll.
+func TestConvertEmitsBedrockAsyncInvokeVideo(t *testing.T) {
+	src := []byte(`
+model_providers:
+  - name: bedrock-prod
+    type: bedrock
+models:
+  - type: model
+    name: nova-reel
+    capabilities: [video]
+    formats: [{type: bedrock}]
+    config:
+      route: {paths: [/ai]}
+      model: {alias: nova-reel}
+    targets:
+      - name: amazon.nova-reel-v1:1
+        provider: bedrock-prod
+        config: {type: bedrock, region: us-east-1}
+`)
+
+	out, warnings, err := convertYAML(src)
+	require.NoError(t, err, "convert")
+	require.Empty(t, warnings)
+
+	var deck struct {
+		Services []struct {
+			Routes []struct {
+				Name    string   `yaml:"name"`
+				Paths   []string `yaml:"paths"`
+				Methods []string `yaml:"methods"`
+				Tags    []string `yaml:"tags"`
+			} `yaml:"routes"`
+		} `yaml:"services"`
+		Plugins []struct {
+			Name   string `yaml:"name"`
+			Route  string `yaml:"route"`
+			Config struct {
+				LLMFormat string `yaml:"llm_format"`
+				Sources   []struct {
+					Source   string `yaml:"source"`
+					BodyPath string `yaml:"body_path"`
+				} `yaml:"sources"`
+			} `yaml:"config"`
+		} `yaml:"plugins"`
+	}
+	require.NoError(t, yaml.Unmarshal(out, &deck), "parse generated decK config")
+
+	require.Len(t, deck.Services, 1)
+	modelRoutes := deck.Services[0].Routes
+	routes := map[string]int{}
+	for i, route := range modelRoutes {
+		routes[route.Name] = i
+	}
+	require.Contains(t, routes, "bedrock-async-invoke")
+	create := modelRoutes[routes["bedrock-async-invoke"]]
+	require.Equal(t, []string{"/ai/async-invoke"}, create.Paths,
+		"the async-invoke path carries no model")
+	require.Equal(t, []string{"POST", "OPTIONS"}, create.Methods)
+
+	require.Contains(t, routes, "bedrock-async-invoke-lifecycle")
+	poll := modelRoutes[routes["bedrock-async-invoke-lifecycle"]]
+	require.Equal(t, []string{"GET"}, poll.Methods)
+	require.Equal(t, []string{"aigw:video-lifecycle"}, poll.Tags)
+
+	var selector bool
+	var lifecycleFormat string
+	for _, plugin := range deck.Plugins {
+		if plugin.Name == "ai-model-selector" && plugin.Route == "bedrock-async-invoke" {
+			selector = true
+			require.Len(t, plugin.Config.Sources, 1)
+			require.Equal(t, "body", plugin.Config.Sources[0].Source)
+			require.Equal(t, "modelId", plugin.Config.Sources[0].BodyPath)
+		}
+		if plugin.Name == "ai-proxy-advanced" && plugin.Route == "bedrock-async-invoke-lifecycle" {
+			lifecycleFormat = plugin.Config.LLMFormat
+		}
+	}
+	require.True(t, selector, "the create route reads the model from the body")
+	require.Equal(t, "bedrock", lifecycleFormat, "the poll route keeps the bedrock format")
+}
+
+// A model that declares video in two formats gets one lifecycle route per
+// section, each on its own path.
+func TestConvertEmitsVideoLifecycleRoutesPerSection(t *testing.T) {
+	src := []byte(`
+model_providers:
+  - name: openai-prod
+    type: openai
+  - name: bedrock-prod
+    type: bedrock
+models:
+  - type: model
+    name: dual-video
+    capabilities: [video]
+    formats: [{type: openai}, {type: bedrock}]
+    config:
+      route: {paths: [/ai]}
+    targets:
+      - name: sora-2
+        provider: openai-prod
+        config: {type: openai}
+      - name: amazon.nova-reel-v1:1
+        provider: bedrock-prod
+        config: {type: bedrock, region: us-east-1}
+`)
+
+	out, warnings, err := convertYAML(src)
+	require.NoError(t, err, "convert")
+	// A bedrock target also serves the openai video route, so both lifecycle
+	// routes hold two targets and report the ambiguity once.
+	require.Len(t, warnings, 1)
+	require.Contains(t, warnings[0], "multiple targets")
+
+	var deck struct {
+		Services []struct {
+			Routes []struct {
+				Name    string   `yaml:"name"`
+				Paths   []string `yaml:"paths"`
+				Methods []string `yaml:"methods"`
+			} `yaml:"routes"`
+		} `yaml:"services"`
+	}
+	require.NoError(t, yaml.Unmarshal(out, &deck), "parse generated decK config")
+	require.Len(t, deck.Services, 1)
+
+	byName := map[string][]string{}
+	for _, route := range deck.Services[0].Routes {
+		byName[route.Name] = route.Paths
+	}
+	require.Equal(t, []string{"/ai/videos"}, byName["openai-videos-lifecycle"])
+	require.Equal(t, []string{"/ai/async-invoke"}, byName["bedrock-async-invoke-lifecycle"])
+}
+
 func TestConvertWarnsAndEmitsSharedVideoLifecycleRoutes(t *testing.T) {
 	src := []byte(`
 model_providers:
@@ -428,11 +562,11 @@ models:
 	require.Contains(t, string(out), "openai-videos-lifecycle-2")
 }
 
-// A single model whose capabilities all resolve to the same route (e.g. a
-// Bedrock model exposing embeddings+image+video, all served by /invoke) would
-// otherwise collapse into one ai-proxy-advanced carrying one genai_category but
-// targets with mismatched route_types — a config the data plane rejects. The
-// converter keeps the first capability and drops the rest with a warning.
+// A single model whose capabilities share one route (e.g. a Bedrock model
+// exposing embeddings and image on /invoke) would otherwise collapse into one
+// ai-proxy-advanced with mismatched target route_types. The data plane rejects
+// that config. The converter keeps the first capability and drops a conflicting
+// one with a warning.
 func TestConvertGuardsMultimodalCollapse(t *testing.T) {
 	src := []byte(`
 model_providers:
@@ -464,21 +598,77 @@ models:
 			dropped = append(dropped, issue)
 		}
 	}
-	require.Len(t, dropped, 2, "issues: %v", result.Issues)
-	for i, capability := range []string{"image", "video"} {
-		require.Equal(t, Warning, dropped[i].Severity)
-		require.Equal(t, []string{fmt.Sprintf("capabilities[%d]", i+1)}, dropped[i].Source.Fields)
-		require.Contains(t, dropped[i].Reason, `capability "`+capability+`"`)
-		require.Contains(t, dropped[i].Reason, "cannot serve multiple genai categories")
-	}
+	require.Len(t, dropped, 1, "issues: %v", result.Issues)
+	require.Equal(t, Warning, dropped[0].Severity)
+	require.Equal(t, []string{"capabilities[1]"}, dropped[0].Source.Fields)
+	require.Contains(t, dropped[0].Reason, `capability "image"`)
+	require.Contains(t, dropped[0].Reason, "cannot serve multiple genai categories")
 
 	out, err := result.Output.ToYAML()
 	require.NoError(t, err)
 	require.Contains(t, string(out), "genai_category: text/embeddings")
+	require.Contains(t, string(out), "video/v1/videos/generations",
+		"video survives on its own async-invoke route")
 	require.NotContains(t, string(out), "image/v1/images/generations",
 		"the skipped image capability must not leak a target into the output")
-	require.NotContains(t, string(out), "video/v1/videos/generations",
-		"the skipped video capability must not leak a target into the output")
+}
+
+// A bedrock runtime target serves the Responses API only on the native path,
+// which the bedrock format selects.
+func TestConvertRejectsBedrockRuntimeAgenticInOpenAIFormat(t *testing.T) {
+	src := []byte(`
+model_providers:
+  - name: bedrock-prod
+    type: bedrock
+models:
+  - type: model
+    name: claude-bedrock
+    capabilities: [agentic]
+    formats: [{type: openai}]
+    targets:
+      - name: anthropic.claude-3-5-sonnet
+        provider: bedrock-prod
+        config: {type: bedrock, region: us-east-1}
+    policies: []
+    access:
+      acls: {allow: [], deny: []}
+    config:
+      route: {paths: [/ai]}
+`)
+	_, _, err := convertDoc(src, false)
+	require.Error(t, err, "an openai-format agentic capability has no endpoint here")
+	require.Contains(t, err.Error(), `no target can serve capability "agentic"`)
+}
+
+// A mantle target keeps the openai format, so it reaches the Responses API
+// there.
+func TestConvertAcceptsBedrockMantleAgenticInOpenAIFormat(t *testing.T) {
+	src := []byte(`
+model_providers:
+  - name: bedrock-prod
+    type: bedrock
+models:
+  - type: model
+    name: gpt-oss
+    capabilities: [agentic]
+    formats: [{type: openai}]
+    targets:
+      - name: openai.gpt-oss-120b
+        provider: bedrock-prod
+        config: {type: bedrock, region: us-east-1, endpoint_type: mantle}
+    policies: []
+    access:
+      acls: {allow: [], deny: []}
+    config:
+      route: {paths: [/ai]}
+`)
+	doc, warnings, err := convertDoc(src, false)
+	require.NoError(t, err)
+	require.Empty(t, warnings)
+	out, err := doc.ToYAML()
+	require.NoError(t, err)
+	require.Contains(t, string(out), "route_type: llm/v1/responses")
+	require.Contains(t, string(out), "llm_format: openai")
 }
 
 // A Kong acl plugin permits exactly one of config.allow / config.deny

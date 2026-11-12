@@ -133,14 +133,13 @@ routes:
       - http
       - https
     strip_path: false
-  - id: fd893c85-2a3a-522b-9c79-f97f8980442d
-    name: bedrock-invoke-4
+  - id: 751f3bc6-2b23-58c0-897a-ca3b20491b67
+    name: bedrock-async-invoke
     service:
       id: 947a4e23-b483-5a65-8165-da9aed24565b
     paths:
-      - ~/bedrock-video/model/(?<model_name>[^/]+)/invoke(?:-with-response-stream)?
+      - /bedrock-video/async-invoke
     methods:
-      - GET
       - POST
       - OPTIONS
     protocols:
@@ -218,6 +217,20 @@ routes:
       - http
       - https
     strip_path: false
+  - id: bd17fb45-7638-554f-b4ef-dd1aa6d158fa
+    name: bedrock-async-invoke-lifecycle
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /bedrock-video/async-invoke
+    methods:
+      - GET
+    protocols:
+      - http
+      - https
+    strip_path: false
+    tags:
+      - aigw:video-lifecycle
 plugins:
   - id: 17fa8192-4b9f-5b5a-8379-20ad8bc836a7
     name: ai-model-selector
@@ -555,10 +568,10 @@ plugins:
     config:
       max_request_body_size: 8388608
       sources:
-        - path_pattern: model/([^/]+)/
-          source: path
+        - body_path: modelId
+          source: body
     route:
-      id: fd893c85-2a3a-522b-9c79-f97f8980442d
+      id: 751f3bc6-2b23-58c0-897a-ca3b20491b67
   - id: 0f8844dd-7362-5ea0-8eeb-35ee0580b632
     name: ai-proxy-advanced
     config:
@@ -584,7 +597,7 @@ plugins:
             provider: bedrock
           route_type: video/v1/videos/generations
     route:
-      id: fd893c85-2a3a-522b-9c79-f97f8980442d
+      id: 751f3bc6-2b23-58c0-897a-ca3b20491b67
     model:
       id: 0835e469-295d-5fcc-9115-467aed1342ab
   - id: cccc78d9-7846-57bc-af68-12f85e625fcd
@@ -757,6 +770,32 @@ plugins:
           route_type: llm/v1/files
     route:
       id: b433d478-0f40-5518-b6bb-815583936241
+  - id: df451b5d-1af4-57b8-8ced-85dc15c61fe8
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: video/generation
+      llm_format: bedrock
+      model_name_header: false
+      targets:
+        - auth:
+            aws_access_key_id: e2e-fake-access-key-id
+            aws_secret_access_key: e2e-fake-secret-access-key
+          description: amazon.nova-reel-v1:1
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: amazon.nova-reel-v1:1
+            options:
+              bedrock:
+                aws_region: us-east-1
+                video_output_s3_uri: s3://e2e-bucket/videos
+            provider: bedrock
+          route_type: video/v1/videos/generations
+    route:
+      id: bd17fb45-7638-554f-b4ef-dd1aa6d158fa
 ai_models:
   - id: 45407819-61a7-5d51-a737-b63bcbab37ff
     name: bedrock-chat

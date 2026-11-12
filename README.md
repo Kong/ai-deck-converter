@@ -191,8 +191,10 @@ methods, `route_type`, `genai_category`) is defined per provider section in
 spellings are normalized (`chat`→`generate`, `batch`→`batches`); bare `audio`
 fans out to speech/transcription/translation. Native formats (bedrock, gemini)
 emit regex routes (`~/ai/...`); capabilities that share an upstream
-endpoint (e.g. bedrock embeddings/image/audio/video → `/invoke`) collapse into
-one route with multiple targets.
+endpoint (e.g. bedrock embeddings/image/audio → `/invoke`) collapse into one
+route with multiple targets. Bedrock `video` has its own route, on
+`/async-invoke`, with the model id in the body. A tagged companion route
+serves the job poll, which carries no model.
 
 Most capabilities map to a single canonical endpoint, but a few are reachable
 through more than one and get a route per endpoint: bedrock `generate` emits
@@ -302,6 +304,9 @@ and `formats` beyond the first.
   by a `generate` capability — see `convert/testdata/58_bedrock_generate_and_speech`.
   This never breaks round-tripping a converter-produced config, since re-
   converting the recovered model reproduces the same route/target either way.
+  Bedrock `video` is not in that group: its `bedrock-async-invoke` route name
+  tells it apart on revert. The tagged `bedrock-async-invoke-lifecycle` route
+  is ignored on revert.
 - **Bedrock mantle targets.** A `bedrock` target with `endpoint_type: mantle`
   serves only the `llm/v1/chat`, `llm/v1/responses`, and `llm/v1/files` route
   types, in the `openai` or `anthropic` format. It therefore gets only the

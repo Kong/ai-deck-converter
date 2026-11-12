@@ -216,6 +216,18 @@ func TestEndpointsForAndSectionEndpoints(t *testing.T) {
 	require.Equal(t, catTextGen, responses.GenaiCategory)
 	require.NotNil(t, responses.DefaultModelSelectorConfig, "the model travels in the body")
 
+	// Bedrock video follows the AWS async-invoke shape. The model travels in
+	// the body. The path carries none.
+	video := EndpointTable["bedrock"]["video"].Primary
+	require.Equal(t, "async-invoke", video.RouteLabel)
+	require.Equal(t, "/async-invoke", video.PathSuffix)
+	require.False(t, video.IsRegex, "the async-invoke path is a plain prefix route")
+	require.Equal(t, mPost, video.Methods)
+	require.Equal(t, "video/v1/videos/generations", video.RouteType)
+	require.NotNil(t, video.DefaultModelSelectorConfig)
+	require.Equal(t, "modelId", (*video.DefaultModelSelectorConfig)["body_path"],
+		"the async-invoke body carries the model id")
+
 	// A section with no secondaries returns exactly the primary specs.
 	require.Len(t, SectionEndpoints("anthropic"), len(EndpointTable["anthropic"]),
 		"anthropic section has no secondary endpoints")
@@ -327,4 +339,18 @@ func TestGeminiEnvInvalidField(t *testing.T) {
 			require.Equal(t, tt.want, tt.env.InvalidField())
 		})
 	}
+}
+
+func TestVideoLifecycleRoutes(t *testing.T) {
+	openai, ok := VideoLifecycleRouteFor("openai")
+	require.True(t, ok)
+	require.Equal(t, []string{"GET", "DELETE"}, openai.Methods)
+
+	bedrock, ok := VideoLifecycleRouteFor("bedrock")
+	require.True(t, ok)
+	require.Equal(t, []string{"GET"}, bedrock.Methods)
+	require.Contains(t, bedrock.Label, "async-invoke")
+
+	_, ok = VideoLifecycleRouteFor("gemini")
+	require.False(t, ok, "gemini serves the job status on the video route")
 }
