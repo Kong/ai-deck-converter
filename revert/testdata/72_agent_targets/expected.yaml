@@ -1,0 +1,37 @@
+agents:
+  - type: a2a
+    name: booking
+    config:
+      targets:
+        - address: booking-1.internal:8080
+          weight: 200
+        - address: booking-2.internal:8080
+          failover: true
+      balancer:
+        algorithm: consistent-hashing
+        hash_on_header: X-Session
+      route:
+        paths:
+          - /booking
+      logging:
+        payloads: false
+        statistics: true
+        max_payload_size: 1048576
+  - type: http
+    name: plain
+    config:
+      targets:
+        - address: a.internal:80
+      balancer:
+        algorithm: lowest-latency
+      route:
+        paths:
+          - /plain
+  - type: http
+    name: nobalancer
+    config:
+      targets:
+        - address: c.internal:80
+      route:
+        paths:
+          - /nobalancer

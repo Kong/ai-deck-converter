@@ -1,0 +1,44 @@
+_format_version: "3.0"
+services:
+  - name: booking
+    host: booking-upstream
+    protocol: http
+    routes:
+      - name: booking-route
+        paths:
+          - /booking
+        plugins:
+          - name: ai-a2a-proxy
+            config: {}
+  - name: plain
+    host: plain-upstream
+    protocol: http
+    routes:
+      - name: plain-route
+        paths:
+          - /plain
+  - name: nobalancer
+    host: nobalancer-upstream
+    protocol: http
+    routes:
+      - name: nobalancer-route
+        paths:
+          - /nobalancer
+upstreams:
+  - name: booking-upstream
+    algorithm: consistent-hashing
+    hash_on: header
+    hash_on_header: X-Session
+    targets:
+      - target: booking-1.internal:8080
+        weight: 200
+      - target: booking-2.internal:8080
+        failover: true
+  - name: plain-upstream
+    algorithm: latency
+    targets:
+      - target: a.internal:80
+  - name: nobalancer-upstream
+    algorithm: round-robin
+    targets:
+      - target: c.internal:80
