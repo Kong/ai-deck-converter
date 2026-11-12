@@ -1,0 +1,44 @@
+# Two agentic models share one base path, so they share the lifecycle route.
+# Its requests carry no model, so its policies are route-scoped and the route
+# can hold only one set: two route-scoped plugins of one name on a route
+# collide on Kong's plugin uniqueness key. The models' policies differ, so the
+# first model's set governs the route and the second is reported.
+models:
+  - name: fast
+    type: model
+    capabilities: [agentic]
+    formats: [{type: openai}]
+    policies: [fast-limit]
+    config:
+      route: {paths: [/ai]}
+    targets:
+      - name: gpt-4.1-mini
+        provider: openai-prod
+  - name: smart
+    type: model
+    capabilities: [agentic]
+    formats: [{type: openai}]
+    policies: [smart-limit]
+    config:
+      route: {paths: [/ai]}
+    targets:
+      - name: gpt-4.1
+        provider: openai-prod
+model_providers:
+  - name: openai-prod
+    type: openai
+    config:
+      auth:
+        type: bearer
+        token: "{vault://ai/openai-key}"
+policies:
+  - type: rate-limiting
+    name: fast-limit
+    config:
+      minute: 100
+      policy: local
+  - type: rate-limiting
+    name: smart-limit
+    config:
+      minute: 10
+      policy: local

@@ -66,6 +66,25 @@ services:
         regex_priority: 0
         request_buffering: true
         response_buffering: true
+      - name: openai-responses-lifecycle
+        paths:
+          - ~/responses/.+
+        methods:
+          - GET
+          - POST
+          - DELETE
+          - OPTIONS
+        protocols:
+          - http
+          - https
+        strip_path: true
+        preserve_host: false
+        https_redirect_status_code: 426
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+        tags:
+          - aigw:responses-lifecycle
       - name: anthropic-messages-3
         paths:
           - /team-b/v1/messages
@@ -174,6 +193,25 @@ services:
         regex_priority: 0
         request_buffering: true
         response_buffering: true
+      - name: openai-responses-lifecycle-2
+        paths:
+          - ~/compat/responses/.+
+        methods:
+          - GET
+          - POST
+          - DELETE
+          - OPTIONS
+        protocols:
+          - http
+          - https
+        strip_path: true
+        preserve_host: false
+        https_redirect_status_code: 426
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+        tags:
+          - aigw:responses-lifecycle
       - name: openai-batches
         paths:
           - /health/check/batches
@@ -1440,6 +1478,30 @@ plugins:
           weight: 100
     route: openai-responses
     model: model-13
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      max_request_body_size: 8388608
+      model_name_header: true
+      response_streaming: allow
+      targets:
+        - auth:
+            allow_override: false
+            header_name: Authorization
+            header_value: Bearer {vault://ai/provider-c-token}
+          description: model-13
+          logging:
+            log_payloads: true
+            log_statistics: true
+          model:
+            name: model-13
+            provider: openai
+          route_type: llm/v1/responses
+          weight: 100
+    route: openai-responses-lifecycle
   - name: ai-model-selector
     config:
       max_request_body_size: 8388608
@@ -2114,6 +2176,43 @@ plugins:
     config:
       balancer:
         algorithm: round-robin
+        connect_timeout: 60000
+        fail_timeout: 10000
+        failover_criteria:
+          - error
+          - timeout
+        max_fails: 0
+        read_timeout: 60000
+        retries: 5
+        slots: 10000
+        write_timeout: 60000
+      genai_category: text/generation
+      llm_format: openai
+      max_request_body_size: 8388608
+      model_name_header: true
+      response_streaming: allow
+      targets:
+        - auth:
+            allow_override: false
+            header_name: Authorization
+            header_value: Bearer {vault://ai/provider-g-token}
+          description: model-31
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: model-31
+            options:
+              input_cost: 14.5
+              output_cost: 19
+            provider: xai
+          route_type: llm/v1/responses
+          weight: 100
+    route: openai-responses-lifecycle-2
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
       genai_category: text/generation
       llm_format: openai
       max_request_body_size: 8388608
@@ -2195,6 +2294,17 @@ plugins:
       anonymous: anonymous
       issuer: https://sso.example.com/oauth2/default
     route: openai-responses
+  - name: key-auth
+    config:
+      anonymous: anonymous
+      key_names:
+        - x-api-key
+    route: openai-responses-lifecycle
+  - name: openid-connect
+    config:
+      anonymous: anonymous
+      issuer: https://sso.example.com/oauth2/default
+    route: openai-responses-lifecycle
   - name: pre-function
     config:
       access:
@@ -2271,6 +2381,17 @@ plugins:
       anonymous: anonymous
       issuer: https://sso.example.com/oauth2/default
     route: openai-responses-2
+  - name: key-auth
+    config:
+      anonymous: anonymous
+      key_names:
+        - x-api-key
+    route: openai-responses-lifecycle-2
+  - name: openid-connect
+    config:
+      anonymous: anonymous
+      issuer: https://sso.example.com/oauth2/default
+    route: openai-responses-lifecycle-2
   - name: request-termination
     config:
       message: ok

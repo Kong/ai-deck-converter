@@ -6,3 +6,11 @@
     fields:
       - config.route
   severity: WARNING
+- code: ROUTING_CONFLICT
+  reason: route "openai-responses-lifecycle" serves requests addressed by a stored ID, which carry no model, so every target on it shares one balancer pool. Target "primary" of model "a" and target "fallback" of model "a" resolve to different providers, but a stored ID exists only on the provider that created it, so Kong can send such a request to a provider that does not have it.
+  source:
+    kind: model
+    name: a
+    fields:
+      - config.route
+  severity: WARNING

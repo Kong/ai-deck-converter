@@ -1,0 +1,8 @@
+- code: ROUTING_CONFLICT
+  reason: route "openai-responses-lifecycle" serves requests addressed by a stored ID, which carry no model, so every target on it shares one balancer pool. Target "gpt-4.1-mini" of model "fast" and target "gpt-4.1" of model "smart" resolve to different providers, but a stored ID exists only on the provider that created it, so Kong can send such a request to a provider that does not have it.
+  source:
+    kind: model
+    name: smart
+    fields:
+      - config.route
+  severity: WARNING
