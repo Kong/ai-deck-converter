@@ -11,6 +11,8 @@ type DBLessDocument struct {
 	FormatVersion          string                      `yaml:"_format_version"`
 	Transform              bool                        `yaml:"_transform"`
 	Services               []DBLessService             `yaml:"services,omitempty"`
+	Upstreams              []DBLessUpstream            `yaml:"upstreams,omitempty"`
+	Targets                []DBLessTarget              `yaml:"targets,omitempty"`
 	Routes                 []DBLessRoute               `yaml:"routes,omitempty"`
 	Consumers              []DBLessConsumer            `yaml:"consumers,omitempty"`
 	ConsumerGroups         []DBLessConsumerGroup       `yaml:"consumer_groups,omitempty"`
@@ -192,4 +194,22 @@ type DBLessKeyAuthCredential struct {
 	Consumer string   `yaml:"consumer"`
 	TTL      *int     `yaml:"ttl,omitempty"`
 	Tags     []string `yaml:"tags,omitempty"`
+}
+
+type DBLessUpstream struct {
+	ID           string   `yaml:"id"`
+	Name         string   `yaml:"name"`
+	Algorithm    string   `yaml:"algorithm,omitempty"`
+	HashOn       string   `yaml:"hash_on,omitempty"`
+	HashOnHeader string   `yaml:"hash_on_header,omitempty"`
+	Tags         []string `yaml:"tags,omitempty"`
+}
+
+type DBLessTarget struct {
+	ID       string            `yaml:"id"`
+	Upstream map[string]string `yaml:"upstream"`
+	Target   string            `yaml:"target"`
+	Weight   *int              `yaml:"weight,omitempty"`
+	Failover *bool             `yaml:"failover,omitempty"`
+	Tags     []string          `yaml:"tags,omitempty"`
 }

@@ -1,0 +1,17 @@
+- code: CONFIG_FIELD_INVALID
+  reason: agent "both" sets both config.url and config.targets; use one
+  source:
+    kind: agent
+    name: both
+    fields:
+      - config.url
+      - config.targets
+  severity: ERROR
+- code: UNSUPPORTED_IN_MIN_RUNTIME_VERSION
+  reason: config.targets requires minimum runtime version "2.4", but the configured minimum is "2.3"
+  source:
+    kind: agent
+    name: tls
+    fields:
+      - config.targets
+  severity: ERROR

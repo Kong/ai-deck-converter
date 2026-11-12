@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/Kong/ai-deck-converter/internal/aigw"
+	"github.com/Kong/ai-deck-converter/internal/aimap"
 	"github.com/Kong/ai-deck-converter/internal/kong"
 )
 
@@ -43,8 +44,11 @@ func (r *Reverter) revertAgent(svc *kong.Service, rt *kong.Route, name string,
 		a.Config.Upstream = upstream
 	}
 
-	a.Config.URL = serviceURL(svc)
-	if a.Config.URL == "" {
+	if up := r.upstreamOf(svc); up != nil {
+		if err := r.liftAgentUpstream(&a, up); err != nil {
+			return err
+		}
+	} else if a.Config.URL = serviceURL(svc); a.Config.URL == "" {
 		if err := r.warn("agent %q: service %q has no upstream url/host", name, svc.Name); err != nil {
 			return err
 		}
@@ -59,5 +63,43 @@ func (r *Reverter) revertAgent(svc *kong.Service, rt *kong.Route, name string,
 	a.Access.AuthStrategies = authStrategies
 
 	r.out.Agents = append(r.out.Agents, a)
+	return nil
+}
+
+// upstreamOf returns the Upstream that the host of a URL-less service names.
+func (r *Reverter) upstreamOf(svc *kong.Service) *kong.Upstream {
+	if svc.URL != "" {
+		return nil
+	}
+	for i := range r.src.Upstreams {
+		if r.src.Upstreams[i].Name == svc.Host {
+			return &r.src.Upstreams[i]
+		}
+	}
+	return nil
+}
+
+func (r *Reverter) liftAgentUpstream(a *aigw.Agent, up *kong.Upstream) error {
+	for _, t := range up.Targets {
+		a.Config.Targets = append(a.Config.Targets, aigw.UpstreamTarget{
+			Address: t.Target, Weight: t.Weight, Failover: t.Failover,
+		})
+	}
+	algorithm, ok := aimap.UpstreamAlgorithmFromKong(up.Algorithm)
+	if !ok {
+		return r.warn("agent %q: upstream %q has unsupported algorithm %q; balancer dropped",
+			a.Name, up.Name, up.Algorithm)
+	}
+	if algorithm == "round-robin" {
+		return nil
+	}
+	b := &aigw.Balancer{Algorithm: algorithm, Fields: map[string]any{}}
+	switch algorithm {
+	case "consistent-hashing":
+		if up.HashOnHeader != "" && up.HashOnHeader != aimap.DefaultUpstreamHashHeader {
+			b.Fields["hash_on_header"] = up.HashOnHeader
+		}
+	}
+	a.Config.Balancer = b
 	return nil
 }

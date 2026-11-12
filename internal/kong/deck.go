@@ -13,6 +13,7 @@ const FormatVersion = "3.0"
 type Document struct {
 	FormatVersion  string          `yaml:"_format_version"`
 	Services       []Service       `yaml:"services,omitempty"`
+	Upstreams      []Upstream      `yaml:"upstreams,omitempty"`
 	Routes         []Route         `yaml:"routes,omitempty"`
 	Consumers      []Consumer      `yaml:"consumers,omitempty"`
 	ConsumerGroups []ConsumerGroup `yaml:"consumer_groups,omitempty"`
@@ -171,6 +172,26 @@ type Service struct {
 	Plugins           []Plugin `yaml:"plugins,omitempty"`
 	Tags              []string `yaml:"tags,omitempty"`
 	Source            *Source  `yaml:"-"`
+}
+
+// Upstream is a Kong Gateway Upstream. Its Targets nest under it.
+type Upstream struct {
+	ID           string           `yaml:"id,omitempty"`
+	Name         string           `yaml:"name"`
+	Algorithm    string           `yaml:"algorithm,omitempty"`
+	HashOn       string           `yaml:"hash_on,omitempty"`
+	HashOnHeader string           `yaml:"hash_on_header,omitempty"`
+	Targets      []UpstreamTarget `yaml:"targets,omitempty"`
+	Tags         []string         `yaml:"tags,omitempty"`
+}
+
+// UpstreamTarget is a Kong Gateway Target of an Upstream.
+type UpstreamTarget struct {
+	ID       string   `yaml:"id,omitempty"`
+	Target   string   `yaml:"target"`
+	Weight   *int     `yaml:"weight,omitempty"`
+	Failover *bool    `yaml:"failover,omitempty"`
+	Tags     []string `yaml:"tags,omitempty"`
 }
 
 // Route is a Kong Gateway Route. Plugins may be nested.
