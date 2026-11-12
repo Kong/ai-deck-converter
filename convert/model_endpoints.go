@@ -130,18 +130,46 @@ type endpointPair struct {
 	specs      []aimap.EndpointSpec
 }
 
+// allWebProtocols selects the endpoints of every transport.
+var allWebProtocols = []string{"http", "https", "ws", "wss"}
+
+// pairDrops records why targetPairs left out endpoints of a "*" model.
+type pairDrops struct {
+	// protocolFormats holds the formats with an endpoint that the target
+	// supports and the route protocols left out.
+	protocolFormats map[string]bool
+	// websocketAuth is true when the auth of the model left out a WebSocket
+	// endpoint.
+	websocketAuth bool
+}
+
+// add records the drops of other in d.
+func (d *pairDrops) add(other pairDrops) {
+	for format := range other.protocolFormats {
+		if d.protocolFormats == nil {
+			d.protocolFormats = map[string]bool{}
+		}
+		d.protocolFormats[format] = true
+	}
+	d.websocketAuth = d.websocketAuth || other.websocketAuth
+}
+
 // targetPairs returns the ordered pairs of t that aimap.TargetSupports
 // accepts. An endpoint gated above the minimum is left out with one warning.
 // A gated capability is left out silently.
 func (c *Converter) targetPairs(
 	src ConversionIssueSource, m *aigw.Model, lists modelLists, formats []string, t plannedTarget,
-) []endpointPair {
+) ([]endpointPair, pairDrops) {
 	var pairs []endpointPair
+	var drops pairDrops
 	for _, format := range formats {
 		section := aimap.SectionFor(format, t.providerType)
 		capabilities := lists.capabilities
 		if lists.capsWildcard {
-			capabilities = aimap.SupportedCapabilities(aigw.Format{Type: format}, t.target, m.Type, c.minRuntimeVersion)
+			// The protocols filter each endpoint below. drops then records
+			// the endpoints that only the protocols leave out.
+			capabilities = aimap.SupportedCapabilities(
+				aigw.Format{Type: format}, t.target, m.Type, allWebProtocols, c.minRuntimeVersion)
 		}
 		for _, capability := range capabilities {
 			specs, ok := aimap.EndpointsFor(section, capability)
@@ -156,6 +184,10 @@ func (c *Converter) targetPairs(
 				if !aimap.TargetSupports(format, t.target, spec) {
 					continue
 				}
+				if lists.capsWildcard && !aimap.ProtocolsServe(m.Config.Route.Protocols, spec) {
+					drops.add(pairDrops{protocolFormats: map[string]bool{format: true}})
+					continue
+				}
 				if feature, ok := aimap.EndpointFeature(section, spec.RouteLabel); ok && !c.supports(feature) {
 					// The field names the capability list, not one entry.
 					// A wildcard and the same document re-converted report alike.
@@ -164,6 +196,7 @@ func (c *Converter) targetPairs(
 					continue
 				}
 				if lists.capsWildcard && aimap.IsWebSocketEndpoint(spec) && !c.canProtectWebSocket(m) {
+					drops.websocketAuth = true
 					continue
 				}
 				accepted = append(accepted, spec)
@@ -173,7 +206,28 @@ func (c *Converter) targetPairs(
 			}
 		}
 	}
-	return pairs
+	return pairs, drops
+}
+
+// checkWildcardProtocols fails a "*" model that has no endpoint because its
+// route protocols left out every endpoint of its targets.
+func (c *Converter) checkWildcardProtocols(
+	src ConversionIssueSource, m *aigw.Model, pairsByTarget map[int][]endpointPair, drops pairDrops,
+) error {
+	if len(drops.protocolFormats) == 0 {
+		return nil
+	}
+	for _, pairs := range pairsByTarget {
+		if len(pairs) > 0 {
+			return nil
+		}
+	}
+	reason := fmt.Sprintf("model %q: config.route.protocols %v leave out every endpoint that a target supports",
+		m.Name, m.Config.Route.Protocols)
+	if drops.websocketAuth {
+		reason += ". The auth of the model cannot protect the WebSocket endpoints that the protocols select"
+	}
+	return c.fail(src.at("config.route.protocols"), ConfigFieldInvalid, "%s", reason)
 }
 
 // canProtectWebSocket reports whether the auth of m can protect a WebSocket
@@ -290,9 +344,11 @@ func (c *Converter) checkCapabilityEndpoints(
 }
 
 // warnUnservedFormats warns for each explicit format that gives no endpoint
-// for any target.
+// for any target. A format that only the route protocols empty gets no
+// warning, because "*" causes the result.
 func (c *Converter) warnUnservedFormats(
 	src ConversionIssueSource, m *aigw.Model, lists modelLists, pairsByTarget map[int][]endpointPair,
+	drops pairDrops,
 ) {
 	if lists.formatsWildcard || len(pairsByTarget) == 0 {
 		return
@@ -308,7 +364,7 @@ func (c *Converter) warnUnservedFormats(
 	}
 	for i, f := range m.Formats {
 		format := formatType(f)
-		if served[format] || slices.Contains(explicitFormatsBefore(m, i), format) {
+		if served[format] || drops.protocolFormats[format] || slices.Contains(explicitFormatsBefore(m, i), format) {
 			continue
 		}
 		c.warn(src.at(fmt.Sprintf("formats[%d].type", i)), ConfigFieldDropped,

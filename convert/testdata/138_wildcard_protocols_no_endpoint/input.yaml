@@ -1,0 +1,22 @@
+# A "*" model whose route protocols select no endpoint fails. The other
+# model still converts.
+models:
+  - name: grpc-only
+    type: model
+    capabilities: ["*"]
+    config:
+      route: {paths: [/grpc], protocols: [grpc]}
+    targets: [{name: gpt-5.4, provider: openai-prod}]
+  - name: chat
+    type: model
+    capabilities: [generate]
+    config:
+      route: {paths: [/chat]}
+    targets: [{name: gpt-5.4, provider: openai-prod}]
+model_providers:
+  - name: openai-prod
+    type: openai
+    config:
+      auth:
+        type: bearer
+        token: "{vault://ai/openai-key}"

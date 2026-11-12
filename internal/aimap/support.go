@@ -201,9 +201,9 @@ func IsAPICapability(capability aigw.Capability) bool {
 }
 
 // SupportedCapabilities returns the capabilities represented by "*" for a given
-// format, target, model type, and minimum runtime version.
+// format, target, model type, route protocols, and minimum runtime version.
 func SupportedCapabilities(
-	format aigw.Format, target Target, modelType string, minRuntimeVersion Version,
+	format aigw.Format, target Target, modelType string, protocols []string, minRuntimeVersion Version,
 ) []aigw.Capability {
 	section := SectionFor(format.Type, target.ProviderType)
 	// claimed holds the genai category of each route label. One
@@ -220,7 +220,7 @@ func SupportedCapabilities(
 		specs, _ := EndpointsFor(section, capability)
 		var labels []string
 		for _, spec := range specs {
-			if !TargetSupports(format.Type, target, spec) {
+			if !TargetSupports(format.Type, target, spec) || !ProtocolsServe(protocols, spec) {
 				continue
 			}
 			if category, ok := claimed[spec.RouteLabel]; ok && category != spec.GenaiCategory {

@@ -1,0 +1,35 @@
+# Under "*", the route protocols select the endpoints. No protocols and
+# [https] select the HTTP endpoints. [https, wss] adds realtime. [wss]
+# selects only realtime. Each route keeps the protocols of its transport.
+models:
+  - name: default-protocols
+    type: model
+    capabilities: ["*"]
+    config:
+      route: {paths: [/default]}
+    targets: [{name: gpt-5.4, provider: openai-prod}]
+  - name: https-only
+    type: model
+    capabilities: ["*"]
+    config:
+      route: {paths: [/https], protocols: [https]}
+    targets: [{name: gpt-5.4, provider: openai-prod}]
+  - name: both-transports
+    type: model
+    capabilities: ["*"]
+    config:
+      route: {paths: [/both], protocols: [https, wss]}
+    targets: [{name: gpt-5.4, provider: openai-prod}]
+  - name: websocket-only
+    type: model
+    capabilities: ["*"]
+    config:
+      route: {paths: [/ws], protocols: [wss]}
+    targets: [{name: gpt-realtime, provider: openai-prod}]
+model_providers:
+  - name: openai-prod
+    type: openai
+    config:
+      auth:
+        type: bearer
+        token: "{vault://ai/openai-key}"

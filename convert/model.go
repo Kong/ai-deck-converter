@@ -543,6 +543,7 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 	formats := c.effectiveFormats(lists, targets)
 	pairsByTarget := map[int][]endpointPair{}
 	var supportedPairs map[int][]endpointPair
+	var drops pairDrops
 	if passthrough {
 		for _, t := range targets {
 			pairsByTarget[t.index] = []endpointPair{{
@@ -556,7 +557,12 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 			}
 		}
 		for _, t := range targets {
-			pairsByTarget[t.index] = c.targetPairs(src, m, lists, formats, t)
+			pairs, d := c.targetPairs(src, m, lists, formats, t)
+			pairsByTarget[t.index] = pairs
+			drops.add(d)
+		}
+		if err := c.checkWildcardProtocols(src, m, pairsByTarget, drops); err != nil {
+			return err
 		}
 		supportedPairs = maps.Clone(pairsByTarget)
 		keepEqualPaths(formats, pairsByTarget)
@@ -897,7 +903,7 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 		if err := c.checkTargetSupport(src, m, lists, formats, servedBy, targets); err != nil {
 			return err
 		}
-		c.warnUnservedFormats(src, m, lists, supportedPairs)
+		c.warnUnservedFormats(src, m, lists, supportedPairs, drops)
 	}
 
 	plugins, err := c.scopedPlugins(src, m.Policies, m.Access.ACLs)
@@ -1287,7 +1293,7 @@ func (c *Converter) videoLifecycleCandidates(skipped map[int][]ConversionIssue) 
 				continue
 			}
 			spec, ok := aimap.LookupEndpoint(section, "video")
-			if !ok {
+			if !ok || wildcard && !aimap.ProtocolsServe(m.Config.Route.Protocols, spec) {
 				continue
 			}
 			lifecycleTargets := make([]videoLifecycleTarget, 0, len(m.TargetModels))
@@ -1541,7 +1547,9 @@ func (c *Converter) warnTransportOverrides(src ConversionIssueSource, m *aigw.Mo
 				"because Kong does not match methods on ws and wss routes.",
 			m.Name, route.Name)
 	}
-	if len(rc.Protocols) > 0 && !slices.Equal(rc.Protocols, route.Protocols) {
+	websocket := slices.ContainsFunc(route.Protocols, aimap.IsWebSocketProtocol)
+	// Protocols of the other transport go to the routes of that transport.
+	if len(rc.Protocols) > 0 && !slices.Equal(aimap.TransportProtocols(rc.Protocols, websocket), route.Protocols) {
 		c.warn(src.at("config.route.protocols"), ConfigFieldOverridden,
 			"model %q sets config.route.protocols to %v. This will be overridden to %v on the %q route, "+
 				"because the route transport supports only these protocols.",

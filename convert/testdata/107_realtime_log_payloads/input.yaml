@@ -1,13 +1,14 @@
 # The data plane rejects log_payloads true on a realtime target. The
 # realtime route gets log_payloads false with a warning, also under "*".
-# The other routes keep log_payloads true.
+# The other routes keep log_payloads true. The protocols include ws and
+# wss, so "*" selects realtime.
 models:
   - name: everything
     type: model
     capabilities: ["*"]
     formats: [{type: openai}]
     config:
-      route: {paths: [/ai]}
+      route: {paths: [/ai], protocols: [http, https, ws, wss]}
       logging: {payloads: true}
     targets:
       - name: gpt-5.4

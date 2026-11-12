@@ -2,13 +2,14 @@
 # the targets that support it. The bedrock target gets the openai routes it
 # supports and the bedrock routes. On the openai images route it gets
 # log_statistics false, because the data plane rejects statistics there.
+# Its protocols include ws and wss, so it also gets realtime.
 models:
   - name: everything
     type: model
     capabilities: ["*"]
     formats: [{type: "*"}]
     config:
-      route: {paths: [/ai]}
+      route: {paths: [/ai], protocols: [http, https, ws, wss]}
     targets:
       - name: gpt-5.4
         provider: openai-prod

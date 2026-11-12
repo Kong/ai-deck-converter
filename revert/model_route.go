@@ -47,7 +47,7 @@ func liftModelRoute(rt *kong.Route, spec *aimap.EndpointSpec) aigw.ModelRouteCon
 
 // isWebSocketRoute reports whether rt serves the ws or wss protocol.
 func isWebSocketRoute(rt *kong.Route) bool {
-	return slices.ContainsFunc(rt.Protocols, func(p string) bool { return p == "ws" || p == "wss" })
+	return slices.ContainsFunc(rt.Protocols, aimap.IsWebSocketProtocol)
 }
 
 // sameModelRoute reports whether the route configs a and b can come from one
@@ -125,4 +125,37 @@ func fromKongCIDRPorts(in []kong.CIDRPort) []aigw.CIDRPort {
 func applyLiftedRoute(dst *aigw.ModelRouteConfig, rc aigw.ModelRouteConfig) {
 	rc.Paths, rc.Model = dst.Paths, dst.Model
 	*dst = rc
+}
+
+// recordTransport records the transport of rt for finishProtocols.
+func (g *modelGroup) recordTransport(rt *kong.Route) {
+	if !isWebSocketRoute(rt) {
+		g.hasHTTPRoute = true
+		return
+	}
+	for _, p := range rt.Protocols {
+		if !slices.Contains(g.wsProtocols, p) {
+			g.wsProtocols = append(g.wsProtocols, p)
+		}
+	}
+}
+
+// finishProtocols adds the WebSocket route protocols to the model protocols.
+// HTTP routes with no protocols use the Kong default of http and https.
+// A WebSocket route gets the default ws and wss from no protocols.
+func (g *modelGroup) finishProtocols() {
+	rc := &g.model.Config.Route
+	if g.wsProtocols == nil || rc.Protocols == nil && slices.Equal(g.wsProtocols, []string{"ws", "wss"}) {
+		return
+	}
+	protocols := slices.Clone(rc.Protocols)
+	if protocols == nil && g.hasHTTPRoute {
+		protocols = []string{"http", "https"}
+	}
+	for _, p := range g.wsProtocols {
+		if !slices.Contains(protocols, p) {
+			protocols = append(protocols, p)
+		}
+	}
+	rc.Protocols = protocols
 }

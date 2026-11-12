@@ -1,12 +1,13 @@
 # A global authentication policy cannot protect a WebSocket route. Under
-# "*", the model loses only its realtime endpoint, with no issue.
+# "*", the model loses only its realtime endpoint, with no issue. Its
+# protocols include ws and wss, so only the auth policy leaves it out.
 models:
   - name: everything
     type: model
     capabilities: ["*"]
     formats: [{type: openai}]
     config:
-      route: {paths: [/ai]}
+      route: {paths: [/ai], protocols: [http, https, ws, wss]}
     targets:
       - name: gpt-5.4
         provider: openai-prod

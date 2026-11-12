@@ -6,6 +6,7 @@ import (
 	"slices"
 
 	"github.com/Kong/ai-deck-converter/internal/aigw"
+	"github.com/Kong/ai-deck-converter/internal/aimap"
 	"github.com/Kong/ai-deck-converter/internal/kong"
 )
 
@@ -102,7 +103,7 @@ func isWebSocketAuthPlugin(p kong.Plugin) bool {
 }
 
 func hasWebSocketProtocol(protocols []string) bool {
-	return slices.ContainsFunc(protocols, func(p string) bool { return p == "ws" || p == "wss" })
+	return slices.ContainsFunc(protocols, aimap.IsWebSocketProtocol)
 }
 
 // modelPolicyRefs recovers every auth plugin of a model as an auth strategy.

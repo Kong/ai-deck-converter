@@ -1,9 +1,8 @@
 package convert
 
 import (
-	"slices"
-
 	"github.com/Kong/ai-deck-converter/internal/aigw"
+	"github.com/Kong/ai-deck-converter/internal/aimap"
 	"github.com/Kong/ai-deck-converter/internal/kong"
 )
 
@@ -59,7 +58,7 @@ func buildModelRoute(
 	}, routeName)
 	route.Name = routeName
 	route.Paths = paths
-	route.Protocols = transportProtocols(route.Protocols, websocket)
+	route.Protocols = aimap.RouteProtocols(route.Protocols, websocket)
 	if websocket {
 		// Kong rejects methods on ws and wss routes.
 		route.Methods = nil
@@ -70,34 +69,6 @@ func buildModelRoute(
 		route.StripPath = new(false)
 	}
 	return route
-}
-
-// transportProtocols changes each route protocol to its counterpart on the
-// WebSocket or HTTP transport. The TLS choice of each protocol stays.
-// One model route config feeds the routes of both transports.
-func transportProtocols(protocols []string, websocket bool) []string {
-	counterpart := map[string]string{"ws": "http", "wss": "https"}
-	if websocket {
-		counterpart = map[string]string{"http": "ws", "https": "wss", "ws": "ws", "wss": "wss"}
-	} else if !slices.ContainsFunc(protocols, func(p string) bool { return p == "ws" || p == "wss" }) {
-		return protocols
-	}
-
-	var out []string
-	for _, p := range protocols {
-		if mapped, ok := counterpart[p]; ok {
-			p = mapped
-		} else if websocket {
-			continue
-		}
-		if !slices.Contains(out, p) {
-			out = append(out, p)
-		}
-	}
-	if websocket && len(out) == 0 {
-		return []string{"ws", "wss"}
-	}
-	return out
 }
 
 func toKongCIDRPorts(in []aigw.CIDRPort) []kong.CIDRPort {

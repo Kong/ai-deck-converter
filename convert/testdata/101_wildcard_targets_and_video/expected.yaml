@@ -102,16 +102,6 @@ services:
         strip_path: false
         tags:
           - aigw:video-lifecycle
-  - name: ai-gateway-websocket
-    url: ws://ai-gateway.upstream.local
-    routes:
-      - name: openai-realtime
-        paths:
-          - /ai/realtime
-        protocols:
-          - ws
-          - wss
-        strip_path: false
 plugins:
   - name: ai-model-selector
     config:
@@ -472,42 +462,6 @@ plugins:
           route_type: image/v1/images/edits
     route: openai-images-edits
     model: a
-  - name: ai-proxy-advanced
-    protocols:
-      - ws
-      - wss
-    config:
-      balancer:
-        algorithm: round-robin
-      genai_category: realtime/generation
-      llm_format: openai
-      targets:
-        - description: primary
-          logging:
-            log_payloads: false
-            log_statistics: true
-          model:
-            name: primary
-            provider: openai
-          route_type: realtime/v1/realtime
-        - auth:
-            header_name: api-key
-            header_value: '{vault://ai/azure-key}'
-          description: fallback
-          logging:
-            log_payloads: false
-            log_statistics: true
-          model:
-            name: fallback
-            options:
-              azure_api_version: "2024-10-21"
-              azure_deployment_id: fallback
-              azure_instance: kong-prod
-            provider: azure
-          route_type: realtime/v1/realtime
-    route: openai-realtime
-    tags:
-      - ai-gateway-realtime-model:a
   - name: ai-model-selector
     config:
       max_request_body_size: 8388608

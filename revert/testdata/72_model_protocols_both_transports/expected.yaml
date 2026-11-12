@@ -1,0 +1,26 @@
+models:
+  - type: model
+    name: chat-and-realtime
+    capabilities:
+      - generate
+      - realtime
+    formats:
+      - type: openai
+    targets:
+      - name: gpt-5.4
+        provider: openai-1
+        config:
+          type: openai
+    config:
+      route:
+        paths:
+          - /ai
+        protocols:
+          - https
+          - wss
+      logging:
+        payloads: false
+        statistics: true
+model_providers:
+  - type: openai
+    name: openai-1
