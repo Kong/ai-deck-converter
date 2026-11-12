@@ -189,6 +189,23 @@ routes:
       - http
       - https
     strip_path: false
+  - id: 740677ad-a667-5a50-a255-e369d244e981
+    name: openai-responses-lifecycle
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - ~/mantle-openai/responses/.+
+    methods:
+      - GET
+      - POST
+      - DELETE
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+    tags:
+      - aigw:responses-lifecycle
   - id: bb559a54-dc17-5c0f-b946-b0d9c5cebd7a
     name: anthropic-messages
     service:
@@ -691,7 +708,33 @@ plugins:
       id: 1a3f650c-2709-5e79-a792-7ffd18243fbf
     model:
       id: 337a0f42-f075-5ed7-85a7-069f5ba0d5a9
-  - id: 7d1a0f05-fed7-51f6-83f9-f8830f85d070
+  - id: f767a5a0-2605-5ec7-a54b-54b5ba91d32e
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            aws_access_key_id: e2e-fake-access-key-id
+            aws_secret_access_key: e2e-fake-secret-access-key
+          description: openai.gpt-oss-120b
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: openai.gpt-oss-120b
+            options:
+              bedrock:
+                aws_region: us-east-1
+                endpoint_type: mantle
+                mantle_openai_path_prefix: /v1
+            provider: bedrock
+          route_type: llm/v1/responses
+    route:
+      id: 740677ad-a667-5a50-a255-e369d244e981
+  - id: 7464aef6-9dba-5909-8dc8-d4000be2fc9e
     name: ai-model-selector
     config:
       max_request_body_size: 8388608
@@ -700,7 +743,7 @@ plugins:
           source: body
     route:
       id: bb559a54-dc17-5c0f-b946-b0d9c5cebd7a
-  - id: 0f933206-16d8-5873-a1fa-6ca08ff363c2
+  - id: 32c66b25-eee1-5606-ae08-3fbd6e58cfba
     name: ai-proxy-advanced
     config:
       balancer:
@@ -730,7 +773,7 @@ plugins:
       id: bb559a54-dc17-5c0f-b946-b0d9c5cebd7a
     model:
       id: 670ee2da-e67b-59f4-811d-48aec0ff00d0
-  - id: 32c66b25-eee1-5606-ae08-3fbd6e58cfba
+  - id: df451b5d-1af4-57b8-8ced-85dc15c61fe8
     name: ai-proxy-advanced
     config:
       balancer:
