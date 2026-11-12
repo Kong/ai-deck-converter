@@ -1,0 +1,8 @@
+- code: BEHAVIOR_MAY_DIFFER
+  reason: 'model "smart" shares route "openai-responses-lifecycle" with model "fast", which has different policies or ACLs. That route serves requests addressed by a stored ID, which carry no model, so its policies and ACLs cannot be scoped per model: model "fast" has none, so no policy or ACL is enforced there.'
+  source:
+    kind: model
+    name: smart
+    fields:
+      - access.acls
+  severity: WARNING

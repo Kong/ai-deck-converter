@@ -1,0 +1,34 @@
+# Two agentic models share one lifecycle route and differ only in their ACLs.
+# The first model's set governs the route. The warning points at the ACLs of
+# the second model.
+models:
+  - name: fast
+    type: model
+    capabilities: [agentic]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/ai]}
+    targets:
+      - name: gpt-4.1-mini
+        provider: openai-prod
+  - name: smart
+    type: model
+    capabilities: [agentic]
+    formats: [{type: openai}]
+    access:
+      acls:
+        allow: [premium-users]
+    config:
+      route: {paths: [/ai]}
+    targets:
+      - name: gpt-4.1
+        provider: openai-prod
+model_providers:
+  - name: openai-prod
+    type: openai
+    config:
+      auth:
+        type: bearer
+        token: "{vault://ai/openai-key}"
+consumer_groups:
+  - name: premium-users

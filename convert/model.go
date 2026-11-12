@@ -1072,14 +1072,14 @@ func (c *Converter) attachLifecycleGuards(
 	set := lifecycleGuardSet{fingerprint: guardSetFingerprint(plugins), model: m.Name}
 	if first, ok := st.lifecycleGuards[routeName]; ok {
 		if first.fingerprint != set.fingerprint {
-			enforced := fmt.Sprintf("only model %q's policies are enforced there", first.model)
+			enforced := fmt.Sprintf("only model %q's policies and ACLs are enforced there", first.model)
 			if first.fingerprint == "" {
-				enforced = fmt.Sprintf("model %q has none, so no policy is enforced there", first.model)
+				enforced = fmt.Sprintf("model %q has none, so no policy or ACL is enforced there", first.model)
 			}
-			c.warn(src.at("policies"), BehaviorMayDiffer,
-				"model %q shares route %q with model %q, which has different policies. That route "+
-					"serves requests addressed by a stored ID, which carry no model, so its policies "+
-					"cannot be scoped per model: %s.",
+			c.warn(src.at(guardFields(m, plugins)...), BehaviorMayDiffer,
+				"model %q shares route %q with model %q, which has different policies or ACLs. That "+
+					"route serves requests addressed by a stored ID, which carry no model, so its "+
+					"policies and ACLs cannot be scoped per model: %s.",
 				m.Name, routeName, first.model, enforced)
 		}
 		return
@@ -1485,6 +1485,18 @@ func capabilityField(m *aigw.Model, capability string) string {
 
 // scopedPluginField returns the path of the source of a plugin that
 // scopedPlugins built from refs.
+// guardFields returns the field of each policy and ACL plugin of m without
+// duplicates. It returns nil when m has none.
+func guardFields(m *aigw.Model, plugins []kong.Plugin) []string {
+	var fields []string
+	for k := range plugins {
+		if field := scopedPluginField(m.Policies, plugins[k]); !slices.Contains(fields, field) {
+			fields = append(fields, field)
+		}
+	}
+	return fields
+}
+
 func scopedPluginField(refs []string, p kong.Plugin) string {
 	if p.Source != nil && p.Source.EntityType == "policy" {
 		if i := slices.Index(refs, p.Source.EntityName); i >= 0 {
