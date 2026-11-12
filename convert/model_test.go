@@ -709,3 +709,50 @@ func TestBedrockMantleEndpointType(t *testing.T) {
 		})
 	}
 }
+
+// TestRealtimeRouteSkipsRateLimitingAdvanced pins the AG-2355 fix. The data
+// plane rejects the whole config when ai-rate-limiting-advanced has ws or wss.
+func TestRealtimeRouteSkipsRateLimitingAdvanced(t *testing.T) {
+	src := []byte(`models:
+  - name: azure-everything
+    capabilities: ["*"]
+    formats: [{type: openai}]
+    config: {route: {paths: [/ai]}}
+    policies: [token-limit]
+    targets:
+      - name: gpt-5-4
+        provider: azure-prod
+        config: {type: azure, azure_deployment_id: gpt-5-4, azure_api_version: "2024-10-21"}
+policies:
+  - type: ai-rate-limiting-advanced
+    name: token-limit
+    config:
+      strategy: local
+      policies:
+        - match: [{type: provider, values: [azure-prod]}]
+          limits: [{limit: 1000, window_size: 60, tokens_count_strategy: total_tokens}]
+model_providers:
+  - name: azure-prod
+    type: azure
+    config:
+      instance: kong-e2e
+      auth: {type: basic, headers: [{name: api-key, value: key}]}
+`)
+	result, err := Convert(src, testOptions)
+	require.NoError(t, err)
+
+	issue := requireIssue(t, result.Issues, Warning, ConfigFieldDropped, kindModel, "azure-everything", "policies[0]")
+	require.Contains(t, issue.Reason,
+		`plugin "ai-rate-limiting-advanced", which does not support the ws and wss protocols`)
+	require.Contains(t, issue.Reason, `"openai-realtime"`)
+
+	for _, p := range pluginsOnRoute(result.Output, "openai-realtime") {
+		require.NotEqual(t, "ai-rate-limiting-advanced", p.Name, "the realtime route keeps no rate limit plugin")
+	}
+	var chatNames []string
+	for _, p := range pluginsOnRoute(result.Output, "openai-chat") {
+		chatNames = append(chatNames, p.Name)
+		require.Empty(t, p.Protocols, "plugin %q on the HTTP route", p.Name)
+	}
+	require.Contains(t, chatNames, "ai-rate-limiting-advanced", "the HTTP route keeps the policy")
+}

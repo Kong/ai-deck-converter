@@ -12,8 +12,12 @@ package aimap
 // whole configuration when any one plugin declares a protocol its own schema
 // does not accept.
 var webSocketPlugins = map[string]bool{
-	"acl": true, "ai-proxy": true, "ai-proxy-advanced": true, "ai-rate-limiting-advanced": true, "azure-functions": true,
-	"basic-auth": true, "confluent-consume": true, "datadog": true, "file-log": true,
+	"acl": true, "ai-proxy": true, "ai-proxy-advanced": true,
+	// ai-rate-limiting-advanced gets ws and wss support in
+	// https://github.com/Kong/kong-ee/pull/18876.
+	"ai-rate-limiting-advanced": false,
+	"azure-functions":           true,
+	"basic-auth":                true, "confluent-consume": true, "datadog": true, "file-log": true,
 	"grpc-gateway": true, "grpc-web": true, "hmac-auth": true, "http-log": true,
 	"ip-restriction": true, "kafka-consume": true, "kafka-log": true, "key-auth": true,
 	"key-auth-enc": true, "ldap-auth": true, "ldap-auth-advanced": true, "loggly": true,
