@@ -813,7 +813,7 @@ plugins:
           route_type: llm/v1/files
     route:
       id: b433d478-0f40-5518-b6bb-815583936241
-  - id: df451b5d-1af4-57b8-8ced-85dc15c61fe8
+  - id: d70f9948-2d3c-5912-bf94-c6895cbb0563
     name: ai-proxy-advanced
     config:
       balancer:
