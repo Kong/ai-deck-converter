@@ -154,6 +154,9 @@ func (c *Converter) policyPlugin(p *aigw.Policy, tags []string, preserveID bool)
 	if !ok {
 		return kong.Plugin{}, false
 	}
+	if p.Type == "ai-sanitizer" && !c.supports(aimap.FeatureSanitizerAllWithCredentials) {
+		config = aimap.CollapseSanitizerAnonymize(config)
+	}
 	plugin := kong.Plugin{
 		Name:        p.Type,
 		Condition:   p.Condition,
