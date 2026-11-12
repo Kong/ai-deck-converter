@@ -178,3 +178,52 @@ func TestMapOptionsPassthroughDoesNotDefaultAnthropicVersion(t *testing.T) {
 		map[string]any{"anthropic_version": "2024-01-01"},
 		mapOptions(map[string]any{"version": "2024-01-01"}, "anthropic", "claude-sonnet-4-5", anthropic, true))
 }
+
+func TestClientAuthOverride(t *testing.T) {
+	basic := aigw.ProviderConfig{Auth: aigw.ProviderAuth{Type: "basic"}}
+	tests := []struct {
+		name     string
+		provider *aigw.Provider
+		want     *bool
+	}{
+		{"bedrock client auth", &aigw.Provider{Type: "bedrock", Config: basic}, ptrBool(true)},
+		{"bedrock header", &aigw.Provider{Type: "bedrock", Config: aigw.ProviderConfig{Auth: aigw.ProviderAuth{
+			Type: "basic", Headers: []aigw.AuthHeader{{Name: "Authorization", Value: "Bearer k"}},
+		}}}, nil},
+		{"bedrock param", &aigw.Provider{Type: "bedrock", Config: aigw.ProviderConfig{Auth: aigw.ProviderAuth{
+			Type: "basic", Params: []aigw.AuthParam{{Name: "key", Value: "abc"}},
+		}}}, nil},
+		{"bedrock aws", &aigw.Provider{
+			Type: "bedrock", Config: aigw.ProviderConfig{Auth: aigw.ProviderAuth{Type: "aws"}},
+		}, nil},
+		{"bedrock token vault", &aigw.Provider{Type: "bedrock", Config: basic, TokenVault: &aigw.TokenVaultConfig{}}, nil},
+		{"openai client auth", &aigw.Provider{Type: "openai", Config: basic}, nil},
+		{"nil provider", nil, nil},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			require.Equal(t, tc.want, clientAuthOverride(tc.provider))
+		})
+	}
+}
+
+func TestResolveEmbeddingsBedrockClientAuth(t *testing.T) {
+	c := newConverter(nil, Options{})
+	c.providers["bedrock-client"] = &aigw.Provider{
+		Type: "bedrock", Name: "bedrock-client",
+		Config: aigw.ProviderConfig{Auth: aigw.ProviderAuth{Type: "basic"}},
+	}
+	raw := map[string]any{
+		"provider": "bedrock-client",
+		"auth":     map[string]any{"allow_override": false},
+		"model": map[string]any{
+			"name":   "amazon.titan-embed-text-v2:0",
+			"config": map[string]any{"type": "bedrock"},
+		},
+	}
+
+	got, err := c.resolveEmbeddings(issueSource("model", "m"), raw)
+	require.NoError(t, err)
+	require.Equal(t, map[string]any{"allow_override": true}, got.(map[string]any)["auth"])
+	require.Equal(t, false, raw["auth"].(map[string]any)["allow_override"], "source must stay unchanged")
+}

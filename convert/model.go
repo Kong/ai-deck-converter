@@ -1,6 +1,7 @@
 package convert
 
 import (
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"maps"
@@ -1686,7 +1687,7 @@ func (c *Converter) buildTarget(
 		"route_type": routeType,
 		"model":      model,
 	}
-	if auth := resolveAuth(provider, tm.AllowAuthOverride); auth != nil {
+	if auth := resolveAuth(provider, cmp.Or(clientAuthOverride(provider), tm.AllowAuthOverride)); auth != nil {
 		target["auth"] = auth
 	}
 	if tm.Weight != nil {

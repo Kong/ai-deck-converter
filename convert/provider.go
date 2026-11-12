@@ -8,6 +8,17 @@ import (
 	"github.com/Kong/ai-deck-converter/internal/aimap"
 )
 
+// clientAuthOverride returns true for a Bedrock provider whose clients send their
+// own key. Such a provider has basic auth with no header, no param, and no token
+// vault. The data plane rejects a client key unless allow_override is true.
+func clientAuthOverride(p *aigw.Provider) *bool {
+	if p == nil || p.Type != "bedrock" || p.TokenVault != nil || p.Config.Auth.Type != "basic" ||
+		len(p.Config.Auth.Headers) > 0 || len(p.Config.Auth.Params) > 0 {
+		return nil
+	}
+	return new(true)
+}
+
 // resolveAuth folds a provider's auth configuration into an ai-proxy-advanced
 // target `auth` block. Returns nil when there is nothing to emit.
 func resolveAuth(p *aigw.Provider, allowOverride *bool) map[string]any {
@@ -105,13 +116,9 @@ func resolveAuth(p *aigw.Provider, allowOverride *bool) map[string]any {
 	return auth
 }
 
-// resolveEmbeddings lowers a model's embeddings block into the ai-proxy-advanced
-// embeddings shape. When `embeddings.provider` names a top-level provider entity,
-// its auth is resolved via resolveAuth and merged into `embeddings.auth` (any
-// explicitly configured auth keys win), then the provider reference is dropped —
-// the ai-proxy-advanced embeddings schema has no top-level provider field. The
-// embeddings model's `config` block is lowered regardless of whether a provider
-// entity is referenced.
+// resolveEmbeddings changes a model's embeddings block to the ai-proxy-advanced
+// shape. Keys set in `embeddings.auth` win over the auth of `embeddings.provider`.
+// A client-key Bedrock provider always sets allow_override to true.
 //
 // It works on a copy. A model pass can run more than once over the source.
 func (c *Converter) resolveEmbeddings(src ConversionIssueSource, raw any) (any, error) {
@@ -143,7 +150,7 @@ func (c *Converter) resolveEmbeddings(src ConversionIssueSource, raw any) (any, 
 	if provider == nil {
 		return emb, nil
 	}
-	resolved := resolveAuth(provider, nil)
+	resolved := resolveAuth(provider, clientAuthOverride(provider))
 	if resolved == nil {
 		return emb, nil
 	}
@@ -153,7 +160,7 @@ func (c *Converter) resolveEmbeddings(src ConversionIssueSource, raw any) (any, 
 		return emb, nil
 	}
 	for k, v := range resolved {
-		if _, set := existing[k]; !set {
+		if _, set := existing[k]; !set || k == "allow_override" {
 			existing[k] = v
 		}
 	}
