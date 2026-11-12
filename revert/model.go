@@ -574,6 +574,7 @@ func (r *Reverter) modelGroupFor(
 	g.model.Config.MaxRequestBodySize = getInt(cfg, "max_request_body_size")
 	g.model.Config.Balancer = balancerFromConfig(
 		getMap(cfg, "balancer"), aimap.VectorDBFromPlugin(cfg["vectordb"]), cfg["embeddings"],
+		sessionAffinityFromConfig(getMap(cfg, "conversation_state")),
 	)
 	acc.groups[key] = g
 	acc.order = append(acc.order, key)
@@ -1259,11 +1260,27 @@ func isAPIOnly(caps []string) bool {
 	return true
 }
 
+// sessionAffinityFromConfig reverses convert.modelConversationState.
+// shortcut: redis state has no Datastore entity to point at, so it is dropped.
+// Upgrade when revert emits datastores for plugin redis blocks.
+func sessionAffinityFromConfig(cfg map[string]any) any {
+	if cfg == nil || getStr(cfg, "strategy") == "redis" {
+		return nil
+	}
+	out := map[string]any{"storage": map[string]any{"type": "local"}}
+	for _, key := range []string{"enabled", "ttl"} {
+		if v, ok := cfg[key]; ok {
+			out[key] = v
+		}
+	}
+	return out
+}
+
 // balancerFromConfig reverses convert.balancerConfig, dropping the implicit
 // {algorithm: round-robin} default the forward converter emits. The top-level
 // vectordb/embeddings config keys (siblings of `balancer` in ai-proxy-advanced)
 // are folded back into the balancer block, mirroring convert's hoisting.
-func balancerFromConfig(cfg map[string]any, vectordb, embeddings any) *aigw.Balancer {
+func balancerFromConfig(cfg map[string]any, vectordb, embeddings, sessionAffinity any) *aigw.Balancer {
 	algo := getStr(cfg, "algorithm")
 	fields := map[string]any{}
 	for k, v := range cfg {
@@ -1276,6 +1293,9 @@ func balancerFromConfig(cfg map[string]any, vectordb, embeddings any) *aigw.Bala
 	}
 	if embeddings != nil {
 		fields["embeddings"] = embeddings
+	}
+	if sessionAffinity != nil {
+		fields["session_affinity"] = sessionAffinity
 	}
 	if len(cfg) == 0 && len(fields) == 0 {
 		return nil
