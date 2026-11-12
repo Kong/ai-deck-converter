@@ -162,24 +162,13 @@ var PromptReadingPolicies = map[string]bool{
 
 // SanitizerAnonymizesCredentials reports whether an ai-sanitizer config anonymizes credentials,
 // the one sanitizer mode that needs the normalized LLM shape. An unset anonymize defaults to
-// all_and_credentials on the data plane. A list holding "all" as well is still reported: the data
-// plane collapsing it to "all" is a bug tracked in KOKO-4587.
+// all_and_credentials on the data plane.
 func SanitizerAnonymizesCredentials(cfg map[string]any) bool {
-	var types []string
-	switch v := cfg["anonymize"].(type) {
-	case []string:
-		types = v
-	case []any:
-		for _, t := range v {
-			if s, ok := t.(string); ok {
-				types = append(types, s)
-			}
-		}
-	}
+	types := anonymizeTypes(cfg)
 	if len(types) == 0 {
 		return true
 	}
-	return slices.Contains(types, "all_and_credentials") || slices.Contains(types, "credentials")
+	return slices.Contains(types, anonymizeAllAndCredentials) || slices.Contains(types, anonymizeCredentials)
 }
 
 // PassthroughEndpoint is the one route a PassthroughFormat model serves. Capabilities do not

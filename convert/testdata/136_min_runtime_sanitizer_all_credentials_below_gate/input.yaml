@@ -1,0 +1,38 @@
+# Data planes before 2.3 drop "credentials" from an anonymize list that holds
+# "all". At 2.2 the converter changes "all" and "credentials" into one
+# "all_and_credentials" entry. A list without both entries stays the same.
+models:
+  - name: sanitized-gpt
+    type: model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/ai]}
+    targets:
+      - name: gpt-4o
+        provider: openai-prod
+        config: {type: openai}
+    policies: [collapse-me, keep-me]
+policies:
+  - type: ai-sanitizer
+    name: collapse-me
+    config:
+      anonymize: [email, all, phone, credentials]
+  - type: ai-sanitizer
+    name: keep-me
+    config:
+      anonymize: [all, email]
+  - type: ai-sanitizer
+    name: global-collapse
+    global: true
+    config:
+      anonymize: [credentials, all, all_and_credentials]
+model_providers:
+  - name: openai-prod
+    type: openai
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://ai/openai-token}"

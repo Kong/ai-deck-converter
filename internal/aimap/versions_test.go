@@ -61,6 +61,7 @@ var allFeatures = []Feature{
 	FeatureSagemaker,
 	FeatureAuthStrategyTokenVault,
 	FeatureOIDCProtectedResourceMetadata,
+	FeatureSanitizerAllWithCredentials,
 }
 
 func TestFeatureTable(t *testing.T) {
