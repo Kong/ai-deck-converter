@@ -158,13 +158,14 @@ type videoLifecycleTarget struct {
 	providerType string
 }
 
-// videoLifecycleCandidate owns an OpenAI-format video route. Its lifecycle
+// videoLifecycleCandidate owns a video route of one section. Its lifecycle
 // proxy is static (not model-scoped) but retains every creation target.
 type videoLifecycleCandidate struct {
 	index   int
 	model   *aigw.Model
 	targets []videoLifecycleTarget
 	spec    aimap.EndpointSpec
+	section string
 }
 
 // modelPolicyRef names a policy reference of a model by its field path.
@@ -1110,8 +1111,13 @@ func (c *Converter) convertVideoLifecycle(
 	st *modelPass, candidate videoLifecycleCandidate, service *kong.Service,
 ) error {
 	src := issueSource(kindModel, candidate.model.Name)
-	routeName := uniqueModelRouteName("openai-videos-lifecycle", st.usedRouteNames)
-	route := buildVideoLifecycleRoute(candidate.model.Config.Route, routeName, basePaths(candidate.model))
+	lifecycle, ok := aimap.VideoLifecycleRouteFor(candidate.section)
+	if !ok {
+		return nil
+	}
+	routeName := uniqueModelRouteName(candidate.section+"-"+lifecycle.Label, st.usedRouteNames)
+	route := buildVideoLifecycleRoute(candidate.model.Config.Route, routeName, basePaths(candidate.model),
+		candidate.spec, lifecycle.Methods)
 	route.Source = source("model", candidate.model.Name, "config.route")
 	service.Routes = append(service.Routes, route)
 
@@ -1145,7 +1151,7 @@ func (c *Converter) convertVideoLifecycle(
 	}
 	pg := &proxyGroup{
 		routeName:         routeName,
-		llmFormat:         "openai",
+		llmFormat:         candidate.section,
 		genaiCategory:     candidate.spec.GenaiCategory,
 		balancer:          c.balancerConfig(candidate.model.Config.Balancer),
 		vectordb:          lifecycleVectorDB,
@@ -1274,48 +1280,53 @@ func (c *Converter) videoLifecycleCandidates(skipped map[int][]ConversionIssue) 
 			})
 		}
 		lists := modelLists{formats: explicitFormats(m), formatsWildcard: formatsWildcard(m)}
-		section := "openai"
-		if !slices.Contains(c.effectiveFormats(lists, planned), section) {
-			continue
-		}
-		spec, ok := aimap.LookupEndpoint(section, "video")
-		if !ok {
-			continue
-		}
-		lifecycleTargets := make([]videoLifecycleTarget, 0, len(m.TargetModels))
-		for _, t := range planned {
-			if !aimap.TargetSupports(section, t.target, spec) {
+		warnedTargets := false
+		for _, format := range c.effectiveFormats(lists, planned) {
+			section := aimap.SectionFor(format, "")
+			if _, ok := aimap.VideoLifecycleRouteFor(section); !ok {
 				continue
 			}
-			lifecycleTargets = append(lifecycleTargets, videoLifecycleTarget{
-				target: t.tm, provider: t.provider, providerType: t.providerType,
+			spec, ok := aimap.LookupEndpoint(section, "video")
+			if !ok {
+				continue
+			}
+			lifecycleTargets := make([]videoLifecycleTarget, 0, len(m.TargetModels))
+			for _, t := range planned {
+				if !aimap.TargetSupports(format, t.target, spec) {
+					continue
+				}
+				lifecycleTargets = append(lifecycleTargets, videoLifecycleTarget{
+					target: t.tm, provider: t.provider, providerType: t.providerType,
+				})
+			}
+			// convertModel fails the model when no target is left.
+			if len(lifecycleTargets) == 0 {
+				continue
+			}
+			// One warning per model, whichever section reports it first.
+			if len(lifecycleTargets) > 1 && explicitVideo[i] && !warnedTargets {
+				warnedTargets = true
+				c.warn(src.at("targets"), BehaviorMayDiffer,
+					"model %q: video lifecycle route has multiple targets; "+
+						"requests without a model alias may reach a different target than creation", m.Name)
+			}
+
+			routeConfig := m.Config.Route
+			routeConfig.Name = ""
+			routeConfig.Methods = nil
+			key, err := modelRouteConfigKey(routeConfig)
+			if err != nil {
+				key = m.Name
+			}
+			key = section + "|" + key
+			if _, ok := sharedRoutes[key]; !ok {
+				sharedOrder = append(sharedOrder, key)
+			}
+			sharedRoutes[key] = append(sharedRoutes[key], i)
+			candidates = append(candidates, videoLifecycleCandidate{
+				index: i, model: m, targets: lifecycleTargets, spec: spec, section: section,
 			})
 		}
-		// convertModel fails the model when no target is left.
-		if len(lifecycleTargets) == 0 {
-			continue
-		}
-		if len(lifecycleTargets) > 1 && explicitVideo[i] {
-			c.warn(src.at("targets"), BehaviorMayDiffer,
-				"model %q: video lifecycle route has multiple targets; "+
-					"requests without a model alias may reach a different target than creation", m.Name)
-		}
-
-		routeConfig := m.Config.Route
-		routeConfig.Name = ""
-		routeConfig.Methods = nil
-		key, err := modelRouteConfigKey(routeConfig)
-		if err != nil {
-			key = m.Name
-		}
-		key = section + "|" + key
-		if _, ok := sharedRoutes[key]; !ok {
-			sharedOrder = append(sharedOrder, key)
-		}
-		sharedRoutes[key] = append(sharedRoutes[key], i)
-		candidates = append(candidates, videoLifecycleCandidate{
-			index: i, model: m, targets: lifecycleTargets, spec: spec,
-		})
 	}
 
 	for _, key := range sharedOrder {
@@ -1507,14 +1518,15 @@ func scopedPluginField(refs []string, p kong.Plugin) string {
 	return "access.acls"
 }
 
-func buildVideoLifecycleRoute(rc aigw.ModelRouteConfig, routeName string, bases []string) kong.Route {
+func buildVideoLifecycleRoute(
+	rc aigw.ModelRouteConfig, routeName string, bases []string, spec aimap.EndpointSpec, methods []string,
+) kong.Route {
 	rc.Methods = nil
 	paths := make([]string, 0, len(bases))
 	for _, base := range bases {
-		base = strings.TrimRight(base, "/")
-		paths = append(paths, base+"/videos")
+		paths = append(paths, aimap.RoutePath(base, spec))
 	}
-	route := buildModelRoute(rc, routeName, paths, []string{"GET", "DELETE"}, false)
+	route := buildModelRoute(rc, routeName, paths, methods, false)
 	route.Tags = append(route.Tags, aimap.VideoLifecycleRouteTag)
 	return route
 }

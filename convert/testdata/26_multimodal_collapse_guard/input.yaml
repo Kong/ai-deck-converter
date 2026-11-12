@@ -1,8 +1,8 @@
-# A single multimodal Bedrock model whose capabilities all resolve to the shared
-# /invoke endpoint but carry different genai_categories. Only one category can be
-# served by the single ai-proxy-advanced on that route, so the converter keeps the
-# first capability (embeddings) and warns/skips image and video. Under -strict the
-# collision is fatal instead. See convertModels in convert/model.go.
+# A single multimodal Bedrock model. Its embeddings and image endpoints share
+# /invoke but carry different genai_categories. The single ai-proxy-advanced on
+# that route serves one category. The converter keeps the first capability and
+# warns/skips image. Video survives on its own async-invoke routes. Under -strict
+# the collision is fatal. See convertModels in convert/model.go.
 model_providers:
   - name: bedrock-prod
     type: bedrock

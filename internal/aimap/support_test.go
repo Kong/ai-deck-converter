@@ -111,6 +111,22 @@ func TestTargetSupportsConditions(t *testing.T) {
 			agenticSpec(t, "responses"), false,
 		},
 		{
+			"bedrock mantle responses in openai format", "openai",
+			Target{ProviderType: "bedrock", Mantle: true},
+			agenticSpec(t, "responses"), true,
+		},
+		// The rule follows the route type, so the openai section's own
+		// responses spec rejects a bedrock runtime target too.
+		{
+			"bedrock runtime responses on the openai section spec", "openai", bedrock,
+			spec(t, "openai", "agentic"), false,
+		},
+		// The rule applies to bedrock alone.
+		{
+			"azure responses stay accepted", "openai", azure,
+			spec(t, "openai", "agentic"), true,
+		},
+		{
 			"bedrock retrieve stays on chat", "bedrock", bedrock,
 			agenticSpec(t, "retrieve"), true,
 		},
@@ -192,9 +208,10 @@ func TestSupportedCapabilities(t *testing.T) {
 		SupportedCapabilities(aigw.Format{Type: "gemini"}, Target{ProviderType: "gemini"}, "model", mustVersion("2.2")),
 		"agentic")
 
-	// generate claims the invoke route first, so the other genai categories
-	// lose it, and invoke is their only endpoint.
-	require.Equal(t, []aigw.Capability{"generate", "agentic", "audio/speech", "rerank"},
+	// generate claims the invoke route first. Embeddings and image lose it,
+	// because invoke is their only endpoint. Video has its own async-invoke
+	// route.
+	require.Equal(t, []aigw.Capability{"generate", "agentic", "audio/speech", "rerank", "video"},
 		SupportedCapabilities(aigw.Format{Type: "bedrock"}, Target{ProviderType: "bedrock"}, "model", LatestVersion))
 }
 

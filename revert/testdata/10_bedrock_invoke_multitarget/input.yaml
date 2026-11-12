@@ -10,6 +10,21 @@ services:
           - GET
           - POST
         strip_path: false
+      - name: bedrock-async-invoke
+        paths:
+          - /ai/async-invoke
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: bedrock-async-invoke-lifecycle
+        paths:
+          - /ai/async-invoke
+        methods:
+          - GET
+        strip_path: false
+        tags:
+          - aigw:video-lifecycle
 plugins:
   - name: ai-proxy-advanced
     config:
@@ -52,6 +67,15 @@ plugins:
                 aws_region: us-east-1
             provider: bedrock
           route_type: llm/v1/chat
+    route:
+      name: bedrock-invoke
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: video/generation
+      llm_format: bedrock
+      targets:
         - auth:
             aws_access_key_id: '{vault://ai/aws-access-key-id}'
             aws_secret_access_key: '{vault://ai/aws-secret-access-key}'
@@ -65,7 +89,18 @@ plugins:
             provider: bedrock
           route_type: video/v1/videos/generations
     route:
-      name: bedrock-invoke
+      name: bedrock-async-invoke
+  - name: ai-proxy-advanced
+    config:
+      genai_category: video/generation
+      llm_format: bedrock
+      targets:
+        - model:
+            name: amazon.nova-reel-v1:1
+            provider: bedrock
+          route_type: video/v1/videos/generations
+    route:
+      name: bedrock-async-invoke-lifecycle
 ai_models:
   - name: titan-embed-text-v2
     alias: '@bedrock/titan-embed-text-v2'

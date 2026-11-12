@@ -310,8 +310,8 @@ func testBedrockModelAllEndpoints(t *testing.T, license string) {
 	loaded := requireRoutesLoaded(t, gateway,
 		"bedrock-converse", "bedrock-invoke", "bedrock-chat", "bedrock-messages",
 		"bedrock-retrieve", "bedrock-rerank",
-		"bedrock-invoke-2", "bedrock-invoke-3", "bedrock-invoke-4",
-		"bedrock-batches",
+		"bedrock-invoke-2", "bedrock-invoke-3", "bedrock-async-invoke",
+		"bedrock-async-invoke-lifecycle", "bedrock-batches",
 		"openai-chat", "openai-responses", "anthropic-messages", "openai-files",
 	)
 	t.Logf("PASS: the gateway accepted all %d bedrock and bedrock mantle routes", loaded)

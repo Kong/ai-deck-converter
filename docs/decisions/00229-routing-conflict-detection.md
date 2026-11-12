@@ -380,10 +380,11 @@ no second issue for the pair.
 
 ### Video lifecycle routes that models share
 
-Two OpenAI video models with the same route configuration each make a video
-lifecycle route on the same paths. `videoLifecycleCandidates` reports a
-`WARNING` on `config.route` of each of these models. Both models still
-convert.
+Two video models of one section with the same route configuration each make a
+video lifecycle route on the same paths. The section decides the route: the
+OpenAI one serves the OpenAI video operations, and the bedrock one serves the
+`async-invoke` poll. `videoLifecycleCandidates` reports a `WARNING` on
+`config.route` of each of these models. Both models still convert.
 
 The route check also sees these overlapping lifecycle routes. It does not
 report them again. The lifecycle check already names every model on the

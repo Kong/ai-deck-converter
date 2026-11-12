@@ -40,23 +40,6 @@ routes:
       - http
       - https
     strip_path: false
-  - id: 740677ad-a667-5a50-a255-e369d244e981
-    name: openai-responses-lifecycle
-    service:
-      id: 947a4e23-b483-5a65-8165-da9aed24565b
-    paths:
-      - ~/ai/responses/.+
-    methods:
-      - GET
-      - POST
-      - DELETE
-      - OPTIONS
-    protocols:
-      - http
-      - https
-    strip_path: false
-    tags:
-      - aigw:responses-lifecycle
   - id: 718639d6-1ff2-57e3-9528-df761b890443
     name: openai-audio-speech
     service:
@@ -397,6 +380,19 @@ routes:
       - http
       - https
     strip_path: false
+  - id: 751f3bc6-2b23-58c0-897a-ca3b20491b67
+    name: bedrock-async-invoke
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /ai/async-invoke
+    methods:
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
   - id: 2384fe9d-eacc-5ac2-ae4c-4752cc597f81
     name: openai-chat-2
     service:
@@ -589,6 +585,20 @@ routes:
     methods:
       - GET
       - DELETE
+    protocols:
+      - http
+      - https
+    strip_path: false
+    tags:
+      - aigw:video-lifecycle
+  - id: bd17fb45-7638-554f-b4ef-dd1aa6d158fa
+    name: bedrock-async-invoke-lifecycle
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /ai/async-invoke
+    methods:
+      - GET
     protocols:
       - http
       - https
@@ -917,72 +927,7 @@ plugins:
       id: 1a3f650c-2709-5e79-a792-7ffd18243fbf
     model:
       id: 290b3237-5b60-5df0-bfbe-912660aef648
-  - id: 12106a5c-cbd2-5942-8432-ef9bc4adca1b
-    name: ai-proxy-advanced
-    config:
-      balancer:
-        algorithm: round-robin
-      genai_category: text/generation
-      llm_format: openai
-      targets:
-        - description: gpt-5.4
-          logging:
-            log_payloads: false
-            log_statistics: true
-          model:
-            name: gpt-5.4
-            provider: openai
-          route_type: llm/v1/responses
-        - auth:
-            header_name: api-key
-            header_value: e2e-fake-azure-key
-          description: gpt-5-4
-          logging:
-            log_payloads: false
-            log_statistics: true
-          model:
-            name: gpt-5-4
-            options:
-              azure_api_version: "2024-10-21"
-              azure_deployment_id: gpt-5-4
-              azure_instance: kong-e2e
-            provider: azure
-          route_type: llm/v1/responses
-        - auth:
-            aws_access_key_id: e2e-fake-access-key-id
-            aws_secret_access_key: e2e-fake-secret-access-key
-          description: openai.gpt-oss-120b
-          logging:
-            log_payloads: false
-            log_statistics: true
-          model:
-            name: openai.gpt-oss-120b
-            options:
-              bedrock:
-                aws_region: us-east-1
-                endpoint_type: mantle
-                mantle_openai_path_prefix: /v1
-            provider: bedrock
-          route_type: llm/v1/responses
-        - description: grok-4
-          logging:
-            log_payloads: false
-            log_statistics: true
-          model:
-            name: grok-4
-            provider: xai
-          route_type: llm/v1/responses
-        - description: v0-1.5-md
-          logging:
-            log_payloads: false
-            log_statistics: true
-          model:
-            name: v0-1.5-md
-            provider: vercel
-          route_type: llm/v1/responses
-    route:
-      id: 740677ad-a667-5a50-a255-e369d244e981
-  - id: 700ea379-9666-54e2-a9ab-a865ab879aa9
+  - id: 5477cac7-3c38-581b-899b-f9d520e9d5e4
     name: ai-model-selector
     config:
       max_request_body_size: 8388608
@@ -991,7 +936,7 @@ plugins:
           source: body
     route:
       id: 718639d6-1ff2-57e3-9528-df761b890443
-  - id: 693f2c49-9a06-59cc-92cf-0747f3214011
+  - id: 628550fd-b362-5247-b3ba-f2f6fa95de13
     name: ai-proxy-advanced
     config:
       balancer:
@@ -1028,7 +973,7 @@ plugins:
       id: 718639d6-1ff2-57e3-9528-df761b890443
     model:
       id: 290b3237-5b60-5df0-bfbe-912660aef648
-  - id: 8be6e29e-0829-5501-80fb-fdfe8b43acca
+  - id: 3912bf60-1edb-5602-89ae-a8a2e41177f4
     name: ai-model-selector
     config:
       max_request_body_size: 8388608
@@ -1037,7 +982,7 @@ plugins:
           source: body
     route:
       id: cc97f945-f7ef-5ccf-aa4c-ed3489745d3a
-  - id: bcefe664-4bf5-5e5a-8fd0-386c330b967f
+  - id: ccc68bd9-2622-5864-b026-137e5c06c755
     name: ai-proxy-advanced
     config:
       balancer:
@@ -1074,7 +1019,7 @@ plugins:
       id: cc97f945-f7ef-5ccf-aa4c-ed3489745d3a
     model:
       id: 290b3237-5b60-5df0-bfbe-912660aef648
-  - id: 51b42192-4429-5743-97f6-7c1bc6da1813
+  - id: cd4aa418-5dc5-57fe-860c-f5ddb6889d88
     name: ai-model-selector
     config:
       max_request_body_size: 8388608
@@ -1083,7 +1028,7 @@ plugins:
           source: body
     route:
       id: 43ea1e35-1444-56c0-8120-135c776376c4
-  - id: d59d0f0a-e311-59af-937d-02dc12719ca2
+  - id: d7038ac4-55db-505a-824e-d2a548ec7424
     name: ai-proxy-advanced
     config:
       balancer:
@@ -1120,7 +1065,7 @@ plugins:
       id: 43ea1e35-1444-56c0-8120-135c776376c4
     model:
       id: 290b3237-5b60-5df0-bfbe-912660aef648
-  - id: 0c628171-03a6-5e5e-a900-b6a5651353b2
+  - id: b5fb23d3-496f-532c-9b75-245ccfee68d3
     name: ai-model-selector
     config:
       max_request_body_size: 8388608
@@ -1129,7 +1074,7 @@ plugins:
           source: body
     route:
       id: 0da1097c-6edc-5c9c-a032-cd042d0db5e4
-  - id: 0041d7bf-ccdd-5413-9839-9e1fa7ecc34e
+  - id: e4b46606-e4f5-57c3-9298-949d4e990f2d
     name: ai-proxy-advanced
     config:
       balancer:
@@ -1273,7 +1218,7 @@ plugins:
       id: 0da1097c-6edc-5c9c-a032-cd042d0db5e4
     model:
       id: 290b3237-5b60-5df0-bfbe-912660aef648
-  - id: 6d3d68a8-0522-573e-8c28-82a375d27f7a
+  - id: 47b56eb4-93bb-5ba2-a7a7-1b24635b434e
     name: ai-model-selector
     config:
       max_request_body_size: 8388608
@@ -1282,7 +1227,7 @@ plugins:
           source: body
     route:
       id: 67276980-b7e0-58ee-8c51-bafe739db8f8
-  - id: 7f38955a-5cc4-5370-b6ad-aae52d1f7c2f
+  - id: 1fc0cc9b-eb94-5eb9-8c69-d8361c990007
     name: ai-proxy-advanced
     config:
       balancer:
@@ -1373,7 +1318,7 @@ plugins:
       id: 67276980-b7e0-58ee-8c51-bafe739db8f8
     model:
       id: 290b3237-5b60-5df0-bfbe-912660aef648
-  - id: 2c5720cd-c721-59b0-b582-74af3b8a50d4
+  - id: b21a1b0e-3d70-5c23-84a5-d25fee046ce9
     name: ai-model-selector
     config:
       max_request_body_size: 8388608
@@ -1382,7 +1327,7 @@ plugins:
           source: body
     route:
       id: 5db3317e-efa0-532d-84a8-e42fdf5a90e9
-  - id: bca10a79-b3a8-5f49-8fdf-1ce807de3324
+  - id: cf7316be-1398-5d7d-bed6-bacd43b095b8
     name: ai-proxy-advanced
     config:
       balancer:
@@ -1455,7 +1400,7 @@ plugins:
       id: 5db3317e-efa0-532d-84a8-e42fdf5a90e9
     model:
       id: 290b3237-5b60-5df0-bfbe-912660aef648
-  - id: 5f4b0e19-29d1-5ce6-b34f-3e1394bf878e
+  - id: bca10a79-b3a8-5f49-8fdf-1ce807de3324
     name: ai-proxy-advanced
     protocols:
       - ws
@@ -1493,7 +1438,7 @@ plugins:
       id: b2ed74bc-70de-5c05-98a5-1ff4f804ad51
     tags:
       - ai-gateway-realtime-model:every-endpoint
-  - id: 4c3c42b4-138d-5f50-b141-efb32541e17c
+  - id: a247694c-c5a9-5b80-a65b-4598c2e2dffd
     name: ai-model-selector
     config:
       max_request_body_size: 8388608
@@ -1502,7 +1447,7 @@ plugins:
           source: body
     route:
       id: f6304e3f-b5ab-5f47-9007-cbc2a95b6701
-  - id: 0f8844dd-7362-5ea0-8eeb-35ee0580b632
+  - id: e5d9f5b0-2145-5715-8c71-796608710480
     name: ai-proxy-advanced
     config:
       balancer:
@@ -1575,7 +1520,7 @@ plugins:
       id: f6304e3f-b5ab-5f47-9007-cbc2a95b6701
     model:
       id: 290b3237-5b60-5df0-bfbe-912660aef648
-  - id: 5a7abd23-205f-5c84-b7f1-035c47aaeaf5
+  - id: c059681f-5745-5af7-9bfa-b22fa2f982d1
     name: ai-model-selector
     config:
       max_request_body_size: 8388608
@@ -1584,7 +1529,7 @@ plugins:
           source: body
     route:
       id: bb559a54-dc17-5c0f-b946-b0d9c5cebd7a
-  - id: 74150451-efc7-5a74-9754-5c27da9e52ac
+  - id: cccc78d9-7846-57bc-af68-12f85e625fcd
     name: ai-proxy-advanced
     config:
       balancer:
@@ -1839,7 +1784,7 @@ plugins:
       id: bb559a54-dc17-5c0f-b946-b0d9c5cebd7a
     model:
       id: 290b3237-5b60-5df0-bfbe-912660aef648
-  - id: 4ea90c46-4e21-5a47-b656-f67c908b7483
+  - id: 17eaf231-63cd-5a56-a5e2-23ac294f4c9b
     name: ai-model-selector
     config:
       max_request_body_size: 8388608
@@ -1848,7 +1793,7 @@ plugins:
           source: body
     route:
       id: fd509521-bbbc-518e-bc93-2088432bf86d
-  - id: 732a022e-4d91-596a-9c3c-60772ba24ae0
+  - id: dd276604-c64f-5c9f-85c3-f358cc3115c0
     name: ai-proxy-advanced
     config:
       balancer:
@@ -1869,7 +1814,7 @@ plugins:
       id: fd509521-bbbc-518e-bc93-2088432bf86d
     model:
       id: 290b3237-5b60-5df0-bfbe-912660aef648
-  - id: 57aa58f8-ab0c-5912-87d0-4c630e5c6b8c
+  - id: ad35bedc-5ff8-5182-8be6-fa58212663b8
     name: ai-model-selector
     config:
       max_request_body_size: 8388608
@@ -1878,7 +1823,7 @@ plugins:
           source: path
     route:
       id: b4a57e40-147c-502b-a080-e3102a5c3273
-  - id: f767a5a0-2605-5ec7-a54b-54b5ba91d32e
+  - id: fc67fd65-983a-5b80-9bda-de44a1de9b6a
     name: ai-proxy-advanced
     config:
       balancer:
@@ -1902,7 +1847,7 @@ plugins:
       id: b4a57e40-147c-502b-a080-e3102a5c3273
     model:
       id: 290b3237-5b60-5df0-bfbe-912660aef648
-  - id: 7464aef6-9dba-5909-8dc8-d4000be2fc9e
+  - id: 7d1a0f05-fed7-51f6-83f9-f8830f85d070
     name: ai-model-selector
     config:
       max_request_body_size: 8388608
@@ -1911,7 +1856,7 @@ plugins:
           source: path
     route:
       id: 090ce054-21c9-5fd3-a8f0-e0733e5dcc43
-  - id: 32c66b25-eee1-5606-ae08-3fbd6e58cfba
+  - id: 0f933206-16d8-5873-a1fa-6ca08ff363c2
     name: ai-proxy-advanced
     config:
       balancer:
@@ -1935,7 +1880,7 @@ plugins:
       id: 090ce054-21c9-5fd3-a8f0-e0733e5dcc43
     model:
       id: 290b3237-5b60-5df0-bfbe-912660aef648
-  - id: 9f441429-2107-5112-a203-1310c082846a
+  - id: fa610156-f802-55ef-83c8-ae3eaf3f2108
     name: ai-model-selector
     config:
       max_request_body_size: 8388608
@@ -1944,7 +1889,7 @@ plugins:
           source: body
     route:
       id: d13c1734-7773-5150-a0c3-4e7816185423
-  - id: d70f9948-2d3c-5912-bf94-c6895cbb0563
+  - id: df451b5d-1af4-57b8-8ced-85dc15c61fe8
     name: ai-proxy-advanced
     config:
       balancer:
@@ -1969,7 +1914,7 @@ plugins:
       id: d13c1734-7773-5150-a0c3-4e7816185423
     model:
       id: 290b3237-5b60-5df0-bfbe-912660aef648
-  - id: f3515fbe-04f7-51bb-99c3-f704adf55463
+  - id: e41c8d88-a48b-5844-8a57-a33fffd02a7e
     name: ai-model-selector
     config:
       max_request_body_size: 8388608
@@ -1978,7 +1923,7 @@ plugins:
           source: body
     route:
       id: c1264434-e7f1-576d-ba87-6d40613b3401
-  - id: 21ffbeb8-dfe5-5e97-b16d-19a479b6367c
+  - id: f792d94c-ef6e-508b-8827-fb8893e1fe80
     name: ai-proxy-advanced
     config:
       balancer:
@@ -2003,7 +1948,7 @@ plugins:
       id: c1264434-e7f1-576d-ba87-6d40613b3401
     model:
       id: 290b3237-5b60-5df0-bfbe-912660aef648
-  - id: 87b6a1d3-f81e-5d03-a5c1-4516a12e4cb5
+  - id: 31b3c4cf-162c-5171-9585-c6c3ca276a73
     name: ai-model-selector
     config:
       max_request_body_size: 8388608
@@ -2012,7 +1957,7 @@ plugins:
           source: path
     route:
       id: a52aa612-4383-505f-8126-223ecf6adf57
-  - id: 0e90067c-b01d-519b-8c7a-d2571143396f
+  - id: bb2d381a-8b20-5590-ab40-4c32b2d19ab3
     name: ai-proxy-advanced
     config:
       balancer:
@@ -2036,7 +1981,7 @@ plugins:
       id: a52aa612-4383-505f-8126-223ecf6adf57
     model:
       id: 290b3237-5b60-5df0-bfbe-912660aef648
-  - id: 575b95e1-98d6-531d-8a29-202747a5786f
+  - id: 7ab45c62-37ab-59ea-adea-071f45d6392a
     name: ai-model-selector
     config:
       max_request_body_size: 8388608
@@ -2045,7 +1990,7 @@ plugins:
           source: path
     route:
       id: 05b6b580-1be6-57bc-a0ac-403501e7e580
-  - id: 872f937c-ac5f-5057-8276-82da6badc516
+  - id: fc66f557-89a5-5aae-9e65-b2e29552ce83
     name: ai-proxy-advanced
     config:
       balancer:
@@ -2069,7 +2014,7 @@ plugins:
       id: 05b6b580-1be6-57bc-a0ac-403501e7e580
     model:
       id: 290b3237-5b60-5df0-bfbe-912660aef648
-  - id: f3ce365f-a20a-5cd2-926e-c61d53292a28
+  - id: 3d62014b-faae-58da-b0a3-8f5289a6c77e
     name: ai-model-selector
     config:
       max_request_body_size: 8388608
@@ -2078,7 +2023,7 @@ plugins:
           source: path
     route:
       id: f6269af6-c4d1-5182-bd8b-0277dc6dacec
-  - id: 2af31037-68b1-5181-9fb3-abfe385a2c2c
+  - id: 0bf3e851-2bd5-55a9-a251-5b67f915f8e1
     name: ai-proxy-advanced
     config:
       balancer:
@@ -2102,7 +2047,7 @@ plugins:
       id: f6269af6-c4d1-5182-bd8b-0277dc6dacec
     model:
       id: 290b3237-5b60-5df0-bfbe-912660aef648
-  - id: cdfbbbf9-c767-57d5-873c-daa4f220d92b
+  - id: 2af31037-68b1-5181-9fb3-abfe385a2c2c
     name: ai-proxy-advanced
     config:
       balancer:
@@ -2126,7 +2071,7 @@ plugins:
       id: d737a125-0d34-5ee4-b5ff-4900a3ac7761
     model:
       id: 290b3237-5b60-5df0-bfbe-912660aef648
-  - id: bf5eac04-ee61-5717-a1ee-225c25c404ec
+  - id: de01be3e-30b7-5045-8647-93e4ab483162
     name: ai-model-selector
     config:
       max_request_body_size: 8388608
@@ -2135,7 +2080,7 @@ plugins:
           source: path
     route:
       id: ec635808-315e-5e7d-9d25-1008e4e52862
-  - id: 2c985393-f9f7-58d4-820a-72af137d4bf5
+  - id: 1bf01e70-ed4a-55c1-aae7-884a66f75c66
     name: ai-proxy-advanced
     config:
       balancer:
@@ -2159,7 +2104,7 @@ plugins:
       id: ec635808-315e-5e7d-9d25-1008e4e52862
     model:
       id: 290b3237-5b60-5df0-bfbe-912660aef648
-  - id: 5b0886e0-df81-56c7-9068-d07eb63fe9f9
+  - id: ec0677d5-cb50-5a1b-b314-4e515cee4716
     name: ai-model-selector
     config:
       max_request_body_size: 8388608
@@ -2168,7 +2113,7 @@ plugins:
           source: path
     route:
       id: 934cbaf7-d722-5a54-ae50-48c0b63343dd
-  - id: 399a4aca-ed9a-564a-a9bd-930da3765c7a
+  - id: 8adcf34b-3911-5718-bedc-73cec692380f
     name: ai-proxy-advanced
     config:
       balancer:
@@ -2195,7 +2140,7 @@ plugins:
       id: 934cbaf7-d722-5a54-ae50-48c0b63343dd
     model:
       id: 290b3237-5b60-5df0-bfbe-912660aef648
-  - id: db4a72db-95f8-56c8-88d9-a7f402e61ff6
+  - id: f380237c-03d1-52e4-b0ba-d2ec2da8a2fd
     name: ai-model-selector
     config:
       max_request_body_size: 8388608
@@ -2204,7 +2149,7 @@ plugins:
           source: path
     route:
       id: df12ed34-44b5-5c3d-9c3d-908ece02fb32
-  - id: 2c7de7cf-712c-5e56-99ef-75711209024a
+  - id: 9e62a138-4573-5ce3-a85d-722f1af742bf
     name: ai-proxy-advanced
     config:
       balancer:
@@ -2231,7 +2176,7 @@ plugins:
       id: df12ed34-44b5-5c3d-9c3d-908ece02fb32
     model:
       id: 290b3237-5b60-5df0-bfbe-912660aef648
-  - id: 8bd31c5c-e416-5623-b681-0f886d7594f1
+  - id: c84a6794-8508-5179-8870-ed4381d00ecb
     name: ai-model-selector
     config:
       max_request_body_size: 8388608
@@ -2240,7 +2185,7 @@ plugins:
           source: body
     route:
       id: 3e5bbe5f-d382-52f7-837e-2701814528e5
-  - id: 6df7a848-5e92-5f9a-9bc6-0fafc8171afa
+  - id: 664c4a9c-c501-52b1-a838-a340bec883a1
     name: ai-proxy-advanced
     config:
       balancer:
@@ -2267,7 +2212,7 @@ plugins:
       id: 3e5bbe5f-d382-52f7-837e-2701814528e5
     model:
       id: 290b3237-5b60-5df0-bfbe-912660aef648
-  - id: 80fddec6-ba35-54c0-986c-20590f9eded5
+  - id: 4192a4c9-dcab-59b8-ab5f-9b0bd4776046
     name: ai-model-selector
     config:
       max_request_body_size: 8388608
@@ -2276,7 +2221,7 @@ plugins:
           source: body
     route:
       id: f389aa8d-e597-5c0f-8678-04572278e83e
-  - id: 06ba03c2-e867-50b5-84f8-b30c6f42d004
+  - id: 56d505a4-7a71-5cf4-9892-ab452e36d4a9
     name: ai-proxy-advanced
     config:
       balancer:
@@ -2303,7 +2248,7 @@ plugins:
       id: f389aa8d-e597-5c0f-8678-04572278e83e
     model:
       id: 290b3237-5b60-5df0-bfbe-912660aef648
-  - id: 5af4b4d6-4e86-5252-84c0-0d3ac225b81b
+  - id: 44677999-0c96-51de-add5-7cab886fe786
     name: ai-model-selector
     config:
       max_request_body_size: 8388608
@@ -2312,7 +2257,7 @@ plugins:
           source: path
     route:
       id: 78397398-a48f-503c-ba71-7ac2ea7b5883
-  - id: 1e61edd5-e904-594c-b1e3-c71b9cb9c31c
+  - id: b78cbd07-f10d-507c-8848-630475638d8d
     name: ai-proxy-advanced
     config:
       balancer:
@@ -2339,7 +2284,7 @@ plugins:
       id: 78397398-a48f-503c-ba71-7ac2ea7b5883
     model:
       id: 290b3237-5b60-5df0-bfbe-912660aef648
-  - id: 890bc4e3-1066-5bbc-a4af-181adf8c9e8e
+  - id: 4d155f27-15ce-5d8f-8d1f-e0b79bef515a
     name: ai-model-selector
     config:
       max_request_body_size: 8388608
@@ -2348,7 +2293,7 @@ plugins:
           source: body
     route:
       id: 41282f10-4533-5f5a-bac3-cf0991d72913
-  - id: c89225ed-b7c6-5646-b288-3d675edef7f0
+  - id: 50fc8a43-6f4b-5098-ad3d-f74ab970b2b3
     name: ai-proxy-advanced
     config:
       balancer:
@@ -2375,7 +2320,7 @@ plugins:
       id: 41282f10-4533-5f5a-bac3-cf0991d72913
     model:
       id: 290b3237-5b60-5df0-bfbe-912660aef648
-  - id: 023fd608-9e24-577d-8bf2-50013bd3618b
+  - id: bfe76476-3a6b-588e-b13b-7c9c5989d18c
     name: ai-model-selector
     config:
       max_request_body_size: 8388608
@@ -2384,7 +2329,7 @@ plugins:
           source: path
     route:
       id: 57dbc083-73ad-583e-b144-a4006f6e1721
-  - id: 027cbe8c-1e9e-54e4-8f19-99f89b8ab282
+  - id: 7073101d-5250-5977-aad1-d75fd14e094f
     name: ai-proxy-advanced
     config:
       balancer:
@@ -2411,7 +2356,43 @@ plugins:
       id: 57dbc083-73ad-583e-b144-a4006f6e1721
     model:
       id: 290b3237-5b60-5df0-bfbe-912660aef648
-  - id: f891f456-7c56-51d5-ace6-fbfec51f3a5f
+  - id: 3d4fc098-afc1-5067-9f42-43a96ab01234
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: modelId
+          source: body
+    route:
+      id: 751f3bc6-2b23-58c0-897a-ca3b20491b67
+  - id: 965942ab-85d1-599d-85fc-6954d4a6342a
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: video/generation
+      llm_format: bedrock
+      targets:
+        - auth:
+            aws_access_key_id: e2e-fake-access-key-id
+            aws_secret_access_key: e2e-fake-secret-access-key
+          description: amazon.nova-pro-v1:0
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: amazon.nova-pro-v1:0
+            options:
+              bedrock:
+                aws_region: us-east-1
+            provider: bedrock
+          route_type: video/v1/videos/generations
+    route:
+      id: 751f3bc6-2b23-58c0-897a-ca3b20491b67
+    model:
+      id: 290b3237-5b60-5df0-bfbe-912660aef648
+  - id: efa430a3-22be-5417-acec-467f7f38b3ec
     name: ai-model-selector
     config:
       max_request_body_size: 8388608
@@ -2420,7 +2401,7 @@ plugins:
           source: body
     route:
       id: 2384fe9d-eacc-5ac2-ae4c-4752cc597f81
-  - id: d5f89a84-f2f8-5804-bac5-ff97745f5927
+  - id: 8e474d28-ca33-5b25-a416-310d74344864
     name: ai-proxy-advanced
     config:
       balancer:
@@ -2449,7 +2430,7 @@ plugins:
       id: 2384fe9d-eacc-5ac2-ae4c-4752cc597f81
     model:
       id: 290b3237-5b60-5df0-bfbe-912660aef648
-  - id: 38cd379f-d7e2-5e7b-9aa2-79bfabb6e378
+  - id: 88738618-3195-58b3-a9ac-49c2d6fdcdb1
     name: ai-model-selector
     config:
       max_request_body_size: 8388608
@@ -2458,7 +2439,7 @@ plugins:
           source: body
     route:
       id: d42385f3-0b4d-574b-8090-3625031103eb
-  - id: d789edc0-987b-548b-b941-d929c461cf69
+  - id: 580986cd-e17d-5d2e-8aaf-266efedf2791
     name: ai-proxy-advanced
     config:
       balancer:
@@ -2487,7 +2468,7 @@ plugins:
       id: d42385f3-0b4d-574b-8090-3625031103eb
     model:
       id: 290b3237-5b60-5df0-bfbe-912660aef648
-  - id: 31c0e500-b6ec-5a3f-b8bc-5499c9c1b3b9
+  - id: adc77ab2-c74f-5f55-8df9-612e4700a018
     name: ai-model-selector
     config:
       max_request_body_size: 8388608
@@ -2496,7 +2477,7 @@ plugins:
           source: body
     route:
       id: a5fe20b2-fe87-59f3-a7bf-b47efa1d5e4e
-  - id: da1139e5-35db-5ca6-a75e-8851baa45a1f
+  - id: 96a19cab-084f-51da-b067-814d72560eda
     name: ai-proxy-advanced
     config:
       balancer:
@@ -2517,7 +2498,7 @@ plugins:
       id: a5fe20b2-fe87-59f3-a7bf-b47efa1d5e4e
     model:
       id: 290b3237-5b60-5df0-bfbe-912660aef648
-  - id: 76634acf-dc27-50b3-befe-6420ca38f505
+  - id: 649838de-3799-5437-ac1f-91863b4a087d
     name: ai-model-selector
     config:
       max_request_body_size: 8388608
@@ -2526,7 +2507,7 @@ plugins:
           source: body
     route:
       id: 96cb42a8-d9be-53d5-afe8-bad2af2d17f0
-  - id: 098e7779-9500-5d64-a5b0-910b43964321
+  - id: 4690ef5a-a3fa-5f28-99e0-cc8cf9e1c439
     name: ai-proxy-advanced
     config:
       balancer:
@@ -2547,7 +2528,7 @@ plugins:
       id: 96cb42a8-d9be-53d5-afe8-bad2af2d17f0
     model:
       id: 290b3237-5b60-5df0-bfbe-912660aef648
-  - id: 4690ef5a-a3fa-5f28-99e0-cc8cf9e1c439
+  - id: eba6af44-82a5-5c6f-a764-90fb3ee050b0
     name: ai-proxy-advanced
     config:
       balancer:
@@ -2628,7 +2609,7 @@ plugins:
           route_type: llm/v1/batches
     route:
       id: cbac5221-6bcd-5bfa-9575-4519bea13df0
-  - id: eba6af44-82a5-5c6f-a764-90fb3ee050b0
+  - id: 4c3f0a74-5f78-552b-8b01-4094cb876734
     name: ai-proxy-advanced
     config:
       balancer:
@@ -2670,7 +2651,7 @@ plugins:
           route_type: llm/v1/files
     route:
       id: b433d478-0f40-5518-b6bb-815583936241
-  - id: 4c3f0a74-5f78-552b-8b01-4094cb876734
+  - id: 2c7c958f-aa48-580a-9610-de404a7e7892
     name: ai-proxy-advanced
     config:
       balancer:
@@ -2689,7 +2670,7 @@ plugins:
           route_type: llm/v1/skills
     route:
       id: 0aaa3657-2434-58f7-90bf-7e2930afabdb
-  - id: 2c7c958f-aa48-580a-9610-de404a7e7892
+  - id: bacca35c-e603-5a2c-95e9-986629589785
     name: ai-proxy-advanced
     config:
       balancer:
@@ -2713,7 +2694,7 @@ plugins:
           route_type: llm/v1/batches
     route:
       id: da59badf-6dcb-5328-8c6c-3784d8e14dd3
-  - id: bacca35c-e603-5a2c-95e9-986629589785
+  - id: eec1f4f2-3948-5679-9551-ad26b81cc998
     name: ai-proxy-advanced
     config:
       balancer:
@@ -2737,28 +2718,6 @@ plugins:
           route_type: llm/v1/skills
     route:
       id: a9529cc3-1568-5a89-9867-71939c502cbc
-  - id: eec1f4f2-3948-5679-9551-ad26b81cc998
-    name: ai-proxy-advanced
-    config:
-      balancer:
-        algorithm: round-robin
-      genai_category: text/generation
-      llm_format: gemini
-      model_name_header: false
-      targets:
-        - auth:
-            header_name: x-goog-api-key
-            header_value: e2e-fake-gemini-key
-          description: gemini-2.5-pro
-          logging:
-            log_payloads: false
-            log_statistics: true
-          model:
-            name: gemini-2.5-pro
-            provider: gemini
-          route_type: llm/v1/batches
-    route:
-      id: 0b3d41ee-cd0b-51a2-ba17-192fbf50cad8
   - id: c63d72b8-576d-5b03-a6b8-59f36efebca5
     name: ai-proxy-advanced
     config:
@@ -2780,8 +2739,30 @@ plugins:
             provider: gemini
           route_type: llm/v1/batches
     route:
-      id: a77dd8e9-17ff-5236-b291-761e4874b365
+      id: 0b3d41ee-cd0b-51a2-ba17-192fbf50cad8
   - id: 5935d3b2-0b7d-5266-b7ec-2fbf1438df04
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: gemini
+      model_name_header: false
+      targets:
+        - auth:
+            header_name: x-goog-api-key
+            header_value: e2e-fake-gemini-key
+          description: gemini-2.5-pro
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: gemini-2.5-pro
+            provider: gemini
+          route_type: llm/v1/batches
+    route:
+      id: a77dd8e9-17ff-5236-b291-761e4874b365
+  - id: 09004fd8-8c65-578c-9d79-fb96ba0c5e46
     name: ai-proxy-advanced
     config:
       balancer:
@@ -2802,7 +2783,7 @@ plugins:
           route_type: llm/v1/chat
     route:
       id: cf8371c0-4886-5860-aba0-ddbf24d941a6
-  - id: 09004fd8-8c65-578c-9d79-fb96ba0c5e46
+  - id: fac7b9c2-1250-500e-9fc0-660a8dee0d39
     name: ai-proxy-advanced
     config:
       balancer:
@@ -2828,7 +2809,7 @@ plugins:
           route_type: llm/v1/batches
     route:
       id: a65a9e4b-10b4-5de0-93ae-0173e5ae0346
-  - id: fac7b9c2-1250-500e-9fc0-660a8dee0d39
+  - id: 6e554090-7dc0-55d3-8a9e-2a839a522e13
     name: ai-proxy-advanced
     config:
       balancer:
@@ -2895,6 +2876,31 @@ plugins:
           route_type: video/v1/videos/generations
     route:
       id: 9336ce94-9290-5d11-944d-2b3a489731e3
+  - id: 352b73b6-9e38-59eb-8415-c3dc746d19c2
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: video/generation
+      llm_format: bedrock
+      model_name_header: false
+      targets:
+        - auth:
+            aws_access_key_id: e2e-fake-access-key-id
+            aws_secret_access_key: e2e-fake-secret-access-key
+          description: amazon.nova-pro-v1:0
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: amazon.nova-pro-v1:0
+            options:
+              bedrock:
+                aws_region: us-east-1
+            provider: bedrock
+          route_type: video/v1/videos/generations
+    route:
+      id: bd17fb45-7638-554f-b4ef-dd1aa6d158fa
 ai_models:
   - id: 290b3237-5b60-5df0-bfbe-912660aef648
     name: every-endpoint

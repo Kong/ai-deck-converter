@@ -62,6 +62,11 @@ func TestResolveEndpointDisambiguation(t *testing.T) {
 		"bedrock-converse", "~/ai/model/(?<model_name>[^/]+)/converse(?:-stream)?")
 	require.True(t, ok, "bedrock converse generate ok")
 	require.Equal(t, "generate", m.capability, "bedrock converse generate capability")
+	// Video resolves from its route type, on the async-invoke route.
+	m, ok = resolveEndpoint("bedrock", "video/v1/videos/generations", "video/generation",
+		"bedrock-async-invoke", "/ai/async-invoke")
+	require.True(t, ok, "bedrock async-invoke video ok")
+	require.Equal(t, "video", m.capability, "bedrock async-invoke video capability")
 	// A route_type the section's table doesn't use still resolves via the
 	// route name / path shape.
 	m, ok = resolveEndpoint("anthropic", "llm/v1/completions", "", "anthropic-messages", "/ai/v1/messages")

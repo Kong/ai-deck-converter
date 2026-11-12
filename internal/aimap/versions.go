@@ -91,6 +91,11 @@ const (
 	// FeatureOIDCProtectedResourceMetadata is the openid-connect plugin field
 	// protected_resource_metadata. It is a plugin schema gate, not an API field.
 	FeatureOIDCProtectedResourceMetadata Feature = "oidc-protected-resource-metadata"
+	// FeatureSanitizerAllWithCredentials is an ai-sanitizer anonymize list
+	// that holds "all" and "credentials". Older data planes drop
+	// "credentials" from it. See CollapseSanitizerAnonymize.
+	//nolint:gosec // a feature name, not a credential
+	FeatureSanitizerAllWithCredentials Feature = "sanitizer-all-with-credentials"
 )
 
 // featureSince maps each feature to its first AI Gateway release. The source
@@ -118,6 +123,7 @@ var featureSince = map[Feature]Version{
 	FeatureSagemaker:                     mustVersion("2.1"),
 	FeatureAuthStrategyTokenVault:        mustVersion("2.3"),
 	FeatureOIDCProtectedResourceMetadata: mustVersion("2.3"),
+	FeatureSanitizerAllWithCredentials:   mustVersion("2.3"),
 }
 
 // Since returns the first AI Gateway release that has f. It panics for an

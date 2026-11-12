@@ -1,5 +1,5 @@
 # Every bedrock endpoint and every bedrock mantle endpoint.
-# Each invoke capability has a different genai category. Each therefore has its own model.
+# Each capability has a different genai category. Each therefore has its own model.
 model_providers:
   - name: bedrock-prod
     type: bedrock
