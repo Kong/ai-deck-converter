@@ -869,3 +869,93 @@ policies:
 	requireIssue(t, result.Issues, Warning, BehaviorMayDiffer, kindModel, "mixed", "policies[0]")
 	require.Len(t, result.Output.ClonedPlugins, 1)
 }
+
+// A document whose only model routes are type "api" keeps the response body, so
+// a global or consumer-scoped transformer loses nothing and needs no warning.
+func TestConvertDoesNotWarnScopedTransformerWithoutBodyModelRoute(t *testing.T) {
+	for name, extra := range map[string]string{
+		"global":   "",
+		"consumer": "consumers:\n  - name: c1\n    type: api-key\n    policies: [adv]\n",
+		"group":    "consumer_groups:\n  - name: g1\n    policies: [adv]\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			policy := `
+  - type: response-transformer-advanced
+    name: adv
+    config:
+      add:
+        json: ["added:yes"]
+`
+			if name == "global" {
+				policy = `
+  - type: response-transformer-advanced
+    name: adv
+    global: true
+    config:
+      add:
+        json: ["added:yes"]
+`
+			}
+			src := []byte(`
+models:
+  - type: api
+    name: files-api
+    capabilities: [files]
+    formats: [{type: openai}]
+    targets:
+      - name: gpt-4o
+        provider: p1
+        config: {type: openai}
+    config:
+      route: {paths: [/files-api]}
+model_providers:
+  - name: p1
+    type: openai
+    config:
+      auth:
+        type: basic
+        headers: [{name: Authorization, value: "Bearer token"}]
+policies:
+` + policy + extra)
+
+			result, err := Convert(src, testOptions)
+			require.NoError(t, err)
+			require.Empty(t, result.Issues,
+				"a type api route keeps the body, so the transformer loses nothing")
+		})
+	}
+}
+
+// A passthrough model forwards the body unchanged, so the same applies.
+func TestConvertDoesNotWarnScopedTransformerForPassthroughOnly(t *testing.T) {
+	src := []byte(`
+models:
+  - type: model
+    name: raw
+    formats: [{type: passthrough}]
+    targets:
+      - name: gpt-4o
+        provider: p1
+        config: {type: openai}
+    config:
+      route: {paths: [/raw]}
+model_providers:
+  - name: p1
+    type: openai
+    config:
+      auth:
+        type: basic
+        headers: [{name: Authorization, value: "Bearer token"}]
+policies:
+  - type: response-transformer-advanced
+    name: adv
+    global: true
+    config:
+      add:
+        json: ["added:yes"]
+`)
+
+	result, err := Convert(src, Options{MinRuntimeVersion: "2.3"})
+	require.NoError(t, err)
+	require.Empty(t, result.Issues)
+}

@@ -887,7 +887,7 @@ func (r *Reverter) finalizeModels(acc *modelAcc) error {
 		}
 		for _, fk := range append([]string{g.model.Name}, g.mergedFKs...) {
 			for _, p := range r.idx.model[fk] {
-				if r.pluginType(p) == "acl" {
+				if p.Name == "acl" {
 					// Multiple model-scoped acl plugins (one per merged alias)
 					// union their allow/deny lists; the last must not win.
 					mergeACLs(&g.model.Access.ACLs, aclsFromBlock(p.Config))

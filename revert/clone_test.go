@@ -245,3 +245,32 @@ func TestRevertClonedAuthPluginUsesBaseType(t *testing.T) {
 		})
 	}
 }
+
+// A clone of an AI plugin must resolve before the route, MCP and agent
+// dispatch, or the entity is misclassified and its config is lost.
+func TestRevertClonedAIProxyKeepsItsEntity(t *testing.T) {
+	doc := &kong.Document{
+		ClonedPlugins: []kong.ClonedPlugin{{Name: "my-mcp", Ref: "ai-mcp-proxy"}},
+		Services: []kong.Service{{
+			Name: "svc",
+			URL:  "http://upstream.example.com",
+			Routes: []kong.Route{{
+				Name:  "r1",
+				Paths: []string{"/mcp"},
+				Plugins: []kong.Plugin{{
+					Name:   "my-mcp",
+					Config: map[string]any{"mode": "conversion-listener"},
+				}},
+			}},
+		}},
+	}
+
+	out, warnings, err := RevertDocument(doc, Options{})
+	require.NoError(t, err)
+	require.Len(t, warnings, 1)
+	require.Contains(t, warnings[0], `revert as "ai-mcp-proxy"`)
+
+	require.Len(t, out.MCPServers, 1, "the clone must still resolve to the AI plugin")
+	require.Equal(t, "conversion-listener", out.MCPServers[0].Type)
+	require.Empty(t, out.Agents, "the route must not fall back to a plain agent")
+}

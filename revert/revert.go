@@ -158,6 +158,7 @@ func (r *Reverter) warn(format string, args ...any) error {
 }
 
 func (r *Reverter) run() error {
+	r.resolveCloneNames()
 	r.buildIndexes()
 	r.indexMCPListenerSources()
 	if err := r.revertCustomPolicies(); err != nil {

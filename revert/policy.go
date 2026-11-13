@@ -6,7 +6,6 @@ import (
 	"slices"
 
 	"github.com/Kong/ai-deck-converter/internal/aigw"
-	"github.com/Kong/ai-deck-converter/internal/aimap"
 	"github.com/Kong/ai-deck-converter/internal/kong"
 )
 
@@ -36,20 +35,6 @@ var authPluginNames = map[string]bool{
 	"openid-connect": true,
 }
 
-// pluginType returns the bundled plugin a clone copies, so every dispatch on a
-// plugin name sees the plugin the user configured. A name that neither the
-// document's cloned_plugins nor the converter's clone names resolve keeps its
-// own name.
-func (r *Reverter) pluginType(p kong.Plugin) string {
-	if ref, ok := r.idx.cloneRefs[p.Name]; ok {
-		return ref
-	}
-	if ref, ok := aimap.CloneRef(p.Name); ok {
-		return ref
-	}
-	return p.Name
-}
-
 // policyRefs converts an entity's plugins into policy name references,
 // special-casing acl plugins into ACLs and skipping the AI plugins (which are
 // reconstructed into first-class entities by the service reversal steps).
@@ -57,7 +42,7 @@ func (r *Reverter) policyRefs(plugins []kong.Plugin) ([]string, aigw.ACLs) {
 	var refs []string
 	var acls aigw.ACLs
 	for _, p := range plugins {
-		switch pluginType := r.pluginType(p); {
+		switch pluginType := p.Name; {
 		case aiPluginNames[pluginType]:
 			continue
 		case pluginType == "acl":
@@ -76,7 +61,7 @@ func (r *Reverter) policyRefs(plugins []kong.Plugin) ([]string, aigw.ACLs) {
 func (r *Reverter) authStrategyPolicyRefs(plugins []kong.Plugin) ([]string, aigw.ACLs, []string) {
 	plugins = slices.Clone(plugins)
 	for i := range plugins {
-		if r.pluginType(plugins[i]) == "openid-connect" {
+		if plugins[i].Name == "openid-connect" {
 			plugins[i].Config = withoutHiddenAccessTokenHeader(plugins[i].Config)
 		}
 	}
@@ -98,7 +83,7 @@ func (r *Reverter) splitAuthStrategies(
 	var rest []kong.Plugin
 	var idpRefs []string
 	for _, p := range plugins {
-		if idpType := r.pluginType(p); authPluginNames[idpType] && isStrategy(p) {
+		if idpType := p.Name; authPluginNames[idpType] && isStrategy(p) {
 			idpRefs = append(idpRefs, r.registerAuthStrategy(p, idpType).Name)
 			continue
 		}
@@ -131,12 +116,10 @@ func (r *Reverter) modelPolicyRefs(plugins []kong.Plugin) ([]string, aigw.ACLs, 
 // enabled state, condition, expressions, and config. Otherwise it registers a
 // new policy with a unique name.
 //
-// A cloned plugin reverts as the policy type of the plugin it copies: the clone
-// exists only to give one instance another priority, and the AI Gateway model
-// has no clone. The document's cloned_plugins names the base plugin, so a
-// user-authored clone resolves too, not only the converter's fixed names.
+// A cloned plugin already carries the name of the plugin it copies, since
+// resolveCloneNames rewrote it: the AI Gateway model has no clone.
 func (r *Reverter) registerPolicy(p kong.Plugin, global bool) *aigw.Policy {
-	policyType := r.pluginType(p)
+	policyType := p.Name
 	for i := range r.policies {
 		existing := &r.policies[i]
 		if existing.Type != policyType {

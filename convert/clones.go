@@ -84,10 +84,12 @@ func applyPostAIClone(p kong.Plugin, clone postAIClone, websocket bool) (kong.Pl
 // converter cannot move below ai-proxy-advanced. A global, consumer- or
 // consumer-group-scoped plugin is one instance for all of its routes, so moving
 // it would also reorder routes that run no ai-proxy-advanced.
+//
+// Only a type "model" body route loses a body change, so a document that
+// converts none gets no warning: a type "api" or passthrough route keeps the
+// body ai-proxy-advanced passes through.
 func (c *Converter) warnUnreorderedResponseTransformers() {
-	if !slices.ContainsFunc(c.out.Plugins, func(p kong.Plugin) bool {
-		return p.Name == "ai-proxy-advanced"
-	}) {
+	if !c.hasBodyModelRoute() {
 		return
 	}
 	for i := range c.src.Policies {
@@ -105,6 +107,15 @@ func (c *Converter) warnUnreorderedResponseTransformers() {
 		}
 		c.warnScopedResponseTransformer(p)
 	}
+}
+
+// hasBodyModelRoute reports whether the output carries an ai-proxy-advanced of a
+// type "model" body model. Only those plugins carry a model FK and rewrite the
+// response body.
+func (c *Converter) hasBodyModelRoute() bool {
+	return slices.ContainsFunc(c.out.Plugins, func(p kong.Plugin) bool {
+		return p.Name == "ai-proxy-advanced" && p.Model != nil
+	})
 }
 
 // warnScopedResponseTransformer reports policy p when a consumer or consumer

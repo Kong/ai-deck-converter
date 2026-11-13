@@ -7,26 +7,22 @@ import "github.com/Kong/ai-deck-converter/internal/kong"
 // groups top-level plugins by their scope so each reversal step sees a uniform
 // view (nested plugins are read in place by the step that owns the parent).
 type pluginIndex struct {
-	// cloneRefs maps a clone plugin name to the bundled plugin it copies,
-	// built from the document's cloned_plugins.
-	cloneRefs map[string]string
-	global    []kong.Plugin            // no foreign key: global plugins
-	service   map[string][]kong.Plugin // service name -> plugins
-	route     map[string][]kong.Plugin // route name -> plugins
-	consumer  map[string][]kong.Plugin // consumer username -> plugins
-	group     map[string][]kong.Plugin // consumer group name -> plugins
-	model     map[string][]kong.Plugin // ai-models name -> plugins
+	global   []kong.Plugin            // no foreign key: global plugins
+	service  map[string][]kong.Plugin // service name -> plugins
+	route    map[string][]kong.Plugin // route name -> plugins
+	consumer map[string][]kong.Plugin // consumer username -> plugins
+	group    map[string][]kong.Plugin // consumer group name -> plugins
+	model    map[string][]kong.Plugin // ai-models name -> plugins
 }
 
 // buildIndexes populates the plugin index and the ai-models alias index.
 func (r *Reverter) buildIndexes() {
 	r.idx = pluginIndex{
-		cloneRefs: map[string]string{},
-		service:   map[string][]kong.Plugin{},
-		route:     map[string][]kong.Plugin{},
-		consumer:  map[string][]kong.Plugin{},
-		group:     map[string][]kong.Plugin{},
-		model:     map[string][]kong.Plugin{},
+		service:  map[string][]kong.Plugin{},
+		route:    map[string][]kong.Plugin{},
+		consumer: map[string][]kong.Plugin{},
+		group:    map[string][]kong.Plugin{},
+		model:    map[string][]kong.Plugin{},
 	}
 	for _, p := range r.src.Plugins {
 		switch {
@@ -45,11 +41,6 @@ func (r *Reverter) buildIndexes() {
 			r.idx.group[string(*p.ConsumerGroup)] = append(r.idx.group[string(*p.ConsumerGroup)], p)
 		default:
 			r.idx.global = append(r.idx.global, p)
-		}
-	}
-	for _, clone := range r.src.ClonedPlugins {
-		if clone.Ref != "" {
-			r.idx.cloneRefs[clone.Name] = clone.Ref
 		}
 	}
 	for _, m := range r.src.AIModels {

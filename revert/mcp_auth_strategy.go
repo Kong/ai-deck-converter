@@ -28,7 +28,7 @@ import (
 func (r *Reverter) revertMCPAccess(m *aigw.MCPServer, plugins []kong.Plugin) []kong.Plugin {
 	var rest []kong.Plugin
 	for _, p := range plugins {
-		switch idpType := r.pluginType(p); idpType {
+		switch idpType := p.Name; idpType {
 		case "ai-mcp-oauth2":
 			r.applyMCPOAuth2(m, p)
 		case "key-auth", "openid-connect":
