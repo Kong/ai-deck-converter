@@ -29,6 +29,11 @@ func (c *Converter) convertAgent(src ConversionIssueSource, a *aigw.Agent) error
 		return c.fail(src.at("config.url"), MissingRequiredConfigField,
 			"agent %q has no config.url or config.targets; the Service needs an upstream", a.Name)
 	}
+	if !targetsMode {
+		if err := c.checkAgentURLOnlyFields(src, a); err != nil {
+			return err
+		}
+	}
 	route := buildRoute(a.Config.Route, a.Name)
 	route.Source = source("agent", a.Name, "config.route")
 
@@ -75,16 +80,9 @@ func (c *Converter) convertAgent(src ConversionIssueSource, a *aigw.Agent) error
 		Source: serviceURLSource("agent", a.Name),
 	}
 	if targetsMode {
-		up, err := c.agentUpstream(src, a)
-		if err != nil {
+		if err := c.applyAgentTargets(src, a, &svc); err != nil {
 			return err
 		}
-		svc.URL, svc.Host, svc.Protocol = "", up.Name, "http"
-		svc.Source = source("agent", a.Name, "config.targets")
-		if len(a.Config.Certificates) > 0 || len(a.Config.CACertificates) > 0 {
-			svc.Protocol = "https"
-		}
-		c.out.Upstreams = append(c.out.Upstreams, up)
 	}
 	// A disabled agent maps to a disabled Gateway Service so the DP stops
 	// proxying it. enabled defaults to true, so only emit the flag when the

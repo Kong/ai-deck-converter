@@ -55,6 +55,20 @@ func (d *DBLessDocument) Metadata() *ConversionMetadata {
 			))
 		}
 	}
+	for index, upstream := range d.Upstreams {
+		if upstream.Source != nil {
+			metadata.Upstreams = append(metadata.Upstreams, generatedEntitySource(
+				index, fmt.Sprintf("upstreams[%d]", index), upstream.Source,
+			))
+		}
+	}
+	for index, target := range d.Targets {
+		if target.Source != nil {
+			metadata.Targets = append(metadata.Targets, generatedEntitySource(
+				index, fmt.Sprintf("targets[%d]", index), target.Source,
+			))
+		}
+	}
 	return metadata
 }
 
@@ -197,12 +211,14 @@ type DBLessKeyAuthCredential struct {
 }
 
 type DBLessUpstream struct {
-	ID           string   `yaml:"id"`
-	Name         string   `yaml:"name"`
-	Algorithm    string   `yaml:"algorithm,omitempty"`
-	HashOn       string   `yaml:"hash_on,omitempty"`
-	HashOnHeader string   `yaml:"hash_on_header,omitempty"`
-	Tags         []string `yaml:"tags,omitempty"`
+	ID           string        `yaml:"id"`
+	Name         string        `yaml:"name"`
+	Algorithm    string        `yaml:"algorithm,omitempty"`
+	HashOn       string        `yaml:"hash_on,omitempty"`
+	HashOnHeader string        `yaml:"hash_on_header,omitempty"`
+	Healthchecks *Healthchecks `yaml:"healthchecks,omitempty"`
+	Tags         []string      `yaml:"tags,omitempty"`
+	Source       *Source       `yaml:"-"`
 }
 
 type DBLessTarget struct {
@@ -212,4 +228,5 @@ type DBLessTarget struct {
 	Weight   *int              `yaml:"weight,omitempty"`
 	Failover *bool             `yaml:"failover,omitempty"`
 	Tags     []string          `yaml:"tags,omitempty"`
+	Source   *Source           `yaml:"-"`
 }

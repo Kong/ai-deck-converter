@@ -3199,3 +3199,46 @@ models:
 	require.NoError(t, err)
 	require.Empty(t, warnings)
 }
+
+func TestConvertMetadataTracksAgentUpstreamAndTargets(t *testing.T) {
+	src := []byte(`
+agents:
+  - type: http
+    name: booking
+    config:
+      targets:
+        - address: a.internal:443
+        - address: b.internal:443
+      route: {paths: [/booking]}
+`)
+
+	doc, _, err := convertDoc(src, false)
+	require.NoError(t, err)
+
+	dbless := doc.ToDBLess().Metadata()
+	require.Len(t, dbless.Upstreams, 1)
+	require.Equal(t, "upstreams[0]", dbless.Upstreams[0].Location)
+	require.Equal(t, "config.balancer", dbless.Upstreams[0].FieldPrefix)
+	require.Contains(t, dbless.Upstreams[0].FieldMappings, FieldMapping{
+		GeneratedPrefix: "healthchecks", SourcePrefix: "config.targets",
+	})
+	require.Len(t, dbless.Targets, 2)
+	require.Equal(t, GeneratedEntitySource{
+		Index:       1,
+		Location:    "targets[1]",
+		EntityType:  "agent",
+		EntityName:  "booking",
+		FieldPrefix: "config.targets[1]",
+		FieldMappings: []FieldMapping{
+			{GeneratedPrefix: "target", SourcePrefix: "config.targets[1].address"},
+		},
+	}, dbless.Targets[1])
+	require.Len(t, dbless.Services, 1)
+	require.Contains(t, dbless.Services[0].FieldMappings, FieldMapping{
+		GeneratedPrefix: "protocol", SourcePrefix: "config.protocol",
+	})
+
+	deck := doc.Metadata()
+	require.Len(t, deck.Targets, 2)
+	require.Equal(t, "upstreams[0].targets[1]", deck.Targets[1].Location)
+}

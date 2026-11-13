@@ -89,13 +89,15 @@ func (d *Document) ToDBLess() *DBLessDocument {
 		upID := firstNonEmpty(up.ID, StableUUID("upstream:"+up.Name))
 		out.Upstreams = append(out.Upstreams, DBLessUpstream{
 			ID: upID, Name: up.Name, Algorithm: up.Algorithm,
-			HashOn: up.HashOn, HashOnHeader: up.HashOnHeader, Tags: up.Tags,
+			HashOn: up.HashOn, HashOnHeader: up.HashOnHeader,
+			Healthchecks: up.Healthchecks, Tags: up.Tags, Source: up.Source,
 		})
 		for _, t := range up.Targets {
 			out.Targets = append(out.Targets, DBLessTarget{
 				ID:       firstNonEmpty(t.ID, StableUUID("target:"+up.Name+":"+t.Target)),
 				Upstream: map[string]string{"id": upID},
 				Target:   t.Target, Weight: t.Weight, Failover: t.Failover, Tags: t.Tags,
+				Source: t.Source,
 			})
 		}
 	}

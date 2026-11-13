@@ -16,6 +16,12 @@ func (c *Converter) applyUpstreamTLS(src ConversionIssueSource, svc *kong.Servic
 	}
 	// Kong rejects the whole configuration if a non-https Service has these fields.
 	if !serviceIsHTTPS(svc) {
+		if svc.URL == "" {
+			c.reportError(src.at("config.certificates", "config.ca_certificates"), ConfigFieldInvalid,
+				"%s %q sets certificates or ca_certificates, but its config.protocol %q is not https",
+				src.Kind, src.Name, svc.Protocol)
+			return
+		}
 		c.reportError(src.at("config.certificates", "config.ca_certificates"), ConfigFieldInvalid,
 			"%s %q sets certificates or ca_certificates, but its url %q is not https",
 			src.Kind, src.Name, svc.URL)

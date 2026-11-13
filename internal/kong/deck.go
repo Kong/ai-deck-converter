@@ -47,6 +47,19 @@ func (d *Document) Metadata() *ConversionMetadata {
 			metadata.appendPlugin(pluginIndex, location, plugin.Source, plugin.TargetSources)
 		}
 	}
+	for upstreamIndex, upstream := range d.Upstreams {
+		upstreamLocation := fmt.Sprintf("upstreams[%d]", upstreamIndex)
+		if upstream.Source != nil {
+			metadata.Upstreams = append(metadata.Upstreams,
+				generatedEntitySource(upstreamIndex, upstreamLocation, upstream.Source))
+		}
+		for targetIndex, target := range upstream.Targets {
+			if target.Source != nil {
+				location := fmt.Sprintf("%s.targets[%d]", upstreamLocation, targetIndex)
+				metadata.Targets = append(metadata.Targets, generatedEntitySource(targetIndex, location, target.Source))
+			}
+		}
+	}
 	for serviceIndex, service := range d.Services {
 		serviceLocation := fmt.Sprintf("services[%d]", serviceIndex)
 		if service.Source != nil {
@@ -181,8 +194,10 @@ type Upstream struct {
 	Algorithm    string           `yaml:"algorithm,omitempty"`
 	HashOn       string           `yaml:"hash_on,omitempty"`
 	HashOnHeader string           `yaml:"hash_on_header,omitempty"`
+	Healthchecks *Healthchecks    `yaml:"healthchecks,omitempty"`
 	Targets      []UpstreamTarget `yaml:"targets,omitempty"`
 	Tags         []string         `yaml:"tags,omitempty"`
+	Source       *Source          `yaml:"-"`
 }
 
 // UpstreamTarget is a Kong Gateway Target of an Upstream.
@@ -192,6 +207,43 @@ type UpstreamTarget struct {
 	Weight   *int     `yaml:"weight,omitempty"`
 	Failover *bool    `yaml:"failover,omitempty"`
 	Tags     []string `yaml:"tags,omitempty"`
+	Source   *Source  `yaml:"-"`
+}
+
+// Healthchecks is the healthchecks record of a Kong Upstream. Kong fills
+// each field that is not set with its default.
+type Healthchecks struct {
+	Active  *ActiveHealthcheck  `yaml:"active,omitempty"`
+	Passive *PassiveHealthcheck `yaml:"passive,omitempty"`
+}
+
+// ActiveHealthcheck is the healthchecks.active record of a Kong Upstream.
+type ActiveHealthcheck struct {
+	Type                   string                `yaml:"type,omitempty"`
+	HTTPPath               string                `yaml:"http_path,omitempty"`
+	Timeout                *float64              `yaml:"timeout,omitempty"`
+	Concurrency            *int                  `yaml:"concurrency,omitempty"`
+	HTTPSVerifyCertificate *bool                 `yaml:"https_verify_certificate,omitempty"`
+	Healthy                *HealthcheckThreshold `yaml:"healthy,omitempty"`
+	Unhealthy              *HealthcheckThreshold `yaml:"unhealthy,omitempty"`
+}
+
+// PassiveHealthcheck is the healthchecks.passive record of a Kong Upstream.
+type PassiveHealthcheck struct {
+	Type      string                `yaml:"type,omitempty"`
+	Healthy   *HealthcheckThreshold `yaml:"healthy,omitempty"`
+	Unhealthy *HealthcheckThreshold `yaml:"unhealthy,omitempty"`
+}
+
+// HealthcheckThreshold is a healthy or unhealthy record of a Kong Upstream
+// health check.
+type HealthcheckThreshold struct {
+	Interval     *float64 `yaml:"interval,omitempty"`
+	Successes    *int     `yaml:"successes,omitempty"`
+	HTTPFailures *int     `yaml:"http_failures,omitempty"`
+	TCPFailures  *int     `yaml:"tcp_failures,omitempty"`
+	Timeouts     *int     `yaml:"timeouts,omitempty"`
+	HTTPStatuses []int    `yaml:"http_statuses,omitempty"`
 }
 
 // Route is a Kong Gateway Route. Plugins may be nested.

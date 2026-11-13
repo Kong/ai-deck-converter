@@ -2,7 +2,8 @@ _format_version: "3.0"
 services:
   - name: booking
     host: booking-upstream
-    protocol: http
+    protocol: https
+    path: /a2a
     routes:
       - name: booking-route
         paths:
@@ -23,26 +24,98 @@ services:
           - /plain
   - name: nobalancer
     host: nobalancer-upstream
-    protocol: http
+    protocol: https
     routes:
       - name: nobalancer-route
         paths:
           - /nobalancer
+  - name: failover
+    host: failover-upstream
+    protocol: https
+    routes:
+      - name: failover-route
+        paths:
+          - /failover
 upstreams:
   - name: booking-upstream
     algorithm: consistent-hashing
     hash_on: header
     hash_on_header: X-Session
+    healthchecks:
+      active:
+        type: tcp
+        healthy:
+          interval: 10
+          successes: 2
+        unhealthy:
+          interval: 10
+          tcp_failures: 3
+          timeouts: 3
+      passive:
+        type: tcp
+        unhealthy:
+          tcp_failures: 3
+          timeouts: 3
     targets:
-      - target: booking-1.internal:8080
+      - target: booking-1.internal:8443
         weight: 200
-      - target: booking-2.internal:8080
-        failover: true
+      - target: booking-2.internal:8443
   - name: plain-upstream
     algorithm: latency
+    healthchecks:
+      active:
+        type: tcp
+        healthy:
+          interval: 10
+          successes: 2
+        unhealthy:
+          interval: 10
+          tcp_failures: 3
+          timeouts: 3
+      passive:
+        type: tcp
+        unhealthy:
+          tcp_failures: 3
+          timeouts: 3
     targets:
       - target: a.internal:80
   - name: nobalancer-upstream
     algorithm: round-robin
+    healthchecks:
+      active:
+        type: tcp
+        healthy:
+          interval: 10
+          successes: 2
+        unhealthy:
+          interval: 10
+          tcp_failures: 3
+          timeouts: 3
+      passive:
+        type: tcp
+        unhealthy:
+          tcp_failures: 3
+          timeouts: 3
     targets:
-      - target: c.internal:80
+      - target: c.internal:443
+  - name: failover-upstream
+    algorithm: least-connections
+    healthchecks:
+      active:
+        type: tcp
+        healthy:
+          interval: 10
+          successes: 2
+        unhealthy:
+          interval: 10
+          tcp_failures: 3
+          timeouts: 3
+      passive:
+        type: tcp
+        unhealthy:
+          tcp_failures: 3
+          timeouts: 3
+    targets:
+      - target: primary.internal:443
+      - target: backup.internal:443
+        failover: true

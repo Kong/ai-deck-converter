@@ -4,19 +4,20 @@ agents:
     display_name: Booking
     config:
       targets:
-        - address: booking-1.internal:8080
+        - address: booking-1.internal:8443
           weight: 200
-        - address: booking-2.internal:8080
-          failover: true
+        - address: booking-2.internal:8443
       balancer:
         algorithm: consistent-hashing
         hash_on_header: X-Session
+      path: /a2a
       route:
         paths: [/booking]
   - name: plain
     type: http
     display_name: Plain
     config:
+      protocol: http
       targets:
         - address: a.internal:80
       balancer:
@@ -28,6 +29,18 @@ agents:
     display_name: No balancer
     config:
       targets:
-        - address: c.internal:80
+        - address: c.internal:443
       route:
         paths: [/nobalancer]
+  - name: failover
+    type: http
+    display_name: Failover
+    config:
+      targets:
+        - address: primary.internal:443
+        - address: backup.internal:443
+          failover: true
+      balancer:
+        algorithm: least-connections
+      route:
+        paths: [/failover]

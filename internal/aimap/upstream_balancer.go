@@ -9,9 +9,6 @@ var UpstreamAlgorithms = map[string]string{
 	"lowest-latency":     "latency",
 }
 
-// DefaultUpstreamHashHeader is the hash_on_header default of an agent balancer.
-const DefaultUpstreamHashHeader = "X-Kong-LLM-Request-ID"
-
 // UpstreamAlgorithmFromKong returns the agent balancer algorithm of a Kong
 // Upstream algorithm. An empty value means Kong's round-robin default.
 func UpstreamAlgorithmFromKong(kongAlgorithm string) (string, bool) {

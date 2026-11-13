@@ -45,7 +45,7 @@ func (r *Reverter) revertAgent(svc *kong.Service, rt *kong.Route, name string,
 	}
 
 	if up := r.upstreamOf(svc); up != nil {
-		if err := r.liftAgentUpstream(&a, up); err != nil {
+		if err := r.liftAgentUpstream(&a, up, svc); err != nil {
 			return err
 		}
 	} else if a.Config.URL = serviceURL(svc); a.Config.URL == "" {
@@ -79,27 +79,40 @@ func (r *Reverter) upstreamOf(svc *kong.Service) *kong.Upstream {
 	return nil
 }
 
-func (r *Reverter) liftAgentUpstream(a *aigw.Agent, up *kong.Upstream) error {
+func (r *Reverter) liftAgentUpstream(a *aigw.Agent, up *kong.Upstream, svc *kong.Service) error {
 	for _, t := range up.Targets {
 		a.Config.Targets = append(a.Config.Targets, aigw.UpstreamTarget{
 			Address: t.Target, Weight: t.Weight, Failover: t.Failover,
 		})
 	}
+	// Kong defaults a Service protocol to http. The agent default is https.
+	switch protocol := svc.Protocol; protocol {
+	case "", "http":
+		a.Config.Protocol = "http"
+	case "https":
+	default:
+		if err := r.warn("agent %q: service %q has unsupported protocol %q; protocol dropped",
+			a.Name, svc.Name, protocol); err != nil {
+			return err
+		}
+	}
+	a.Config.Path = svc.Path
+
 	algorithm, ok := aimap.UpstreamAlgorithmFromKong(up.Algorithm)
 	if !ok {
 		return r.warn("agent %q: upstream %q has unsupported algorithm %q; balancer dropped",
 			a.Name, up.Name, up.Algorithm)
 	}
-	if algorithm == "round-robin" {
-		return nil
-	}
-	b := &aigw.Balancer{Algorithm: algorithm, Fields: map[string]any{}}
 	switch algorithm {
+	case "round-robin":
 	case "consistent-hashing":
-		if up.HashOnHeader != "" && up.HashOnHeader != aimap.DefaultUpstreamHashHeader {
-			b.Fields["hash_on_header"] = up.HashOnHeader
+		if up.HashOn != "header" || up.HashOnHeader == "" {
+			return r.warn("agent %q: upstream %q hashes on %q, not on a header; balancer dropped",
+				a.Name, up.Name, up.HashOn)
 		}
+		a.Config.Balancer = &aigw.UpstreamBalancer{Algorithm: algorithm, HashOnHeader: up.HashOnHeader}
+	default:
+		a.Config.Balancer = &aigw.UpstreamBalancer{Algorithm: algorithm}
 	}
-	a.Config.Balancer = b
 	return nil
 }
