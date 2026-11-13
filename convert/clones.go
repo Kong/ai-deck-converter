@@ -1,8 +1,10 @@
 package convert
 
 import (
+	"fmt"
 	"slices"
 
+	"github.com/Kong/ai-deck-converter/internal/aigw"
 	"github.com/Kong/ai-deck-converter/internal/aimap"
 	"github.com/Kong/ai-deck-converter/internal/kong"
 )
@@ -73,10 +75,11 @@ func applyPostAIClone(p kong.Plugin, clone postAIClone, websocket bool) (kong.Pl
 	return p, &kong.ClonedPlugin{Name: clone.name, Ref: clone.base, Priority: &priority}
 }
 
-// warnGlobalResponseTransformers reports why a global response transformer
-// cannot move below ai-proxy-advanced. A global plugin is one instance for the
-// whole workspace, so moving it also reorders unrelated routes.
-func (c *Converter) warnGlobalResponseTransformers() {
+// warnUnreorderedResponseTransformers reports the response transformers the
+// converter cannot move below ai-proxy-advanced. A global, consumer- or
+// consumer-group-scoped plugin is one instance for all of its routes, so moving
+// it would also reorder routes that run no ai-proxy-advanced.
+func (c *Converter) warnUnreorderedResponseTransformers() {
 	if !slices.ContainsFunc(c.out.Plugins, func(p kong.Plugin) bool {
 		return p.Name == "ai-proxy-advanced"
 	}) {
@@ -84,18 +87,58 @@ func (c *Converter) warnGlobalResponseTransformers() {
 	}
 	for i := range c.src.Policies {
 		p := &c.src.Policies[i]
-		if p.Global == nil || !*p.Global {
-			continue
-		}
 		if _, ok := aimap.PostAICloneName(p.Type); !ok || !transformsResponseBody(p.Config) {
 			continue
 		}
-		c.warn(issueSource(kindPolicy, p.Name).at("global"), BehaviorMayDiffer,
-			"global policy %q (type %q) cannot change the response body of a model: ai-proxy-advanced "+
-				"writes the body after it, and the converter does not reorder a global plugin. "+
-				"Attach the policy to the model instead.",
-			p.Name, p.Type)
+		if p.Global != nil && *p.Global {
+			c.warn(issueSource(kindPolicy, p.Name).at("global"), BehaviorMayDiffer,
+				"global policy %q (type %q) cannot change the response body of a model: "+
+					"ai-proxy-advanced writes the body after it, and the converter does not reorder a "+
+					"global plugin. Attach the policy to the model instead.",
+				p.Name, p.Type)
+			continue
+		}
+		c.warnScopedResponseTransformer(p)
 	}
+}
+
+// warnScopedResponseTransformer reports policy p when a consumer or consumer
+// group references it. Those plugins scope to the consumer, not to a model, so
+// the clone cannot reorder them either.
+func (c *Converter) warnScopedResponseTransformer(p *aigw.Policy) {
+	for i := range c.src.Consumers {
+		cons := &c.src.Consumers[i]
+		field := policyReferenceField(cons.Policies, p.Name)
+		if field == "" {
+			continue
+		}
+		c.warn(issueSource(kindConsumer, cons.Name).at(field), BehaviorMayDiffer,
+			"policy %q (type %q) on consumer %q cannot change the response body of a model: "+
+				"ai-proxy-advanced writes the body after it, and the converter does not reorder a "+
+				"consumer-scoped plugin. Attach the policy to the model instead.",
+			p.Name, p.Type, cons.Name)
+	}
+	for i := range c.src.ConsumerGroups {
+		group := &c.src.ConsumerGroups[i]
+		field := policyReferenceField(group.Policies, p.Name)
+		if field == "" {
+			continue
+		}
+		c.warn(issueSource(kindConsumerGroup, group.Name).at(field), BehaviorMayDiffer,
+			"policy %q (type %q) on consumer group %q cannot change the response body of a model: "+
+				"ai-proxy-advanced writes the body after it, and the converter does not reorder a "+
+				"consumer-group-scoped plugin. Attach the policy to the model instead.",
+			p.Name, p.Type, group.Name)
+	}
+}
+
+// policyReferenceField returns the field path of the reference to name in refs,
+// or "" when refs does not name it.
+func policyReferenceField(refs []string, name string) string {
+	if i := slices.Index(refs, name); i >= 0 {
+		return fmt.Sprintf("policies[%d]", i)
+	}
+	return ""
 }
 
 // transformsResponseBody reports whether a response transformer config changes

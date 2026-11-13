@@ -154,7 +154,7 @@ func (c *Converter) run() {
 	c.convertConsumers()
 	c.convertModels()
 	c.warnGlobalPoliciesForWebSocket()
-	c.warnGlobalResponseTransformers()
+	c.warnUnreorderedResponseTransformers()
 	c.convertMCPServers()
 	c.convertAgents()
 	c.convertCredentialManagers()

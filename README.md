@@ -291,10 +291,11 @@ and `formats` beyond the first.
     produces for a client that accepts gzip, so its body change only applies to
     clients without gzip. The converter warns; use
     `response-transformer-advanced`, which inflates and deflates the body itself.
-  - A **global** response transformer is not cloned, since one instance serves
-    every route and reordering it would affect routes with no
-    `ai-proxy-advanced`. Attach the policy to the model instead; the converter
-    warns when it sees the combination.
+  - A **global**, **consumer-** or **consumer-group-scoped** response
+    transformer is not cloned. One instance serves every route of that scope, so
+    reordering it would affect routes with no `ai-proxy-advanced`. Attach the
+    policy to the model instead; the converter warns when it sees the
+    combination.
 
   Agent and MCP Server scopes need no clone: `ai-a2a-proxy` (819) and
   `ai-mcp-proxy` (820) run before the transformer at 800, so the transformer

@@ -17,6 +17,7 @@
   emits these policies as cloned plugins (`cloned_plugins`, priority 766) that run
   after `ai-proxy-advanced`. The output now carries `cloned_plugins`, which needs a
   paid license and a decK that supports plugin definitions
-  (`--include-plugin-definitions`). Requires AI Gateway 2.1+; older releases and
-  global response transformers get a `BEHAVIOR_MAY_DIFFER` warning, as does a plain
-  `response-transformer` transforming the body for a gzip-accepting client.
+  (`--include-plugin-definitions`). Requires AI Gateway 2.1+; older releases,
+  global policies and consumer- or consumer-group-scoped policies get a
+  `BEHAVIOR_MAY_DIFFER` warning, as does a plain `response-transformer`
+  transforming the body for a gzip-accepting client.

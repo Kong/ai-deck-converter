@@ -683,3 +683,94 @@ policies:
 	}
 	require.Len(t, result.Output.ClonedPlugins, 1, "one clone definition covers the shared route")
 }
+
+// A consumer- or consumer-group-scoped transformer is one instance for all of
+// that caller's routes, so the clone cannot reorder it. The loss is reported
+// instead of staying silent.
+func TestConvertWarnsConsumerScopedResponseTransformer(t *testing.T) {
+	for name, tc := range map[string]struct {
+		scope  string
+		kind   string
+		entity string
+	}{
+		"consumer":       {"consumers:\n  - name: c1\n    type: api-key\n    policies: [adv]\n", kindConsumer, "c1"},
+		"consumer group": {"consumer_groups:\n  - name: g1\n    policies: [adv]\n", kindConsumerGroup, "g1"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			src := []byte(`
+models:
+  - type: model
+    name: guarded
+    capabilities: [generate]
+    formats: [{type: openai}]
+    targets:
+      - name: gpt-4o
+        provider: p1
+        config: {type: openai}
+    config:
+      route:
+        paths: [/ai]
+        model: {values: [alias]}
+model_providers:
+  - name: p1
+    type: openai
+    config:
+      auth:
+        type: basic
+        headers: [{name: Authorization, value: "Bearer token"}]
+policies:
+  - type: response-transformer-advanced
+    name: adv
+    config:
+      add:
+        json: ["added:yes"]
+` + tc.scope)
+
+			result, err := Convert(src, testOptions)
+			require.NoError(t, err)
+			issue := requireIssue(t, result.Issues, Warning, BehaviorMayDiffer, tc.kind, tc.entity, "policies[0]")
+			require.Contains(t, issue.Reason, "cannot change the response body")
+			require.Empty(t, result.Output.ClonedPlugins)
+		})
+	}
+}
+
+// A headers-only transformer on a consumer needs no warning: it changes no body.
+func TestConvertDoesNotWarnConsumerHeadersOnlyTransformer(t *testing.T) {
+	src := []byte(`
+models:
+  - type: model
+    name: guarded
+    capabilities: [generate]
+    formats: [{type: openai}]
+    targets:
+      - name: gpt-4o
+        provider: p1
+        config: {type: openai}
+    config:
+      route:
+        paths: [/ai]
+        model: {values: [alias]}
+model_providers:
+  - name: p1
+    type: openai
+    config:
+      auth:
+        type: basic
+        headers: [{name: Authorization, value: "Bearer token"}]
+policies:
+  - type: response-transformer-advanced
+    name: adv
+    config:
+      add:
+        headers: ["X-Added:av"]
+consumers:
+  - name: c1
+    type: api-key
+    policies: [adv]
+`)
+
+	result, err := Convert(src, testOptions)
+	require.NoError(t, err)
+	require.Empty(t, result.Issues)
+}
