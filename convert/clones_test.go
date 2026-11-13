@@ -774,3 +774,98 @@ consumers:
 	require.NoError(t, err)
 	require.Empty(t, result.Issues)
 }
+
+// A realtime-only model drops the transformer on every route, so a body-loss
+// warning would send the user to a plugin those routes drop too. Only the drop
+// is reported.
+func TestConvertDoesNotWarnTransformerDroppedOnEveryRoute(t *testing.T) {
+	src := []byte(`
+models:
+  - type: model
+    name: rt-only
+    capabilities: [realtime]
+    formats: [{type: openai}]
+    targets:
+      - name: gpt-4o
+        provider: p1
+        config: {type: openai}
+    policies: [plain]
+    config:
+      route:
+        paths: [/rt]
+        model: {values: [rt-alias]}
+model_providers:
+  - name: p1
+    type: openai
+    config:
+      auth:
+        type: basic
+        headers: [{name: Authorization, value: "Bearer token"}]
+policies:
+  - type: response-transformer
+    name: plain
+    config:
+      remove:
+        json: [service_tier]
+`)
+
+	for name, version := range map[string]string{"above gate": "2.3", "below gate": "2.0"} {
+		t.Run(name, func(t *testing.T) {
+			result, err := Convert(src, Options{MinRuntimeVersion: version})
+			require.NoError(t, err)
+			require.Empty(t, result.Output.ClonedPlugins)
+
+			var dropped, bodyLoss int
+			for _, issue := range result.Issues {
+				if issue.Code == ConfigFieldDropped {
+					dropped++
+				}
+				if issue.Code == BehaviorMayDiffer {
+					bodyLoss++
+				}
+			}
+			require.Equal(t, 1, dropped, "the WebSocket drop must be reported")
+			require.Zero(t, bodyLoss,
+				"a plugin no route keeps must not get a body-loss warning: %v", result.Issues)
+		})
+	}
+}
+
+// A model with a chat route keeps the transformer, so the body-loss warning for
+// a client that accepts gzip still applies.
+func TestConvertStillWarnsTransformerKeptOnAnHTTPRoute(t *testing.T) {
+	src := []byte(`
+models:
+  - type: model
+    name: mixed
+    capabilities: [generate, realtime]
+    formats: [{type: openai}]
+    targets:
+      - name: gpt-4o
+        provider: p1
+        config: {type: openai}
+    policies: [plain]
+    config:
+      route:
+        paths: [/mixed]
+        model: {values: [mixed-alias]}
+model_providers:
+  - name: p1
+    type: openai
+    config:
+      auth:
+        type: basic
+        headers: [{name: Authorization, value: "Bearer token"}]
+policies:
+  - type: response-transformer
+    name: plain
+    config:
+      remove:
+        json: [service_tier]
+`)
+
+	result, err := Convert(src, testOptions)
+	require.NoError(t, err)
+	requireIssue(t, result.Issues, Warning, BehaviorMayDiffer, kindModel, "mixed", "policies[0]")
+	require.Len(t, result.Output.ClonedPlugins, 1)
+}

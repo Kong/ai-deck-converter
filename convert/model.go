@@ -923,7 +923,8 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 		return err
 	}
 	plugins = sourceScopedPlugins(plugins, "model", m.Name)
-	clones := c.planResponseTransformerClones(src, m.Policies, plugins, fkScoped)
+	clones := c.planResponseTransformerClones(src, m.Policies, plugins, fkScoped,
+		func(p kong.Plugin) bool { return keptOnAnyModelRoute(st, routeNames, lifecycleRouteNames, p) })
 	for _, routeName := range routeNames {
 		if lifecycleRouteNames[routeName] {
 			c.attachLifecycleGuards(st, src, m, routeName, plugins, clones)
@@ -1133,6 +1134,23 @@ func (c *Converter) attachLifecycleGuards(
 	}
 }
 
+// keptOnAnyModelRoute reports whether any route of the model keeps plugin p. A
+// WebSocket route keeps only a plugin whose schema accepts ws and wss, and every
+// other route keeps it.
+func keptOnAnyModelRoute(
+	st *modelPass, routeNames []string, lifecycleRouteNames map[string]bool, p kong.Plugin,
+) bool {
+	for _, routeName := range routeNames {
+		if lifecycleRouteNames[routeName] {
+			return true
+		}
+		if _, websocket := st.websocketRoutes[routeName]; !websocket || aimap.SupportsWebSocket(p.Name) {
+			return true
+		}
+	}
+	return false
+}
+
 // warnModelScopedRequestTermination warns once per policy reference in refs.
 // The selector's ordering.after runs every request-termination before the
 // model is known, so these policies never match.
@@ -1222,7 +1240,9 @@ func (c *Converter) convertVideoLifecycle(
 		return err
 	}
 	plugins = sourceScopedPlugins(plugins, "model", candidate.model.Name)
-	clones := c.planResponseTransformerClones(src, candidate.model.Policies, plugins, true)
+	// The lifecycle route is an HTTP route, so it keeps every policy plugin.
+	clones := c.planResponseTransformerClones(src, candidate.model.Policies, plugins, true,
+		func(kong.Plugin) bool { return true })
 	for i := range plugins {
 		plugins[i].Route = kong.NewStringRef(routeName)
 		if clone, ok := clones[i]; ok {

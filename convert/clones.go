@@ -29,8 +29,13 @@ type postAIClone struct {
 //
 // An issue names the model and the policy's position, because decK carries no
 // policy name and revert cannot recover it.
+//
+// keeps reports whether any route of the model keeps the plugin. A plugin that
+// every route drops needs no clone, and a warning about it would send the user
+// to a plugin those routes drop as well.
 func (c *Converter) planResponseTransformerClones(
-	src ConversionIssueSource, policies []string, plugins []kong.Plugin, proxyRewritesBody bool,
+	src ConversionIssueSource, policies []string, plugins []kong.Plugin,
+	proxyRewritesBody bool, keeps func(kong.Plugin) bool,
 ) map[int]postAIClone {
 	clones := map[int]postAIClone{}
 	if !proxyRewritesBody {
@@ -39,7 +44,7 @@ func (c *Converter) planResponseTransformerClones(
 	for i := range plugins {
 		p := plugins[i]
 		cloneName, ok := aimap.PostAICloneName(p.Name)
-		if !ok || !transformsResponseBody(p.Config) {
+		if !ok || !transformsResponseBody(p.Config) || !keeps(p) {
 			continue
 		}
 		field := scopedPluginField(policies, p)
