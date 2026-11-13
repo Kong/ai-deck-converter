@@ -926,7 +926,7 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 	clones := c.planResponseTransformerClones(src, m.Policies, plugins, fkScoped)
 	for _, routeName := range routeNames {
 		if lifecycleRouteNames[routeName] {
-			c.attachLifecycleGuards(st, src, m, routeName, plugins)
+			c.attachLifecycleGuards(st, src, m, routeName, plugins, clones)
 			continue
 		}
 		for k := range plugins {
@@ -1096,9 +1096,21 @@ func guardSetFingerprint(plugins []kong.Plugin) string {
 // policies, just as they do on the ai-proxy-advanced config they merge into.
 func (c *Converter) attachLifecycleGuards(
 	st *modelPass, src ConversionIssueSource, m *aigw.Model,
-	routeName string, plugins []kong.Plugin,
+	routeName string, plugins []kong.Plugin, clones map[int]postAIClone,
 ) {
-	set := lifecycleGuardSet{fingerprint: guardSetFingerprint(plugins), model: m.Name}
+	// plugins is shared with the other routes of this model, so the rename must
+	// not leak out of the lifecycle route.
+	guards := slices.Clone(plugins)
+	for k := range guards {
+		if clone, ok := clones[k]; ok {
+			var cloneDef *kong.ClonedPlugin
+			guards[k], cloneDef = applyPostAIClone(guards[k], clone, false)
+			if cloneDef != nil {
+				st.clonedPlugins[cloneDef.Name] = *cloneDef
+			}
+		}
+	}
+	set := lifecycleGuardSet{fingerprint: guardSetFingerprint(guards), model: m.Name}
 	if first, ok := st.lifecycleGuards[routeName]; ok {
 		if first.fingerprint != set.fingerprint {
 			enforced := fmt.Sprintf("only model %q's policies and ACLs are enforced there", first.model)
@@ -1114,8 +1126,8 @@ func (c *Converter) attachLifecycleGuards(
 		return
 	}
 	st.lifecycleGuards[routeName] = set
-	for k := range plugins {
-		p := plugins[k]
+	for k := range guards {
+		p := guards[k]
 		p.Route = kong.NewStringRef(routeName)
 		st.guardPlugins = append(st.guardPlugins, p)
 	}

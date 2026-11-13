@@ -37,8 +37,9 @@ var authPluginNames = map[string]bool{
 }
 
 // pluginType returns the bundled plugin a clone copies, so every dispatch on a
-// plugin name sees the plugin the user configured. A clone the document does not
-// declare keeps its own name.
+// plugin name sees the plugin the user configured. A name that neither the
+// document's cloned_plugins nor the converter's clone names resolve keeps its
+// own name.
 func (r *Reverter) pluginType(p kong.Plugin) string {
 	if ref, ok := r.idx.cloneRefs[p.Name]; ok {
 		return ref

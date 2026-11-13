@@ -1,10 +1,12 @@
 # ai-proxy-advanced writes the response in body_filter after these transformers
 # would. Kong cannot order a plugin per phase, so the converter moves a
-# model-scoped transformer below ai-proxy-advanced with a cloned plugin.
+# model-scoped transformer below ai-proxy-advanced with a cloned plugin. The
+# agentic capability adds the responses lifecycle route, which carries its own
+# ai-proxy-advanced and needs the same clone.
 models:
   - type: model
     name: transformed-gpt
-    capabilities: [generate]
+    capabilities: [generate, agentic]
     formats: [{type: openai}]
     targets:
       - name: gpt-4o

@@ -576,3 +576,110 @@ policies:
 	}
 	require.Equal(t, 1, lifecycle, "the video lifecycle route carries the cloned transformer")
 }
+
+// The responses lifecycle route carries its own ai-proxy-advanced, so it needs
+// the same clone the create route gets. Its guards are route-scoped because no
+// ai-model-selector runs there.
+func TestConvertClonesTransformerOnResponsesLifecycleRoute(t *testing.T) {
+	src := []byte(`
+models:
+  - name: guarded
+    type: model
+    capabilities: [generate, agentic]
+    formats: [{type: openai}]
+    targets:
+      - name: gpt-4o
+        provider: p1
+        config: {type: openai}
+    policies: [adv]
+    config:
+      route: {paths: [/ai]}
+model_providers:
+  - name: p1
+    type: openai
+    config:
+      auth:
+        type: basic
+        headers: [{name: Authorization, value: "Bearer token"}]
+policies:
+  - type: response-transformer-advanced
+    name: adv
+    config:
+      add:
+        json: ["added:yes"]
+`)
+
+	result, err := Convert(src, testOptions)
+	require.NoError(t, err)
+	require.Len(t, result.Output.ClonedPlugins, 1)
+
+	clonedOn := map[string]bool{}
+	for _, p := range result.Output.Plugins {
+		if p.Name != aimap.ResponseTransformerAdvancedCloneName || p.Route == nil {
+			continue
+		}
+		clonedOn[string(*p.Route)] = true
+	}
+	require.True(t, clonedOn["openai-responses-lifecycle"],
+		"the lifecycle route must run the clone, not the static-priority plugin")
+	require.True(t, clonedOn["openai-responses"], "the create route must run the clone")
+
+	for _, p := range result.Output.Plugins {
+		if p.Name == "response-transformer-advanced" && p.Route != nil {
+			t.Fatalf("route %q kept the static-priority transformer, so ai-proxy-advanced overwrites its body",
+				*p.Route)
+		}
+	}
+}
+
+// A model whose lifecycle route shares a route with another model still
+// fingerprints the same policy set, whether or not it is cloned, so the shared
+// route does not warn about differing policies.
+func TestConvertLifecycleGuardsFingerprintAcrossCloneStates(t *testing.T) {
+	src := []byte(`
+models:
+  - name: first
+    type: model
+    capabilities: [generate, agentic]
+    formats: [{type: openai}]
+    targets:
+      - name: gpt-4o
+        provider: p1
+        config: {type: openai}
+    policies: [adv]
+    config:
+      route: {paths: [/ai]}
+  - name: second
+    type: model
+    capabilities: [generate, agentic]
+    formats: [{type: openai}]
+    targets:
+      - name: gpt-4o
+        provider: p1
+        config: {type: openai}
+    policies: [adv]
+    config:
+      route: {paths: [/ai]}
+model_providers:
+  - name: p1
+    type: openai
+    config:
+      auth:
+        type: basic
+        headers: [{name: Authorization, value: "Bearer token"}]
+policies:
+  - type: response-transformer-advanced
+    name: adv
+    config:
+      add:
+        json: ["added:yes"]
+`)
+
+	result, err := Convert(src, testOptions)
+	require.NoError(t, err)
+	for _, issue := range result.Issues {
+		require.NotEqual(t, BehaviorMayDiffer, issue.Code,
+			"the two models configure the same policy, so sharing the lifecycle route must not warn: %v", issue)
+	}
+	require.Len(t, result.Output.ClonedPlugins, 1, "one clone definition covers the shared route")
+}
