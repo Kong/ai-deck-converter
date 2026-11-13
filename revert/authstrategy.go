@@ -14,12 +14,15 @@ import (
 // synthesized "anonymous" fallback, which convert always adds) reuses the
 // existing auth strategy; otherwise a new one is registered under a unique
 // name.
-func (r *Reverter) registerAuthStrategy(p kong.Plugin) *aigw.AuthStrategy {
-	cfg := stripSyntheticAuthFields(p.Name, p.Config)
+//
+// idpType is the plugin the clone copies, because a cloned plugin reverts as the
+// base plugin and the AI Gateway model has no clone type.
+func (r *Reverter) registerAuthStrategy(p kong.Plugin, idpType string) *aigw.AuthStrategy {
+	cfg := stripSyntheticAuthFields(idpType, p.Config)
 
 	for i := range r.authStrategies {
 		existing := &r.authStrategies[i]
-		if existing.Type != p.Name {
+		if existing.Type != idpType {
 			continue
 		}
 		if !reflect.DeepEqual(existing.Config, cfg) {
@@ -29,8 +32,8 @@ func (r *Reverter) registerAuthStrategy(p kong.Plugin) *aigw.AuthStrategy {
 	}
 
 	idp := aigw.AuthStrategy{
-		Type:   p.Name,
-		Name:   r.uniqueAuthStrategyName(p.Name),
+		Type:   idpType,
+		Name:   r.uniqueAuthStrategyName(idpType),
 		Config: cfg,
 	}
 	r.authStrategies = append(r.authStrategies, idp)

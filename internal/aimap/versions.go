@@ -96,6 +96,10 @@ const (
 	// "credentials" from it. See CollapseSanitizerAnonymize.
 	//nolint:gosec // a feature name, not a credential
 	FeatureSanitizerAllWithCredentials Feature = "sanitizer-all-with-credentials"
+	// FeatureClonedPlugins is the cloned_plugins entity. A cloned plugin is the
+	// only way to run one instance of a plugin at another priority, because Kong
+	// has no per-instance priority.
+	FeatureClonedPlugins Feature = "cloned-plugins"
 )
 
 // featureSince maps each feature to its first AI Gateway release. The source
@@ -124,6 +128,7 @@ var featureSince = map[Feature]Version{
 	FeatureAuthStrategyTokenVault:        mustVersion("2.3"),
 	FeatureOIDCProtectedResourceMetadata: mustVersion("2.3"),
 	FeatureSanitizerAllWithCredentials:   mustVersion("2.3"),
+	FeatureClonedPlugins:                 mustVersion("2.1"),
 }
 
 // Since returns the first AI Gateway release that has f. It panics for an

@@ -198,6 +198,15 @@ func (d *Document) ToDBLess() *DBLessDocument {
 		})
 	}
 
+	for _, plugin := range d.ClonedPlugins {
+		out.ClonedPlugins = append(out.ClonedPlugins, DBLessClonedPlugin{
+			ID:       firstNonEmpty(plugin.ID, StableUUID("cloned_plugin:"+plugin.Name)),
+			Name:     plugin.Name,
+			Ref:      plugin.Ref,
+			Priority: plugin.Priority,
+		})
+	}
+
 	for _, cert := range d.CACertificates {
 		out.CACertificates = append(out.CACertificates, DBLessCACertificate{
 			ID:         firstNonEmpty(cert.ID, StableUUID("ca_certificate:"+cert.Cert)),

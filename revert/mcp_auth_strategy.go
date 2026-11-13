@@ -28,20 +28,20 @@ import (
 func (r *Reverter) revertMCPAccess(m *aigw.MCPServer, plugins []kong.Plugin) []kong.Plugin {
 	var rest []kong.Plugin
 	for _, p := range plugins {
-		switch p.Name {
+		switch idpType := r.pluginType(p); idpType {
 		case "ai-mcp-oauth2":
 			r.applyMCPOAuth2(m, p)
 		case "key-auth", "openid-connect":
 			// The MCP lowering has a protected_resource_metadata block. A
 			// plain openid-connect plugin has none.
-			if p.Name == "openid-connect" {
+			if idpType == "openid-connect" {
 				if prm := getMap(p.Config, "protected_resource_metadata"); getStr(prm, "resource") != "" {
 					r.applyMCPOIDCProtectedResource(m, p, prm)
 					continue
 				}
 			}
 			p.Config = withoutHiddenAccessTokenHeader(p.Config)
-			idp := r.registerAuthStrategy(p)
+			idp := r.registerAuthStrategy(p, idpType)
 			m.Access.AuthStrategies = append(m.Access.AuthStrategies, idp.Name)
 		default:
 			rest = append(rest, p)
@@ -81,7 +81,7 @@ func (r *Reverter) applyMCPOIDCProtectedResource(
 	}
 	cfg = withoutHiddenAccessTokenHeader(cfg)
 
-	idp := r.registerAuthStrategy(kong.Plugin{Name: "openid-connect", Config: cfg})
+	idp := r.registerAuthStrategy(kong.Plugin{Name: "openid-connect", Config: cfg}, "openid-connect")
 	m.Access.AuthStrategies = append(m.Access.AuthStrategies, idp.Name)
 }
 
@@ -111,7 +111,7 @@ func (r *Reverter) applyMCPOAuth2(m *aigw.MCPServer, p kong.Plugin) {
 		// reconstruct.
 		return
 	}
-	idp := r.registerAuthStrategy(kong.Plugin{Name: "openid-connect", Config: oidcCfg})
+	idp := r.registerAuthStrategy(kong.Plugin{Name: "openid-connect", Config: oidcCfg}, "openid-connect")
 	m.Access.AuthStrategies = append(m.Access.AuthStrategies, idp.Name)
 }
 

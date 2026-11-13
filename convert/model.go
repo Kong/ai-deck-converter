@@ -210,6 +210,9 @@ type modelPass struct {
 	skipped map[int][]ConversionIssue
 	// tokenVaults holds the token-vault-exchange config of each model.
 	tokenVaults map[*aigw.Model]map[string]any
+	// clonedPlugins holds the plugin clones the model-scoped response
+	// transformers need, deduped by name.
+	clonedPlugins map[string]kong.ClonedPlugin
 }
 
 // convertModels groups all (model, target, capability) tuples into routes under
@@ -253,6 +256,7 @@ func (c *Converter) convertModelsPass(skipped map[int][]ConversionIssue) bool {
 		aliasConflicts:      map[string]bool{},
 		skipped:             skipped,
 		tokenVaults:         map[*aigw.Model]map[string]any{},
+		clonedPlugins:       map[string]kong.ClonedPlugin{},
 	}
 	c.modelRouteModels = map[string][]string{}
 	lifecycleCandidates := c.videoLifecycleCandidates(skipped)
@@ -346,7 +350,21 @@ func (c *Converter) convertModelsPass(skipped map[int][]ConversionIssue) bool {
 		}
 	}
 	c.out.Plugins = append(c.out.Plugins, st.guardPlugins...)
+	c.appendModelClones(st)
 	return true
+}
+
+// appendModelClones adds the plugin clones of the pass to the document in a
+// stable name order.
+func (c *Converter) appendModelClones(st *modelPass) {
+	names := make([]string, 0, len(st.clonedPlugins))
+	for name := range st.clonedPlugins {
+		names = append(names, name)
+	}
+	slices.Sort(names)
+	for _, name := range names {
+		c.out.ClonedPlugins = append(c.out.ClonedPlugins, st.clonedPlugins[name])
+	}
 }
 
 // appendTokenVaultExchange adds the token-vault-exchange plugin of pg with
@@ -905,6 +923,7 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 		return err
 	}
 	plugins = sourceScopedPlugins(plugins, "model", m.Name)
+	clones := c.planResponseTransformerClones(src, m.Policies, plugins, fkScoped)
 	for _, routeName := range routeNames {
 		if lifecycleRouteNames[routeName] {
 			c.attachLifecycleGuards(st, src, m, routeName, plugins)
@@ -913,7 +932,15 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 		for k := range plugins {
 			p := plugins[k]
 			p.Route = kong.NewStringRef(routeName)
-			if protocols, ok := st.websocketRoutes[routeName]; ok {
+			protocols, websocket := st.websocketRoutes[routeName]
+			if clone, ok := clones[k]; ok {
+				var cloneDef *kong.ClonedPlugin
+				p, cloneDef = applyPostAIClone(p, clone, websocket)
+				if cloneDef != nil {
+					st.clonedPlugins[cloneDef.Name] = *cloneDef
+				}
+			}
+			if websocket {
 				if !aimap.SupportsWebSocket(p.Name) {
 					c.warn(src.at(scopedPluginField(m.Policies, p)), ConfigFieldDropped,
 						"model %q uses plugin %q, which does not support the ws and wss protocols. "+
@@ -1183,8 +1210,16 @@ func (c *Converter) convertVideoLifecycle(
 		return err
 	}
 	plugins = sourceScopedPlugins(plugins, "model", candidate.model.Name)
+	clones := c.planResponseTransformerClones(src, candidate.model.Policies, plugins, true)
 	for i := range plugins {
 		plugins[i].Route = kong.NewStringRef(routeName)
+		if clone, ok := clones[i]; ok {
+			var cloneDef *kong.ClonedPlugin
+			plugins[i], cloneDef = applyPostAIClone(plugins[i], clone, false)
+			if cloneDef != nil {
+				st.clonedPlugins[cloneDef.Name] = *cloneDef
+			}
+		}
 		c.out.Plugins = append(c.out.Plugins, plugins[i])
 	}
 	idpPlugins, err := c.scopedAuthStrategyPlugins(src, candidate.model.Access.AuthStrategies)

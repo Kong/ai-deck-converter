@@ -163,6 +163,9 @@ func (r *Reverter) run() error {
 	if err := r.revertCustomPolicies(); err != nil {
 		return err
 	}
+	if err := r.warnClonedPlugins(); err != nil {
+		return err
+	}
 	r.revertGlobalPolicies()
 	r.revertVaults()
 	r.revertCACertificates()
