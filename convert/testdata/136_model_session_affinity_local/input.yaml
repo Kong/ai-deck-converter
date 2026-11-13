@@ -1,0 +1,32 @@
+models:
+  - type: model
+    display_name: gpt-4o
+    name: gpt-4o
+    capabilities: [generate]
+    formats:
+      - type: openai
+    targets:
+      - name: gpt-4o
+        provider: openai-main
+        config:
+          type: openai
+    config:
+      route:
+        paths: [/ai]
+      balancer:
+        algorithm: lowest-latency
+        latency_strategy: tpot
+        session_affinity:
+          enabled: true
+          ttl: 3600
+          storage:
+            type: local
+model_providers:
+  - name: openai-main
+    type: openai
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: Bearer sk-test

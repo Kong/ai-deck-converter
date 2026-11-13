@@ -96,6 +96,9 @@ const (
 	// "credentials" from it. See CollapseSanitizerAnonymize.
 	//nolint:gosec // a feature name, not a credential
 	FeatureSanitizerAllWithCredentials Feature = "sanitizer-all-with-credentials"
+	// FeatureSessionAffinity is the model field config.balancer.session_affinity.
+	// It becomes the ai-proxy-advanced field conversation_state.
+	FeatureSessionAffinity Feature = "session-affinity"
 )
 
 // featureSince maps each feature to its first AI Gateway release. The source
@@ -124,6 +127,7 @@ var featureSince = map[Feature]Version{
 	FeatureAuthStrategyTokenVault:        mustVersion("2.3"),
 	FeatureOIDCProtectedResourceMetadata: mustVersion("2.3"),
 	FeatureSanitizerAllWithCredentials:   mustVersion("2.3"),
+	FeatureSessionAffinity:               mustVersion("2.4"),
 }
 
 // Since returns the first AI Gateway release that has f. It panics for an
