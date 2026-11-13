@@ -1,0 +1,69 @@
+_format_version: "3.0"
+services:
+  - name: booking
+    host: booking-upstream
+    protocol: https
+    path: /a2a
+    routes:
+      - name: booking-route
+        paths:
+          - /booking
+        plugins:
+          - name: ai-a2a-proxy
+            config: {}
+  - name: plain
+    host: plain-upstream
+    protocol: http
+    routes:
+      - name: plain-route
+        paths:
+          - /plain
+  - name: nobalancer
+    host: nobalancer-upstream
+    routes:
+      - name: nobalancer-route
+        paths:
+          - /nobalancer
+  - name: failover
+    host: failover-upstream
+    protocol: https
+    routes:
+      - name: failover-route
+        paths:
+          - /failover
+upstreams:
+  - name: booking-upstream
+    algorithm: consistent-hashing
+    hash_on: header
+    hash_on_header: X-Session
+    targets:
+      - target: booking-1.internal:8443
+        weight: 200
+      - target: booking-2.internal:8443
+  - name: plain-upstream
+    algorithm: latency
+    targets:
+      - target: a.internal:80
+  - name: nobalancer-upstream
+    algorithm: round-robin
+    targets:
+      - target: c.internal:80
+  - name: failover-upstream
+    algorithm: least-connections
+    healthchecks:
+      active:
+        type: https
+        http_path: /.well-known/agent-card.json
+        healthy:
+          interval: 5
+          successes: 2
+        unhealthy:
+          interval: 5
+          tcp_failures: 3
+      passive:
+        unhealthy:
+          http_failures: 5
+    targets:
+      - target: primary.internal:443
+      - target: backup.internal:443
+        failover: true

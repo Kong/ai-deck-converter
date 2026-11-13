@@ -1,0 +1,64 @@
+- code: CONFIG_FIELD_INVALID
+  reason: agent "hashing-failover" target 1 is a failover target, which consistent-hashing does not support
+  source:
+    kind: agent
+    name: hashing-failover
+    fields:
+      - config.targets[1].failover
+  severity: ERROR
+- code: CONFIG_FIELD_INVALID
+  reason: agent "only-failover" has only failover targets; at least one target must not be a failover target
+  source:
+    kind: agent
+    name: only-failover
+    fields:
+      - config.targets
+  severity: ERROR
+- code: CONFIG_FIELD_INVALID
+  reason: agent "repeated-address" target 1 repeats the address "a.internal:443" of target 0
+  source:
+    kind: agent
+    name: repeated-address
+    fields:
+      - config.targets[1].address
+  severity: ERROR
+- code: MISSING_REQUIRED_CONFIG_FIELD
+  reason: agent "no-hash-header" uses consistent-hashing without config.balancer.hash_on_header
+  source:
+    kind: agent
+    name: no-hash-header
+    fields:
+      - config.balancer.hash_on_header
+  severity: ERROR
+- code: CONFIG_FIELD_INVALID
+  reason: agent "url-with-protocol" sets config.protocol, which requires config.targets
+  source:
+    kind: agent
+    name: url-with-protocol
+    fields:
+      - config.protocol
+  severity: ERROR
+- code: CONFIG_FIELD_INVALID
+  reason: agent "bad-protocol" has unsupported config.protocol "grpc"; use http or https
+  source:
+    kind: agent
+    name: bad-protocol
+    fields:
+      - config.protocol
+  severity: ERROR
+- code: CONFIG_FIELD_INVALID
+  reason: agent "bad-path" config.path "a2a" must start with /
+  source:
+    kind: agent
+    name: bad-path
+    fields:
+      - config.path
+  severity: ERROR
+- code: CONFIG_FIELD_IGNORED
+  reason: agent "ignored-hash-header" sets config.balancer.hash_on_header, which only consistent-hashing uses
+  source:
+    kind: agent
+    name: ignored-hash-header
+    fields:
+      - config.balancer.hash_on_header
+  severity: WARNING

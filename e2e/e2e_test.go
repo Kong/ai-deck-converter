@@ -67,6 +67,7 @@ func TestE2E(t *testing.T) {
 		{"token_vault_exchange_credential_placement", func(t *testing.T) { testTokenVaultExchangeCredentialPlacement(t, license) }},
 		{"token_vault_callback_oidc_enrollment", func(t *testing.T) { testTokenVaultCallbackOIDCEnrollment(t, license) }},
 		{"token_vault_manager_session_enrollment", func(t *testing.T) { testTokenVaultManagerSessionEnrollment(t, license) }},
+		{"agent_targets_failover", func(t *testing.T) { testAgentTargetsFailover(t, license) }},
 	}
 	for _, c := range cases {
 		c := c

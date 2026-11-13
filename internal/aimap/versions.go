@@ -88,6 +88,7 @@ const (
 	FeatureBaseten                    Feature = "baseten"
 	FeatureSagemaker                  Feature = "sagemaker"
 	FeatureAuthStrategyTokenVault     Feature = "auth-strategy-token-vault"
+	FeatureAgentTargets               Feature = "agent-targets"
 	// FeatureOIDCProtectedResourceMetadata is the openid-connect plugin field
 	// protected_resource_metadata. It is a plugin schema gate, not an API field.
 	FeatureOIDCProtectedResourceMetadata Feature = "oidc-protected-resource-metadata"
@@ -122,6 +123,7 @@ var featureSince = map[Feature]Version{
 	FeatureBaseten:                       mustVersion("2.3"),
 	FeatureSagemaker:                     mustVersion("2.1"),
 	FeatureAuthStrategyTokenVault:        mustVersion("2.3"),
+	FeatureAgentTargets:                  mustVersion("2.4"),
 	FeatureOIDCProtectedResourceMetadata: mustVersion("2.3"),
 	FeatureSanitizerAllWithCredentials:   mustVersion("2.3"),
 }

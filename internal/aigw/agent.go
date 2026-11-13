@@ -48,10 +48,16 @@ func (a *AgentAccessConfig) UnmarshalYAML(node *yaml.Node) error {
 // AgentConfig holds the upstream URL, route, logging, upstream-auth, and proxy
 // configuration.
 type AgentConfig struct {
-	URL                string      `yaml:"url,omitempty"`
-	Route              RouteConfig `yaml:"route,omitempty"`
-	MaxRequestBodySize *int        `yaml:"max_request_body_size,omitempty"`
-	Logging            *Logging    `yaml:"logging,omitempty"`
+	URL string `yaml:"url,omitempty"`
+	// Targets replace URL. They lower to a Kong Upstream. Balancer,
+	// Protocol, and Path are valid only with Targets.
+	Targets            []UpstreamTarget  `yaml:"targets,omitempty"`
+	Balancer           *UpstreamBalancer `yaml:"balancer,omitempty"`
+	Protocol           string            `yaml:"protocol,omitempty"`
+	Path               string            `yaml:"path,omitempty"`
+	Route              RouteConfig       `yaml:"route,omitempty"`
+	MaxRequestBodySize *int              `yaml:"max_request_body_size,omitempty"`
+	Logging            *Logging          `yaml:"logging,omitempty"`
 	// Upstream lowers to the ai-a2a-proxy plugin's auth record (upstream
 	// authentication, e.g. AWS SigV4).
 	Upstream *UpstreamConfig `yaml:"upstream,omitempty"`

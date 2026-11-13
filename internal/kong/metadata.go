@@ -14,6 +14,8 @@ type ConversionMetadata struct {
 	Plugins       []GeneratedEntitySource
 	Routes        []GeneratedEntitySource
 	Services      []GeneratedEntitySource
+	Upstreams     []GeneratedEntitySource
+	Targets       []GeneratedEntitySource
 	// MinRuntimeVersion is the minimum runtime version that the conversion
 	// used, in the form MAJOR.MINOR.
 	MinRuntimeVersion string
@@ -33,7 +35,7 @@ type PluginTargetSource struct {
 }
 
 // GeneratedEntitySource identifies the source API entity for a generated
-// plugin, route, or service. FieldPrefix is used for direct field mappings;
+// plugin, route, service, upstream, or target. FieldPrefix is used for direct field mappings;
 // FieldMappings handle generated field names that differ from the API model.
 type GeneratedEntitySource struct {
 	Index         int

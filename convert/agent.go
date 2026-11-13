@@ -20,9 +20,19 @@ func (c *Converter) convertAgents() {
 }
 
 func (c *Converter) convertAgent(src ConversionIssueSource, a *aigw.Agent) error {
-	if a.Config.URL == "" {
+	targetsMode := len(a.Config.Targets) > 0
+	if targetsMode && a.Config.URL != "" {
+		return c.fail(src.at("config.url", "config.targets"), ConfigFieldInvalid,
+			"agent %q sets both config.url and config.targets; use one", a.Name)
+	}
+	if !targetsMode && a.Config.URL == "" {
 		return c.fail(src.at("config.url"), MissingRequiredConfigField,
-			"agent %q has no config.url; the Service needs an upstream", a.Name)
+			"agent %q has no config.url or config.targets; the Service needs an upstream", a.Name)
+	}
+	if !targetsMode {
+		if err := c.checkAgentURLOnlyFields(src, a); err != nil {
+			return err
+		}
 	}
 	route := buildRoute(a.Config.Route, a.Name)
 	route.Source = source("agent", a.Name, "config.route")
@@ -68,6 +78,11 @@ func (c *Converter) convertAgent(src ConversionIssueSource, a *aigw.Agent) error
 		Routes: []kong.Route{route},
 		Tags:   c.labelsToTags(a.Labels),
 		Source: serviceURLSource("agent", a.Name),
+	}
+	if targetsMode {
+		if err := c.applyAgentTargets(src, a, &svc); err != nil {
+			return err
+		}
 	}
 	// A disabled agent maps to a disabled Gateway Service so the DP stops
 	// proxying it. enabled defaults to true, so only emit the flag when the

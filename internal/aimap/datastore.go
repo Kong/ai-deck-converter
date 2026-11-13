@@ -403,6 +403,10 @@ func CheckTokenVaultDirectory(ds *aigw.Datastore) error {
 	return nil
 }
 
+// TokenVaultExchangeName is the name of the plugin that a provider's
+// token_vault lowers into.
+const TokenVaultExchangeName = "token-vault-exchange" //nolint:gosec // a plugin name, not a credential
+
 // TokenVaultCallbackName is the name of the route and of the plugin that
 // handle the Token Vault callback.
 const TokenVaultCallbackName = "token-vault-callback-handler"

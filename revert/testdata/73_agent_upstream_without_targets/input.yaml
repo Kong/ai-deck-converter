@@ -1,0 +1,12 @@
+_format_version: "3.0"
+services:
+  - name: booking
+    host: booking-upstream
+    protocol: https
+    routes:
+      - name: booking-route
+        paths:
+          - /booking
+upstreams:
+  - name: booking-upstream
+    algorithm: round-robin

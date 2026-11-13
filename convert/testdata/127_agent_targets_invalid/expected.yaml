@@ -1,0 +1,29 @@
+_format_version: "3.0"
+services:
+  - name: ignored-hash-header
+    host: ignored-hash-header-upstream
+    protocol: https
+    routes:
+      - name: ignored-hash-header-route
+        paths:
+          - /ignored-hash-header
+upstreams:
+  - name: ignored-hash-header-upstream
+    algorithm: round-robin
+    healthchecks:
+      active:
+        type: tcp
+        healthy:
+          interval: 10
+          successes: 2
+        unhealthy:
+          interval: 10
+          tcp_failures: 3
+          timeouts: 3
+      passive:
+        type: tcp
+        unhealthy:
+          tcp_failures: 3
+          timeouts: 3
+    targets:
+      - target: a.internal:443

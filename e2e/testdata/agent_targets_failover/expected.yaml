@@ -1,0 +1,46 @@
+_format_version: "3.0"
+_transform: false
+services:
+  - id: 0cd2569f-64d5-53f4-ab64-1dec512148cc
+    name: booking
+    host: booking-upstream
+    protocol: http
+upstreams:
+  - id: 38959305-4a7a-5e69-8a65-9077b411597c
+    name: booking-upstream
+    algorithm: round-robin
+    healthchecks:
+      active:
+        type: tcp
+        healthy:
+          interval: 10
+          successes: 2
+        unhealthy:
+          interval: 10
+          tcp_failures: 3
+          timeouts: 3
+      passive:
+        type: tcp
+        unhealthy:
+          tcp_failures: 3
+          timeouts: 3
+targets:
+  - id: 25513ca3-453f-5ae6-92b4-fb993a15a523
+    upstream:
+      id: 38959305-4a7a-5e69-8a65-9077b411597c
+    target: host.docker.internal:1
+  - id: 80c1a26f-5fe9-59a3-b8a4-96f38e504158
+    upstream:
+      id: 38959305-4a7a-5e69-8a65-9077b411597c
+    target: host.docker.internal:2
+    failover: true
+routes:
+  - id: cff88e46-5b30-5312-b667-aa91ecad12a6
+    name: booking-route
+    service:
+      id: 0cd2569f-64d5-53f4-ab64-1dec512148cc
+    paths:
+      - /booking
+    protocols:
+      - http
+      - https

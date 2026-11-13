@@ -1,0 +1,8 @@
+agents:
+  - type: http
+    name: booking
+    config:
+      url: https://booking-upstream
+      route:
+        paths:
+          - /booking

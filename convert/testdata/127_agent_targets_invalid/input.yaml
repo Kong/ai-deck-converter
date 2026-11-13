@@ -1,0 +1,79 @@
+agents:
+  - name: hashing-failover
+    type: http
+    display_name: Hashing failover
+    config:
+      targets:
+        - address: a.internal:443
+        - address: b.internal:443
+          failover: true
+      balancer:
+        algorithm: consistent-hashing
+        hash_on_header: X-Session
+      route:
+        paths: [/hashing-failover]
+  - name: only-failover
+    type: http
+    display_name: Only failover
+    config:
+      targets:
+        - address: a.internal:443
+          failover: true
+      route:
+        paths: [/only-failover]
+  - name: repeated-address
+    type: http
+    display_name: Repeated address
+    config:
+      targets:
+        - address: a.internal:443
+        - address: a.internal:443
+      route:
+        paths: [/repeated-address]
+  - name: no-hash-header
+    type: http
+    display_name: No hash header
+    config:
+      targets:
+        - address: a.internal:443
+      balancer:
+        algorithm: consistent-hashing
+      route:
+        paths: [/no-hash-header]
+  - name: url-with-protocol
+    type: http
+    display_name: URL with protocol
+    config:
+      url: https://a.internal
+      protocol: https
+      route:
+        paths: [/url-with-protocol]
+  - name: bad-protocol
+    type: http
+    display_name: Bad protocol
+    config:
+      protocol: grpc
+      targets:
+        - address: a.internal:443
+      route:
+        paths: [/bad-protocol]
+  - name: bad-path
+    type: http
+    display_name: Bad path
+    config:
+      path: a2a
+      targets:
+        - address: a.internal:443
+      route:
+        paths: [/bad-path]
+  - name: ignored-hash-header
+    type: http
+    display_name: Ignored hash header
+    config:
+      targets:
+        - address: a.internal:443
+      balancer:
+        algorithm: round-robin
+        hash_on_header: X-Session
+      route:
+        paths: [/ignored-hash-header]

@@ -21,3 +21,17 @@ type UpstreamAuth struct {
 	RoleSessionName string `yaml:"role_session_name,omitempty"`
 	STSEndpointURL  string `yaml:"sts_endpoint_url,omitempty"`
 }
+
+// UpstreamTarget is one load-balanced upstream address of an agent.
+type UpstreamTarget struct {
+	Address  string `yaml:"address,omitempty"`
+	Failover *bool  `yaml:"failover,omitempty"`
+	Weight   *int   `yaml:"weight,omitempty"`
+}
+
+// UpstreamBalancer is the balancer of an agent with targets. It lowers to
+// the Upstream.
+type UpstreamBalancer struct {
+	Algorithm    string `yaml:"algorithm,omitempty"`
+	HashOnHeader string `yaml:"hash_on_header,omitempty"`
+}

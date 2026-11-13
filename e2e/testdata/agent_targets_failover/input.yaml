@@ -1,0 +1,15 @@
+# The primary target is a closed port. A request that fails on it is retried on
+# the failover target. The default health checks also mark the primary
+# unhealthy.
+agents:
+  - name: booking
+    type: http
+    display_name: Booking
+    config:
+      protocol: http
+      targets:
+        - address: host.docker.internal:1
+        - address: host.docker.internal:2
+          failover: true
+      route:
+        paths: [/booking]
