@@ -1,13 +1,14 @@
 # A WebSocket route has no anonymous fallback, so more than one auth
 # strategy cannot protect it. Under "*", the two-strategy model loses only
 # its realtime endpoint, with no issue. The one-strategy model keeps it.
+# Both models list ws and wss, so only the auth leaves realtime out.
 models:
   - name: two-strategies
     type: model
     capabilities: ["*"]
     formats: [{type: openai}]
     config:
-      route: {paths: [/two]}
+      route: {paths: [/two], protocols: [http, https, ws, wss]}
     targets:
       - name: gpt-5.4
         provider: openai-prod
@@ -18,7 +19,7 @@ models:
     capabilities: ["*"]
     formats: [{type: openai}]
     config:
-      route: {paths: [/one]}
+      route: {paths: [/one], protocols: [http, https, ws, wss]}
     targets:
       - name: gpt-5.4
         provider: openai-prod

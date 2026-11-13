@@ -412,13 +412,13 @@ func TestRealtimeRouteUsesWebSocketTransport(t *testing.T) {
 	httpService, chat := routeByName(t, doc, "openai-chat")
 	require.Equal(t, aimap.GatewayServiceName, httpService.Name)
 	require.Equal(t, []string{"GET", "POST"}, chat.Methods)
-	require.Equal(t, []string{"https"}, chat.Protocols, "wss maps to its HTTP counterpart")
+	require.Equal(t, []string{"https"}, chat.Protocols, "each route keeps the protocols of its transport")
 
 	wsService, realtime := routeByName(t, doc, "openai-realtime")
 	require.Equal(t, aimap.GatewayWebSocketServiceName, wsService.Name)
 	require.Equal(t, aimap.GatewayWebSocketServiceURL, wsService.URL)
 	require.Nil(t, realtime.Methods)
-	require.Equal(t, []string{"wss"}, realtime.Protocols, "https maps to its WebSocket counterpart")
+	require.Equal(t, []string{"wss"}, realtime.Protocols, "each route keeps the protocols of its transport")
 
 	plugins := pluginsOnRoute(doc, "openai-realtime")
 	require.Len(t, plugins, 1, "no ai-model-selector on the WebSocket route")
@@ -426,13 +426,154 @@ func TestRealtimeRouteUsesWebSocketTransport(t *testing.T) {
 	require.Nil(t, plugins[0].Model)
 	require.Equal(t, []string{"wss"}, plugins[0].Protocols)
 
-	require.Len(t, warnings, 3)
-	require.Contains(t, warnings[0], `overridden to [https] on the "openai-chat" route`)
-	require.Contains(t, warnings[1], `ignored on the WebSocket route "openai-realtime"`)
-	require.Contains(t, warnings[2], `overridden to [wss] on the "openai-realtime" route`)
+	// Protocols of both transports give no override warning.
+	require.Len(t, warnings, 1)
+	require.Contains(t, warnings[0], `ignored on the WebSocket route "openai-realtime"`)
 
 	_, _, err := convertDoc([]byte(src), true)
 	require.Error(t, err)
+}
+
+func TestRealtimeRouteMapsProtocolsOfOtherTransport(t *testing.T) {
+	src := `models:
+  - name: m
+    capabilities: [generate, realtime]
+    config:
+      route:
+        paths: [/ai]
+        protocols: [https]
+    targets: [{name: t, provider: openai-prod, config: {type: openai}}]
+` + overrideProvider
+	doc, warnings := convertRealtimeDocument(t, src)
+
+	_, chat := routeByName(t, doc, "openai-chat")
+	require.Equal(t, []string{"https"}, chat.Protocols)
+	_, realtime := routeByName(t, doc, "openai-realtime")
+	require.Equal(t, []string{"wss"}, realtime.Protocols, "https maps to its WebSocket counterpart")
+
+	require.Len(t, warnings, 1)
+	require.Contains(t, warnings[0], `overridden to [wss] on the "openai-realtime" route`)
+}
+
+func TestWildcardProtocolsSelectEndpoints(t *testing.T) {
+	for _, tc := range []struct {
+		protocols      string
+		http, realtime bool
+	}{
+		{"", true, false},
+		{"protocols: [https]", true, false},
+		{"protocols: [https, wss]", true, true},
+		{"protocols: [wss]", false, true},
+	} {
+		t.Run(tc.protocols, func(t *testing.T) {
+			src := `models:
+  - name: m
+    capabilities: ["*"]
+    config:
+      route:
+        paths: [/ai]
+        ` + tc.protocols + `
+    targets: [{name: t, provider: openai-prod, config: {type: openai}}]
+` + overrideProvider
+			result, err := Convert([]byte(src), testOptions)
+			require.NoError(t, err)
+			require.Empty(t, result.Issues)
+			names := map[string]bool{}
+			for _, svc := range result.Output.Services {
+				for _, rt := range svc.Routes {
+					names[rt.Name] = true
+				}
+			}
+			require.Equal(t, tc.http, names["openai-chat"])
+			require.Equal(t, tc.realtime, names["openai-realtime"])
+		})
+	}
+}
+
+func TestWildcardProtocolsWithNoEndpointFailModel(t *testing.T) {
+	src := []byte(`models:
+  - name: m
+    capabilities: ["*"]
+    config: {route: {paths: [/ai], protocols: [grpc]}}
+    targets: [{name: t, provider: openai-prod, config: {type: openai}}]
+` + overrideProvider)
+	result, err := Convert(src, testOptions)
+	require.NoError(t, err)
+	requireIssue(t, result.Issues, Error, ConfigFieldInvalid, kindModel, "m", "config.route.protocols")
+	require.Empty(t, result.Output.Services)
+}
+
+func TestWildcardProtocolsBlameOnlyWhenTheyLeaveOutEndpoints(t *testing.T) {
+	// A mistral target has no API capability. The model has no endpoint
+	// with or without protocols, so the protocols get no issue.
+	apiModel := func(protocols string) []byte {
+		return []byte(`models:
+  - name: m
+    type: api
+    capabilities: ["*"]
+    config: {route: {paths: [/ai]` + protocols + `}}
+    targets: [{name: t, provider: mistral-prod}]
+model_providers:
+  - name: mistral-prod
+    type: mistral
+    config:
+      auth: {type: bearer, token: key}
+`)
+	}
+	withoutProtocols, err := Convert(apiModel(""), testOptions)
+	require.NoError(t, err)
+	withProtocols, err := Convert(apiModel(", protocols: [http, https]"), testOptions)
+	require.NoError(t, err)
+	require.Equal(t, withoutProtocols.Issues, withProtocols.Issues)
+
+	// wss selects only realtime, which two auth strategies cannot protect.
+	src := []byte(`models:
+  - name: m
+    capabilities: ["*"]
+    config: {route: {paths: [/ai], protocols: [wss]}}
+    access: {auth_strategies: [okta-oidc, key-auth-default]}
+    targets: [{name: t, provider: openai-prod, config: {type: openai}}]
+auth_strategies:
+  - name: okta-oidc
+    type: openid-connect
+    config: {issuer: https://dev-123456.okta.com/oauth2/default}
+  - name: key-auth-default
+    type: key-auth
+    config: {key_names: [x-api-key]}
+` + overrideProvider)
+	result, err := Convert(src, testOptions)
+	require.NoError(t, err)
+	issue := requireIssue(t, result.Issues, Error, ConfigFieldInvalid, kindModel, "m", "config.route.protocols")
+	require.Contains(t, issue.Reason, "cannot protect the WebSocket endpoints")
+}
+
+func TestWildcardProtocolsEmptyFormatWithoutIssue(t *testing.T) {
+	// wss leaves the anthropic format no endpoint. The openai format keeps
+	// realtime, so the model converts with no issue.
+	src := []byte(`models:
+  - name: m
+    capabilities: ["*"]
+    formats: [{type: anthropic}, {type: openai}]
+    config: {route: {paths: [/ai], protocols: [wss]}}
+    targets: [{name: t, provider: openai-prod, config: {type: openai}}]
+` + overrideProvider)
+	result, err := Convert(src, testOptions)
+	require.NoError(t, err)
+	require.Empty(t, result.Issues)
+	_, realtime := routeByName(t, result.Output, "openai-realtime")
+	require.Equal(t, []string{"wss"}, realtime.Protocols)
+
+	// A format that no target supports still gets the warning.
+	src = []byte(`models:
+  - name: m
+    capabilities: ["*"]
+    formats: [{type: cohere}, {type: openai}]
+    config: {route: {paths: [/ai], protocols: [wss]}}
+    targets: [{name: t, provider: openai-prod, config: {type: openai}}]
+` + overrideProvider)
+	result, err = Convert(src, testOptions)
+	require.NoError(t, err)
+	requireIssue(t, result.Issues, Warning, ConfigFieldDropped, kindModel, "m", "formats[0].type")
 }
 
 func TestRealtimeRoutesAreNotSharedBetweenModels(t *testing.T) {
@@ -717,7 +858,7 @@ func TestRealtimeRouteSkipsRateLimitingAdvanced(t *testing.T) {
   - name: azure-everything
     capabilities: ["*"]
     formats: [{type: openai}]
-    config: {route: {paths: [/ai]}}
+    config: {route: {paths: [/ai], protocols: [https, wss]}}
     policies: [token-limit]
     targets:
       - name: gpt-5-4

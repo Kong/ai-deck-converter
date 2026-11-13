@@ -1,0 +1,8 @@
+- code: CONFIG_FIELD_INVALID
+  reason: 'model "grpc-only": config.route.protocols [grpc] leave out every endpoint that a target supports'
+  source:
+    kind: model
+    name: grpc-only
+    fields:
+      - config.route.protocols
+  severity: ERROR

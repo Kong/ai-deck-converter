@@ -51,6 +51,11 @@ type modelGroup struct {
 	// statsForced and payloadsForced are true when an endpoint forced the
 	// value. With no supporting endpoint, the value stays unset.
 	statsForced, payloadsForced bool
+	// wsProtocols holds the protocols of the WebSocket routes of g. They stay
+	// out of the route key. Routes of both transports then group together.
+	wsProtocols []string
+	// hasHTTPRoute is true when g has a route that is not a WebSocket route.
+	hasHTTPRoute bool
 }
 
 // targetFingerprint returns a stable dedup key for a reconstructed target
@@ -297,6 +302,7 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 					return err
 				}
 			}
+			g.recordTransport(rt)
 			if seq := &acc.routeGroups[len(acc.routeGroups)-1]; !slices.Contains(*seq, g) {
 				*seq = append(*seq, g)
 			}
@@ -869,6 +875,7 @@ func (r *Reverter) finalizeModels(acc *modelAcc) error {
 		g.model.Capabilities = g.capabilities()
 		g.model.Formats = g.formats()
 		g.finishLogging()
+		g.finishProtocols()
 		if isAPIOnly(g.model.Capabilities) {
 			g.model.Type = "api"
 		}

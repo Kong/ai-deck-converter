@@ -6,7 +6,7 @@ models:
     capabilities: ["*"]
     formats: [{type: "*"}]
     config:
-      route: {paths: [/ai]}
+      route: {paths: [/ai], protocols: [http, https, ws, wss]}
     targets:
       - {name: gpt-5.4, provider: openai-prod}
       - name: gpt-5-4

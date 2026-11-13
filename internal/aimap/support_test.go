@@ -198,21 +198,26 @@ func TestSupportedCapabilities(t *testing.T) {
 			"generate", "agentic", "audio/speech", "audio/transcription", "audio/translation",
 			"embeddings", "image", "realtime", "video",
 		},
-		SupportedCapabilities(aigw.Format{Type: "openai"}, openai, "model", LatestVersion))
+		SupportedCapabilities(aigw.Format{Type: "openai"}, openai, "model", []string{"https", "wss"}, LatestVersion))
+	// The Kong default protocols select no WebSocket endpoint.
+	require.NotContains(t,
+		SupportedCapabilities(aigw.Format{Type: "openai"}, openai, "model", nil, LatestVersion), "realtime")
+	require.Equal(t, []aigw.Capability{"realtime"},
+		SupportedCapabilities(aigw.Format{Type: "openai"}, openai, "model", []string{"wss"}, LatestVersion))
 	require.Equal(t, []aigw.Capability{"batches", "files", "skills"},
-		SupportedCapabilities(aigw.Format{Type: "openai"}, openai, "api", mustVersion("2.2")))
+		SupportedCapabilities(aigw.Format{Type: "openai"}, openai, "api", nil, mustVersion("2.2")))
 	require.Equal(t, []aigw.Capability{"batches", "files"},
-		SupportedCapabilities(aigw.Format{Type: "openai"}, openai, "api", mustVersion("2.1")))
+		SupportedCapabilities(aigw.Format{Type: "openai"}, openai, "api", nil, mustVersion("2.1")))
 	// The gemini agentic gate applies only in the gemini section.
 	require.NotContains(t,
-		SupportedCapabilities(aigw.Format{Type: "gemini"}, Target{ProviderType: "gemini"}, "model", mustVersion("2.2")),
+		SupportedCapabilities(aigw.Format{Type: "gemini"}, Target{ProviderType: "gemini"}, "model", nil, mustVersion("2.2")),
 		"agentic")
 
 	// generate claims the invoke route first. Embeddings and image lose it,
 	// because invoke is their only endpoint. Video has its own async-invoke
 	// route.
 	require.Equal(t, []aigw.Capability{"generate", "agentic", "audio/speech", "rerank", "video"},
-		SupportedCapabilities(aigw.Format{Type: "bedrock"}, Target{ProviderType: "bedrock"}, "model", LatestVersion))
+		SupportedCapabilities(aigw.Format{Type: "bedrock"}, Target{ProviderType: "bedrock"}, "model", nil, LatestVersion))
 }
 
 func TestGeminiInteractionsNeedProjectAndLocation(t *testing.T) {
@@ -224,5 +229,53 @@ func TestGeminiInteractionsNeedProjectAndLocation(t *testing.T) {
 		require.Equal(t, !enterprise, TargetSupports("gemini", Target{ProviderType: "gemini"}, ce.Spec), ce.Spec.RouteLabel)
 		require.Equal(t, enterprise,
 			TargetSupports("gemini", Target{ProviderType: "gemini", GeminiEnterprise: true}, ce.Spec), ce.Spec.RouteLabel)
+	}
+}
+
+func TestProtocolsServe(t *testing.T) {
+	chat, _ := EndpointsFor("openai", "generate")
+	realtime, _ := EndpointsFor("openai", "realtime")
+	for _, tc := range []struct {
+		protocols      []string
+		http, realtime bool
+	}{
+		{nil, true, false},
+		{[]string{"https"}, true, false},
+		{[]string{"https", "wss"}, true, true},
+		{[]string{"ws"}, false, true},
+		{[]string{"grpc"}, false, false},
+	} {
+		require.Equal(t, tc.http, ProtocolsServe(tc.protocols, chat[0]), "%v", tc.protocols)
+		require.Equal(t, tc.realtime, ProtocolsServe(tc.protocols, realtime[0]), "%v", tc.protocols)
+	}
+}
+
+func TestTransportProtocols(t *testing.T) {
+	protocols := []string{"https", "wss", "grpc"}
+	require.Equal(t, []string{"https", "grpc"}, TransportProtocols(protocols, false))
+	require.Equal(t, []string{"wss", "grpc"}, TransportProtocols(protocols, true))
+}
+
+func TestRouteProtocols(t *testing.T) {
+	for _, tc := range []struct {
+		in        []string
+		websocket bool
+		want      []string
+	}{
+		{nil, false, nil},
+		{[]string{"https"}, false, []string{"https"}},
+		{[]string{"ws", "wss"}, false, []string{"http", "https"}},
+		{[]string{"http", "ws"}, false, []string{"http"}},
+		{[]string{"grpc"}, false, []string{"grpc"}},
+		// grpc is not an HTTP protocol, so wss still changes to https.
+		{[]string{"grpc", "wss"}, false, []string{"grpc", "https"}},
+		{[]string{"https", "grpc", "wss"}, false, []string{"https", "grpc"}},
+		{nil, true, []string{"ws", "wss"}},
+		{[]string{"https"}, true, []string{"wss"}},
+		{[]string{"grpc"}, true, []string{"ws", "wss"}},
+		{[]string{"http", "ws", "wss"}, true, []string{"ws", "wss"}},
+		{[]string{"grpc", "wss"}, true, []string{"wss"}},
+	} {
+		require.Equal(t, tc.want, RouteProtocols(tc.in, tc.websocket), "%v websocket=%v", tc.in, tc.websocket)
 	}
 }

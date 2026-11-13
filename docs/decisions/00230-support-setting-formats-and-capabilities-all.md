@@ -27,6 +27,7 @@ In scope:
 - setting `*` in model `formats`
 - support creating models with more than one format
 - the format rules that the data plane applies to each provider
+- the route protocols of the model, which limit the endpoints that `*` selects
 
 Out of scope:
 - including the `passthrough` format as part of `*`
@@ -43,6 +44,12 @@ model, inspecting its targets, and building the list of supported
 endpoints. Then the converter will create the supported endpoints for each
 model.
 
+`*` also checks the `config.route.protocols` of the model. It selects an
+endpoint only when the protocols include one of the endpoint's transport.
+For example, `*` adds `realtime` only when the protocols include `ws` or
+`wss`. An absent protocol list keeps the Kong default of `http` and
+`https`, so `*` adds no `realtime` endpoint.
+
 Note: the data plane will reject configuration that contains endpoints that are
 not supported by the targets of the model.
 
@@ -57,6 +64,9 @@ models:
     type: model
     capabilities: ["*"]
     formats: [{type: "*"}]
+    config:
+      route:
+        protocols: [https, wss]
     targets:
       - name: primary
         provider: openai-prod
@@ -75,6 +85,8 @@ models:
 
 - `inference` gets the supported OpenAI inference endpoints and Anthropic
   Messages. Its wildcard excludes `batches`, `files`, and `skills`.
+  Its protocols include `wss`, so it also gets `realtime`. Its HTTP routes
+  get `https`, and its `realtime` route gets `wss`.
 - `provider-api` gets the OpenAI `batches`, `files`, and `skills` endpoints.
   Both targets serve batches and files. Only `primary` serves skills.
   Neither target supports the explicit `cohere` format, so the converter
@@ -113,7 +125,8 @@ func SupportedFormats(targets []Target, minRuntimeVersion Version) []aigw.Format
 // SupportedCapabilities returns the capabilities represented by "*" for a given
 // format, target, model type, and minimum runtime version.
 func SupportedCapabilities(
-	format aigw.Format, target Target, modelType string, minRuntimeVersion Version,
+	format aigw.Format, target Target, modelType string, protocols []string,
+	minRuntimeVersion Version,
 ) []aigw.Capability
 ```
 
@@ -126,7 +139,45 @@ Note: `SupportedFormats()` and `SupportedCapabilities()` validate their
 inputs against two things: the AI data plane's validation rules, and the
 feature gates for the minimum runtime version. The feature gates keep
 version-specific capabilities and formats from leaking into runtimes that
-don't support them.
+don't support them. `SupportedCapabilities()` also checks the route
+protocols of the model. See [Route protocols](#route-protocols).
+
+## Route protocols
+
+Each endpoint has one transport:
+
+- WebSocket: the endpoints of `aimap.IsWebSocketEndpoint`, today only
+  `realtime`. These need `ws` or `wss`.
+- HTTP: every other endpoint, including the generated lifecycle routes.
+  These need `http` or `https`.
+
+Under `*` in `capabilities`, the converter selects an endpoint only when
+`config.route.protocols` includes a protocol of its transport:
+
+| `config.route.protocols` | HTTP endpoints | `realtime` |
+|--------------------------|----------------|------------|
+| absent or `[]`           | selected       | left out   |
+| `[https]`                | selected       | left out   |
+| `[https, wss]`           | selected       | selected   |
+| `[wss]`                  | left out       | selected   |
+
+- An absent or empty list keeps the Kong default of `http` and `https`.
+- Other protocols, for example `grpc`, select no endpoint. An HTTP route
+  keeps them.
+- Each route gets only the protocols of its transport. With
+  `[https, wss]`, the HTTP routes get `[https]` and the `realtime` route
+  gets `[wss]`.
+- A `*` model whose protocols leave out every endpoint fails with
+  `CONFIG_FIELD_INVALID` on `config.route.protocols`. A model that has no
+  endpoint for another reason gets no protocols issue.
+- An explicit format that only the protocols leave with no endpoint gives
+  no `CONFIG_FIELD_DROPPED` warning, because a target supports it.
+
+An explicit capability does not check the protocols. Its route changes each
+protocol to the counterpart on its transport, as today. The converter gives
+the `CONFIG_FIELD_OVERRIDDEN` warning on `config.route.protocols` only when
+the protocols include no protocol of the route's transport. A model that
+lists protocols of both transports gets no warning.
 
 ## Support for multiple model formats
 
@@ -163,7 +214,10 @@ needed:
   format adds routes, an unknown second format fails the model, and the
   new pair order can reorder routes and plugins.
 - **Many generated routes**: one `type: model` model on an `openai`
-  provider makes 12 routes with `*` in both lists.
+  provider makes 12 routes with `*` in both lists and `ws` or `wss` in its
+  protocols.
+- **`realtime` needs a protocol list**: a `*` model with no protocols gets
+  no `realtime` route. The user must add `ws` or `wss`.
 - **Requests can fail on a route that loads**, because `TargetSupports`
   checks the provider and not the model.
 - **Some results under `*` give no issue**, for example, a failover that
@@ -188,6 +242,10 @@ Alternatives:
   limited target remove endpoints from the whole model.
 - **Default absent or empty lists to every value**, which adds routes to
   every existing model.
+- **Ignore the protocols under `*`**, which adds a WebSocket route that the
+  user did not ask for.
+- **Select `realtime` when the protocols are absent**, which adds a `ws`
+  route to a model with the Kong default of `http` and `https`.
 - **A boolean field such as `all_capabilities: true`**, which uses two
   fields for one list.
 - **Warn for each value that `*` leaves out or changes**, which stops
@@ -427,6 +485,8 @@ func LogStatisticsSupported(providerType string, spec EndpointSpec) bool
 target.ProviderType)` without:
 
 - capabilities with no endpoint that `TargetSupports` accepts,
+- capabilities with no endpoint whose transport the route protocols
+  include,
 - capabilities outside the model's type (`type: api` gets only `batches`,
   `files`, and `skills`),
 - capabilities that a `CapabilityFeature` gate leaves out,
@@ -439,8 +499,9 @@ issue. The converter removes duplicate formats and uses the pair order of
 
 ## Special cases
 
-- **`realtime`**: under `*`, a model that cannot protect a WebSocket route
-  loses only its `realtime` endpoint.
+- **`realtime`**: under `*`, a model gets `realtime` only when its route
+  protocols include `ws` or `wss`. A model that cannot protect a WebSocket
+  route loses only its `realtime` endpoint.
 - **Video lifecycle routes**: a `video` capability from `*` gives no
   lifecycle warning.
 - **Version gates**: `*` adds no `Feature`, because it makes only routes
@@ -464,6 +525,8 @@ issue. The converter removes duplicate formats and uses the pair order of
 | Video lifecycle route with 2+ targets                       | no issue        | `WARNING` `BEHAVIOR_MAY_DIFFER` on `targets`                                        |
 | Two video models on one route                               | no issue        | `WARNING` `ROUTING_CONFLICT` on `config.route`                                      |
 | `realtime` that the model cannot protect                    | left out        | model fails, `CONFIG_FIELD_INVALID`                                                 |
+| Route protocols leave out the transport of an endpoint      | left out        | route gets counterpart protocols, `WARNING` `CONFIG_FIELD_OVERRIDDEN` on `config.route.protocols` |
+| Route protocols select no endpoint                          | model fails, `CONFIG_FIELD_INVALID` on `config.route.protocols` | N/A                                  |
 | No target serves a capability                               | N/A             | model fails, `CONFIG_FIELD_INVALID` on the capability                               |
 | Only gated formats serve a capability                       | N/A             | model fails, `UNSUPPORTED_IN_MIN_RUNTIME_VERSION`                                   |
 | A value next to `*`                                         | ignored         | N/A                                                                                 |
@@ -486,6 +549,17 @@ formats and capabilities in pair order, with three changes:
   - A `log_statistics` value equal to the default also stays unset when
     an endpoint of the model forces `false`. Set explicitly, it would give
     a `CONFIG_FIELD_OVERRIDDEN` warning on the second conversion.
+- **Protocols**: it writes the protocols of the HTTP routes, then the
+  protocols of the WebSocket route.
+  - It leaves the protocols unset when the HTTP routes have none and the
+    WebSocket route has the default `[ws, wss]`.
+  - HTTP routes with no protocols add the Kong default `http` and `https`
+    when the WebSocket route has other protocols.
+  - It merges the protocols of all WebSocket routes of the model.
+  - The WebSocket protocols stay out of the route key, so the routes of
+    one model still group together.
+  - A re-conversion of the written list gives the same route protocols
+    and no `CONFIG_FIELD_OVERRIDDEN` warning.
 - **Alias-less groups**: it groups alias-less routes by sorted target
   fingerprints and base paths, so one `type: api` model reverts to one
   model, a fix that can ship separately.
@@ -513,6 +587,12 @@ The round trip stays byte-identical. For a forward model with
 - `targetSupports` becomes `aimap.TargetSupports`, and the `checkTarget`
   mantle check stays only for models with no `openai` or `anthropic`
   format.
+- Under `*`, `targetPairs` leaves out an endpoint whose transport the
+  model's `config.route.protocols` leave out.
+- `warnTransportOverrides` compares each route with the model protocols of
+  the route's transport, not with the full list.
+- The reverter adds the WebSocket route protocols to the model protocols
+  after it groups the routes.
 - Under `*`, `targetPairs` leaves out a WebSocket endpoint that a global
   auth policy or more than one auth strategy cannot protect. An explicit
   `realtime` keeps the existing checks, which fail the model.
@@ -546,16 +626,16 @@ New cases in `convert/testdata`:
 - `87_min_runtime_wildcard_skips_gated`: the API wildcard at 2.1 serves batches
   and files. The converter skips skills without an issue.
 - `91_wildcard_all`: each route of a `*` model has only the targets that
-  support it.
+  support it. Its protocols include `wss`, so it gets `realtime`.
 - `98_wildcard_issues`: an unknown format and a misspelled capability.
 - `99_multi_format_order`: pair order, duplicate formats, and
   `(openai, skills)` on `anthropic`.
 - `100_wildcard_realtime_global_auth`: `realtime` is left out with no
-  issue.
+  issue. Its protocols include `wss`, so only the auth leaves it out.
 - `101_wildcard_targets_and_video`: a `*` model with two targets and video
   models on one route.
 - `102_wildcard_realtime_auth_strategies`: `realtime` stays with one auth
-  strategy.
+  strategy. Its protocols include `wss`.
 - `103_target_support_explicit`: `anthropic` and raw `llama2` targets on
   `embeddings` and an `azure` target on `skills` give `BEHAVIOR_MAY_DIFFER`.
   The `skills` model is `type: api`, because a `type: model` model with
@@ -571,6 +651,13 @@ New cases in `convert/testdata`:
   `log_payloads: false` with a warning.
 - `111_multi_format_explicit`: explicit lists with equal `realtime` paths.
 - `112_wildcard_ignored_values`: values next to `*` with no issue.
+- `137_wildcard_protocols`: `*` models with absent protocols, `[https]`,
+  `[https, wss]`, and `[wss]`, as in the [Route protocols](#route-protocols)
+  table. Each case gives no issue.
+- `138_wildcard_protocols_no_endpoint`: a `*` model with `[grpc]` fails
+  with `CONFIG_FIELD_INVALID` on `config.route.protocols`.
+- `139_explicit_protocols_both_transports`: an explicit `realtime` and
+  `generate` model with `[https, wss]` gives no `CONFIG_FIELD_OVERRIDDEN`.
 
 Changed and unchanged cases:
 
@@ -584,6 +671,8 @@ Changed and unchanged cases:
 
 - `69_model_multi_format` is new: a model with routes in two sections
   reverts with both formats.
+- `72_model_protocols_both_transports` is new: a model with `https` HTTP
+  routes and a `wss` `realtime` route reverts with `[https, wss]`.
 - `60_skills_api` changes because of the forced values rule.
   `10_bedrock_invoke_multitarget` does not change.
 - `revert/roundtrip_test.go` runs each new forward case and must stay
@@ -592,7 +681,8 @@ Changed and unchanged cases:
 ## End-to-end tests
 
 - `wildcard_model_all_endpoints_2_0` to `_2_3` are new: the data plane of
-  each version must load every route of a `*` model.
+  each version must load every route of a `*` model. The model sets
+  `[http, https, ws, wss]`, so it also gets `realtime`.
   - The 2.0, 2.1, and 2.2 cases pass.
   - The 2.3 case also has a mantle `bedrock` target. It fails only on the
     Gemini Interactions routes until a data plane release ships that API.

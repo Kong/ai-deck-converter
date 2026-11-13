@@ -5,6 +5,7 @@ import (
 
 	"github.com/Kong/ai-deck-converter/convert"
 	"github.com/Kong/ai-deck-converter/internal/aigw"
+	"github.com/Kong/ai-deck-converter/internal/kong"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 )
@@ -196,4 +197,46 @@ models:
 
 	_, _, err = Revert(deck1, Options{Strict: true})
 	require.Error(t, err)
+}
+
+func TestFinishProtocols(t *testing.T) {
+	route := func(protocols ...string) *kong.Route { return &kong.Route{Protocols: protocols} }
+	for _, tc := range []struct {
+		name   string
+		http   []string
+		routes []*kong.Route
+		want   []string
+	}{
+		{"default protocols stay unset", nil, []*kong.Route{route(), route("ws", "wss")}, nil},
+		{"websocket only", nil, []*kong.Route{route("wss")}, []string{"wss"}},
+		// Kong serves http and https on an HTTP route with no protocols.
+		{
+			"http routes keep the kong default", nil,
+			[]*kong.Route{route(), route("wss")},
+			[]string{"http", "https", "wss"},
+		},
+		{
+			"both transports",
+			[]string{"https"},
+			[]*kong.Route{route("https"), route("wss")},
+			[]string{"https", "wss"},
+		},
+		{"websocket routes that give the default", nil, []*kong.Route{route("ws"), route("wss")}, nil},
+		{
+			"distinct websocket routes merge",
+			[]string{"https"},
+			[]*kong.Route{route("https"), route("ws"), route("wss")},
+			[]string{"https", "ws", "wss"},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			g := &modelGroup{}
+			g.model.Config.Route.Protocols = tc.http
+			for _, rt := range tc.routes {
+				g.recordTransport(rt)
+			}
+			g.finishProtocols()
+			require.Equal(t, tc.want, g.model.Config.Route.Protocols)
+		})
+	}
 }

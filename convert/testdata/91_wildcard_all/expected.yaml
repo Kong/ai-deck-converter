@@ -9,6 +9,9 @@ services:
         methods:
           - POST
           - OPTIONS
+        protocols:
+          - http
+          - https
         strip_path: false
       - name: openai-responses
         paths:
@@ -16,6 +19,9 @@ services:
         methods:
           - POST
           - OPTIONS
+        protocols:
+          - http
+          - https
         strip_path: false
       - name: openai-responses-lifecycle
         paths:
@@ -25,6 +31,9 @@ services:
           - POST
           - DELETE
           - OPTIONS
+        protocols:
+          - http
+          - https
         strip_path: false
         tags:
           - aigw:responses-lifecycle
@@ -34,6 +43,9 @@ services:
         methods:
           - POST
           - OPTIONS
+        protocols:
+          - http
+          - https
         strip_path: false
       - name: openai-audio-transcribe
         paths:
@@ -41,6 +53,9 @@ services:
         methods:
           - POST
           - OPTIONS
+        protocols:
+          - http
+          - https
         strip_path: false
       - name: openai-audio-translate
         paths:
@@ -48,6 +63,9 @@ services:
         methods:
           - POST
           - OPTIONS
+        protocols:
+          - http
+          - https
         strip_path: false
       - name: openai-embeddings
         paths:
@@ -55,6 +73,9 @@ services:
         methods:
           - POST
           - OPTIONS
+        protocols:
+          - http
+          - https
         strip_path: false
       - name: openai-images
         paths:
@@ -62,6 +83,9 @@ services:
         methods:
           - POST
           - OPTIONS
+        protocols:
+          - http
+          - https
         strip_path: false
       - name: openai-images-edits
         paths:
@@ -69,6 +93,9 @@ services:
         methods:
           - POST
           - OPTIONS
+        protocols:
+          - http
+          - https
         strip_path: false
       - name: openai-videos
         paths:
@@ -76,6 +103,9 @@ services:
         methods:
           - POST
           - OPTIONS
+        protocols:
+          - http
+          - https
         strip_path: false
       - name: anthropic-messages
         paths:
@@ -83,6 +113,9 @@ services:
         methods:
           - POST
           - OPTIONS
+        protocols:
+          - http
+          - https
         strip_path: false
       - name: bedrock-converse
         paths:
@@ -91,6 +124,9 @@ services:
           - GET
           - POST
           - OPTIONS
+        protocols:
+          - http
+          - https
         strip_path: false
       - name: bedrock-invoke
         paths:
@@ -99,6 +135,9 @@ services:
           - GET
           - POST
           - OPTIONS
+        protocols:
+          - http
+          - https
         strip_path: false
       - name: bedrock-chat
         paths:
@@ -106,6 +145,9 @@ services:
         methods:
           - POST
           - OPTIONS
+        protocols:
+          - http
+          - https
         strip_path: false
       - name: bedrock-messages
         paths:
@@ -113,6 +155,9 @@ services:
         methods:
           - POST
           - OPTIONS
+        protocols:
+          - http
+          - https
         strip_path: false
       - name: bedrock-retrieve
         paths:
@@ -121,6 +166,9 @@ services:
           - GET
           - POST
           - OPTIONS
+        protocols:
+          - http
+          - https
         strip_path: false
       - name: bedrock-responses
         paths:
@@ -130,6 +178,9 @@ services:
           - POST
           - DELETE
           - OPTIONS
+        protocols:
+          - http
+          - https
         strip_path: false
       - name: bedrock-rerank
         paths:
@@ -138,6 +189,9 @@ services:
           - GET
           - POST
           - OPTIONS
+        protocols:
+          - http
+          - https
         strip_path: false
       - name: bedrock-async-invoke
         paths:
@@ -145,6 +199,9 @@ services:
         methods:
           - POST
           - OPTIONS
+        protocols:
+          - http
+          - https
         strip_path: false
       - name: openai-videos-lifecycle
         paths:
@@ -152,6 +209,9 @@ services:
         methods:
           - GET
           - DELETE
+        protocols:
+          - http
+          - https
         strip_path: false
         tags:
           - aigw:video-lifecycle
@@ -160,6 +220,9 @@ services:
           - /ai/async-invoke
         methods:
           - GET
+        protocols:
+          - http
+          - https
         strip_path: false
         tags:
           - aigw:video-lifecycle

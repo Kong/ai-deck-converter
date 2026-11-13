@@ -1,0 +1,16 @@
+# An explicit model that lists protocols of both transports gets no
+# CONFIG_FIELD_OVERRIDDEN warning. Each route keeps its own protocols.
+models:
+  - name: chat-and-realtime
+    type: model
+    capabilities: [generate, realtime]
+    config:
+      route: {paths: [/ai], protocols: [https, wss]}
+    targets: [{name: gpt-5.4, provider: openai-prod}]
+model_providers:
+  - name: openai-prod
+    type: openai
+    config:
+      auth:
+        type: bearer
+        token: "{vault://ai/openai-key}"
