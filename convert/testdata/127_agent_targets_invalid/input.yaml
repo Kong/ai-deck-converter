@@ -66,3 +66,14 @@ agents:
         - address: a.internal:443
       route:
         paths: [/bad-path]
+  - name: ignored-hash-header
+    type: http
+    display_name: Ignored hash header
+    config:
+      targets:
+        - address: a.internal:443
+      balancer:
+        algorithm: round-robin
+        hash_on_header: X-Session
+      route:
+        paths: [/ignored-hash-header]

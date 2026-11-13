@@ -123,17 +123,25 @@ func (c *Converter) addAgentTargets(src ConversionIssueSource, a *aigw.Agent, up
 
 func (c *Converter) applyUpstreamBalancer(src ConversionIssueSource, a *aigw.Agent, up *kong.Upstream) error {
 	b := a.Config.Balancer
-	if b == nil || b.Algorithm == "" {
+	if b == nil {
 		up.Algorithm = aimap.UpstreamAlgorithms["round-robin"]
 		return nil
 	}
-	algorithm, ok := aimap.UpstreamAlgorithms[b.Algorithm]
+	name := b.Algorithm
+	if name == "" {
+		name = "round-robin"
+	}
+	algorithm, ok := aimap.UpstreamAlgorithms[name]
 	if !ok {
 		return c.fail(src.at("config.balancer.algorithm"), ConfigFieldInvalid,
 			"agent %q: unsupported balancer algorithm %q", a.Name, b.Algorithm)
 	}
 	up.Algorithm = algorithm
-	if b.Algorithm == "consistent-hashing" {
+	if name != "consistent-hashing" && b.HashOnHeader != "" {
+		c.warn(src.at("config.balancer.hash_on_header"), ConfigFieldIgnored,
+			"agent %q sets config.balancer.hash_on_header, which only consistent-hashing uses", a.Name)
+	}
+	if name == "consistent-hashing" {
 		// The gateway sets no header on agent traffic that can be a default.
 		if b.HashOnHeader == "" {
 			return c.fail(src.at("config.balancer.hash_on_header"), MissingRequiredConfigField,

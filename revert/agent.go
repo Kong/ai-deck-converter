@@ -44,7 +44,11 @@ func (r *Reverter) revertAgent(svc *kong.Service, rt *kong.Route, name string,
 		a.Config.Upstream = upstream
 	}
 
-	if up := r.upstreamOf(svc); up != nil {
+	up, err := r.upstreamOf(svc)
+	if err != nil {
+		return err
+	}
+	if up != nil {
 		if err := r.liftAgentUpstream(&a, up, svc); err != nil {
 			return err
 		}
@@ -67,16 +71,23 @@ func (r *Reverter) revertAgent(svc *kong.Service, rt *kong.Route, name string,
 }
 
 // upstreamOf returns the Upstream that the host of a URL-less service names.
-func (r *Reverter) upstreamOf(svc *kong.Service) *kong.Upstream {
+// An Upstream without targets gives no agent targets. The service URL is
+// used then.
+func (r *Reverter) upstreamOf(svc *kong.Service) (*kong.Upstream, error) {
 	if svc.URL != "" {
-		return nil
+		return nil, nil
 	}
 	for i := range r.src.Upstreams {
-		if r.src.Upstreams[i].Name == svc.Host {
-			return &r.src.Upstreams[i]
+		up := &r.src.Upstreams[i]
+		if up.Name != svc.Host {
+			continue
 		}
+		if len(up.Targets) == 0 {
+			return nil, r.warn("service %q: upstream %q has no targets; using the service url", svc.Name, up.Name)
+		}
+		return up, nil
 	}
-	return nil
+	return nil, nil
 }
 
 func (r *Reverter) liftAgentUpstream(a *aigw.Agent, up *kong.Upstream, svc *kong.Service) error {

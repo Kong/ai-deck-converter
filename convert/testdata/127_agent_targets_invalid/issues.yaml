@@ -54,3 +54,11 @@
     fields:
       - config.path
   severity: ERROR
+- code: CONFIG_FIELD_IGNORED
+  reason: agent "ignored-hash-header" sets config.balancer.hash_on_header, which only consistent-hashing uses
+  source:
+    kind: agent
+    name: ignored-hash-header
+    fields:
+      - config.balancer.hash_on_header
+  severity: WARNING
