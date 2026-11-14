@@ -19,6 +19,7 @@ type Document struct {
 	ConsumerGroups []ConsumerGroup `yaml:"consumer_groups,omitempty"`
 	Plugins        []Plugin        `yaml:"plugins,omitempty"`
 	CustomPlugins  []CustomPlugin  `yaml:"custom_plugins,omitempty"`
+	ClonedPlugins  []ClonedPlugin  `yaml:"cloned_plugins,omitempty"`
 	Vaults         []Vault         `yaml:"vaults,omitempty"`
 	Certificates   []Certificate   `yaml:"certificates,omitempty"`
 	AIModels       []AIModel       `yaml:"ai_models,omitempty"`
@@ -314,6 +315,17 @@ type CustomPlugin struct {
 	Name    string `yaml:"name"`
 	Schema  string `yaml:"schema"`
 	Handler string `yaml:"handler"`
+}
+
+// ClonedPlugin defines a copy of a bundled, cloneable plugin under another
+// name, optionally at another priority. Kong has no per-instance priority, so
+// this is the only way to move one instance of a plugin in the static phase
+// order.
+type ClonedPlugin struct {
+	ID       string `yaml:"id,omitempty"`
+	Name     string `yaml:"name"`
+	Ref      string `yaml:"ref"`
+	Priority *int   `yaml:"priority,omitempty"`
 }
 
 // Source identifies the original AI Gateway entity field which produced a

@@ -210,6 +210,9 @@ type modelPass struct {
 	skipped map[int][]ConversionIssue
 	// tokenVaults holds the token-vault-exchange config of each model.
 	tokenVaults map[*aigw.Model]map[string]any
+	// clonedPlugins holds the plugin clones the model-scoped response
+	// transformers need, deduped by name.
+	clonedPlugins map[string]kong.ClonedPlugin
 }
 
 // convertModels groups all (model, target, capability) tuples into routes under
@@ -253,6 +256,7 @@ func (c *Converter) convertModelsPass(skipped map[int][]ConversionIssue) bool {
 		aliasConflicts:      map[string]bool{},
 		skipped:             skipped,
 		tokenVaults:         map[*aigw.Model]map[string]any{},
+		clonedPlugins:       map[string]kong.ClonedPlugin{},
 	}
 	c.modelRouteModels = map[string][]string{}
 	lifecycleCandidates := c.videoLifecycleCandidates(skipped)
@@ -346,7 +350,21 @@ func (c *Converter) convertModelsPass(skipped map[int][]ConversionIssue) bool {
 		}
 	}
 	c.out.Plugins = append(c.out.Plugins, st.guardPlugins...)
+	c.appendModelClones(st)
 	return true
+}
+
+// appendModelClones adds the plugin clones of the pass to the document in a
+// stable name order.
+func (c *Converter) appendModelClones(st *modelPass) {
+	names := make([]string, 0, len(st.clonedPlugins))
+	for name := range st.clonedPlugins {
+		names = append(names, name)
+	}
+	slices.Sort(names)
+	for _, name := range names {
+		c.out.ClonedPlugins = append(c.out.ClonedPlugins, st.clonedPlugins[name])
+	}
 }
 
 // appendTokenVaultExchange adds the token-vault-exchange plugin of pg with
@@ -911,15 +929,25 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 		return err
 	}
 	plugins = sourceScopedPlugins(plugins, "model", m.Name)
+	clones := c.planResponseTransformerClones(src, m.Policies, plugins, fkScoped,
+		func(p kong.Plugin) bool { return keptOnAnyModelRoute(st, routeNames, lifecycleRouteNames, p) })
 	for _, routeName := range routeNames {
 		if lifecycleRouteNames[routeName] {
-			c.attachLifecycleGuards(st, src, m, routeName, plugins)
+			c.attachLifecycleGuards(st, src, m, routeName, plugins, clones)
 			continue
 		}
 		for k := range plugins {
 			p := plugins[k]
 			p.Route = kong.NewStringRef(routeName)
-			if protocols, ok := st.websocketRoutes[routeName]; ok {
+			protocols, websocket := st.websocketRoutes[routeName]
+			if clone, ok := clones[k]; ok {
+				var cloneDef *kong.ClonedPlugin
+				p, cloneDef = applyPostAIClone(p, clone, websocket)
+				if cloneDef != nil {
+					st.clonedPlugins[cloneDef.Name] = *cloneDef
+				}
+			}
+			if websocket {
 				if !aimap.SupportsWebSocket(p.Name) {
 					c.warn(src.at(scopedPluginField(m.Policies, p)), ConfigFieldDropped,
 						"model %q uses plugin %q, which does not support the ws and wss protocols. "+
@@ -1075,9 +1103,21 @@ func guardSetFingerprint(plugins []kong.Plugin) string {
 // policies, just as they do on the ai-proxy-advanced config they merge into.
 func (c *Converter) attachLifecycleGuards(
 	st *modelPass, src ConversionIssueSource, m *aigw.Model,
-	routeName string, plugins []kong.Plugin,
+	routeName string, plugins []kong.Plugin, clones map[int]postAIClone,
 ) {
-	set := lifecycleGuardSet{fingerprint: guardSetFingerprint(plugins), model: m.Name}
+	// plugins is shared with the other routes of this model, so the rename must
+	// not leak out of the lifecycle route.
+	guards := slices.Clone(plugins)
+	for k := range guards {
+		if clone, ok := clones[k]; ok {
+			var cloneDef *kong.ClonedPlugin
+			guards[k], cloneDef = applyPostAIClone(guards[k], clone, false)
+			if cloneDef != nil {
+				st.clonedPlugins[cloneDef.Name] = *cloneDef
+			}
+		}
+	}
+	set := lifecycleGuardSet{fingerprint: guardSetFingerprint(guards), model: m.Name}
 	if first, ok := st.lifecycleGuards[routeName]; ok {
 		if first.fingerprint != set.fingerprint {
 			enforced := fmt.Sprintf("only model %q's policies and ACLs are enforced there", first.model)
@@ -1093,11 +1133,28 @@ func (c *Converter) attachLifecycleGuards(
 		return
 	}
 	st.lifecycleGuards[routeName] = set
-	for k := range plugins {
-		p := plugins[k]
+	for k := range guards {
+		p := guards[k]
 		p.Route = kong.NewStringRef(routeName)
 		st.guardPlugins = append(st.guardPlugins, p)
 	}
+}
+
+// keptOnAnyModelRoute reports whether any route of the model keeps plugin p. A
+// WebSocket route keeps only a plugin whose schema accepts ws and wss, and every
+// other route keeps it.
+func keptOnAnyModelRoute(
+	st *modelPass, routeNames []string, lifecycleRouteNames map[string]bool, p kong.Plugin,
+) bool {
+	for _, routeName := range routeNames {
+		if lifecycleRouteNames[routeName] {
+			return true
+		}
+		if _, websocket := st.websocketRoutes[routeName]; !websocket || aimap.SupportsWebSocket(p.Name) {
+			return true
+		}
+	}
+	return false
 }
 
 // warnModelScopedRequestTermination warns once per policy reference in refs.
@@ -1189,8 +1246,18 @@ func (c *Converter) convertVideoLifecycle(
 		return err
 	}
 	plugins = sourceScopedPlugins(plugins, "model", candidate.model.Name)
+	// The lifecycle route is an HTTP route, so it keeps every policy plugin.
+	clones := c.planResponseTransformerClones(src, candidate.model.Policies, plugins, true,
+		func(kong.Plugin) bool { return true })
 	for i := range plugins {
 		plugins[i].Route = kong.NewStringRef(routeName)
+		if clone, ok := clones[i]; ok {
+			var cloneDef *kong.ClonedPlugin
+			plugins[i], cloneDef = applyPostAIClone(plugins[i], clone, false)
+			if cloneDef != nil {
+				st.clonedPlugins[cloneDef.Name] = *cloneDef
+			}
+		}
 		c.out.Plugins = append(c.out.Plugins, plugins[i])
 	}
 	idpPlugins, err := c.scopedAuthStrategyPlugins(src, candidate.model.Access.AuthStrategies)

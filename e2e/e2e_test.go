@@ -40,6 +40,7 @@ func TestE2E(t *testing.T) {
 		{"pre_function_model_ordering", func(t *testing.T) { testPreFunctionModelPolicyRunsAfterModelSelection(t, license) }},
 		{"pre_function_model_ordering_auth", func(t *testing.T) { testPreFunctionModelOrderingKeepsAuthFirst(t, license) }},
 		{"model_scoped_request_termination_auth", func(t *testing.T) { testModelScopedRequestTermination(t, license) }},
+		{"model_response_transformer_ordering", func(t *testing.T) { testModelResponseTransformerOrdering(t, license) }},
 		{"gemini_model_all_capabilities", func(t *testing.T) { testGeminiModelAllCapabilities(t, license) }},
 		{"bedrock_model_all_endpoints", func(t *testing.T) { testBedrockModelAllEndpoints(t, license) }},
 		{"bedrock_mantle_vpc_endpoint", func(t *testing.T) { testBedrockMantleVPCEndpoint(t, license) }},

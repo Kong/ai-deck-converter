@@ -63,6 +63,7 @@ var allFeatures = []Feature{
 	FeatureAgentTargets,
 	FeatureOIDCProtectedResourceMetadata,
 	FeatureSanitizerAllWithCredentials,
+	FeatureClonedPlugins,
 }
 
 func TestFeatureTable(t *testing.T) {

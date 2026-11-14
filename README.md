@@ -179,7 +179,7 @@ See `convert/testdata/*/input.yaml` for worked examples.
 | SNI | Nested under its referenced Certificate's `snis` list (`hostname` → `name`, `labels` → `tags`); decK's file format has no standalone SNI entity. The SNI's own `name`/`display_name` have no Kong counterpart and are dropped. In `db-less` mode SNIs become a top-level `snis` entry referencing the certificate's generated `id`. |
 | Model with `capabilities: ["*"]` or `formats: [{type: "*"}]` | `*` selects each endpoint that at least one target supports, and a list with `*` ignores its other values. `*` in `formats` never selects `passthrough`. `*` in `capabilities` also selects an endpoint only when `config.route.protocols` include a protocol of its transport: `realtime` needs `ws` or `wss`, and other endpoints need `http` or `https` (no protocols means Kong's default `http` and `https`, so no `realtime`). `*` gives no issue for what it leaves out, but a model whose protocols leave out every endpoint fails with `CONFIG_FIELD_INVALID` on `config.route.protocols`; see "Route protocols" in `docs/decisions/00230-support-setting-formats-and-capabilities-all.md`. Revert writes the explicit lists, never `*`. |
 | Model with `formats: [{type: passthrough}]` | Requires AI Gateway 2.2+. **One route on the bare base path** (every method, no endpoint suffix), whatever `capabilities` it declares — `[]` is fine — with one route-scoped `ai-proxy-advanced` whose targets carry `route_type: passthrough` and no `model_alias`; `llm_format` is the provider's native format (openai for providers without their own). No `ai-model-selector`, no video lifecycle routes, and the model's policies/ACLs are route-scoped rather than `model:`-scoped, since nothing can select an `ai-models` row for a body of unknown shape (the row is still emitted). No `anthropic_version` default is applied. |
-| Model `policies`/`acls` | Top-level plugins scoped to the `ai-models` entity via a `model:` FK. When a policy's plugin type has a static Kong priority above `ai-model-selector`'s (`aimap.OutranksModelSelector`, e.g. `pre-function`), the route's `ai-model-selector` gets `ordering.before.access` with that plugin name. See "Assumptions and limitations" below. |
+| Model `policies`/`acls` | Top-level plugins scoped to the `ai-models` entity via a `model:` FK. When a policy's plugin type has a static Kong priority above `ai-model-selector`'s (`aimap.OutranksModelSelector`, e.g. `pre-function`), the route's `ai-model-selector` gets `ordering.before.access` with that plugin name. A `response-transformer` or `response-transformer-advanced` policy is emitted as a cloned plugin (`cloned_plugins`) at priority 766 so it runs after `ai-proxy-advanced`. See "Assumptions and limitations" below. |
 | Agent `access.acls` | Kong `acl` plugin on the agent's Route. |
 | `labels` | `tags` flattened to sorted `key:value` strings. |
 
@@ -258,7 +258,10 @@ How Kong entities come back:
   SNI name and its `certificate` reference are synthesized positionally
   (`sni-1`, `certificate-1`, ...), so this never changes a round trip either.
 - **Unknown plugins → Policies** (global when top-level and unscoped, otherwise
-  referenced from the owning entity); `acl` plugins → `acls`.
+  referenced from the owning entity); `acl` plugins → `acls`. A converter-emitted
+  clone name (`response-transformer-post-ai`,
+  `response-transformer-advanced-post-ai`) comes back as the plugin type it
+  copies, since the AI Gateway model has no clone.
 - **Anything unconvertible is warned about and dropped**; `-strict` makes those
   drops fatal.
 
@@ -275,6 +278,36 @@ and `formats` beyond the first.
 - **Shared gateway Service.** All model routes nest under one `ai-gateway`
   Service with the nominal url `http://ai-gateway.upstream.local`;
   `ai-proxy-advanced` overrides the real upstream per target.
+- **Model-scoped response transformers use a cloned plugin.** `ai-proxy-advanced`
+  writes the response body in `body_filter` at priority 770. Kong applies
+  `ordering` in the access phase only, so a `response-transformer` at 800 writes
+  the body first and `ai-proxy-advanced` then overwrites it. The converter emits a
+  `response-transformer` / `response-transformer-advanced` model policy as a clone
+  (`cloned_plugins`, priority 766), and the plugin references the clone, so the
+  transformer runs after `ai-proxy-advanced` in every phase. This needs AI Gateway
+  2.1 or newer; below that the policy keeps its static priority, loses its body
+  change, and gets a `BEHAVIOR_MAY_DIFFER` warning. Two remaining limits:
+  - `response-transformer` cannot decode the gzip body that `ai-proxy-advanced`
+    produces for a client that accepts gzip, so its body change only applies to
+    clients without gzip. The converter warns; use
+    `response-transformer-advanced`, which inflates and deflates the body itself.
+  - A **global**, **consumer-** or **consumer-group-scoped** response
+    transformer is not cloned. One instance serves every route of that scope, so
+    reordering it would affect routes with no `ai-proxy-advanced`. Attach the
+    policy to the model instead; the converter warns when it sees the
+    combination.
+
+  Agent and MCP Server scopes need no clone: `ai-a2a-proxy` (819) and
+  `ai-mcp-proxy` (820) run before the transformer at 800, so the transformer
+  writes the body last there.
+
+  The output now carries `cloned_plugins`, which changes the deploy
+  prerequisites. Kong requires a paid license for plugin cloning, and decK needs
+  `--include-plugin-definitions` (or `_info.include_plugin_definitions: true`)
+  and a release that supports it, otherwise `deck gateway sync` rejects the
+  file. Clones are not workspace-scoped, so every workspace shares the one
+  global clone definition. Revert maps a converter-emitted clone back to
+  the plugin type it copies, so the policy round-trips.
 - **Realtime routes use WebSocket.** Kong selects its WebSocket proxy path from
   the Service protocol, so `realtime` routes nest under a second
   `ai-gateway-websocket` Service (`ws://ai-gateway.upstream.local`). They use
