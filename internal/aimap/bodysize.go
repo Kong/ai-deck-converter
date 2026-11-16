@@ -4,9 +4,9 @@ package aimap
 // bytes, that the provider publishes.
 var ProviderMaxBodySize = map[string]int{
 	// Anthropic documents a 32 MB limit for the Messages API.
-	"anthropic": 32_000_000,
+	"anthropic": 32_000_000, //nolint:mnd
 	// OpenAI documents a 50 MB limit for all file inputs of one request.
-	"openai": 50_000_000,
+	"openai": 50_000_000, //nolint:mnd
 }
 
 // DefaultModelBodySize returns the max_request_body_size of a model that sets
