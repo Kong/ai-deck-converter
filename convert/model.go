@@ -1240,9 +1240,12 @@ func (c *Converter) convertVideoLifecycle(
 		return err
 	}
 	plugins = sourceScopedPlugins(plugins, "model", candidate.model.Name)
-	// The lifecycle route is an HTTP route, so it keeps every policy plugin.
-	clones := c.planResponseTransformerClones(src, candidate.model.Policies, plugins, true,
-		func(kong.Plugin) bool { return true })
+	// The lifecycle route keeps every policy plugin, since it is an HTTP route.
+	// It still clones only for a type "model" body model, like the routes
+	// convertModel builds: videoLifecycleCandidates accepts a type "api" model
+	// that lists video, and ai-proxy-advanced leaves such a body unchanged.
+	clones := c.planResponseTransformerClones(src, candidate.model.Policies, plugins,
+		isModelType(candidate.model), func(kong.Plugin) bool { return true })
 	for i := range plugins {
 		plugins[i].Route = kong.NewStringRef(routeName)
 		if clone, ok := clones[i]; ok {

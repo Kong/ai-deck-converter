@@ -959,3 +959,52 @@ policies:
 	require.NoError(t, err)
 	require.Empty(t, result.Issues)
 }
+
+// videoLifecycleCandidates accepts a type "api" model that lists video. Its
+// video lifecycle route must keep the type "api" rule, so no clone and no
+// cloned_plugins entry appear for a transformer that route keeps.
+func TestConvertDoesNotCloneAPIModelVideoLifecycleTransformer(t *testing.T) {
+	src := []byte(`
+models:
+  - type: api
+    name: sora-api
+    capabilities: [video]
+    formats: [{type: openai}]
+    targets:
+      - name: sora-2
+        provider: p1
+        config: {type: openai}
+    policies: [adv]
+    config:
+      route: {paths: [/sora-api]}
+model_providers:
+  - name: p1
+    type: openai
+    config:
+      auth:
+        type: basic
+        headers: [{name: Authorization, value: "Bearer token"}]
+policies:
+  - type: response-transformer-advanced
+    name: adv
+    config:
+      add:
+        json: ["added:yes"]
+`)
+
+	result, err := Convert(src, testOptions)
+	require.NoError(t, err)
+	require.Empty(t, result.Issues, "a type api model needs no clone warning")
+	require.Empty(t, result.Output.ClonedPlugins,
+		"a type api video lifecycle route keeps ai-proxy-advanced's body")
+
+	// The lifecycle route still carries the transformer, just uncloned.
+	var onLifecycle bool
+	for _, p := range result.Output.Plugins {
+		if p.Name == "response-transformer-advanced" && p.Route != nil &&
+			strings.Contains(string(*p.Route), "videos-lifecycle") {
+			onLifecycle = true
+		}
+	}
+	require.True(t, onLifecycle, "the lifecycle route keeps the policy plugin")
+}

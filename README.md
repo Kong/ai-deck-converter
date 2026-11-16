@@ -286,7 +286,10 @@ and `formats` beyond the first.
   (`cloned_plugins`, priority 766), and the plugin references the clone, so the
   transformer runs after `ai-proxy-advanced` in every phase. This needs AI Gateway
   2.1 or newer; below that the policy keeps its static priority, loses its body
-  change, and gets a `BEHAVIOR_MAY_DIFFER` warning. Two remaining limits:
+  change, and gets a `BEHAVIOR_MAY_DIFFER` warning. Only a `type: model` body
+  model is cloned: a `type: api` model (including one that lists `video`) and a
+  passthrough model receive the body unchanged from `ai-proxy-advanced`, so their
+  transformer keeps its static priority. Two remaining limits:
   - `response-transformer` cannot decode the gzip body that `ai-proxy-advanced`
     produces for a client that accepts gzip, so its body change only applies to
     clients without gzip. The converter warns; use
