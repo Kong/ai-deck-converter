@@ -1813,7 +1813,7 @@ datastores:
 `)
 	_, _, err := convertDoc(src, false)
 	require.Error(t, err, "convert")
-	require.Contains(t, err.Error(), "only one is allowed")
+	require.Contains(t, err.Error(), "more than one datastore")
 }
 
 func TestConvertRejectsDatastoreOnNonSemanticModel(t *testing.T) {

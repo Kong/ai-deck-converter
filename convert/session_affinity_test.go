@@ -146,3 +146,163 @@ func TestSessionAffinityConflictOnSharedRoute(t *testing.T) {
 	_, _, err := convertDoc([]byte(src), false)
 	require.ErrorContains(t, err, "different balancer.session_affinity")
 }
+
+const datastorePurposeFixtures = overrideProvider + `
+datastores:
+  - name: vec-redis
+    type: redis-ee
+    config: {host: vec.internal, port: 6379}
+  - name: shared-redis
+    type: redis-ee
+    config: {host: redis.internal, port: 6379}
+  - name: ce-redis
+    type: redis-ce
+    config: {host: redis.internal}
+`
+
+func datastorePurposeModel(name, datastores, balancer string) string {
+	return `models:
+  - name: ` + name + `
+    capabilities: [generate]
+    datastores: ` + datastores + `
+    config:
+      route: {paths: [/` + name + `]}
+      balancer: ` + balancer + `
+    targets: [{name: t, provider: openai-prod, config: {type: openai}}]
+` + datastorePurposeFixtures
+}
+
+func TestSessionAffinityDatastorePurpose(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]struct {
+		datastores string
+		balancer   string
+		want       map[string]any
+	}{
+		"session affinity datastore with round-robin": {
+			datastores: `[{name: shared-redis, purpose: session-affinity}]`,
+			balancer:   `{algorithm: round-robin, session_affinity: {enabled: true, storage: {type: redis}}}`,
+			want: map[string]any{
+				"enabled":  true,
+				"strategy": "redis",
+				"redis":    map[string]any{"host": "redis.internal", "port": 6379},
+			},
+		},
+		"underscore spelling is accepted": {
+			datastores: `[{name: shared-redis, purpose: session_affinity}]`,
+			balancer:   `{algorithm: round-robin, session_affinity: {storage: {type: redis}}}`,
+			want: map[string]any{
+				"strategy": "redis",
+				"redis":    map[string]any{"host": "redis.internal", "port": 6379},
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			doc, _, err := convertDoc([]byte(datastorePurposeModel("m", tc.datastores, tc.balancer)), false)
+			require.NoError(t, err)
+			plugins := pluginsNamed(doc, "ai-proxy-advanced")
+			require.Len(t, plugins, 1)
+			require.Equal(t, tc.want, plugins[0].Config["conversation_state"])
+			_, hasVDB := plugins[0].Config["vectordb"]
+			require.False(t, hasVDB)
+		})
+	}
+}
+
+func TestSessionAffinityDatastorePurposeSemantic(t *testing.T) {
+	t.Parallel()
+
+	balancer := `{algorithm: semantic, ` +
+		`embeddings: {name: text-embedding-3-small, provider: openai-prod, config: {type: openai}}, ` +
+		`vectordb: {strategy: redis, dimensions: 3, distance_metric: cosine}, ` +
+		`session_affinity: {enabled: true, storage: {type: redis}}}`
+	datastores := `[{name: vec-redis, purpose: embeddings}, {name: shared-redis, purpose: session-affinity}]`
+
+	doc, _, err := convertDoc([]byte(datastorePurposeModel("m", datastores, balancer)), false)
+	require.NoError(t, err)
+	plugins := pluginsNamed(doc, "ai-proxy-advanced")
+	require.Len(t, plugins, 1)
+
+	require.Equal(t, map[string]any{
+		"strategy":        "redis",
+		"dimensions":      3,
+		"distance_metric": "cosine",
+		"redis":           map[string]any{"host": "vec.internal", "port": 6379},
+	}, plugins[0].Config["vectordb"])
+	require.Equal(t, map[string]any{
+		"enabled":  true,
+		"strategy": "redis",
+		"redis":    map[string]any{"host": "redis.internal", "port": 6379},
+	}, plugins[0].Config["conversation_state"])
+}
+
+func TestSessionAffinityDatastorePurposeRejects(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]struct {
+		datastores string
+		balancer   string
+		want       string
+	}{
+		"embeddings purpose on a non semantic balancer": {
+			datastores: `[{name: vec-redis, purpose: embeddings}]`,
+			balancer:   `{algorithm: round-robin}`,
+			want:       "requires the semantic balancer",
+		},
+		"unknown purpose": {
+			datastores: `[{name: shared-redis, purpose: teleport}]`,
+			balancer:   `{algorithm: round-robin}`,
+			want:       `unknown datastore purpose "teleport"`,
+		},
+		"two embeddings entries": {
+			datastores: `[{name: vec-redis, purpose: embeddings}, {name: shared-redis, purpose: embeddings}]`,
+			balancer:   `{algorithm: semantic}`,
+			want:       `more than one datastore with purpose "embeddings"`,
+		},
+		"two session affinity entries": {
+			datastores: `[{name: vec-redis, purpose: session-affinity}, {name: shared-redis, purpose: session-affinity}]`,
+			balancer:   `{algorithm: round-robin, session_affinity: {storage: {type: redis}}}`,
+			want:       `more than one datastore with purpose "session-affinity"`,
+		},
+		"session affinity datastore with local storage": {
+			datastores: `[{name: shared-redis, purpose: session-affinity}]`,
+			balancer:   `{algorithm: round-robin, session_affinity: {storage: {type: local}}}`,
+			want:       "session affinity storage is not redis",
+		},
+		"session affinity datastore without a block": {
+			datastores: `[{name: shared-redis, purpose: session-affinity}]`,
+			balancer:   `{algorithm: round-robin}`,
+			want:       "has no session affinity block",
+		},
+		"session affinity datastore with consistent hashing": {
+			datastores: `[{name: shared-redis, purpose: session-affinity}]`,
+			balancer:   `{algorithm: consistent-hashing}`,
+			want:       "has no session affinity block",
+		},
+		"datastore named in both places": {
+			datastores: `[{name: shared-redis, purpose: session-affinity}]`,
+			balancer:   `{algorithm: round-robin, session_affinity: {storage: {type: redis, datastore: {name: vec-redis}}}}`,
+			want:       `names datastore "vec-redis"`,
+		},
+		"session affinity datastore of the wrong type": {
+			datastores: `[{name: ce-redis, purpose: session-affinity}]`,
+			balancer:   `{algorithm: round-robin, session_affinity: {storage: {type: redis}}}`,
+			want:       `expected "redis-ee"`,
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			result, err := Convert([]byte(datastorePurposeModel("m", tc.datastores, tc.balancer)), testOptions)
+			require.NoError(t, err)
+			require.ErrorContains(t, issuesError(result.Issues, false), tc.want)
+		})
+	}
+}
