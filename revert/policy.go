@@ -43,10 +43,10 @@ func (r *Reverter) policyRefs(plugins []kong.Plugin) ([]string, aigw.ACLs) {
 	var refs []string
 	var acls aigw.ACLs
 	for _, p := range plugins {
-		switch {
-		case aiPluginNames[p.Name]:
+		switch pluginType := p.Name; {
+		case aiPluginNames[pluginType]:
 			continue
-		case p.Name == "acl":
+		case pluginType == "acl":
 			acls = aclsFromBlock(p.Config)
 		default:
 			refs = append(refs, r.registerPolicy(p, false).Name)
@@ -84,8 +84,8 @@ func (r *Reverter) splitAuthStrategies(
 	var rest []kong.Plugin
 	var idpRefs []string
 	for _, p := range plugins {
-		if authPluginNames[p.Name] && isStrategy(p) {
-			idpRefs = append(idpRefs, r.registerAuthStrategy(p).Name)
+		if idpType := p.Name; authPluginNames[idpType] && isStrategy(p) {
+			idpRefs = append(idpRefs, r.registerAuthStrategy(p, idpType).Name)
 			continue
 		}
 		rest = append(rest, p)
@@ -116,10 +116,14 @@ func (r *Reverter) modelPolicyRefs(plugins []kong.Plugin) ([]string, aigw.ACLs, 
 // registerPolicy reuses a registered policy with equal type, scope kind,
 // enabled state, condition, expressions, and config. Otherwise it registers a
 // new policy with a unique name.
+//
+// A cloned plugin already carries the name of the plugin it copies, since
+// resolveCloneNames rewrote it: the AI Gateway model has no clone.
 func (r *Reverter) registerPolicy(p kong.Plugin, global bool) *aigw.Policy {
+	policyType := p.Name
 	for i := range r.policies {
 		existing := &r.policies[i]
-		if existing.Type != p.Name {
+		if existing.Type != policyType {
 			continue
 		}
 		if (existing.Global != nil && *existing.Global) != global {
@@ -141,8 +145,8 @@ func (r *Reverter) registerPolicy(p kong.Plugin, global bool) *aigw.Policy {
 	}
 
 	policy := aigw.Policy{
-		Type:        p.Name,
-		Name:        r.uniquePolicyName(p.Name),
+		Type:        policyType,
+		Name:        r.uniquePolicyName(policyType),
 		Enabled:     p.Enabled,
 		Condition:   p.Condition,
 		Expressions: p.Expressions,

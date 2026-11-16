@@ -3,10 +3,14 @@
 package e2e
 
 import (
+	"compress/gzip"
 	"encoding/json"
 	"fmt"
+	"io"
 	"strings"
 	"testing"
+
+	"github.com/Kong/ai-deck-converter/internal/aimap"
 )
 
 const mockAuthHeaderValue = "Bearer e2e-mock-secret"
@@ -374,6 +378,158 @@ func testBedrockMantleVPCEndpoint(t *testing.T, license string) {
 		t.Fatalf("the gateway loaded no ai-proxy-advanced targets:\n%s", body)
 	}
 	t.Logf("PASS: the gateway accepted %d routes and %d mantle targets with a vpc_endpoint", loaded, targets)
+}
+
+// testModelResponseTransformerOrdering proves a model-scoped response
+// transformer still changes the response body. ai-proxy-advanced writes the
+// body in body_filter at a lower priority than the transformer's 800, so
+// without a clone the transformer's body change is overwritten and only the
+// header change survives. The converter emits a clone below ai-proxy-advanced,
+// which keeps both changes.
+func testModelResponseTransformerOrdering(t *testing.T, license string) {
+	mock := startMockUpstream(t)
+	configPath := convertCase(t, "model_response_transformer_ordering", "2.3", patchMockUpstream(mock.Port, mockAuthHeaderValue))
+
+	gateway := startGateway(t, GatewayOptions{
+		Image:  gatewayImage(t, "kong/kong-ai-gateway:2.3.0"),
+		Config: configPath,
+		Env:    []string{licenseEnv(license)},
+	})
+	gateway.waitReady()
+
+	requireRoutesLoaded(t, gateway, "openai-chat")
+
+	// Both transformers must be cloned below ai-proxy-advanced, or the data
+	// plane ignores the body change the case asserts.
+	status, _, body := httpGet(gateway.AdminURL() + "/cloned-plugins")
+	if status != 200 {
+		t.Fatalf("GET /cloned-plugins returned %d:\n%s", status, body)
+	}
+	var cloned struct {
+		Data []struct {
+			Ref      string `json:"ref"`
+			Priority int    `json:"priority"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(body), &cloned); err != nil {
+		t.Fatalf("decoding GET /cloned-plugins: %v\n%s", err, body)
+	}
+	priorities := map[string]int{}
+	for _, c := range cloned.Data {
+		priorities[c.Ref] = c.Priority
+	}
+	for _, ref := range []string{"response-transformer", "response-transformer-advanced"} {
+		priority := priorities[ref]
+		if aiProxyPriority := aimap.PluginPriority["ai-proxy-advanced"]; priority == 0 || priority >= aiProxyPriority {
+			t.Fatalf("the gateway did not load a %s clone below ai-proxy-advanced (%d); cloned plugins:\n%s",
+				ref, aiProxyPriority, body)
+		}
+	}
+
+	chat := func(t *testing.T, alias, acceptEncoding string) httpResponse {
+		t.Helper()
+		return httpPost(t, gateway.ProxyURL()+"/ai-response-transform/chat/completions",
+			map[string]string{"Content-Type": "application/json", "Accept-Encoding": acceptEncoding},
+			fmt.Sprintf(`{"model": %q, "messages": [{"role": "user", "content": "hi"}]}`, alias))
+	}
+
+	t.Run("advanced transformer, no compression", func(t *testing.T) {
+		resp := chat(t, "advanced-transformed-alias", "identity")
+		requireStatus(t, resp, 200, "advanced transformer response")
+		if got := headerValue(resp.Header, "X-Added"); got != "av" {
+			t.Fatalf("the header transform did not apply: X-Added is %q, want \"av\"", got)
+		}
+		jsonBody := decodeJSONBody(t, resp.Body, "identity")
+		if _, ok := jsonBody["object"]; ok {
+			t.Fatalf("the body transform did not apply: the removed property \"object\" is still present:\n%s", resp.Body)
+		}
+		if got := jsonBody["added"]; got != "yes" {
+			t.Fatalf("the body transform did not apply: added is %v, want \"yes\"", got)
+		}
+		t.Logf("PASS: the advanced transformer changed both the header and the body")
+	})
+
+	// ai-proxy-advanced gzips the response for a client that accepts gzip. The
+	// advanced plugin inflates and deflates it, so its body change still lands.
+	t.Run("advanced transformer, gzip", func(t *testing.T) {
+		resp := chat(t, "advanced-transformed-alias", "gzip")
+		requireStatus(t, resp, 200, "advanced transformer gzip response")
+		payload := gunzipBody(t, resp)
+		if got := headerValue(resp.Header, "X-Added"); got != "av" {
+			t.Fatalf("the header transform did not apply: X-Added is %q, want \"av\"", got)
+		}
+		jsonBody := decodeJSONBody(t, payload, "gzip")
+		if _, ok := jsonBody["object"]; ok {
+			t.Fatalf("the body transform did not apply over gzip: the removed property \"object\" is still present:\n%s", payload)
+		}
+		if got := jsonBody["added"]; got != "yes" {
+			t.Fatalf("the body transform did not apply over gzip: added is %v, want \"yes\"", got)
+		}
+		t.Logf("PASS: the advanced transformer changed both the header and the body over gzip")
+	})
+
+	t.Run("plain transformer, no compression", func(t *testing.T) {
+		resp := chat(t, "plain-transformed-alias", "identity")
+		requireStatus(t, resp, 200, "plain transformer response")
+		if got := headerValue(resp.Header, "X-Plain"); got != "av" {
+			t.Fatalf("the header transform did not apply: X-Plain is %q, want \"av\"", got)
+		}
+		jsonBody := decodeJSONBody(t, resp.Body, "identity")
+		if got := jsonBody["plain"]; got != "yes" {
+			t.Fatalf("the body transform did not apply: plain is %v, want \"yes\"", got)
+		}
+		t.Logf("PASS: the plain transformer changed both the header and the body")
+	})
+
+	// Pins the documented limit: response-transformer does not decode the gzip
+	// body, so only the header change reaches a gzip-accepting client.
+	t.Run("plain transformer, gzip limitation", func(t *testing.T) {
+		resp := chat(t, "plain-transformed-alias", "gzip")
+		requireStatus(t, resp, 200, "plain transformer gzip response")
+		if got := headerValue(resp.Header, "X-Plain"); got != "av" {
+			t.Fatalf("the header transform did not apply: X-Plain is %q, want \"av\"", got)
+		}
+		payload := gunzipBody(t, resp)
+		jsonBody := decodeJSONBody(t, payload, "gzip")
+		if _, ok := jsonBody["plain"]; ok {
+			t.Fatalf("the plain transformer unexpectedly changed a gzip body; update the documented limit:\n%s", payload)
+		}
+		t.Logf("PASS: the plain transformer's gzip limit matches the converter's warning")
+	})
+
+	if hits := mock.hits(); len(hits) == 0 {
+		t.Fatal("the request never reached the mock upstream")
+	}
+}
+
+// decodeJSONBody decodes body, which fails the test with context on error.
+func decodeJSONBody(t *testing.T, body, label string) map[string]any {
+	t.Helper()
+	var out map[string]any
+	if err := json.Unmarshal([]byte(body), &out); err != nil {
+		t.Fatalf("%s: the response body is not JSON: %v\n%s", label, err, body)
+	}
+	return out
+}
+
+// gunzipBody returns the decompressed body of a gzip-encoded response. The
+// request sets Accept-Encoding explicitly, so the Go transport passes the
+// bytes through and the Content-Encoding header is visible.
+func gunzipBody(t *testing.T, resp httpResponse) string {
+	t.Helper()
+	if got := headerValue(resp.Header, "Content-Encoding"); got != "gzip" {
+		t.Fatalf("the gateway did not gzip the response: Content-Encoding is %q", got)
+	}
+	reader, err := gzip.NewReader(strings.NewReader(resp.Body))
+	if err != nil {
+		t.Fatalf("opening the gzip response body: %v", err)
+	}
+	defer reader.Close()
+	payload, err := io.ReadAll(reader)
+	if err != nil {
+		t.Fatalf("reading the gzip response body: %v", err)
+	}
+	return string(payload)
 }
 
 // requireRoutesLoaded fails t unless the gateway loaded each route in names.

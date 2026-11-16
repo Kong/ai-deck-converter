@@ -1,0 +1,122 @@
+_format_version: "3.0"
+_transform: false
+services:
+  - id: 947a4e23-b483-5a65-8165-da9aed24565b
+    name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    host: ai-gateway.upstream.local
+    port: 80
+    protocol: http
+routes:
+  - id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+    name: openai-chat
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /ai-response-transform/chat/completions
+    methods:
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+plugins:
+  - id: 17fa8192-4b9f-5b5a-8379-20ad8bc836a7
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+  - id: f3adc007-171c-5519-8763-3a0eef79bde3
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-4o
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: advanced-transformed-alias
+            name: gpt-4o
+            provider: openai
+          route_type: llm/v1/chat
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+    model:
+      id: 323628f6-724e-510f-b1fd-2d85596f63c0
+  - id: fe4129f3-2075-5492-8b59-90def2cf73ab
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-4o
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: plain-transformed-alias
+            name: gpt-4o
+            provider: openai
+          route_type: llm/v1/chat
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+    model:
+      id: 757e7c72-3569-506e-b538-4ed3dc48dadf
+  - id: 9855e032-f9c5-5507-af72-52e40fdb92bd
+    name: response-transformer-advanced-post-ai
+    config:
+      add:
+        headers:
+          - X-Added:av
+        json:
+          - added:yes
+      remove:
+        json:
+          - object
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+    model:
+      id: 323628f6-724e-510f-b1fd-2d85596f63c0
+  - id: 20fb0daf-a938-542a-92ab-6756f0aee97a
+    name: response-transformer-post-ai
+    config:
+      add:
+        headers:
+          - X-Plain:av
+        json:
+          - plain:yes
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+    model:
+      id: 757e7c72-3569-506e-b538-4ed3dc48dadf
+cloned_plugins:
+  - id: 1a527c36-9ef2-5885-9249-6553a23a2a58
+    name: response-transformer-advanced-post-ai
+    ref: response-transformer-advanced
+    priority: 766
+  - id: 717e10ba-5208-5dd8-b7ee-97595acb5ae9
+    name: response-transformer-post-ai
+    ref: response-transformer
+    priority: 766
+ai_models:
+  - id: 323628f6-724e-510f-b1fd-2d85596f63c0
+    name: advanced-transformed-alias
+  - id: 757e7c72-3569-506e-b538-4ed3dc48dadf
+    name: plain-transformed-alias

@@ -140,3 +140,51 @@ func OutranksModelSelector(pluginType string) bool {
 	p, ok := PluginPriority[pluginType]
 	return ok && p > AIModelSelectorPriority
 }
+
+// ResponseTransformerClonePriority is the priority a cloned
+// response-transformer runs at when the converter needs it to see the body that
+// ai-proxy-advanced produced. ai-proxy-advanced writes the final body in
+// body_filter, and Kong applies dynamic ordering only in the access phase, so
+// a model-scoped transformer at 800 is overwritten. The clone slots below
+// ai-proxy-advanced (770) and above the plugins that consume the body for
+// logging: ai-semantic-cache is at 765, and 766 is unused.
+const ResponseTransformerClonePriority = 766
+
+// ResponseTransformerCloneName is the Kong plugin name the converter clones
+// response-transformer to. Kong has no per-instance priority, so a cloned
+// plugin definition is the only way to move one instance below
+// ai-proxy-advanced. The name is not a bundled plugin name, so it never
+// shadows one.
+const ResponseTransformerCloneName = "response-transformer-post-ai"
+
+// ResponseTransformerAdvancedCloneName is the clone name of
+// response-transformer-advanced. It is separate from the plain clone because a
+// clone copies exactly one base plugin.
+const ResponseTransformerAdvancedCloneName = "response-transformer-advanced-post-ai"
+
+// postAICloneNames maps each bundled response transformer to the clone name the
+// converter emits for it. The two directions of this map are the whole contract
+// between convert (which renames the plugin) and revert (which recovers the
+// type).
+var postAICloneNames = map[string]string{
+	"response-transformer":          ResponseTransformerCloneName,
+	"response-transformer-advanced": ResponseTransformerAdvancedCloneName,
+}
+
+// PostAICloneName returns the clone name the converter emits for pluginType,
+// and whether pluginType has one.
+func PostAICloneName(pluginType string) (string, bool) {
+	name, ok := postAICloneNames[pluginType]
+	return name, ok
+}
+
+// CloneRef returns the bundled plugin that a converter-emitted clone name
+// copies, and whether name is such a clone.
+func CloneRef(name string) (string, bool) {
+	for ref, clone := range postAICloneNames {
+		if clone == name {
+			return ref, true
+		}
+	}
+	return "", false
+}

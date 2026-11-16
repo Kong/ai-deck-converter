@@ -1,0 +1,173 @@
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: openai-chat
+        paths:
+          - /ai/chat/completions
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-responses
+        paths:
+          - /ai/responses
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-responses-lifecycle
+        paths:
+          - ~/ai/responses/.+
+        methods:
+          - GET
+          - POST
+          - DELETE
+          - OPTIONS
+        strip_path: false
+        tags:
+          - aigw:responses-lifecycle
+plugins:
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-chat
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://env/openai-key}'
+          description: gpt-4o
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: transformed-gpt
+            name: gpt-4o
+            provider: openai
+          route_type: llm/v1/chat
+    route: openai-chat
+    model: transformed-gpt
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-responses
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://env/openai-key}'
+          description: gpt-4o
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: transformed-gpt
+            name: gpt-4o
+            provider: openai
+          route_type: llm/v1/responses
+    route: openai-responses
+    model: transformed-gpt
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://env/openai-key}'
+          description: gpt-4o
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: gpt-4o
+            provider: openai
+          route_type: llm/v1/responses
+    route: openai-responses-lifecycle
+  - name: response-transformer-post-ai
+    config:
+      add:
+        headers:
+          - X-Plain:yes
+      remove:
+        json:
+          - service_tier
+    route: openai-chat
+    model: transformed-gpt
+  - name: response-transformer-advanced-post-ai
+    config:
+      add:
+        headers:
+          - X-Advanced:yes
+      replace:
+        json:
+          - model:replaced
+    route: openai-chat
+    model: transformed-gpt
+  - name: response-transformer-post-ai
+    config:
+      add:
+        headers:
+          - X-Plain:yes
+      remove:
+        json:
+          - service_tier
+    route: openai-responses
+    model: transformed-gpt
+  - name: response-transformer-advanced-post-ai
+    config:
+      add:
+        headers:
+          - X-Advanced:yes
+      replace:
+        json:
+          - model:replaced
+    route: openai-responses
+    model: transformed-gpt
+  - name: response-transformer-post-ai
+    config:
+      add:
+        headers:
+          - X-Plain:yes
+      remove:
+        json:
+          - service_tier
+    route: openai-responses-lifecycle
+  - name: response-transformer-advanced-post-ai
+    config:
+      add:
+        headers:
+          - X-Advanced:yes
+      replace:
+        json:
+          - model:replaced
+    route: openai-responses-lifecycle
+cloned_plugins:
+  - name: response-transformer-advanced-post-ai
+    ref: response-transformer-advanced
+    priority: 766
+  - name: response-transformer-post-ai
+    ref: response-transformer
+    priority: 766
+ai_models:
+  - name: transformed-gpt

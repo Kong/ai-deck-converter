@@ -1,0 +1,8 @@
+- code: BEHAVIOR_MAY_DIFFER
+  reason: a "response-transformer" policy does not change the response body of the model for a client that accepts gzip. response-transformer does not decode the body ai-proxy-advanced compressed. Use response-transformer-advanced to transform compressed responses too.
+  source:
+    kind: model
+    name: transformed-gpt
+    fields:
+      - policies[0]
+  severity: WARNING

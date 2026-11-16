@@ -19,6 +19,7 @@ type DBLessDocument struct {
 	ConsumerGroupConsumers []DBLessConsumerGroupMember `yaml:"consumer_group_consumers,omitempty"`
 	Plugins                []DBLessPlugin              `yaml:"plugins,omitempty"`
 	CustomPlugins          []DBLessCustomPlugin        `yaml:"custom_plugins,omitempty"`
+	ClonedPlugins          []DBLessClonedPlugin        `yaml:"cloned_plugins,omitempty"`
 	Vaults                 []DBLessVault               `yaml:"vaults,omitempty"`
 	Certificates           []DBLessCertificate         `yaml:"certificates,omitempty"`
 	SNIs                   []DBLessSNI                 `yaml:"snis,omitempty"`
@@ -143,6 +144,14 @@ type DBLessCustomPlugin struct {
 	Name    string `yaml:"name"`
 	Schema  string `yaml:"schema"`
 	Handler string `yaml:"handler"`
+}
+
+// DBLessClonedPlugin defines a copy of a bundled plugin under another name.
+type DBLessClonedPlugin struct {
+	ID       string `yaml:"id"`
+	Name     string `yaml:"name"`
+	Ref      string `yaml:"ref"`
+	Priority *int   `yaml:"priority,omitempty"`
 }
 
 type DBLessConsumer struct {

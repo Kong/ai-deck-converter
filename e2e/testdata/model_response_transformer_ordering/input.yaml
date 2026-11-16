@@ -1,0 +1,68 @@
+models:
+  # One model per transformer plugin, on the same route, so one gateway covers
+  # both clones the converter emits.
+  - display_name: Advanced transformed model
+    name: advanced-transformed-model
+    type: model
+    enabled: true
+    capabilities: [ generate ]
+    formats:
+      - type: openai
+    config:
+      route:
+        paths: [ /ai-response-transform ]
+        model:
+          values: [ advanced-transformed-alias ]
+    targets:
+      - name: gpt-4o
+        provider: openai-prod
+        config:
+          type: openai
+    policies: [ advanced-body-transform ]
+    access:
+      acls: { allow: [ ], deny: [ ] }
+  - display_name: Plain transformed model
+    name: plain-transformed-model
+    type: model
+    enabled: true
+    capabilities: [ generate ]
+    formats:
+      - type: openai
+    config:
+      route:
+        paths: [ /ai-response-transform ]
+        model:
+          values: [ plain-transformed-alias ]
+    targets:
+      - name: gpt-4o
+        provider: openai-prod
+        config:
+          type: openai
+    policies: [ plain-body-transform ]
+    access:
+      acls: { allow: [ ], deny: [ ] }
+model_providers:
+  - name: openai-prod
+    type: openai
+    display_name: OpenAI Prod
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://ai/openai-token}"
+policies:
+  - type: response-transformer-advanced
+    name: advanced-body-transform
+    config:
+      remove:
+        json: [ object ]
+      add:
+        json: [ "added:yes" ]
+        headers: [ "X-Added:av" ]
+  - type: response-transformer
+    name: plain-body-transform
+    config:
+      add:
+        json: [ "plain:yes" ]
+        headers: [ "X-Plain:av" ]
