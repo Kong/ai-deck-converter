@@ -176,7 +176,7 @@ plugins:
   - id: 17fa8192-4b9f-5b5a-8379-20ad8bc836a7
     name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 50000000
       sources:
         - body_path: model
           source: body
@@ -189,6 +189,7 @@ plugins:
         algorithm: round-robin
       genai_category: text/generation
       llm_format: openai
+      max_request_body_size: 50000000
       targets:
         - description: gpt-5
           logging:
@@ -206,7 +207,7 @@ plugins:
   - id: dcebfb31-cc0f-5469-b6d7-9d8807a4e8d2
     name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 50000000
       sources:
         - body_path: model
           source: body
@@ -219,6 +220,7 @@ plugins:
         algorithm: round-robin
       genai_category: text/generation
       llm_format: openai
+      max_request_body_size: 50000000
       targets:
         - description: gpt-5
           logging:
@@ -236,7 +238,7 @@ plugins:
   - id: 5477cac7-3c38-581b-899b-f9d520e9d5e4
     name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 50000000
       sources:
         - body_path: requested_model
           source: body
@@ -249,6 +251,7 @@ plugins:
         algorithm: round-robin
       genai_category: text/generation
       llm_format: openai
+      max_request_body_size: 50000000
       targets:
         - description: gpt-5
           logging:
@@ -278,6 +281,7 @@ plugins:
         algorithm: round-robin
       genai_category: text/generation
       llm_format: openai
+      max_request_body_size: 50000000
       targets:
         - description: gpt-5
           logging:

@@ -29,7 +29,7 @@ services:
 plugins:
   - name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 32000000
       sources:
         - body_path: model
           source: body
@@ -40,6 +40,7 @@ plugins:
         algorithm: round-robin
       genai_category: text/generation
       llm_format: openai
+      max_request_body_size: 32000000
       targets:
         - description: claude-sonnet-4-5
           logging:
@@ -56,7 +57,7 @@ plugins:
     model: ordered
   - name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 32000000
       sources:
         - body_path: model
           source: body
@@ -67,6 +68,7 @@ plugins:
         algorithm: round-robin
       genai_category: text/generation
       llm_format: anthropic
+      max_request_body_size: 32000000
       targets:
         - description: claude-sonnet-4-5
           logging:
@@ -87,6 +89,7 @@ plugins:
         algorithm: round-robin
       genai_category: text/generation
       llm_format: anthropic
+      max_request_body_size: 32000000
       model_name_header: false
       targets:
         - description: claude-sonnet-4-5

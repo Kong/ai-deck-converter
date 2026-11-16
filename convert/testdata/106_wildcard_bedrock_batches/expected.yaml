@@ -76,6 +76,7 @@ plugins:
         algorithm: round-robin
       genai_category: text/generation
       llm_format: openai
+      max_request_body_size: 50000000
       model_name_header: false
       targets:
         - description: gpt-5.4
@@ -93,6 +94,7 @@ plugins:
         algorithm: round-robin
       genai_category: text/generation
       llm_format: openai
+      max_request_body_size: 50000000
       model_name_header: false
       targets:
         - description: gpt-5.4
@@ -110,6 +112,7 @@ plugins:
         algorithm: round-robin
       genai_category: text/generation
       llm_format: openai
+      max_request_body_size: 50000000
       model_name_header: false
       targets:
         - description: gpt-5.4
@@ -127,6 +130,7 @@ plugins:
         algorithm: round-robin
       genai_category: text/generation
       llm_format: openai
+      max_request_body_size: 50000000
       model_name_header: false
       targets:
         - description: gpt-5.4

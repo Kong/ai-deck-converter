@@ -210,6 +210,9 @@ type modelPass struct {
 	skipped map[int][]ConversionIssue
 	// tokenVaults holds the token-vault-exchange config of each model.
 	tokenVaults map[*aigw.Model]map[string]any
+	// bodySizes holds the ai-proxy-advanced max_request_body_size of each
+	// model.
+	bodySizes map[*aigw.Model]*int
 	// clonedPlugins holds the plugin clones the model-scoped response
 	// transformers need, deduped by name.
 	clonedPlugins map[string]kong.ClonedPlugin
@@ -256,6 +259,7 @@ func (c *Converter) convertModelsPass(skipped map[int][]ConversionIssue) bool {
 		aliasConflicts:      map[string]bool{},
 		skipped:             skipped,
 		tokenVaults:         map[*aigw.Model]map[string]any{},
+		bodySizes:           map[*aigw.Model]*int{},
 		clonedPlugins:       map[string]kong.ClonedPlugin{},
 	}
 	c.modelRouteModels = map[string][]string{}
@@ -585,6 +589,8 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 		supportedPairs = maps.Clone(pairsByTarget)
 		keepEqualPaths(formats, pairsByTarget)
 	}
+	bodySize := c.modelBodySize(m, targets, pairsByTarget)
+	st.bodySizes[m] = bodySize
 
 	servedBy := map[string][]int{}
 	// routed holds the capabilities that got a route. collapsed holds the
@@ -639,7 +645,7 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 				}
 				var selectorCfgs []map[string]any
 				if !passthrough && !websocket && !lifecycle {
-					selectorCfgs = c.buildModelSelectorConfig(src, m, spec)
+					selectorCfgs = c.buildModelSelectorConfig(src, m, spec, bodySize)
 				}
 				// The alias *value* is per-model and deliberately excluded from
 				// routeConfigKey. The selector shape does not split routes either.
@@ -805,7 +811,7 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 						embeddings:        embeddings,
 						responseStreaming: m.Config.ResponseStreaming,
 						modelNameHeader:   modelNameHeader,
-						maxBodySize:       m.Config.MaxRequestBodySize,
+						maxBodySize:       bodySize,
 						proxy:             proxyConfigBlock(m.Config.Proxy),
 						source: source("model", m.Name, "config",
 							kong.FieldMapping{GeneratedPrefix: "config.proxy_config", SourcePrefix: "config.proxy"},
@@ -1221,7 +1227,7 @@ func (c *Converter) convertVideoLifecycle(
 		tokenVault:        st.tokenVaults[candidate.model],
 		responseStreaming: candidate.model.Config.ResponseStreaming,
 		modelNameHeader:   boolPtr(false),
-		maxBodySize:       candidate.model.Config.MaxRequestBodySize,
+		maxBodySize:       st.bodySizes[candidate.model],
 		proxy:             proxyConfigBlock(candidate.model.Config.Proxy),
 		targets:           targets,
 		targetSources:     targetSources,
@@ -2275,14 +2281,33 @@ func isPassthrough(m *aigw.Model) bool {
 		slices.ContainsFunc(m.Formats, func(f aigw.Format) bool { return f.Type == aimap.PassthroughFormat })
 }
 
+// modelBodySize returns the ai-proxy-advanced max_request_body_size of m. A
+// model that sets none gets the published limit of the providers that serve
+// an endpoint. A target without an endpoint stays out of the output.
+func (c *Converter) modelBodySize(m *aigw.Model, targets []plannedTarget, pairs map[int][]endpointPair) *int {
+	if m.Config.MaxRequestBodySize != nil || !c.supports(aimap.FeatureProviderBodySize) {
+		return m.Config.MaxRequestBodySize
+	}
+	var types []string
+	for _, t := range targets {
+		if len(pairs[t.index]) > 0 {
+			types = append(types, t.providerType)
+		}
+	}
+	if size, ok := aimap.DefaultModelBodySize(types); ok {
+		return &size
+	}
+	return nil
+}
+
 // bodySizeOrDefault returns the ai-model-selector's max_request_body_size: at
 // least aimap.DefaultMaxBodySize, raised to the model's own
 // max_request_body_size (destined for ai-proxy-advanced) only if that value
 // is larger, so the selector never reads less of the body than the proxy
 // itself is configured to accept. The plugin reads 0 as unlimited, so a
 // model value of 0 returns 0.
-func bodySizeOrDefault(m *aigw.Model) int {
-	if size := m.Config.MaxRequestBodySize; size != nil && (*size == 0 || *size > aimap.DefaultMaxBodySize) {
+func bodySizeOrDefault(size *int) int {
+	if size != nil && (*size == 0 || *size > aimap.DefaultMaxBodySize) {
 		return *size
 	}
 	return aimap.DefaultMaxBodySize
@@ -2293,7 +2318,7 @@ func bodySizeOrDefault(m *aigw.Model) int {
 // body/header/path parameters override the source. No source override leaves
 // source selection to the endpoint's format/capability default.
 func (c *Converter) buildModelSelectorConfig(
-	src ConversionIssueSource, m *aigw.Model, spec aimap.EndpointSpec,
+	src ConversionIssueSource, m *aigw.Model, spec aimap.EndpointSpec, bodySize *int,
 ) []map[string]any {
 	switch {
 	case m.Config.Route.Model.Path.PathParam != "":
@@ -2301,7 +2326,7 @@ func (c *Converter) buildModelSelectorConfig(
 		// PCRE-in-path model extraction applies only when the authored paths are regex paths that actually carry
 		// a named capture group for this param.
 		if !pathParamCaptured(m.Config.Route.Paths, param, spec.IsRegex) {
-			def := defaultModelSelectorConfig(m, spec)
+			def := defaultModelSelectorConfig(bodySize, spec)
 			// The fallback is silent and harmless only when the format's default
 			// selector still reads the model from the path (gemini/bedrock native
 			// capture). For body-default formats (openai/azure) it quietly switches
@@ -2319,7 +2344,7 @@ func (c *Converter) buildModelSelectorConfig(
 				"source":                "path",
 				"pcre_pattern":          sourcePath,
 				"pcre_capture_name":     param,
-				"max_request_body_size": bodySizeOrDefault(m),
+				"max_request_body_size": bodySizeOrDefault(bodySize),
 			}
 		}
 		return sources
@@ -2329,7 +2354,7 @@ func (c *Converter) buildModelSelectorConfig(
 			{
 				"source":                "body",
 				"body_path":             m.Config.Route.Model.Body.BodyParam,
-				"max_request_body_size": bodySizeOrDefault(m),
+				"max_request_body_size": bodySizeOrDefault(bodySize),
 			},
 		}
 	case m.Config.Route.Model.Header.HeaderParam != "":
@@ -2341,7 +2366,7 @@ func (c *Converter) buildModelSelectorConfig(
 		}
 	}
 
-	return []map[string]any{defaultModelSelectorConfig(m, spec)}
+	return []map[string]any{defaultModelSelectorConfig(bodySize, spec)}
 }
 
 // defaultSourceIsBody reports whether a fallback selector config reads the model
@@ -2377,7 +2402,7 @@ func (c *Converter) warnPathParamNotCaptured(
 		m.Name, param, param)
 }
 
-func defaultModelSelectorConfig(m *aigw.Model, spec aimap.EndpointSpec) map[string]any {
+func defaultModelSelectorConfig(bodySize *int, spec aimap.EndpointSpec) map[string]any {
 	if spec.DefaultModelSelectorConfig == nil {
 		return nil
 	}
@@ -2387,7 +2412,7 @@ func defaultModelSelectorConfig(m *aigw.Model, spec aimap.EndpointSpec) map[stri
 	for k, v := range *spec.DefaultModelSelectorConfig {
 		config[k] = v
 	}
-	config["max_request_body_size"] = bodySizeOrDefault(m)
+	config["max_request_body_size"] = bodySizeOrDefault(bodySize)
 
 	return config
 }
