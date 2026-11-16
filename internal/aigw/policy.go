@@ -18,8 +18,8 @@ type Policy struct {
 }
 
 // DatastoreRef references a top-level datastore by name. It is always a
-// mapping: `datastores: [{name: my-redis}]`. Policies and models (the latter
-// when its balancer is semantic) both reference through this shape.
+// mapping: `datastores: [{name: my-redis}]`. Policies and auth strategies
+// reference through this shape. Models use ModelDatastoreRef.
 //
 // Path is reserved and not honored yet.
 type DatastoreRef struct {

@@ -13,10 +13,19 @@ type Model struct {
 	Formats      []Format       `yaml:"formats,omitempty"`
 	TargetModels []TargetModel  `yaml:"targets,omitempty"`
 	Policies     []string       `yaml:"policies,omitempty"`
-	Datastores   []DatastoreRef `yaml:"datastores,omitempty"`
+	Datastores   []ModelDatastoreRef `yaml:"datastores,omitempty"`
 	Access       ModelAccess    `yaml:"access,omitempty"`
 	Config       ModelConfig    `yaml:"config,omitempty"`
 	Labels       Labels         `yaml:"labels,omitempty"`
+}
+
+// ModelDatastoreRef references a top-level datastore by name. Purpose records
+// the model feature that uses the datastore: embeddings (the default) or
+// session-affinity. Path is reserved and not honored yet.
+type ModelDatastoreRef struct {
+	Name  string  `yaml:"name"`
+	Purpose string `yaml:"purpose,omitempty"`
+	Path  *string `yaml:"path,omitempty"`
 }
 
 // ModelAccess is the access-control configuration for a Model: auth strategies
