@@ -129,6 +129,30 @@ func TestRevertWarnsCloneWithoutModelRepresentation(t *testing.T) {
 	require.Equal(t, "acl", out.Policies[0].Type)
 }
 
+// A deck dump taken without --include-plugin-definitions carries a plugin
+// under a converter clone name but no cloned_plugins block at all. Revert must
+// still recover the base plugin type from the name alone.
+func TestRevertResolvesConverterCloneNameWithoutClonedPluginsBlock(t *testing.T) {
+	doc := &kong.Document{
+		Plugins: []kong.Plugin{{
+			Name:   aimap.ResponseTransformerCloneName,
+			Route:  kong.NewStringRef("r1"),
+			Config: map[string]any{"remove": map[string]any{"json": []any{"foo"}}},
+		}},
+		Services: []kong.Service{{
+			Name:   "svc",
+			URL:    "http://upstream.example.com",
+			Routes: []kong.Route{{Name: "r1", Paths: []string{"/x"}}},
+		}},
+	}
+
+	out, _, err := RevertDocument(doc, Options{})
+	require.NoError(t, err)
+	require.Len(t, out.Policies, 1)
+	require.Equal(t, "response-transformer", out.Policies[0].Type,
+		"a converter clone name must revert to its base plugin even with no cloned_plugins entry")
+}
+
 // A converter-emitted clone whose priority was edited warns, since converting
 // again rewrites it to the converter's own priority.
 func TestRevertWarnsConverterCloneWithForeignPriority(t *testing.T) {

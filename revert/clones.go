@@ -18,9 +18,6 @@ func (r *Reverter) resolveCloneNames() {
 			refs[clone.Name] = clone.Ref
 		}
 	}
-	if len(refs) == 0 {
-		return
-	}
 
 	renamePlugins := func(list []kong.Plugin) []kong.Plugin {
 		if len(list) == 0 {
