@@ -1,0 +1,62 @@
+models:
+  - type: model
+    name: gpt
+    capabilities:
+      - generate
+      - embeddings
+    formats:
+      - type: openai
+    targets:
+      - name: gpt-5.2
+        provider: openai-env
+        config:
+          type: openai
+      - name: text-embedding-3-large
+        provider: openai-env
+        config:
+          type: openai
+    config:
+      route:
+        paths:
+          - /ai
+        methods:
+          - POST
+      logging:
+        payloads: false
+        statistics: true
+      response_streaming: allow
+      max_request_body_size: 52428800
+  - type: model
+    name: gpt-2
+    capabilities:
+      - audio/transcription
+    formats:
+      - type: openai
+    targets:
+      - name: whisper-1
+        provider: openai-env
+        config:
+          type: openai
+    config:
+      route:
+        paths:
+          - /ai
+        methods:
+          - POST
+        model:
+          values:
+            - gpt
+      logging:
+        payloads: false
+        statistics: true
+      response_streaming: deny
+      max_request_body_size: 26214400
+model_providers:
+  - type: openai
+    name: openai-env
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: Bearer {vault://env/openai-key}
