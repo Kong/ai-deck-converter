@@ -1,0 +1,18 @@
+mcp_servers:
+  - type: passthrough-listener
+    display_name: Both
+    name: both
+    upstream_url: https://a.internal/mcp
+    config:
+      targets:
+        - address: a.internal:443
+      route: {paths: [/mcp/both]}
+    tools: []
+  - type: passthrough-listener
+    display_name: Gated
+    name: gated
+    config:
+      targets:
+        - address: b.internal:443
+      route: {paths: [/mcp/gated]}
+    tools: []

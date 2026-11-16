@@ -3242,3 +3242,52 @@ agents:
 	require.Len(t, deck.Targets, 2)
 	require.Equal(t, "upstreams[0].targets[1]", deck.Targets[1].Location)
 }
+
+func TestConvertMetadataTracksMCPServerUpstreamAndTargets(t *testing.T) {
+	src := []byte(`
+mcp_servers:
+  - type: passthrough-listener
+    name: vendor
+    config:
+      targets:
+        - address: a.internal:443
+        - address: b.internal:443
+      route: {paths: [/vendor]}
+    tools: []
+`)
+
+	doc, _, err := convertDoc(src, false)
+	require.NoError(t, err)
+
+	dbless := doc.ToDBLess().Metadata()
+	require.Len(t, dbless.Upstreams, 1)
+	require.Equal(t, "upstreams[0]", dbless.Upstreams[0].Location)
+	require.Equal(t, "mcp_server", dbless.Upstreams[0].EntityType)
+	require.Equal(t, "vendor", dbless.Upstreams[0].EntityName)
+	require.Contains(t, dbless.Upstreams[0].FieldMappings, FieldMapping{
+		GeneratedPrefix: "healthchecks", SourcePrefix: "config.targets",
+	})
+	require.Len(t, dbless.Targets, 2)
+	require.Equal(t, GeneratedEntitySource{
+		Index:       1,
+		Location:    "targets[1]",
+		EntityType:  "mcp_server",
+		EntityName:  "vendor",
+		FieldPrefix: "config.targets[1]",
+		FieldMappings: []FieldMapping{
+			{GeneratedPrefix: "target", SourcePrefix: "config.targets[1].address"},
+		},
+	}, dbless.Targets[1])
+	require.Len(t, dbless.Services, 1)
+	require.Contains(t, dbless.Services[0].FieldMappings, FieldMapping{
+		GeneratedPrefix: "protocol", SourcePrefix: "config.protocol",
+	})
+	require.Contains(t, dbless.Services[0].FieldMappings, FieldMapping{
+		GeneratedPrefix: "path", SourcePrefix: "config.path",
+	})
+
+	deck := doc.Metadata()
+	require.Len(t, deck.Targets, 2)
+	require.Equal(t, "upstreams[0].targets[1]", deck.Targets[1].Location)
+	require.Equal(t, "mcp_server", deck.Upstreams[0].EntityType)
+}

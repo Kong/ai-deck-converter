@@ -61,6 +61,7 @@ var allFeatures = []Feature{
 	FeatureSagemaker,
 	FeatureAuthStrategyTokenVault,
 	FeatureAgentTargets,
+	FeatureMCPTargets,
 	FeatureOIDCProtectedResourceMetadata,
 	FeatureSanitizerAllWithCredentials,
 	FeatureClonedPlugins,

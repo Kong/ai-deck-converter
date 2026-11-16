@@ -208,10 +208,14 @@ type MCPProtectedResourceMetadata struct {
 // MCPServerConfig holds routing, logging, proxy, and server configuration.
 // Access control lives on the MCPServer itself (see MCPAccess), not here.
 type MCPServerConfig struct {
-	Route              RouteConfig    `yaml:"route,omitempty"`
-	Logging            *Logging       `yaml:"logging,omitempty"`
-	MaxRequestBodySize *int           `yaml:"max_request_body_size,omitempty"`
-	Server             map[string]any `yaml:"server,omitempty"`
+	Targets            []UpstreamTarget  `yaml:"targets,omitempty"`
+	Balancer           *UpstreamBalancer `yaml:"balancer,omitempty"`
+	Protocol           string            `yaml:"protocol,omitempty"`
+	Path               string            `yaml:"path,omitempty"`
+	Route              RouteConfig       `yaml:"route,omitempty"`
+	Logging            *Logging          `yaml:"logging,omitempty"`
+	MaxRequestBodySize *int              `yaml:"max_request_body_size,omitempty"`
+	Server             map[string]any    `yaml:"server,omitempty"`
 	// Proxy lowers to the ai-mcp-proxy plugin's proxy_config (only honored by
 	// the plugin in passthrough-listener mode).
 	Proxy *ProxyConfig `yaml:"proxy,omitempty"`

@@ -1,0 +1,6 @@
+- code: CONFIG_FIELD_DROPPED
+  reason: MCP server "orphan-api" is conversion-only but no listener names it in config.sources; dropping its service and route
+  source:
+    kind: mcp_server
+    name: orphan-api
+  severity: WARNING

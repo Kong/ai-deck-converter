@@ -158,7 +158,32 @@ func (c *Converter) convertMCPServer(
 		Tags:   c.labelsToTags(m.Labels),
 		Source: serviceURLSource("mcp_server", m.Name),
 	}
-	if m.UpstreamURL != "" {
+	targetsMode := len(m.Config.Targets) > 0
+	if targetsMode && m.UpstreamURL != "" {
+		return kong.Service{}, c.fail(src.at("config.url", "config.targets"), ConfigFieldInvalid,
+			"MCP server %q sets both config.url and config.targets; use one", m.Name)
+	}
+	if !targetsMode {
+		if err := c.checkURLOnlyFields(src, mcpUpstreamTargets(m)); err != nil {
+			return kong.Service{}, err
+		}
+	}
+	if targetsMode && m.Type == "listener" {
+		return kong.Service{}, c.fail(src.at("config.targets"), ConfigFieldInvalid,
+			"MCP server %q has type listener, which does not support config.targets", m.Name)
+	}
+	if targetsMode {
+		// ai-mcp-proxy sends a call of a tool with a host to that host, not to the Upstream.
+		for i, tool := range m.Tools {
+			if tool.Host != "" {
+				return kong.Service{}, c.fail(src.at(fmt.Sprintf("tools[%d].host", i)), ConfigFieldInvalid,
+					"MCP server %q sets tools[%d].host, which bypasses config.targets", m.Name, i)
+			}
+		}
+		if err := c.applyTargets(src, mcpUpstreamTargets(m), &service); err != nil {
+			return kong.Service{}, err
+		}
+	} else if m.UpstreamURL != "" {
 		service.URL = m.UpstreamURL
 	} else {
 		service.Host = placeholderHost
@@ -272,6 +297,7 @@ func (c *Converter) exposedSources() map[string]bool {
 func (c *Converter) pruneUnexposedSources(conversionOnlyServices []int, exposed map[string]bool) {
 	// Collect first, in document order, so the warnings are deterministic.
 	drop := make(map[int]bool, len(conversionOnlyServices))
+	dropped := make(map[string]bool, len(conversionOnlyServices))
 	for _, i := range conversionOnlyServices {
 		name := c.out.Services[i].Name
 		if exposed[name] {
@@ -281,6 +307,7 @@ func (c *Converter) pruneUnexposedSources(conversionOnlyServices []int, exposed 
 			"MCP server %q is conversion-only but no listener names it in config.sources; "+
 				"dropping its service and route", name)
 		drop[i] = true
+		dropped[name] = true
 	}
 	if len(drop) == 0 {
 		return
@@ -294,6 +321,10 @@ func (c *Converter) pruneUnexposedSources(conversionOnlyServices []int, exposed 
 		kept = append(kept, c.out.Services[i])
 	}
 	c.out.Services = kept
+	// The Upstream of a dropped server has no Service that uses it.
+	c.out.Upstreams = slices.DeleteFunc(c.out.Upstreams, func(up kong.Upstream) bool {
+		return up.Source != nil && up.Source.EntityType == "mcp_server" && dropped[up.Source.EntityName]
+	})
 	c.pruneUnusedTokenVaultCallbackRoute()
 }
 

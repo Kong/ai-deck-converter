@@ -32,8 +32,8 @@ func serviceURLSource(entityType, entityName string) *kong.Source {
 	)
 }
 
-func agentTargetsServiceSource(entityName string) *kong.Source {
-	return source("agent", entityName, "config.targets",
+func targetsServiceSource(entityType, entityName string) *kong.Source {
+	return source(entityType, entityName, "config.targets",
 		kong.FieldMapping{GeneratedPrefix: "host", SourcePrefix: "config.targets"},
 		kong.FieldMapping{GeneratedPrefix: "protocol", SourcePrefix: "config.protocol"},
 		kong.FieldMapping{GeneratedPrefix: "path", SourcePrefix: "config.path"},
@@ -42,8 +42,8 @@ func agentTargetsServiceSource(entityName string) *kong.Source {
 	)
 }
 
-func agentUpstreamSource(entityName string) *kong.Source {
-	return source("agent", entityName, "config.balancer",
+func targetsUpstreamSource(entityType, entityName string) *kong.Source {
+	return source(entityType, entityName, "config.balancer",
 		kong.FieldMapping{GeneratedPrefix: "name", SourcePrefix: "name"},
 		kong.FieldMapping{GeneratedPrefix: "healthchecks", SourcePrefix: "config.targets"},
 		kong.FieldMapping{GeneratedPrefix: "hash_on", SourcePrefix: "config.balancer.hash_on_header"},

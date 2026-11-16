@@ -112,7 +112,18 @@ func (r *Reverter) revertMCPServer(svc *kong.Service, rt *kong.Route, plugins, s
 
 	// The forward converter uses a placeholder localhost host when the server
 	// has no upstream; reverse that back to "no upstream_url".
-	if svc.URL != "" || svc.Host != placeholderHost {
+	up, err := r.upstreamOf(svc)
+	if err != nil {
+		return err
+	}
+	if up != nil {
+		lifted, err := r.liftUpstream("MCP server", m.Name, up, svc)
+		if err != nil {
+			return err
+		}
+		m.Config.Targets, m.Config.Balancer = lifted.targets, lifted.balancer
+		m.Config.Protocol, m.Config.Path = lifted.protocol, lifted.path
+	} else if svc.URL != "" || svc.Host != placeholderHost {
 		m.UpstreamURL = serviceURL(svc)
 	}
 

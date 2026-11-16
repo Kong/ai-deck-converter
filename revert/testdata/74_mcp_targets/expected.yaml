@@ -1,0 +1,87 @@
+mcp_servers:
+  - type: passthrough-listener
+    name: vendor-mcp
+    config:
+      targets:
+        - address: vendor-1.internal:8443
+          weight: 200
+        - address: vendor-2.internal:8443
+      balancer:
+        algorithm: consistent-hashing
+        hash_on_header: Mcp-Session-Id
+      path: /mcp
+      route:
+        paths:
+          - /mcp/vendor
+      logging:
+        payloads: false
+        statistics: true
+        audits: false
+  - type: conversion-only
+    name: flights-api
+    config:
+      targets:
+        - address: flights.internal:80
+      balancer:
+        algorithm: lowest-latency
+      protocol: http
+      route:
+        paths:
+          - /mcp/flights
+      logging:
+        payloads: false
+        statistics: true
+        audits: false
+    tools:
+      - name: searchFlights
+        description: Search available flights
+        method: GET
+        path: /flights
+  - type: upstream-server
+    name: upstream-mcp
+    config:
+      targets:
+        - address: primary.internal:443
+        - address: backup.internal:443
+          failover: true
+      balancer:
+        algorithm: least-connections
+      route:
+        paths:
+          - /mcp/upstream
+      logging:
+        payloads: false
+        statistics: true
+        audits: false
+      tools_cache_ttl_seconds: 60
+  - type: conversion-listener
+    name: bookings-mcp
+    config:
+      targets:
+        - address: bookings.internal:443
+      route:
+        paths:
+          - /mcp/bookings
+      logging:
+        payloads: false
+        statistics: true
+        audits: false
+    tools:
+      - name: listBookings
+        description: List bookings
+        method: GET
+        path: /bookings
+  - type: listener
+    name: aggregate
+    config:
+      route:
+        paths:
+          - /mcp/aggregate
+      logging:
+        payloads: false
+        statistics: true
+        audits: false
+      server:
+        tag: mcp-listener:aggregate-id
+      sources:
+        - flights-api

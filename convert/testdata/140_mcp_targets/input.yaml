@@ -1,0 +1,74 @@
+mcp_servers:
+  - type: passthrough-listener
+    display_name: Vendor MCP
+    name: vendor-mcp
+    config:
+      targets:
+        - address: vendor-1.internal:8443
+          weight: 200
+        - address: vendor-2.internal:8443
+      balancer:
+        algorithm: consistent-hashing
+        hash_on_header: Mcp-Session-Id
+      path: /mcp
+      route: {paths: [/mcp/vendor]}
+    tools: []
+  - type: conversion-only
+    display_name: Flights API
+    name: flights-api
+    config:
+      protocol: http
+      targets:
+        - address: flights.internal:80
+      balancer:
+        algorithm: lowest-latency
+      route: {paths: [/mcp/flights]}
+    tools:
+      - name: searchFlights
+        description: Search available flights
+        method: GET
+        path: /flights
+  - type: upstream-server
+    display_name: Upstream MCP
+    name: upstream-mcp
+    config:
+      tools_cache_ttl_seconds: 60
+      targets:
+        - address: primary.internal:443
+        - address: backup.internal:443
+          failover: true
+      balancer:
+        algorithm: least-connections
+      route: {paths: [/mcp/upstream]}
+  - type: conversion-listener
+    display_name: Bookings MCP
+    name: bookings-mcp
+    config:
+      targets:
+        - address: bookings.internal:443
+      route: {paths: [/mcp/bookings]}
+    tools:
+      - name: listBookings
+        description: List bookings
+        method: GET
+        path: /bookings
+  - type: conversion-only
+    display_name: Orphan API
+    name: orphan-api
+    config:
+      targets:
+        - address: orphan.internal:443
+      route: {paths: [/mcp/orphan]}
+    tools:
+      - name: getOrphan
+        description: Get an orphan
+        method: GET
+        path: /orphan
+  - type: listener
+    display_name: Aggregate
+    name: aggregate
+    config:
+      server:
+        tag: mcp-listener:aggregate-id
+      sources: [flights-api]
+      route: {paths: [/mcp/aggregate]}
