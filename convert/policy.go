@@ -154,29 +154,18 @@ func nestedMap(m map[string]any, path ...string) map[string]any {
 }
 
 // fillPolicyGeminiEndpoints fills api_endpoint in the gemini options blocks of
-// config. It copies config before the first write. A source policy is emitted
-// at several scopes. It reports false when a location cannot start a host.
+// config. It works on a copy, because a source policy is emitted at several
+// scopes. It reports false when a location cannot start a host.
 func (c *Converter) fillPolicyGeminiEndpoints(
 	p *aigw.Policy, config map[string]any,
 ) (map[string]any, bool) {
-	copied := false
+	config, _ = deepCopy(config).(map[string]any)
 	for _, path := range policyGeminiPaths {
-		endpoint, invalid := aimap.DeriveGeminiAPIEndpoint(nestedMap(config, path...))
-		if invalid != "" {
+		if invalid := aimap.FillGeminiAPIEndpoint(nestedMap(config, path...)); invalid != "" {
 			field := "config." + strings.Join(append(path, invalid), ".")
 			c.reportError(issueSource(kindPolicy, p.Name).at(field), ConfigFieldInvalid,
 				"policy %q: %s is not a valid Google Cloud ID; the policy is omitted", p.Name, field)
 			return nil, false
-		}
-		if endpoint == "" {
-			continue
-		}
-		if !copied {
-			config = deepCopy(config).(map[string]any)
-			copied = true
-		}
-		if gemini := nestedMap(config, path...); gemini != nil {
-			gemini["api_endpoint"] = endpoint
 		}
 	}
 	return config, true

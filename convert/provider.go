@@ -137,6 +137,11 @@ func (c *Converter) resolveEmbeddings(src ConversionIssueSource, raw any) (any, 
 		}
 	}
 
+	modelMap, _ := emb["model"].(map[string]any)
+	if err := c.fillEmbeddingsGeminiEndpoint(src, modelMap); err != nil {
+		return nil, err
+	}
+
 	providerType, explicit := lowerEmbeddingsModel(emb, provider, c.minRuntimeVersion)
 	if f, gated := aimap.ProviderFeature(providerType); gated && !c.supports(f) {
 		field := "config.balancer.embeddings.model.config.type"
@@ -145,21 +150,6 @@ func (c *Converter) resolveEmbeddings(src ConversionIssueSource, raw any) (any, 
 		}
 		// A semantic balancer needs its embeddings, so the model cannot convert.
 		return nil, c.failUnsupported(src.at(field), f, "provider type "+providerType)
-	}
-
-	// The data plane builds the host from location_id. An invalid location
-	// cannot convert, because the alternate is a broken upstream URL.
-	if providerType == "gemini" && !c.supports(aimap.FeatureGeminiEndpointDerivation) {
-		modelMap, _ := emb["model"].(map[string]any)
-		options, _ := modelMap["options"].(map[string]any)
-		gemini, _ := options["gemini"].(map[string]any)
-		if _, invalid := aimap.DeriveGeminiAPIEndpoint(gemini); invalid != "" {
-			return nil, c.fail(
-				src.at("config.balancer.embeddings.model.config.gcp_environment."+invalid),
-				ConfigFieldInvalid,
-				"model %q: gcp_environment.%s is not a valid Google Cloud ID; the model is omitted",
-				src.Name, invalid)
-		}
 	}
 
 	if provider == nil {
@@ -180,6 +170,32 @@ func (c *Converter) resolveEmbeddings(src ConversionIssueSource, raw any) (any, 
 		}
 	}
 	return emb, nil
+}
+
+// fillEmbeddingsGeminiEndpoint fills api_endpoint in the embeddings gemini
+// block, in the authored or the ai-proxy-advanced shape. The data plane builds
+// the host from location_id, so an invalid one cannot convert.
+func (c *Converter) fillEmbeddingsGeminiEndpoint(
+	src ConversionIssueSource, modelMap map[string]any,
+) error {
+	if c.supports(aimap.FeatureGeminiEndpointDerivation) {
+		return nil
+	}
+	where, field := "gcp_environment", "config.balancer.embeddings.model.config."
+	gemini := nestedMap(modelMap, "config", "gcp_environment")
+	if gemini == nil {
+		where, field = "options.gemini", "config.balancer.embeddings.model."
+		gemini = nestedMap(modelMap, "options", "gemini")
+	}
+	if gemini == nil {
+		return nil
+	}
+	if invalid := aimap.FillGeminiAPIEndpoint(gemini); invalid != "" {
+		return c.fail(src.at(field+where+"."+invalid), ConfigFieldInvalid,
+			"model %q: %s.%s is not a valid Google Cloud ID; the model is omitted",
+			src.Name, where, invalid)
+	}
+	return nil
 }
 
 // deepCopy copies the maps and slices of a YAML value.
@@ -414,9 +430,7 @@ func mapOptions(
 	}
 
 	if providerType == "gemini" && !aimap.Supports(aimap.FeatureGeminiEndpointDerivation, minVersion) {
-		if endpoint, _ := aimap.DeriveGeminiAPIEndpoint(nested["gemini"]); endpoint != "" {
-			nested["gemini"]["api_endpoint"] = endpoint
-		}
+		aimap.FillGeminiAPIEndpoint(nested["gemini"])
 	}
 
 	for prov, m := range nested {

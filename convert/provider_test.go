@@ -1,6 +1,7 @@
 package convert
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/Kong/ai-deck-converter/internal/aigw"
@@ -273,6 +274,49 @@ model_providers:
 	require.Empty(t, result.Output.AIModels, "the model is left out")
 	requireIssue(t, result.Issues, Error, ConfigFieldInvalid, kindModel, "semantic-lb",
 		"config.balancer.embeddings.model.config.gcp_environment.location_id")
+}
+
+// The reverse converter copies the plugin embeddings block into the balancer
+// unchanged, so the fill must cover the lowered model.options.gemini shape too.
+func TestResolveEmbeddingsGeminiEndpointLoweredShape(t *testing.T) {
+	const base = `
+models:
+  - name: semantic-lb
+    type: model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/ai]}
+      balancer:
+        algorithm: semantic
+        embeddings:
+          model:
+            name: text-embedding-004
+            provider: gemini
+            options:
+              gemini: {project_id: my-project, location_id: %s}
+    targets:
+      - name: gpt-4o
+        provider: openai-main
+        config: {type: openai}
+model_providers:
+  - name: openai-main
+    type: openai
+`
+	t.Run("fills the host", func(t *testing.T) {
+		out, issues, err := encodeYAML([]byte(fmt.Sprintf(base, "us")),
+			Options{MinRuntimeVersion: "2.3"})
+		require.NoError(t, err)
+		require.Empty(t, issues)
+		require.Contains(t, string(out), "api_endpoint: aiplatform.us.rep.googleapis.com")
+	})
+	t.Run("reports an invalid location", func(t *testing.T) {
+		_, issues, err := encodeYAML([]byte(fmt.Sprintf(base, "evil.example.com/x")),
+			Options{MinRuntimeVersion: "2.3"})
+		require.NoError(t, err)
+		requireIssue(t, issues, Error, ConfigFieldInvalid, kindModel, "semantic-lb",
+			"config.balancer.embeddings.model.options.gemini.location_id")
+	})
 }
 
 // A passthrough target forwards the client's request unchanged, so the plugin must not

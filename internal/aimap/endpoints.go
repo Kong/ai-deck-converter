@@ -802,10 +802,21 @@ func GeminiAPIEndpoint(locationID string) string {
 	return locationID + "-aiplatform.googleapis.com"
 }
 
-// DeriveGeminiAPIEndpoint returns the api_endpoint to fill in a lowered gemini
+// FillGeminiAPIEndpoint fills api_endpoint in a lowered gemini options block
+// when the block needs one. It returns the invalid field, or "" when the block
+// is valid.
+func FillGeminiAPIEndpoint(gemini map[string]any) string {
+	endpoint, invalid := deriveGeminiAPIEndpoint(gemini)
+	if endpoint != "" {
+		gemini["api_endpoint"] = endpoint
+	}
+	return invalid
+}
+
+// deriveGeminiAPIEndpoint returns the api_endpoint to fill in a lowered gemini
 // options block. It returns the invalid field when the block cannot get a host.
 // Both results are "" when the block needs no fill.
-func DeriveGeminiAPIEndpoint(gemini map[string]any) (endpoint, invalidField string) {
+func deriveGeminiAPIEndpoint(gemini map[string]any) (endpoint, invalidField string) {
 	switch v := gemini["api_endpoint"].(type) {
 	case nil:
 	case string:
