@@ -1969,18 +1969,18 @@ func balancerExtra(b *aigw.Balancer, key string) any {
 	return b.Fields[key]
 }
 
-// Model datastore purpose values. An empty purpose means embeddings.
+// Model datastore purpose values. An empty purpose means the semantic balancer.
 const (
-	modelDatastorePurposeEmbeddings      = "embeddings"
-	modelDatastorePurposeSessionAffinity = "session-affinity"
+	modelDatastorePurposeSemanticBalancer = "semantic-balancer"
+	modelDatastorePurposeSessionAffinity  = "session-affinity"
 )
 
 // normalizeModelDatastorePurpose returns the API spelling of a purpose. An
-// empty purpose means embeddings.
+// empty purpose means the semantic balancer.
 func normalizeModelDatastorePurpose(purpose string) string {
 	purpose = strings.ReplaceAll(purpose, "_", "-")
 	if purpose == "" {
-		return modelDatastorePurposeEmbeddings
+		return modelDatastorePurposeSemanticBalancer
 	}
 	return purpose
 }
@@ -1998,11 +1998,11 @@ func (c *Converter) resolveModelDatastores(
 	embeddingsRef, affinityRef := -1, -1
 	for i, ref := range m.Datastores {
 		switch normalizeModelDatastorePurpose(ref.Purpose) {
-		case modelDatastorePurposeEmbeddings:
+		case modelDatastorePurposeSemanticBalancer:
 			if embeddingsRef >= 0 {
 				return nil, nil, c.fail(src.at("datastores"), ConfigFieldInvalid,
 					"model %q has more than one datastore with purpose %q",
-					m.Name, modelDatastorePurposeEmbeddings)
+					m.Name, modelDatastorePurposeSemanticBalancer)
 			}
 			embeddingsRef = i
 		case modelDatastorePurposeSessionAffinity:
@@ -2024,7 +2024,7 @@ func (c *Converter) resolveModelDatastores(
 			return nil, nil, c.fail(src.at("datastores", "config.balancer.algorithm"), ConfigFieldInvalid,
 				"model %q references datastore %q with purpose %q, but that purpose requires the "+
 					"semantic balancer (set config.balancer.algorithm: semantic)",
-				m.Name, ref.Name, modelDatastorePurposeEmbeddings)
+				m.Name, ref.Name, modelDatastorePurposeSemanticBalancer)
 		}
 		embeddings = c.lookupModelDatastore(src, m, ref.Name,
 			fmt.Sprintf("datastores[%d].name", embeddingsRef))
