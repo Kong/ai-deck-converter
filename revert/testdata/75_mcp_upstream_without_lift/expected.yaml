@@ -23,3 +23,53 @@ mcp_servers:
         statistics: true
         audits: false
     upstream_url: https://vendor-upstream
+  - type: conversion-listener
+    name: tool-host
+    config:
+      route:
+        paths:
+          - /mcp/tool-host
+      logging:
+        payloads: false
+        statistics: true
+        audits: false
+    tools:
+      - name: getItem
+        description: Get an item
+        method: GET
+        path: /items
+        host: other.internal
+    upstream_url: https://tool-host-upstream
+  - type: passthrough-listener
+    name: only-failover
+    config:
+      route:
+        paths:
+          - /mcp/only-failover
+      logging:
+        payloads: false
+        statistics: true
+        audits: false
+    upstream_url: https://only-failover-upstream
+  - type: passthrough-listener
+    name: hashing-failover
+    config:
+      route:
+        paths:
+          - /mcp/hashing-failover
+      logging:
+        payloads: false
+        statistics: true
+        audits: false
+    upstream_url: https://hashing-failover-upstream
+  - type: passthrough-listener
+    name: repeated
+    config:
+      route:
+        paths:
+          - /mcp/repeated
+      logging:
+        payloads: false
+        statistics: true
+        audits: false
+    upstream_url: https://repeated-upstream

@@ -29,6 +29,28 @@ func (r *Reverter) findUpstream(svc *kong.Service) *kong.Upstream {
 	return nil
 }
 
+// targetsConvertible reports whether convert accepts the targets that
+// liftUpstream makes from up.
+func targetsConvertible(up *kong.Upstream) bool {
+	if len(up.Targets) == 0 {
+		return false
+	}
+	// liftUpstream keeps consistent-hashing only if it hashes on a header.
+	hashing := up.Algorithm == aimap.UpstreamAlgorithms["consistent-hashing"] &&
+		up.HashOn == "header" && up.HashOnHeader != ""
+	seen := map[string]bool{}
+	hasRegular := false
+	for _, t := range up.Targets {
+		failover := t.Failover != nil && *t.Failover
+		if t.Target == "" || seen[t.Target] || (hashing && failover) {
+			return false
+		}
+		seen[t.Target] = true
+		hasRegular = hasRegular || !failover
+	}
+	return hasRegular
+}
+
 // liftedUpstream holds the config fields of an agent or an MCP server that
 // revert gets from an Upstream and its Service.
 type liftedUpstream struct {

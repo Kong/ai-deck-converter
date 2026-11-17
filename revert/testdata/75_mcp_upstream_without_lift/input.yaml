@@ -25,8 +25,80 @@ services:
             config:
               mode: passthrough-listener
               tools: []
+  - name: tool-host
+    host: tool-host-upstream
+    protocol: https
+    routes:
+      - name: tool-host-route
+        paths:
+          - /mcp/tool-host
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              mode: conversion-listener
+              tools: 
+                - name: getItem
+                  description: Get an item
+                  method: GET
+                  path: /items
+                  host: other.internal
+  - name: only-failover
+    host: only-failover-upstream
+    protocol: https
+    routes:
+      - name: only-failover-route
+        paths:
+          - /mcp/only-failover
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              mode: passthrough-listener
+              tools: []
+  - name: hashing-failover
+    host: hashing-failover-upstream
+    protocol: https
+    routes:
+      - name: hashing-failover-route
+        paths:
+          - /mcp/hashing-failover
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              mode: passthrough-listener
+              tools: []
+  - name: repeated
+    host: repeated-upstream
+    protocol: https
+    routes:
+      - name: repeated-route
+        paths:
+          - /mcp/repeated
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              mode: passthrough-listener
+              tools: []
 upstreams:
   - name: aggregate-upstream
     targets:
       - target: aggregate.internal:443
   - name: vendor-upstream
+  - name: tool-host-upstream
+    targets:
+      - target: a.internal:443
+  - name: only-failover-upstream
+    targets:
+      - target: a.internal:443
+        failover: true
+  - name: hashing-failover-upstream
+    algorithm: consistent-hashing
+    hash_on: header
+    hash_on_header: Mcp-Session-Id
+    targets:
+      - target: a.internal:443
+      - target: b.internal:443
+        failover: true
+  - name: repeated-upstream
+    targets:
+      - target: a.internal:443
+      - target: a.internal:443

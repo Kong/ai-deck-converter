@@ -112,9 +112,10 @@ func (r *Reverter) revertMCPServer(svc *kong.Service, rt *kong.Route, plugins, s
 
 	// The forward converter uses a placeholder localhost host when the server
 	// has no upstream; reverse that back to "no upstream_url".
-	// A listener cannot have targets. An Upstream without targets gives none.
-	// Both keep the service url, as before targets support.
-	if up := r.findUpstream(svc); up != nil && len(up.Targets) > 0 && m.Type != "listener" {
+	// Revert lifts only targets that convert accepts. Other servers keep the
+	// service url, as before targets support.
+	if up := r.findUpstream(svc); up != nil && m.Type != "listener" &&
+		targetsConvertible(up) && !mcpToolSetsHost(getSlice(cfg, "tools")) {
 		lifted, err := r.liftUpstream("MCP server", m.Name, up, svc)
 		if err != nil {
 			return err
@@ -258,6 +259,18 @@ func mcpServerConfigForAIGateway(server map[string]any) map[string]any {
 		config[key] = value
 	}
 	return config
+}
+
+// mcpToolSetsHost reports whether a tool that convert keeps sets a host.
+// Convert rejects such a tool with targets. It drops a tool without a description.
+func mcpToolSetsHost(tools []any) bool {
+	for _, raw := range tools {
+		tool, ok := raw.(map[string]any)
+		if ok && getStr(tool, "host") != "" && getStr(tool, "description") != "" {
+			return true
+		}
+	}
+	return false
 }
 
 // mcpTool reverses one ai-mcp-proxy config.tools[] entry.
