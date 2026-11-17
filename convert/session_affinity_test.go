@@ -221,7 +221,7 @@ func TestSessionAffinityDatastorePurposeSemantic(t *testing.T) {
 		`embeddings: {name: text-embedding-3-small, provider: openai-prod, config: {type: openai}}, ` +
 		`vectordb: {strategy: redis, dimensions: 3, distance_metric: cosine}, ` +
 		`session_affinity: {enabled: true, storage: {type: redis}}}`
-	datastores := `[{name: vec-redis, purpose: embeddings}, {name: shared-redis, purpose: session-affinity}]`
+	datastores := `[{name: vec-redis, purpose: semantic-balancer}, {name: shared-redis, purpose: session-affinity}]`
 
 	doc, _, err := convertDoc([]byte(datastorePurposeModel("m", datastores, balancer)), false)
 	require.NoError(t, err)
@@ -249,8 +249,8 @@ func TestSessionAffinityDatastorePurposeRejects(t *testing.T) {
 		balancer   string
 		want       string
 	}{
-		"embeddings purpose on a non semantic balancer": {
-			datastores: `[{name: vec-redis, purpose: embeddings}]`,
+		"semantic-balancer purpose on a non semantic balancer": {
+			datastores: `[{name: vec-redis, purpose: semantic-balancer}]`,
 			balancer:   `{algorithm: round-robin}`,
 			want:       "requires the semantic balancer",
 		},
@@ -260,9 +260,9 @@ func TestSessionAffinityDatastorePurposeRejects(t *testing.T) {
 			want:       `unknown datastore purpose "teleport"`,
 		},
 		"two embeddings entries": {
-			datastores: `[{name: vec-redis, purpose: embeddings}, {name: shared-redis, purpose: embeddings}]`,
+			datastores: `[{name: vec-redis, purpose: semantic-balancer}, {name: shared-redis, purpose: semantic-balancer}]`,
 			balancer:   `{algorithm: semantic}`,
-			want:       `more than one datastore with purpose "embeddings"`,
+			want:       `more than one datastore with purpose "semantic-balancer"`,
 		},
 		"two session affinity entries": {
 			datastores: `[{name: vec-redis, purpose: session-affinity}, {name: shared-redis, purpose: session-affinity}]`,
