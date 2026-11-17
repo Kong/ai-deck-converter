@@ -2144,20 +2144,43 @@ func (c *Converter) modelConversationState(
 		return out, nil
 	}
 
-	field := "config.balancer.session_affinity.storage.datastore.name"
-	ds := c.datastores[legacyName]
-	if ds == nil {
-		return nil, c.fail(src.at(field), UndefinedReference,
-			"model %q's balancer.session_affinity references unknown datastore %q", m.Name, legacyName)
+	if legacyName != "" {
+		field := "config.balancer.session_affinity.storage.datastore.name"
+		ds := c.datastores[legacyName]
+		if ds == nil {
+			return nil, c.fail(src.at(field), UndefinedReference,
+				"model %q's balancer.session_affinity references unknown datastore %q", m.Name, legacyName)
+		}
+		if ds.Type != aimap.DatastoreTypeRedisEE {
+			return nil, c.fail(src.at(field), ConfigFieldInvalid,
+				"model %q's balancer.session_affinity datastore %q has type %q, expected %q",
+				m.Name, legacyName, ds.Type, aimap.DatastoreTypeRedisEE)
+		}
+		out["strategy"] = "redis"
+		out["redis"] = maps.Clone(ds.Config)
+		return out, nil
 	}
-	if ds.Type != aimap.DatastoreTypeRedisEE {
-		return nil, c.fail(src.at(field), ConfigFieldInvalid,
-			"model %q's balancer.session_affinity datastore %q has type %q, expected %q",
-			m.Name, legacyName, ds.Type, aimap.DatastoreTypeRedisEE)
+
+	if inline := inlineRedisConfig(storage); len(inline) > 0 {
+		out["strategy"] = "redis"
+		out["redis"] = inline
+		return out, nil
 	}
-	out["strategy"] = "redis"
-	out["redis"] = maps.Clone(ds.Config)
-	return out, nil
+
+	return nil, c.fail(src.at("config.balancer.session_affinity.storage"), ConfigFieldInvalid,
+		"model %q's session affinity storage needs an inline redis connection or a datastore", m.Name)
+}
+
+// inlineRedisConfig returns the inline Redis connection from a session affinity
+// storage block. The type and datastore keys are not connection fields.
+func inlineRedisConfig(storage map[string]any) map[string]any {
+	out := map[string]any{}
+	for k, v := range storage {
+		if k != "type" && k != "datastore" {
+			out[k] = v
+		}
+	}
+	return out
 }
 
 func basePaths(m *aigw.Model) []string {

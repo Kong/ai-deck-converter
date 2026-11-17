@@ -1271,10 +1271,21 @@ func isAPIOnly(caps []string) bool {
 // shortcut: redis state has no Datastore entity to point at, so it is dropped.
 // Upgrade when revert emits datastores for plugin redis blocks.
 func sessionAffinityFromConfig(cfg map[string]any) any {
-	if cfg == nil || getStr(cfg, "strategy") == "redis" {
+	if cfg == nil {
 		return nil
 	}
-	out := map[string]any{"storage": map[string]any{"type": "local"}}
+	storage := map[string]any{"type": "local"}
+	// The plugin config holds the resolved connection, not the datastore
+	// reference, so the inline connection is the only form to restore.
+	if getStr(cfg, "strategy") == "redis" {
+		storage = map[string]any{"type": "redis"}
+		if redis, ok := cfg["redis"].(map[string]any); ok {
+			for k, v := range redis {
+				storage[k] = v
+			}
+		}
+	}
+	out := map[string]any{"storage": storage}
 	for _, key := range []string{"enabled", "ttl"} {
 		if v, ok := cfg[key]; ok {
 			out[key] = v

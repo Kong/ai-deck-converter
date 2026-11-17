@@ -306,3 +306,48 @@ func TestSessionAffinityDatastorePurposeRejects(t *testing.T) {
 		})
 	}
 }
+
+func TestSessionAffinityInlineRedis(t *testing.T) {
+	t.Parallel()
+
+	t.Run("inline connection is used without a datastore", func(t *testing.T) {
+		t.Parallel()
+
+		balancer := `{algorithm: round-robin, session_affinity: {` +
+			`storage: {type: redis, host: inline.internal, port: 6390}}}`
+		doc, _, err := convertDoc([]byte(datastorePurposeModel("inline", `[]`, balancer)), false)
+		require.NoError(t, err)
+		plugins := pluginsNamed(doc, "ai-proxy-advanced")
+		require.Len(t, plugins, 1)
+		require.Equal(t, map[string]any{
+			"strategy": "redis",
+			"redis":    map[string]any{"host": "inline.internal", "port": 6390},
+		}, plugins[0].Config["conversation_state"])
+	})
+
+	t.Run("datastore wins over the inline connection", func(t *testing.T) {
+		t.Parallel()
+
+		balancer := `{algorithm: round-robin, session_affinity: {` +
+			`storage: {type: redis, host: inline.internal, port: 6390}}}`
+		datastores := `[{name: shared-redis, purpose: session-affinity}]`
+		doc, _, err := convertDoc([]byte(datastorePurposeModel("both", datastores, balancer)), false)
+		require.NoError(t, err)
+		plugins := pluginsNamed(doc, "ai-proxy-advanced")
+		require.Len(t, plugins, 1)
+		require.Equal(t, map[string]any{
+			"strategy": "redis",
+			"redis":    map[string]any{"host": "redis.internal", "port": 6379},
+		}, plugins[0].Config["conversation_state"])
+	})
+}
+
+func TestSessionAffinityRedisNeedsAConnection(t *testing.T) {
+	t.Parallel()
+
+	balancer := `{algorithm: round-robin, session_affinity: {storage: {type: redis}}}`
+	result, err := Convert([]byte(datastorePurposeModel("none", `[]`, balancer)), testOptions)
+	require.NoError(t, err)
+	require.ErrorContains(t, issuesError(result.Issues, false),
+		"needs an inline redis connection or a datastore")
+}
