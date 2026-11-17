@@ -30,7 +30,7 @@ func (c *Converter) convertAgent(src ConversionIssueSource, a *aigw.Agent) error
 			"agent %q has no config.url or config.targets; the Service needs an upstream", a.Name)
 	}
 	if !targetsMode {
-		if err := c.checkAgentURLOnlyFields(src, a); err != nil {
+		if err := c.checkURLOnlyFields(src, agentUpstreamTargets(a)); err != nil {
 			return err
 		}
 	}
@@ -80,7 +80,7 @@ func (c *Converter) convertAgent(src ConversionIssueSource, a *aigw.Agent) error
 		Source: serviceURLSource("agent", a.Name),
 	}
 	if targetsMode {
-		if err := c.applyAgentTargets(src, a, &svc); err != nil {
+		if err := c.applyTargets(src, agentUpstreamTargets(a), &svc); err != nil {
 			return err
 		}
 	}

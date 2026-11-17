@@ -1,0 +1,203 @@
+_format_version: "3.0"
+services:
+  - name: vendor-mcp
+    host: vendor-mcp-upstream
+    protocol: https
+    path: /mcp
+    routes:
+      - name: vendor-mcp-route
+        paths:
+          - /mcp/vendor
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              include_consumer_groups: true
+              logging:
+                log_audits: false
+                log_payloads: false
+                log_statistics: true
+              mode: passthrough-listener
+              tools: []
+  - name: flights-api
+    host: flights-api-upstream
+    protocol: http
+    routes:
+      - name: flights-api-route
+        paths:
+          - /mcp/flights
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              include_consumer_groups: true
+              logging:
+                log_audits: false
+                log_payloads: false
+                log_statistics: true
+              mode: conversion-only
+              tools:
+                - description: Search available flights
+                  method: GET
+                  name: searchFlights
+                  path: /flights
+            tags:
+              - mcp-listener:aggregate-id
+          - name: pre-function
+            config:
+              access:
+                - |
+                  local addr = ngx.var.server_addr or ""
+                  if addr:sub(1, 5) ~= "unix:" then
+                    return ngx.exit(ngx.HTTP_NOT_FOUND)
+                  end
+            tags:
+              - aigw-generated:mcp-toolset-gate
+  - name: upstream-mcp
+    host: upstream-mcp-upstream
+    protocol: https
+    routes:
+      - name: upstream-mcp-route
+        paths:
+          - /mcp/upstream
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              include_consumer_groups: true
+              logging:
+                log_audits: false
+                log_payloads: false
+                log_statistics: true
+              mode: upstream-server
+              tools: []
+              tools_cache_ttl_seconds: 60
+          - name: pre-function
+            config:
+              access:
+                - |
+                  local addr = ngx.var.server_addr or ""
+                  if addr:sub(1, 5) ~= "unix:" then
+                    return ngx.exit(ngx.HTTP_NOT_FOUND)
+                  end
+            tags:
+              - aigw-generated:mcp-toolset-gate
+  - name: bookings-mcp
+    host: bookings-mcp-upstream
+    protocol: https
+    routes:
+      - name: bookings-mcp-route
+        paths:
+          - /mcp/bookings
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              include_consumer_groups: true
+              logging:
+                log_audits: false
+                log_payloads: false
+                log_statistics: true
+              mode: conversion-listener
+              tools:
+                - description: List bookings
+                  method: GET
+                  name: listBookings
+                  path: /bookings
+  - name: aggregate
+    host: localhost
+    routes:
+      - name: aggregate-route
+        paths:
+          - /mcp/aggregate
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              include_consumer_groups: true
+              logging:
+                log_audits: false
+                log_payloads: false
+                log_statistics: true
+              mode: listener
+              server:
+                tag: mcp-listener:aggregate-id
+              tools: []
+upstreams:
+  - name: vendor-mcp-upstream
+    algorithm: consistent-hashing
+    hash_on: header
+    hash_on_header: Mcp-Session-Id
+    healthchecks:
+      active:
+        type: tcp
+        healthy:
+          interval: 10
+          successes: 2
+        unhealthy:
+          interval: 10
+          tcp_failures: 3
+          timeouts: 3
+      passive:
+        type: tcp
+        unhealthy:
+          tcp_failures: 3
+          timeouts: 3
+    targets:
+      - target: vendor-1.internal:8443
+        weight: 200
+      - target: vendor-2.internal:8443
+  - name: flights-api-upstream
+    algorithm: latency
+    healthchecks:
+      active:
+        type: tcp
+        healthy:
+          interval: 10
+          successes: 2
+        unhealthy:
+          interval: 10
+          tcp_failures: 3
+          timeouts: 3
+      passive:
+        type: tcp
+        unhealthy:
+          tcp_failures: 3
+          timeouts: 3
+    targets:
+      - target: flights.internal:80
+  - name: upstream-mcp-upstream
+    algorithm: least-connections
+    healthchecks:
+      active:
+        type: tcp
+        healthy:
+          interval: 10
+          successes: 2
+        unhealthy:
+          interval: 10
+          tcp_failures: 3
+          timeouts: 3
+      passive:
+        type: tcp
+        unhealthy:
+          tcp_failures: 3
+          timeouts: 3
+    targets:
+      - target: primary.internal:443
+      - target: backup.internal:443
+        failover: true
+  - name: bookings-mcp-upstream
+    algorithm: round-robin
+    healthchecks:
+      active:
+        type: tcp
+        healthy:
+          interval: 10
+          successes: 2
+        unhealthy:
+          interval: 10
+          tcp_failures: 3
+          timeouts: 3
+      passive:
+        type: tcp
+        unhealthy:
+          tcp_failures: 3
+          timeouts: 3
+    targets:
+      - target: bookings.internal:443

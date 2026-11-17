@@ -1,0 +1,100 @@
+mcp_servers:
+  - type: passthrough-listener
+    display_name: Hashing failover
+    name: hashing-failover
+    config:
+      targets:
+        - address: a.internal:443
+        - address: b.internal:443
+          failover: true
+      balancer:
+        algorithm: consistent-hashing
+        hash_on_header: Mcp-Session-Id
+      route: {paths: [/mcp/hashing-failover]}
+    tools: []
+  - type: passthrough-listener
+    display_name: Only failover
+    name: only-failover
+    config:
+      targets:
+        - address: a.internal:443
+          failover: true
+      route: {paths: [/mcp/only-failover]}
+    tools: []
+  - type: passthrough-listener
+    display_name: Repeated address
+    name: repeated-address
+    config:
+      targets:
+        - address: a.internal:443
+        - address: a.internal:443
+      route: {paths: [/mcp/repeated-address]}
+    tools: []
+  - type: passthrough-listener
+    display_name: No hash header
+    name: no-hash-header
+    config:
+      targets:
+        - address: a.internal:443
+      balancer:
+        algorithm: consistent-hashing
+      route: {paths: [/mcp/no-hash-header]}
+    tools: []
+  - type: passthrough-listener
+    display_name: URL with balancer
+    name: url-with-balancer
+    upstream_url: https://a.internal/mcp
+    config:
+      balancer:
+        algorithm: round-robin
+      route: {paths: [/mcp/url-with-balancer]}
+    tools: []
+  - type: passthrough-listener
+    display_name: Bad protocol
+    name: bad-protocol
+    config:
+      protocol: grpc
+      targets:
+        - address: a.internal:443
+      route: {paths: [/mcp/bad-protocol]}
+    tools: []
+  - type: passthrough-listener
+    display_name: Bad path
+    name: bad-path
+    config:
+      path: mcp
+      targets:
+        - address: a.internal:443
+      route: {paths: [/mcp/bad-path]}
+    tools: []
+  - type: conversion-only
+    display_name: Tool host
+    name: tool-host
+    config:
+      targets:
+        - address: a.internal:443
+      route: {paths: [/mcp/tool-host]}
+    tools:
+      - name: getItem
+        description: Get an item
+        method: GET
+        path: /items
+        host: other.internal
+  - type: listener
+    display_name: Listener
+    name: listener-targets
+    config:
+      targets:
+        - address: a.internal:443
+      route: {paths: [/mcp/listener]}
+  - type: passthrough-listener
+    display_name: Ignored hash header
+    name: ignored-hash-header
+    config:
+      targets:
+        - address: a.internal:443
+      balancer:
+        algorithm: round-robin
+        hash_on_header: Mcp-Session-Id
+      route: {paths: [/mcp/ignored-hash-header]}
+    tools: []
