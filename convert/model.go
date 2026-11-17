@@ -1960,8 +1960,8 @@ func (c *Converter) balancerConfig(b *aigw.Balancer) map[string]any {
 	return cfg
 }
 
-// balancerExtra pulls a hoisted field (vectordb/embeddings) out of the balancer
-// block so it can be emitted at the top level of the plugin config.
+// balancerExtra pulls a hoisted field out of the balancer block so it can be
+// emitted at the top level of the plugin config.
 func balancerExtra(b *aigw.Balancer, key string) any {
 	if b == nil {
 		return nil
@@ -2087,14 +2087,23 @@ func (c *Converter) modelVectorDB(src ConversionIssueSource, m *aigw.Model, ds *
 }
 
 // modelConversationState changes balancer.session_affinity to the
-// ai-proxy-advanced conversation_state block. Redis storage gets the
-// connection of the referenced redis-ee datastore. The consistent-hashing
-// balancer has no affinity layer, so it gets no block.
+// ai-proxy-advanced conversation_state block. A session affinity datastore
+// overrides the inline Redis connection. The consistent-hashing balancer has
+// no affinity layer.
 func (c *Converter) modelConversationState(
 	src ConversionIssueSource, m *aigw.Model, affinityDS *aigw.Datastore,
 ) (map[string]any, error) {
 	raw := balancerExtra(m.Config.Balancer, "session_affinity")
-	if raw == nil || balancerAlgorithm(m.Config.Balancer) == "consistent-hashing" {
+	if balancerAlgorithm(m.Config.Balancer) == "consistent-hashing" {
+		if raw != nil || affinityDS != nil {
+			return nil, c.fail(src.at("config.balancer.session_affinity", "datastores"),
+				ConfigFieldInvalid,
+				"model %q sets session affinity on the consistent-hashing balancer, which has "+
+					"no session affinity layer", m.Name)
+		}
+		return nil, nil
+	}
+	if raw == nil {
 		if affinityDS != nil {
 			return nil, c.fail(src.at("datastores", "config.balancer.session_affinity"), ConfigFieldInvalid,
 				"model %q references a datastore with purpose %q, but the balancer has no "+
@@ -2115,7 +2124,13 @@ func (c *Converter) modelConversationState(
 		}
 	}
 	storage, _ := affinity["storage"].(map[string]any)
-	if storage == nil || storage["type"] != "redis" {
+	storageType, _ := storage["type"].(string)
+	if storageType != "redis" {
+		if storageType != "" && storageType != "local" {
+			return nil, c.fail(src.at("config.balancer.session_affinity.storage.type"),
+				ConfigFieldInvalid,
+				"model %q's session affinity storage type %q is unknown", m.Name, storageType)
+		}
 		if affinityDS != nil {
 			return nil, c.fail(src.at("config.balancer.session_affinity.storage"), ConfigFieldInvalid,
 				"model %q references a datastore with purpose %q, but the session affinity "+

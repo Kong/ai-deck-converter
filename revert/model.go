@@ -1295,9 +1295,8 @@ func sessionAffinityFromConfig(cfg map[string]any) any {
 }
 
 // balancerFromConfig reverses convert.balancerConfig, dropping the implicit
-// {algorithm: round-robin} default the forward converter emits. The top-level
-// vectordb/embeddings config keys (siblings of `balancer` in ai-proxy-advanced)
-// are folded back into the balancer block, mirroring convert's hoisting.
+// {algorithm: round-robin} default the forward converter emits. The hoisted
+// config keys are folded back into the balancer block, mirroring convert.
 func balancerFromConfig(cfg map[string]any, vectordb, embeddings, sessionAffinity any) *aigw.Balancer {
 	algo := getStr(cfg, "algorithm")
 	fields := map[string]any{}

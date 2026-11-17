@@ -57,10 +57,6 @@ func TestSessionAffinityBecomesConversationState(t *testing.T) {
 				"redis":    map[string]any{"host": "redis.internal", "port": 6379},
 			},
 		},
-		"consistent-hashing has no affinity layer": {
-			balancer: `{algorithm: consistent-hashing, session_affinity: {enabled: true}}`,
-			want:     nil,
-		},
 	}
 
 	for name, tc := range cases {
@@ -105,6 +101,10 @@ func TestSessionAffinityRejects(t *testing.T) {
 			balancer: `{algorithm: round-robin, session_affinity: {enabled: true}}`,
 			version:  "2.3",
 			want:     "session_affinity",
+		},
+		"consistent-hashing has no affinity layer": {
+			balancer: `{algorithm: consistent-hashing, session_affinity: {enabled: true}}`,
+			want:     "consistent-hashing balancer, which has no session affinity layer",
 		},
 	}
 
@@ -282,7 +282,7 @@ func TestSessionAffinityDatastorePurposeRejects(t *testing.T) {
 		"session affinity datastore with consistent hashing": {
 			datastores: `[{name: shared-redis, purpose: session-affinity}]`,
 			balancer:   `{algorithm: consistent-hashing}`,
-			want:       "has no session affinity block",
+			want:       "consistent-hashing balancer, which has no session affinity layer",
 		},
 		"datastore named in both places": {
 			datastores: `[{name: shared-redis, purpose: session-affinity}]`,
