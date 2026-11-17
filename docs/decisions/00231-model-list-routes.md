@@ -50,6 +50,8 @@ Out of scope:
   per caller. A kong-ee change builds it from the `serve-model-list` filters
   that kong-ee #24216 added to `ai-proxy-advanced`, and removes
   `route_type: llm/v1/models` from `ai-proxy-advanced` before 2.4 ships.
+  [Entry fields](#entry-fields) and [Authentication](#authentication) say
+  where the plugin must differ from the filters.
 - Lists for the other formats, such as `gemini` and `bedrock`. Their clients
   use other list paths.
 - OpenAI-format lists for Bedrock mantle targets. A mantle route serves the
@@ -310,9 +312,14 @@ limits. So a list entry carries the alias and, when the gateway knows
 the price, `cost`. Mapping the model's `display_name` into target `metadata`
 can follow in its own change.
 
-With dynamic pricing on, the gateway advertises `cost` only for a target whose
-config sets its prices. A target that relies on the LLM pricing service gets
-no `cost`. See [Unresolved questions](#unresolved-questions).
+With dynamic pricing on, billing prices a target without its own prices from
+the LLM pricing service. `kong.llm.dynamic_pricing.price_loader` polls those
+rates at run time. The `serve-model-list` filter computes `cost` when the
+config loads, so today it advertises no `cost` for such a target.
+`ai-models-list` must look the rates up per request with
+`price_loader.get_entry_by_provider_model`, without markup, as billing does. A
+target missing from the polled catalog gets no `cost`, and a target with its
+own prices keeps them.
 
 ## Authentication
 
@@ -433,9 +440,9 @@ agents:
 `Options.ModelListEndpoints` (`model_list_endpoints`) turns lists on. It
 defaults to false, as `PluginInstanceNames` does, because it changes the
 output. When it is not set, the converter makes no list route, gives no
-instance an `id` and reports no list issue. Platform-api provides the value
-and defaults it to true, so Konnect controls the rollout. Admins get no
-switch.
+instance an `id` and reports no list issue. Konnect sets the option only for
+2.4 or later, from the resolved `min_runtime_version` that it already passes to
+the converter. So Konnect controls the rollout. Admins get no switch.
 
 ## Runtime gate
 
@@ -444,9 +451,9 @@ switch.
 converter makes no list route and gives no instance an `id`. When
 `ModelListEndpoints` is set, a document with at least one instance to
 advertise also gets one `UNSUPPORTED_IN_MIN_RUNTIME_VERSION` warning that
-names the minimum runtime version the list needs. Platform-api can leave the
-option off for a gateway below 2.4, so that gateway gets no warning. A
-document with nothing to advertise gets no warning.
+names the minimum runtime version the list needs. Konnect does not set the
+option below 2.4, so only a CLI user who sets it sees this warning. A document
+with nothing to advertise gets no warning.
 
 ## Revert
 
@@ -600,10 +607,7 @@ A caller of `GET /claude-code/v1/models` outside `contractors` gets one entry,
 # Unresolved questions
 [unresolved-questions]: #unresolved-questions
 
-- Should `ai-models-list` advertise the prices of the LLM pricing service?
-  Most data planes will price targets that way, so without it most entries
-  carry no `cost`. The answer changes the kong-ee plugin, not the converter
-  output.
+None.
 
 # Testing
 [testing]: #testing
