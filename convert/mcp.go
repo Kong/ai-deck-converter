@@ -160,8 +160,8 @@ func (c *Converter) convertMCPServer(
 	}
 	targetsMode := len(m.Config.Targets) > 0
 	if targetsMode && m.UpstreamURL != "" {
-		return kong.Service{}, c.fail(src.at("config.url", "config.targets"), ConfigFieldInvalid,
-			"MCP server %q sets both config.url and config.targets; use one", m.Name)
+		return kong.Service{}, c.fail(src.at("upstream_url", "config.targets"), ConfigFieldInvalid,
+			"MCP server %q sets both upstream_url and config.targets; use one", m.Name)
 	}
 	if !targetsMode {
 		if err := c.checkURLOnlyFields(src, mcpUpstreamTargets(m)); err != nil {
@@ -174,8 +174,9 @@ func (c *Converter) convertMCPServer(
 	}
 	if targetsMode {
 		// ai-mcp-proxy sends a call of a tool with a host to that host, not to the Upstream.
+		// mcpTools drops a tool without a description, so that tool is not checked.
 		for i, tool := range m.Tools {
-			if tool.Host != "" {
+			if tool.Host != "" && tool.Description != "" {
 				return kong.Service{}, c.fail(src.at(fmt.Sprintf("tools[%d].host", i)), ConfigFieldInvalid,
 					"MCP server %q sets tools[%d].host, which bypasses config.targets", m.Name, i)
 			}

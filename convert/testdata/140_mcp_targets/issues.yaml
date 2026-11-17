@@ -1,3 +1,11 @@
+- code: MISSING_REQUIRED_CONFIG_FIELD
+  reason: MCP server "bookings-mcp" tool "undescribed" has no description; ai-mcp-proxy requires one
+  source:
+    kind: mcp_server
+    name: bookings-mcp
+    fields:
+      - tools[1].description
+  severity: WARNING
 - code: CONFIG_FIELD_DROPPED
   reason: MCP server "orphan-api" is conversion-only but no listener names it in config.sources; dropping its service and route
   source:

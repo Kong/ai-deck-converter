@@ -52,6 +52,10 @@ mcp_servers:
         description: List bookings
         method: GET
         path: /bookings
+      - name: undescribed
+        method: GET
+        path: /undescribed
+        host: other.internal
   - type: conversion-only
     display_name: Orphan API
     name: orphan-api

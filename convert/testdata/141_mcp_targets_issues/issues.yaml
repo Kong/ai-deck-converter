@@ -1,10 +1,10 @@
 - code: CONFIG_FIELD_INVALID
-  reason: MCP server "both" sets both config.url and config.targets; use one
+  reason: MCP server "both" sets both upstream_url and config.targets; use one
   source:
     kind: mcp_server
     name: both
     fields:
-      - config.url
+      - upstream_url
       - config.targets
   severity: ERROR
 - code: UNSUPPORTED_IN_MIN_RUNTIME_VERSION
