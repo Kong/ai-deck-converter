@@ -236,7 +236,7 @@ provider-specific keys:
 
 - `azure`: `deployment_id` → `azure_deployment_id`, `api_version` → `azure_api_version`, provider `instance` → `azure_instance`
 - `anthropic`: `version` → `anthropic_version`
-- `gemini`: keys in `aimap.GeminiOptionKeys` nest under `options.gemini`; provider `project_id` too.
+- `gemini`: keys in `aimap.GeminiOptionKeys` nest under `options.gemini`.
   Below AI Gateway 2.4 the converter fills `api_endpoint` from `location_id`
   (`global`, `us`, `eu`, or `{location}-aiplatform.googleapis.com`), because
   older data planes require it and derive nothing. An explicit endpoint wins,
