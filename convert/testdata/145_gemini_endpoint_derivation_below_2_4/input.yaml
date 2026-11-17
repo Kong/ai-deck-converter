@@ -1,0 +1,126 @@
+# 2.4 derives the Gemini host from location_id. Older releases require
+# api_endpoint with project_id and location_id. The converter fills the host for
+# those releases, for targets, the balancer embeddings block and policies.
+model_providers:
+  - name: gemini-prod
+    type: gemini
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://ai/gemini-token}"
+  - name: openai-main
+    type: openai
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://env/openai-key}"
+models:
+  - name: gemini-agentic
+    type: model
+    capabilities: [agentic]
+    formats: [{type: gemini}]
+    config:
+      route: {paths: [/ai]}
+    targets:
+      - name: global
+        provider: gemini-prod
+        config:
+          type: gemini
+          gcp_environment:
+            project_id: my-project
+            location_id: global
+      - name: us-multi-region
+        provider: gemini-prod
+        config:
+          type: gemini
+          gcp_environment:
+            project_id: my-project
+            location_id: us
+      - name: eu-multi-region
+        provider: gemini-prod
+        config:
+          type: gemini
+          gcp_environment:
+            project_id: my-project
+            location_id: eu
+      - name: regional
+        provider: gemini-prod
+        config:
+          type: gemini
+          gcp_environment:
+            project_id: my-project
+            location_id: us-central1
+      - name: explicit
+        provider: gemini-prod
+        config:
+          type: gemini
+          gcp_environment:
+            api_endpoint: https://gemini.internal.example.com
+            project_id: my-project
+            location_id: europe-west4
+      - name: empty-endpoint
+        provider: gemini-prod
+        config:
+          type: gemini
+          gcp_environment:
+            api_endpoint: ""
+            project_id: my-project
+            location_id: asia-northeast1
+      - name: null-endpoint
+        provider: gemini-prod
+        config:
+          type: gemini
+          gcp_environment:
+            api_endpoint: null
+            project_id: my-project
+            location_id: southamerica-east1
+  - name: semantic-lb
+    type: model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/lb]}
+      balancer:
+        algorithm: semantic
+        embeddings:
+          provider: gemini-prod
+          model:
+            name: text-embedding-004
+            config:
+              type: gemini
+              gcp_environment:
+                project_id: my-project
+                location_id: europe-west4
+    targets:
+      - name: gpt-4o
+        provider: openai-main
+        config: {type: openai}
+policies:
+  - name: cache
+    type: ai-semantic-cache
+    global: true
+    config:
+      embeddings:
+        model:
+          provider: gemini
+          name: text-embedding-004
+          options:
+            gemini:
+              project_id: my-project
+              location_id: eu
+  - name: judge
+    type: ai-llm-as-judge
+    global: true
+    config:
+      llm:
+        model:
+          provider: gemini
+          name: gemini-2.5-pro
+          options:
+            gemini:
+              project_id: my-project
+              location_id: us-central1

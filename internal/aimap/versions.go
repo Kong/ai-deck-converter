@@ -84,12 +84,15 @@ const (
 	FeatureMCPRateLimiting            Feature = "mcp-rate-limiting"
 	FeatureMCPACLWhen                 Feature = "mcp-acl-when"
 	FeatureGeminiAgenticCapability    Feature = "gemini-agentic-capability"
-	FeatureBedrockRuntimeResponses    Feature = "bedrock-runtime-responses"
-	FeatureBaseten                    Feature = "baseten"
-	FeatureSagemaker                  Feature = "sagemaker"
-	FeatureAuthStrategyTokenVault     Feature = "auth-strategy-token-vault"
-	FeatureAgentTargets               Feature = "agent-targets"
-	FeatureMCPTargets                 Feature = "mcp-targets"
+	// FeatureGeminiEndpointDerivation adds api_endpoint below its release.
+	// The data plane derives the host from location_id from then on.
+	FeatureGeminiEndpointDerivation Feature = "gemini-endpoint-derivation"
+	FeatureBedrockRuntimeResponses  Feature = "bedrock-runtime-responses"
+	FeatureBaseten                  Feature = "baseten"
+	FeatureSagemaker                Feature = "sagemaker"
+	FeatureAuthStrategyTokenVault   Feature = "auth-strategy-token-vault"
+	FeatureAgentTargets             Feature = "agent-targets"
+	FeatureMCPTargets               Feature = "mcp-targets"
 	// FeatureOIDCProtectedResourceMetadata is the openid-connect plugin field
 	// protected_resource_metadata. It is a plugin schema gate, not an API field.
 	FeatureOIDCProtectedResourceMetadata Feature = "oidc-protected-resource-metadata"
@@ -124,6 +127,7 @@ var featureSince = map[Feature]Version{
 	FeatureMCPRateLimiting:               mustVersion("2.3"),
 	FeatureMCPACLWhen:                    mustVersion("2.3"),
 	FeatureGeminiAgenticCapability:       mustVersion("2.3"),
+	FeatureGeminiEndpointDerivation:      mustVersion("2.4"),
 	FeatureBedrockRuntimeResponses:       mustVersion("2.3"),
 	FeatureBaseten:                       mustVersion("2.3"),
 	FeatureSagemaker:                     mustVersion("2.1"),

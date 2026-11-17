@@ -1768,7 +1768,9 @@ func (c *Converter) buildTarget(
 		"name":     tm.Name,
 	}
 	passthrough := routeType == aimap.PassthroughRouteType
-	opts := mapOptions(c.supportedTargetOptions(tm.Config.Options), providerType, tm.Name, provider, passthrough)
+	opts := mapOptions(
+		c.supportedTargetOptions(tm.Config.Options), providerType, tm.Name, provider, passthrough,
+		c.minRuntimeVersion)
 	if opts != nil {
 		model["options"] = opts
 	}

@@ -1,0 +1,364 @@
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: gemini-enterprise-responses
+        paths:
+          - ~/ai/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/interactions
+        methods:
+          - GET
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: gemini-enterprise-beta-responses
+        paths:
+          - ~/ai/v1beta1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/interactions
+        methods:
+          - GET
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-chat
+        paths:
+          - /lb/chat/completions
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+plugins:
+  - name: ai-semantic-cache
+    config:
+      embeddings:
+        model:
+          name: text-embedding-004
+          options:
+            gemini:
+              api_endpoint: aiplatform.eu.rep.googleapis.com
+              location_id: eu
+              project_id: my-project
+          provider: gemini
+  - name: ai-llm-as-judge
+    config:
+      llm:
+        model:
+          name: gemini-2.5-pro
+          options:
+            gemini:
+              api_endpoint: us-central1-aiplatform.googleapis.com
+              location_id: us-central1
+              project_id: my-project
+          provider: gemini
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: gemini-enterprise-responses
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: gemini
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/gemini-token}'
+          description: global
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: global
+            options:
+              gemini:
+                api_endpoint: aiplatform.googleapis.com
+                location_id: global
+                project_id: my-project
+              upstream_url: https://aiplatform.googleapis.com/v1/projects/my-project/locations/global/interactions
+            provider: gemini
+          route_type: llm/v1/responses
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/gemini-token}'
+          description: us-multi-region
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: us-multi-region
+            options:
+              gemini:
+                api_endpoint: aiplatform.us.rep.googleapis.com
+                location_id: us
+                project_id: my-project
+              upstream_url: https://aiplatform.us.rep.googleapis.com/v1/projects/my-project/locations/us/interactions
+            provider: gemini
+          route_type: llm/v1/responses
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/gemini-token}'
+          description: eu-multi-region
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: eu-multi-region
+            options:
+              gemini:
+                api_endpoint: aiplatform.eu.rep.googleapis.com
+                location_id: eu
+                project_id: my-project
+              upstream_url: https://aiplatform.eu.rep.googleapis.com/v1/projects/my-project/locations/eu/interactions
+            provider: gemini
+          route_type: llm/v1/responses
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/gemini-token}'
+          description: regional
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: regional
+            options:
+              gemini:
+                api_endpoint: us-central1-aiplatform.googleapis.com
+                location_id: us-central1
+                project_id: my-project
+              upstream_url: https://us-central1-aiplatform.googleapis.com/v1/projects/my-project/locations/us-central1/interactions
+            provider: gemini
+          route_type: llm/v1/responses
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/gemini-token}'
+          description: explicit
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: explicit
+            options:
+              gemini:
+                api_endpoint: https://gemini.internal.example.com
+                location_id: europe-west4
+                project_id: my-project
+              upstream_url: https://gemini.internal.example.com/v1/projects/my-project/locations/europe-west4/interactions
+            provider: gemini
+          route_type: llm/v1/responses
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/gemini-token}'
+          description: empty-endpoint
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: empty-endpoint
+            options:
+              gemini:
+                api_endpoint: asia-northeast1-aiplatform.googleapis.com
+                location_id: asia-northeast1
+                project_id: my-project
+              upstream_url: https://asia-northeast1-aiplatform.googleapis.com/v1/projects/my-project/locations/asia-northeast1/interactions
+            provider: gemini
+          route_type: llm/v1/responses
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/gemini-token}'
+          description: null-endpoint
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: null-endpoint
+            options:
+              gemini:
+                api_endpoint: southamerica-east1-aiplatform.googleapis.com
+                location_id: southamerica-east1
+                project_id: my-project
+              upstream_url: https://southamerica-east1-aiplatform.googleapis.com/v1/projects/my-project/locations/southamerica-east1/interactions
+            provider: gemini
+          route_type: llm/v1/responses
+    route: gemini-enterprise-responses
+    model: gemini-agentic
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: gemini-enterprise-beta-responses
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: gemini
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/gemini-token}'
+          description: global
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: global
+            options:
+              gemini:
+                api_endpoint: aiplatform.googleapis.com
+                location_id: global
+                project_id: my-project
+              upstream_url: https://aiplatform.googleapis.com/v1beta1/projects/my-project/locations/global/interactions
+            provider: gemini
+          route_type: llm/v1/responses
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/gemini-token}'
+          description: us-multi-region
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: us-multi-region
+            options:
+              gemini:
+                api_endpoint: aiplatform.us.rep.googleapis.com
+                location_id: us
+                project_id: my-project
+              upstream_url: https://aiplatform.us.rep.googleapis.com/v1beta1/projects/my-project/locations/us/interactions
+            provider: gemini
+          route_type: llm/v1/responses
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/gemini-token}'
+          description: eu-multi-region
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: eu-multi-region
+            options:
+              gemini:
+                api_endpoint: aiplatform.eu.rep.googleapis.com
+                location_id: eu
+                project_id: my-project
+              upstream_url: https://aiplatform.eu.rep.googleapis.com/v1beta1/projects/my-project/locations/eu/interactions
+            provider: gemini
+          route_type: llm/v1/responses
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/gemini-token}'
+          description: regional
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: regional
+            options:
+              gemini:
+                api_endpoint: us-central1-aiplatform.googleapis.com
+                location_id: us-central1
+                project_id: my-project
+              upstream_url: https://us-central1-aiplatform.googleapis.com/v1beta1/projects/my-project/locations/us-central1/interactions
+            provider: gemini
+          route_type: llm/v1/responses
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/gemini-token}'
+          description: explicit
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: explicit
+            options:
+              gemini:
+                api_endpoint: https://gemini.internal.example.com
+                location_id: europe-west4
+                project_id: my-project
+              upstream_url: https://gemini.internal.example.com/v1beta1/projects/my-project/locations/europe-west4/interactions
+            provider: gemini
+          route_type: llm/v1/responses
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/gemini-token}'
+          description: empty-endpoint
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: empty-endpoint
+            options:
+              gemini:
+                api_endpoint: asia-northeast1-aiplatform.googleapis.com
+                location_id: asia-northeast1
+                project_id: my-project
+              upstream_url: https://asia-northeast1-aiplatform.googleapis.com/v1beta1/projects/my-project/locations/asia-northeast1/interactions
+            provider: gemini
+          route_type: llm/v1/responses
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/gemini-token}'
+          description: null-endpoint
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: null-endpoint
+            options:
+              gemini:
+                api_endpoint: southamerica-east1-aiplatform.googleapis.com
+                location_id: southamerica-east1
+                project_id: my-project
+              upstream_url: https://southamerica-east1-aiplatform.googleapis.com/v1beta1/projects/my-project/locations/southamerica-east1/interactions
+            provider: gemini
+          route_type: llm/v1/responses
+    route: gemini-enterprise-beta-responses
+    model: gemini-agentic
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-chat
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: semantic
+      embeddings:
+        auth:
+          header_name: Authorization
+          header_value: '{vault://ai/gemini-token}'
+        model:
+          name: text-embedding-004
+          options:
+            gemini:
+              api_endpoint: europe-west4-aiplatform.googleapis.com
+              location_id: europe-west4
+              project_id: my-project
+          provider: gemini
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://env/openai-key}'
+          description: gpt-4o
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: semantic-lb
+            name: gpt-4o
+            provider: openai
+          route_type: llm/v1/chat
+    route: openai-chat
+    model: semantic-lb
+ai_models:
+  - name: gemini-agentic
+  - name: semantic-lb

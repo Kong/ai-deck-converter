@@ -1,0 +1,16 @@
+- code: CONFIG_FIELD_INVALID
+  reason: 'policy "judge-bad": config.llm.model.options.gemini.location_id is not a valid Google Cloud ID; the policy is omitted'
+  source:
+    kind: policy
+    name: judge-bad
+    fields:
+      - config.llm.model.options.gemini.location_id
+  severity: ERROR
+- code: CONFIG_FIELD_INVALID
+  reason: 'model "semantic-lb-bad": gcp_environment.location_id is not a valid Google Cloud ID; the model is omitted'
+  source:
+    kind: model
+    name: semantic-lb-bad
+    fields:
+      - config.balancer.embeddings.model.config.gcp_environment.location_id
+  severity: ERROR
