@@ -422,6 +422,85 @@ has no AI Gateway entity, so it must not become a model.
 `aimap.ModelListPlugin` and `aimap.ModelListSpecs` hold the constants, shared
 by both directions.
 
+## Field mapping
+
+This example maps a platform-api model (`AIGatewayModelModel`, ai-gateways
+v2) to the data plane config the converter emits for it.
+
+The `ai-models-list` side is complete: the converter sets the only two fields
+of a source, `plugin_id` and `access`.
+
+A variant of the example's `claude-opus` that sets one alias in
+`model.values` and a price:
+
+```yaml
+models:
+  - name: claude-opus
+    display_name: Claude Opus
+    type: model
+    capabilities: [generate]
+    formats: [{type: anthropic}]
+    config:
+      route:
+        paths: [/claude-code]
+        model: {values: [claude-opus-4-7]}
+    targets:
+      - name: claude-opus-4-7
+        provider: anthropic-prod
+        config: {type: anthropic, input_cost: 5, output_cost: 25}
+    access:
+      auth_strategies: [okta-oidc]
+      acls: {deny: [contractors]}
+```
+
+converts to this output. Plugins and fields that do not affect the list are
+left out. The `id` is illustrative: the real one hashes the full rendered
+config:
+
+```yaml
+services:
+  - name: ai-gateway
+    routes:
+      - name: anthropic-messages
+        paths: [/claude-code/v1/messages]
+        methods: [POST, OPTIONS]
+      - name: anthropic-models-claude-code
+        paths: [/claude-code/v1/models]
+        methods: [GET]
+        protocols: [http, https]
+plugins:
+  - name: ai-proxy-advanced
+    id: 6f1c0b9e-0d3a-5c47-9f2e-3b8a1d7e4c21  # kong.StableUUID
+    route: anthropic-messages
+    model: claude-opus-4-7
+    config:
+      llm_format: anthropic
+      targets:
+        - model:
+            model_alias: claude-opus-4-7
+            name: claude-opus-4-7
+            provider: anthropic
+            options: {anthropic_version: "2023-06-01", input_cost: 5, output_cost: 25}
+          route_type: llm/v1/chat
+  - name: acl
+    route: anthropic-messages
+    model: claude-opus-4-7
+    config: {deny: [contractors], include_consumer_groups: true}
+  - name: openid-connect
+    route: anthropic-messages
+  - name: ai-models-list
+    route: anthropic-models-claude-code
+    config:
+      sources:
+        - plugin_id: 6f1c0b9e-0d3a-5c47-9f2e-3b8a1d7e4c21
+          access: {deny: [contractors]}
+  - name: openid-connect
+    route: anthropic-models-claude-code
+```
+
+A caller of `GET /claude-code/v1/models` outside `contractors` gets one entry,
+`claude-opus-4-7`, with `cost`. The entry has no `display_name`.
+
 # Drawbacks
 [drawbacks]: #drawbacks
 
