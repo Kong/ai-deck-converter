@@ -1,0 +1,33 @@
+# The reverse converter leaves the embeddings block in the ai-proxy-advanced
+# shape, with model.options.gemini. Below 2.4 the converter fills api_endpoint
+# for that shape too.
+model_providers:
+  - name: openai-main
+    type: openai
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://env/openai-key}"
+models:
+  - name: semantic-lb
+    type: model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/lb]}
+      balancer:
+        algorithm: semantic
+        embeddings:
+          model:
+            name: text-embedding-004
+            provider: gemini
+            options:
+              gemini:
+                project_id: my-project
+                location_id: eu
+    targets:
+      - name: gpt-4o
+        provider: openai-main
+        config: {type: openai}

@@ -136,6 +136,41 @@ func (c *Converter) scopedPlugins(src ConversionIssueSource, refs []string, acls
 	return plugins, nil
 }
 
+// policyGeminiPaths are the gemini options blocks of a plugin config.
+var policyGeminiPaths = [][]string{
+	{"llm", "model", "options", "gemini"},
+	{"embeddings", "model", "options", "gemini"},
+}
+
+// nestedMap returns the map at path in m, or nil when the path is absent.
+func nestedMap(m map[string]any, path ...string) map[string]any {
+	for _, key := range path {
+		m, _ = m[key].(map[string]any)
+		if m == nil {
+			return nil
+		}
+	}
+	return m
+}
+
+// fillPolicyGeminiEndpoints fills api_endpoint in the gemini options blocks of
+// config. It works on a copy, because a source policy is emitted at several
+// scopes. It reports false when a location cannot start a host.
+func (c *Converter) fillPolicyGeminiEndpoints(
+	p *aigw.Policy, config map[string]any,
+) (map[string]any, bool) {
+	config, _ = deepCopy(config).(map[string]any)
+	for _, path := range policyGeminiPaths {
+		if invalid := aimap.FillGeminiAPIEndpoint(nestedMap(config, path...)); invalid != "" {
+			field := "config." + strings.Join(append(path, invalid), ".")
+			c.reportError(issueSource(kindPolicy, p.Name).at(field), ConfigFieldInvalid,
+				"policy %q: %s is not a valid Google Cloud ID; the policy is omitted", p.Name, field)
+			return nil, false
+		}
+	}
+	return config, true
+}
+
 // policyPlugin builds the plugin for p. It reports false when p cannot be
 // converted. The Error issue names the policy.
 func (c *Converter) policyPlugin(p *aigw.Policy, tags []string, preserveID bool) (kong.Plugin, bool) {
@@ -153,6 +188,13 @@ func (c *Converter) policyPlugin(p *aigw.Policy, tags []string, preserveID bool)
 	config, ok := c.applyDatastore(p, c.normalizeRateLimitingProviderMatches(p))
 	if !ok {
 		return kong.Plugin{}, false
+	}
+	if !c.supports(aimap.FeatureGeminiEndpointDerivation) {
+		var filled bool
+		config, filled = c.fillPolicyGeminiEndpoints(p, config)
+		if !filled {
+			return kong.Plugin{}, false
+		}
 	}
 	if p.Type == "ai-sanitizer" && !c.supports(aimap.FeatureSanitizerAllWithCredentials) {
 		config = aimap.CollapseSanitizerAnonymize(config)

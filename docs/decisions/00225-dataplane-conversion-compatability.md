@@ -231,6 +231,7 @@ Each path in "Input fields" is relative to the entity, as in RFC 00207.
 | `2.3` | `FeatureMCPTokenVault`              | `token_vault` on MCP servers                                                                                                                                                                        | `error`. The MCP server is absent. Without the vault, the upstream gets no credential.                                                                                                   |
 | `2.3` | `FeatureMCPACLWhen`                 | `access.acls`, `access.default_tool_acls`, and `tools[n].access.acls` fields `allow_when`, `deny_when` on MCP servers                                                                               | `error` for server fields. The MCP server is absent. `warning` for tool fields. The tool is absent.                                                                                      |
 | `2.3` | `FeatureGeminiAgenticCapability`    | `capabilities: [agentic]` on models with `formats: [{type: gemini}]`                                                                                                                                | `error`. The model is absent. Bedrock and OpenAI also serve `agentic`, but shipped it earlier, so it stays ungated for them.                                                             |
+| `2.4` | `FeatureGeminiEndpointDerivation`   | none. This gate adds an output instead of dropping an input.                                                                                                                                        | Below the gate, the converter fills `options.gemini.api_endpoint` from `location_id` for targets, balancer embeddings and the policy gemini blocks. An invalid `location_id` is an `error`. |
 
 Note: Some gates protect outputs that are not API fields. Their versions come
 from the plugin schemas of each release.
@@ -248,6 +249,10 @@ from the plugin schemas of each release.
 
 - The `Converter` struct stores `minRuntimeVersion`. Each convert step uses it to
   decide whether a feature is supported.
+- `FeatureGeminiEndpointDerivation` is the only inverted gate: below `2.4` the
+  converter adds `options.gemini.api_endpoint`, and at `2.4` or above it adds
+  nothing. An invalid `location_id` blocks the model or leaves the policy out
+  with an `error`, because the converter cannot build a host from it.
 - No endpoint has its own gate. The gated capabilities and formats, for example
   `skills` and `typesafe`, cover their endpoints. Gemini `realtime` runs on
   every supported release, so it has no gate.

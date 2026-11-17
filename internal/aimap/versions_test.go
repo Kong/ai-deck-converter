@@ -57,6 +57,7 @@ var allFeatures = []Feature{
 	FeatureMCPACLWhen,
 	FeatureBaseten,
 	FeatureGeminiAgenticCapability,
+	FeatureGeminiEndpointDerivation,
 	FeatureBedrockRuntimeResponses,
 	FeatureSagemaker,
 	FeatureAuthStrategyTokenVault,

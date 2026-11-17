@@ -1,9 +1,11 @@
 package convert
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/Kong/ai-deck-converter/internal/aigw"
+	"github.com/Kong/ai-deck-converter/internal/aimap"
 	"github.com/stretchr/testify/require"
 )
 
@@ -63,7 +65,7 @@ func TestMapOptionsAzureRenames(t *testing.T) {
 		"temperature":   0.5,
 		"deployment_id": "gpt4o-dep",
 		"api_version":   "2024-02-01",
-	}, "azure", "gpt-4o", p, false)
+	}, "azure", "gpt-4o", p, false, aimap.LatestVersion)
 	want := map[string]any{
 		"temperature":         0.5,
 		"azure_deployment_id": "gpt4o-dep",
@@ -82,7 +84,7 @@ func TestMapOptionsGeminiNesting(t *testing.T) {
 			"location_id":  "us-central1",
 			"api_endpoint": "https://us-central1-aiplatform.googleapis.com",
 		},
-	}, "gemini", "gemini-2.5-pro", p, false)
+	}, "gemini", "gemini-2.5-pro", p, false, aimap.LatestVersion)
 	want := map[string]any{
 		"max_tokens": 4096,
 		"gemini": map[string]any{
@@ -94,6 +96,82 @@ func TestMapOptionsGeminiNesting(t *testing.T) {
 	require.Equal(t, want, got, "mapOptions gemini mismatch")
 }
 
+func TestMapOptionsGeminiEndpointBelowGate(t *testing.T) {
+	below := aimap.Version{Major: 2, Minor: 3}
+	env := func(location string) map[string]any {
+		return map[string]any{"project_id": "my-project", "location_id": location}
+	}
+	withEndpoint := func(location, endpoint string) map[string]any {
+		return map[string]any{
+			"api_endpoint": endpoint, "project_id": "my-project", "location_id": location,
+		}
+	}
+	tests := []struct {
+		name string
+		env  map[string]any
+		want map[string]any
+	}{
+		{"global", env("global"), withEndpoint("global", "aiplatform.googleapis.com")},
+		{"us multi-region", env("us"), withEndpoint("us", "aiplatform.us.rep.googleapis.com")},
+		{"eu multi-region", env("eu"), withEndpoint("eu", "aiplatform.eu.rep.googleapis.com")},
+		{
+			"region", env("us-central1"),
+			withEndpoint("us-central1", "us-central1-aiplatform.googleapis.com"),
+		},
+		{
+			"empty endpoint",
+			map[string]any{"api_endpoint": "", "project_id": "my-project", "location_id": "asia-northeast1"},
+			withEndpoint("asia-northeast1", "asia-northeast1-aiplatform.googleapis.com"),
+		},
+		{
+			"null endpoint",
+			map[string]any{
+				"api_endpoint": nil, "project_id": "my-project", "location_id": "southamerica-east1",
+			},
+			withEndpoint("southamerica-east1", "southamerica-east1-aiplatform.googleapis.com"),
+		},
+		{
+			"explicit endpoint",
+			map[string]any{
+				"api_endpoint": "https://gemini.internal.example.com",
+				"project_id":   "my-project",
+				"location_id":  "europe-west4",
+			},
+			map[string]any{
+				"api_endpoint": "https://gemini.internal.example.com",
+				"project_id":   "my-project",
+				"location_id":  "europe-west4",
+			},
+		},
+		{
+			"no location",
+			map[string]any{"project_id": "my-project"},
+			map[string]any{"project_id": "my-project"},
+		},
+		{
+			"no project",
+			map[string]any{"location_id": "global"},
+			map[string]any{"location_id": "global"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := mapOptions(
+				map[string]any{"gcp_environment": tt.env}, "gemini", "gemini-2.5-pro", nil, false, below)
+			require.Equal(t, map[string]any{"gemini": tt.want}, got)
+		})
+	}
+}
+
+func TestMapOptionsGeminiEndpointAtGate(t *testing.T) {
+	got := mapOptions(map[string]any{"gcp_environment": map[string]any{
+		"project_id": "my-project", "location_id": "us",
+	}}, "gemini", "gemini-2.5-pro", nil, false, aimap.LatestVersion)
+	require.Equal(t, map[string]any{"gemini": map[string]any{
+		"location_id": "us", "project_id": "my-project",
+	}}, got)
+}
+
 func TestMapOptionsBedrockNesting(t *testing.T) {
 	p := &aigw.Provider{Type: "bedrock", Config: aigw.ProviderConfig{Auth: aigw.ProviderAuth{
 		Type: "aws", AssumeRoleARN: "arn:role",
@@ -101,7 +179,7 @@ func TestMapOptionsBedrockNesting(t *testing.T) {
 	got := mapOptions(map[string]any{
 		"max_tokens": 1024,
 		"region":     "us-east-1",
-	}, "bedrock", "anthropic.claude-3-5-sonnet", p, false)
+	}, "bedrock", "anthropic.claude-3-5-sonnet", p, false, aimap.LatestVersion)
 	want := map[string]any{
 		"max_tokens":        1024,
 		"anthropic_version": "bedrock-2023-05-31",
@@ -114,7 +192,8 @@ func TestMapOptionsBedrockNesting(t *testing.T) {
 }
 
 func TestMapOptionsBedrockNonAnthropicDoesNotDefaultAnthropicVersion(t *testing.T) {
-	got := mapOptions(nil, "bedrock", "amazon.titan-embed-text-v2:0", &aigw.Provider{Type: "bedrock"}, false)
+	got := mapOptions(nil, "bedrock", "amazon.titan-embed-text-v2:0",
+		&aigw.Provider{Type: "bedrock"}, false, aimap.LatestVersion)
 	require.Nil(t, got)
 }
 
@@ -126,7 +205,7 @@ func TestLowerEmbeddingsModelBedrockNonAnthropicDoesNotDefaultAnthropicVersion(t
 		},
 	}
 
-	lowerEmbeddingsModel(embeddings, &aigw.Provider{Type: "bedrock"})
+	lowerEmbeddingsModel(embeddings, &aigw.Provider{Type: "bedrock"}, aimap.LatestVersion)
 	model := embeddings["model"].(map[string]any)
 	require.Equal(t, "bedrock", model["provider"])
 	require.NotContains(t, model, "options")
@@ -160,23 +239,104 @@ model_providers:
 	require.Empty(t, result.Output.AIModels, "the model is left out")
 }
 
+func TestResolveEmbeddingsGeminiEndpointInvalidLocation(t *testing.T) {
+	src := []byte(`
+models:
+  - name: semantic-lb
+    type: model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/ai]}
+      balancer:
+        algorithm: semantic
+        embeddings:
+          provider: gemini-prod
+          model:
+            name: text-embedding-004
+            config:
+              type: gemini
+              gcp_environment:
+                project_id: my-project
+                location_id: evil.example.com/x
+    targets:
+      - name: gpt-4o
+        provider: openai-main
+        config: {type: openai}
+model_providers:
+  - name: openai-main
+    type: openai
+  - name: gemini-prod
+    type: gemini
+`)
+	result, err := Convert(src, Options{MinRuntimeVersion: "2.3"})
+	require.NoError(t, err, "convert")
+	require.Empty(t, result.Output.AIModels, "the model is left out")
+	requireIssue(t, result.Issues, Error, ConfigFieldInvalid, kindModel, "semantic-lb",
+		"config.balancer.embeddings.model.config.gcp_environment.location_id")
+}
+
+// The reverse converter copies the plugin embeddings block into the balancer
+// unchanged, so the fill must cover the lowered model.options.gemini shape too.
+func TestResolveEmbeddingsGeminiEndpointLoweredShape(t *testing.T) {
+	const base = `
+models:
+  - name: semantic-lb
+    type: model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/ai]}
+      balancer:
+        algorithm: semantic
+        embeddings:
+          model:
+            name: text-embedding-004
+            provider: gemini
+            options:
+              gemini: {project_id: my-project, location_id: %s}
+    targets:
+      - name: gpt-4o
+        provider: openai-main
+        config: {type: openai}
+model_providers:
+  - name: openai-main
+    type: openai
+`
+	t.Run("fills the host", func(t *testing.T) {
+		out, issues, err := encodeYAML([]byte(fmt.Sprintf(base, "us")),
+			Options{MinRuntimeVersion: "2.3"})
+		require.NoError(t, err)
+		require.Empty(t, issues)
+		require.Contains(t, string(out), "api_endpoint: aiplatform.us.rep.googleapis.com")
+	})
+	t.Run("reports an invalid location", func(t *testing.T) {
+		_, issues, err := encodeYAML([]byte(fmt.Sprintf(base, "evil.example.com/x")),
+			Options{MinRuntimeVersion: "2.3"})
+		require.NoError(t, err)
+		requireIssue(t, issues, Error, ConfigFieldInvalid, kindModel, "semantic-lb",
+			"config.balancer.embeddings.model.options.gemini.location_id")
+	})
+}
+
 // A passthrough target forwards the client's request unchanged, so the plugin must not
 // default the version headers it would otherwise set when building the upstream request.
 func TestMapOptionsPassthroughDoesNotDefaultAnthropicVersion(t *testing.T) {
 	anthropic := &aigw.Provider{Type: "anthropic"}
-	require.Nil(t, mapOptions(nil, "anthropic", "claude-sonnet-4-5", anthropic, true))
+	require.Nil(t, mapOptions(nil, "anthropic", "claude-sonnet-4-5", anthropic, true, aimap.LatestVersion))
 	require.Equal(t,
 		map[string]any{"anthropic_version": "2023-06-01"},
-		mapOptions(nil, "anthropic", "claude-sonnet-4-5", anthropic, false))
+		mapOptions(nil, "anthropic", "claude-sonnet-4-5", anthropic, false, aimap.LatestVersion))
 
 	bedrock := &aigw.Provider{Type: "bedrock"}
-	require.Nil(t, mapOptions(nil, "bedrock", "anthropic.claude-3-5-sonnet", bedrock, true))
+	require.Nil(t, mapOptions(nil, "bedrock", "anthropic.claude-3-5-sonnet", bedrock, true, aimap.LatestVersion))
 
 	// An explicitly authored version is the client's business either way: it is passed
 	// through, not defaulted, so passthrough does not drop it.
 	require.Equal(t,
 		map[string]any{"anthropic_version": "2024-01-01"},
-		mapOptions(map[string]any{"version": "2024-01-01"}, "anthropic", "claude-sonnet-4-5", anthropic, true))
+		mapOptions(map[string]any{"version": "2024-01-01"}, "anthropic", "claude-sonnet-4-5",
+			anthropic, true, aimap.LatestVersion))
 }
 
 func TestClientAuthOverride(t *testing.T) {

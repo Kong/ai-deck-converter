@@ -137,7 +137,12 @@ func (c *Converter) resolveEmbeddings(src ConversionIssueSource, raw any) (any, 
 		}
 	}
 
-	providerType, explicit := lowerEmbeddingsModel(emb, provider)
+	modelMap, _ := emb["model"].(map[string]any)
+	if err := c.fillEmbeddingsGeminiEndpoint(src, modelMap); err != nil {
+		return nil, err
+	}
+
+	providerType, explicit := lowerEmbeddingsModel(emb, provider, c.minRuntimeVersion)
 	if f, gated := aimap.ProviderFeature(providerType); gated && !c.supports(f) {
 		field := "config.balancer.embeddings.model.config.type"
 		if !explicit {
@@ -165,6 +170,32 @@ func (c *Converter) resolveEmbeddings(src ConversionIssueSource, raw any) (any, 
 		}
 	}
 	return emb, nil
+}
+
+// fillEmbeddingsGeminiEndpoint fills api_endpoint in the embeddings gemini
+// block, in the authored or the ai-proxy-advanced shape. The data plane builds
+// the host from location_id, so an invalid one cannot convert.
+func (c *Converter) fillEmbeddingsGeminiEndpoint(
+	src ConversionIssueSource, modelMap map[string]any,
+) error {
+	if c.supports(aimap.FeatureGeminiEndpointDerivation) {
+		return nil
+	}
+	where, field := "gcp_environment", "config.balancer.embeddings.model.config."
+	gemini := nestedMap(modelMap, "config", "gcp_environment")
+	if gemini == nil {
+		where, field = "options.gemini", "config.balancer.embeddings.model."
+		gemini = nestedMap(modelMap, "options", "gemini")
+	}
+	if gemini == nil {
+		return nil
+	}
+	if invalid := aimap.FillGeminiAPIEndpoint(gemini); invalid != "" {
+		return c.fail(src.at(field+where+"."+invalid), ConfigFieldInvalid,
+			"model %q: %s.%s is not a valid Google Cloud ID; the model is omitted",
+			src.Name, where, invalid)
+	}
+	return nil
 }
 
 // deepCopy copies the maps and slices of a YAML value.
@@ -198,7 +229,9 @@ func deepCopy(v any) any {
 //
 // It returns the provider type it lowers. explicit is true when the type comes
 // from the config block and not from the provider entity.
-func lowerEmbeddingsModel(emb map[string]any, provider *aigw.Provider) (providerType string, explicit bool) {
+func lowerEmbeddingsModel(
+	emb map[string]any, provider *aigw.Provider, minVersion aimap.Version,
+) (providerType string, explicit bool) {
 	model, ok := emb["model"].(map[string]any)
 	if !ok {
 		return "", false
@@ -225,7 +258,7 @@ func lowerEmbeddingsModel(emb map[string]any, provider *aigw.Provider) (provider
 		}
 	}
 	name, _ := model["name"].(string)
-	options := mapOptions(opts, providerType, name, provider, false)
+	options := mapOptions(opts, providerType, name, provider, false, minVersion)
 	if providerType == "azure" {
 		options = nestAzureEmbeddingsOptions(options)
 	}
@@ -264,6 +297,7 @@ func nestAzureEmbeddingsOptions(options map[string]any) map[string]any {
 // supplies them.
 func mapOptions(
 	opts map[string]any, providerType, modelName string, provider *aigw.Provider, passthrough bool,
+	minVersion aimap.Version,
 ) map[string]any {
 	out := map[string]any{}
 	nested := map[string]map[string]any{}
@@ -393,6 +427,10 @@ func mapOptions(
 				addNested("bedrock", "batch_role_arn", a.BatchRoleARN)
 			}
 		}
+	}
+
+	if providerType == "gemini" && !aimap.Supports(aimap.FeatureGeminiEndpointDerivation, minVersion) {
+		aimap.FillGeminiAPIEndpoint(nested["gemini"])
 	}
 
 	for prov, m := range nested {

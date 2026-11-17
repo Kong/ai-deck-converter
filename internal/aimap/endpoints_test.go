@@ -333,6 +333,84 @@ func TestRoutePath(t *testing.T) {
 	}
 }
 
+func TestGeminiAPIEndpoint(t *testing.T) {
+	tests := []struct {
+		location string
+		want     string
+	}{
+		{"global", "aiplatform.googleapis.com"},
+		{"us", "aiplatform.us.rep.googleapis.com"},
+		{"eu", "aiplatform.eu.rep.googleapis.com"},
+		{"us-central1", "us-central1-aiplatform.googleapis.com"},
+		{"europe-west4", "europe-west4-aiplatform.googleapis.com"},
+		{"asia-northeast1", "asia-northeast1-aiplatform.googleapis.com"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.location, func(t *testing.T) {
+			require.Equal(t, tt.want, GeminiAPIEndpoint(tt.location))
+		})
+	}
+}
+
+func TestGeminiEnterpriseURLHosts(t *testing.T) {
+	const v1 = "v1/projects/my-project/locations/"
+	tests := []struct {
+		name string
+		env  GeminiEnv
+		want string
+	}{
+		{
+			"global",
+			GeminiEnv{ProjectID: "my-project", LocationID: "global"},
+			"https://aiplatform.googleapis.com/" + v1 + "global/interactions",
+		},
+		{
+			"us multi-region",
+			GeminiEnv{ProjectID: "my-project", LocationID: "us"},
+			"https://aiplatform.us.rep.googleapis.com/" + v1 + "us/interactions",
+		},
+		{
+			"eu multi-region",
+			GeminiEnv{ProjectID: "my-project", LocationID: "eu"},
+			"https://aiplatform.eu.rep.googleapis.com/" + v1 + "eu/interactions",
+		},
+		{
+			"region",
+			GeminiEnv{ProjectID: "my-project", LocationID: "us-central1"},
+			"https://us-central1-aiplatform.googleapis.com/" + v1 + "us-central1/interactions",
+		},
+		{
+			"explicit endpoint",
+			GeminiEnv{
+				ProjectID: "my-project", LocationID: "europe-west4",
+				APIEndpoint: "https://gemini.internal.example.com",
+			},
+			"https://gemini.internal.example.com/" + v1 + "europe-west4/interactions",
+		},
+		{
+			"explicit endpoint without scheme",
+			GeminiEnv{
+				ProjectID: "my-project", LocationID: "europe-west4",
+				APIEndpoint: "gemini.internal.example.com",
+			},
+			"https://gemini.internal.example.com/" + v1 + "europe-west4/interactions",
+		},
+		{
+			"explicit endpoint with trailing slash",
+			GeminiEnv{
+				ProjectID: "my-project", LocationID: "europe-west4",
+				APIEndpoint: "gemini.internal.example.com/",
+			},
+			"https://gemini.internal.example.com/" + v1 + "europe-west4/interactions",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, geminiEnterpriseURL(tt.env, "v1"))
+		})
+	}
+}
+
 func TestGeminiEnvInvalidField(t *testing.T) {
 	tests := []struct {
 		name string

@@ -790,6 +790,53 @@ func GeminiEnvFromOptions(opts map[string]any) GeminiEnv {
 	}
 }
 
+// GeminiAPIEndpoint returns the Agent Platform API host for locationID.
+// The global and multi-region locations have fixed hosts.
+func GeminiAPIEndpoint(locationID string) string {
+	switch locationID {
+	case "global":
+		return "aiplatform.googleapis.com"
+	case "us", "eu":
+		return "aiplatform." + locationID + ".rep.googleapis.com"
+	}
+	return locationID + "-aiplatform.googleapis.com"
+}
+
+// FillGeminiAPIEndpoint fills api_endpoint in a lowered gemini options block
+// when the block needs one. It returns the invalid field, or "" when the block
+// is valid.
+func FillGeminiAPIEndpoint(gemini map[string]any) string {
+	endpoint, invalid := deriveGeminiAPIEndpoint(gemini)
+	if endpoint != "" {
+		gemini["api_endpoint"] = endpoint
+	}
+	return invalid
+}
+
+// deriveGeminiAPIEndpoint returns the api_endpoint to fill in a lowered gemini
+// options block. It returns the invalid field when the block cannot get a host.
+// Both results are "" when the block needs no fill.
+func deriveGeminiAPIEndpoint(gemini map[string]any) (endpoint, invalidField string) {
+	switch v := gemini["api_endpoint"].(type) {
+	case nil:
+	case string:
+		if v != "" {
+			return "", ""
+		}
+	default:
+		return "", ""
+	}
+	project, _ := gemini["project_id"].(string)
+	location, _ := gemini["location_id"].(string)
+	if project == "" || location == "" {
+		return "", ""
+	}
+	if field := (GeminiEnv{ProjectID: project, LocationID: location}).InvalidField(); field != "" {
+		return "", field
+	}
+	return GeminiAPIEndpoint(location), ""
+}
+
 // IsEnterprise reports whether the target uses the Gemini Enterprise API.
 func (e GeminiEnv) IsEnterprise() bool {
 	return e.ProjectID != "" && e.LocationID != ""
@@ -868,10 +915,7 @@ func geminiInteractionsURL(section string, spec EndpointSpec, env GeminiEnv) (st
 }
 
 func geminiEnterpriseURL(env GeminiEnv, version string) string {
-	host := "https://aiplatform.googleapis.com"
-	if env.LocationID != "global" {
-		host = "https://" + env.LocationID + "-aiplatform.googleapis.com"
-	}
+	host := "https://" + GeminiAPIEndpoint(env.LocationID)
 	if env.APIEndpoint != "" {
 		host = strings.TrimSuffix(env.APIEndpoint, "/")
 		if !strings.Contains(host, "://") {

@@ -1,0 +1,88 @@
+# Below 2.4 the converter derives the api_endpoint host. A location_id that
+# cannot start a host name is an error, because the alternate is a broken
+# upstream. The embeddings block fails the model. A policy is left out.
+model_providers:
+  - name: gemini-prod
+    type: gemini
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://ai/gemini-token}"
+  - name: openai-main
+    type: openai
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://env/openai-key}"
+models:
+  - name: semantic-lb-good
+    type: model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/good]}
+      balancer:
+        algorithm: semantic
+        embeddings:
+          provider: gemini-prod
+          model:
+            name: text-embedding-004
+            config:
+              type: gemini
+              gcp_environment:
+                project_id: my-project
+                location_id: us-central1
+    targets:
+      - name: gpt-4o
+        provider: openai-main
+        config: {type: openai}
+  - name: semantic-lb-bad
+    type: model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/bad]}
+      balancer:
+        algorithm: semantic
+        embeddings:
+          provider: gemini-prod
+          model:
+            name: text-embedding-004
+            config:
+              type: gemini
+              gcp_environment:
+                project_id: my-project
+                location_id: evil.example.com/x
+    targets:
+      - name: gpt-4o
+        provider: openai-main
+        config: {type: openai}
+policies:
+  - name: judge-good
+    type: ai-llm-as-judge
+    global: true
+    config:
+      llm:
+        model:
+          provider: gemini
+          name: gemini-2.5-pro
+          options:
+            gemini:
+              project_id: my-project
+              location_id: eu
+  - name: judge-bad
+    type: ai-llm-as-judge
+    global: true
+    config:
+      llm:
+        model:
+          provider: gemini
+          name: gemini-2.5-pro
+          options:
+            gemini:
+              project_id: my-project
+              location_id: bad/loc
