@@ -9,20 +9,24 @@ import (
 // upstreamOf returns the Upstream that the host of a URL-less service names.
 // An Upstream without targets gives no targets. The service URL is used then.
 func (r *Reverter) upstreamOf(svc *kong.Service) (*kong.Upstream, error) {
+	up := r.findUpstream(svc)
+	if up != nil && len(up.Targets) == 0 {
+		return nil, r.warn("service %q: upstream %q has no targets; using the service url", svc.Name, up.Name)
+	}
+	return up, nil
+}
+
+// findUpstream returns the Upstream that the host of a URL-less service names.
+func (r *Reverter) findUpstream(svc *kong.Service) *kong.Upstream {
 	if svc.URL != "" {
-		return nil, nil
+		return nil
 	}
 	for i := range r.src.Upstreams {
-		up := &r.src.Upstreams[i]
-		if up.Name != svc.Host {
-			continue
+		if r.src.Upstreams[i].Name == svc.Host {
+			return &r.src.Upstreams[i]
 		}
-		if len(up.Targets) == 0 {
-			return nil, r.warn("service %q: upstream %q has no targets; using the service url", svc.Name, up.Name)
-		}
-		return up, nil
 	}
-	return nil, nil
+	return nil
 }
 
 // liftedUpstream holds the config fields of an agent or an MCP server that

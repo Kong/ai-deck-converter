@@ -1,0 +1,25 @@
+mcp_servers:
+  - type: listener
+    name: aggregate
+    config:
+      route:
+        paths:
+          - /mcp/aggregate
+      logging:
+        payloads: false
+        statistics: true
+        audits: false
+      server:
+        tag: mcp-listener:aggregate-id
+    upstream_url: https://aggregate-upstream
+  - type: passthrough-listener
+    name: vendor-mcp
+    config:
+      route:
+        paths:
+          - /mcp/vendor
+      logging:
+        payloads: false
+        statistics: true
+        audits: false
+    upstream_url: https://vendor-upstream

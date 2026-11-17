@@ -1,0 +1,32 @@
+_format_version: "3.0"
+services:
+  - name: aggregate
+    host: aggregate-upstream
+    protocol: https
+    routes:
+      - name: aggregate-route
+        paths:
+          - /mcp/aggregate
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              mode: listener
+              server:
+                tag: mcp-listener:aggregate-id
+  - name: vendor-mcp
+    host: vendor-upstream
+    protocol: https
+    routes:
+      - name: vendor-mcp-route
+        paths:
+          - /mcp/vendor
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              mode: passthrough-listener
+              tools: []
+upstreams:
+  - name: aggregate-upstream
+    targets:
+      - target: aggregate.internal:443
+  - name: vendor-upstream
