@@ -79,8 +79,9 @@ const (
 	FeatureFailoverHTTPCodes          Feature = "failover-http-codes"
 	FeatureBedrockVPCEndpoint         Feature = "bedrock-vpc-endpoint"
 	FeatureBedrockEndpointType        Feature = "bedrock-endpoint-type"
-	FeatureMCPTokenVault              Feature = "mcp-token-vault"      //nolint:gosec // a feature name, not a credential
-	FeatureProviderTokenVault         Feature = "provider-token-vault" //nolint:gosec // a feature name, not a credential
+	FeatureMCPTokenVault              Feature = "mcp-token-vault"         //nolint:gosec // a feature name, not a credential
+	FeatureProviderTokenVault         Feature = "provider-token-vault"    //nolint:gosec // a feature name, not a credential
+	FeatureTokenVaultExchangeWS       Feature = "token-vault-exchange-ws" //nolint:gosec // a feature name, not a credential
 	FeatureMCPRateLimiting            Feature = "mcp-rate-limiting"
 	FeatureMCPACLWhen                 Feature = "mcp-acl-when"
 	FeatureGeminiAgenticCapability    Feature = "gemini-agentic-capability"
@@ -127,6 +128,7 @@ var featureSince = map[Feature]Version{
 	FeatureBedrockEndpointType:           mustVersion("2.3"),
 	FeatureMCPTokenVault:                 mustVersion("2.3"),
 	FeatureProviderTokenVault:            mustVersion("2.3"),
+	FeatureTokenVaultExchangeWS:          mustVersion("2.4"),
 	FeatureMCPRateLimiting:               mustVersion("2.3"),
 	FeatureMCPACLWhen:                    mustVersion("2.3"),
 	FeatureGeminiAgenticCapability:       mustVersion("2.3"),

@@ -7,9 +7,12 @@
 > Release date: TBD
 
 ### Features
--
 
-### Bug Fixes
+- A model that needs a WebSocket route and targets a provider whose credential
+  comes from a Token Vault converts at AI Gateway 2.4 and later. The
+  `token-vault-exchange` plugin now carries the `ws` and `wss` protocols of
+  its route. Below 2.4 the model fails with an `UNSUPPORTED_IN_MIN_RUNTIME_VERSION`
+  issue, as before.
 
 - A Bedrock target with `allow_override: true` and no header now gets
   `header_name: Authorization` and a placeholder `header_value`. The data plane
