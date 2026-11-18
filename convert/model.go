@@ -323,7 +323,7 @@ func (c *Converter) convertModelsPass(skipped map[int][]ConversionIssue) bool {
 					TargetSources: pg.targetSources,
 					Source:        pg.source,
 				})
-				c.appendTokenVaultExchange(pg, nil)
+				c.appendTokenVaultExchange(pg, nil, protocols)
 				continue
 			}
 			// One plugin per alias: ai-model-selector activates a model-scoped
@@ -341,7 +341,7 @@ func (c *Converter) convertModelsPass(skipped map[int][]ConversionIssue) bool {
 					TargetSources: pg.targetSources,
 					Source:        pg.source,
 				})
-				c.appendTokenVaultExchange(pg, kong.NewStringRef(alias))
+				c.appendTokenVaultExchange(pg, kong.NewStringRef(alias), nil)
 			}
 		}
 	}
@@ -376,17 +376,19 @@ func (c *Converter) appendModelClones(st *modelPass) {
 }
 
 // appendTokenVaultExchange adds the token-vault-exchange plugin of pg with
-// the scope of its ai-proxy-advanced plugin.
-func (c *Converter) appendTokenVaultExchange(pg *proxyGroup, model *kong.StringRef) {
+// the scope of its ai-proxy-advanced plugin. protocols are the WebSocket route
+// protocols; an HTTP route leaves them empty.
+func (c *Converter) appendTokenVaultExchange(pg *proxyGroup, model *kong.StringRef, protocols []string) {
 	if pg.tokenVault == nil {
 		return
 	}
 	c.out.Plugins = append(c.out.Plugins, kong.Plugin{
-		Name:   tokenVaultExchangePlugin,
-		Route:  kong.NewStringRef(pg.routeName),
-		Model:  model,
-		Config: pg.tokenVault,
-		Source: source(kindModel, pg.source.EntityName, "targets"),
+		Name:      tokenVaultExchangePlugin,
+		Protocols: protocols,
+		Route:     kong.NewStringRef(pg.routeName),
+		Model:     model,
+		Config:    pg.tokenVault,
+		Source:    source(kindModel, pg.source.EntityName, "targets"),
 	})
 }
 
@@ -687,10 +689,9 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 				// gets no selector and its plugin is route-scoped with alias-less
 				// targets, exactly as a WebSocket endpoint does.
 				lifecycle := aimap.IsLifecycleEndpoint(spec)
-				if websocket && tokenVault != nil {
-					return c.fail(src.at(capabilityField(m, capability)), ConfigFieldInvalid,
-						"model %q: capability %q needs a WebSocket route, but %s does not support "+
-							"the ws and wss protocols", m.Name, capability, tokenVaultExchangePlugin)
+				if websocket && tokenVault != nil && !c.supports(aimap.FeatureTokenVaultExchangeWS) {
+					return c.failUnsupported(src.at(capabilityField(m, capability)),
+						aimap.FeatureTokenVaultExchangeWS, capability)
 				}
 				// A global plugin keeps Kong's http/https default protocols. A
 				// global authentication policy therefore cannot protect a ws or
@@ -1332,7 +1333,7 @@ func (c *Converter) convertVideoLifecycle(
 		TargetSources: pg.targetSources,
 		Source:        pg.source,
 	})
-	c.appendTokenVaultExchange(pg, nil)
+	c.appendTokenVaultExchange(pg, nil, nil)
 
 	plugins, err := c.scopedPlugins(src, candidate.model.Policies, candidate.model.Access.ACLs)
 	if err != nil {

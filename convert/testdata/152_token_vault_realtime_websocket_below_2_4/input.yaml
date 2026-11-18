@@ -1,0 +1,27 @@
+# Below 2.4 the token-vault-exchange plugin has no ws or wss protocol, so a
+# realtime model that targets a provider with a Token Vault cannot convert.
+datastores:
+  - name: tv
+    type: token-vault
+    config:
+      directory: d
+      current_version: v1
+      keys: [{version: v1, key: k}]
+
+models:
+  - name: rt
+    type: model
+    capabilities: [realtime]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/ai]}
+    targets:
+      - name: gpt-realtime
+        provider: vault
+        config: {type: openai}
+
+model_providers:
+  - name: vault
+    type: openai
+    datastores: [{name: tv}]
+    token_vault: {provider: openai}
