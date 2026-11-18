@@ -18,7 +18,7 @@ func TestDefaultModelBodySize(t *testing.T) {
 	}{
 		"no providers":     {types: nil},
 		"published":        {types: []string{"anthropic"}, want: 32_000_000, ok: true},
-		"smallest wins":    {types: []string{"anthropic", "small"}, want: 1_000_000, ok: true},
+		"highest wins":     {types: []string{"small", "anthropic"}, want: 32_000_000, ok: true},
 		"one unpublished":  {types: []string{"anthropic", "openai"}},
 		"only unpublished": {types: []string{"openai"}},
 	} {

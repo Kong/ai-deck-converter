@@ -1,0 +1,31 @@
+# Two models share one alias and base path.
+# Only the first model sets config.model.name_header.
+models:
+  - name: gpt
+    type: model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/ai]}
+      model: {name_header: true}
+    targets:
+      - name: gpt-5.2
+        provider: openai-prod
+  - name: gpt-embed
+    type: model
+    capabilities: [embeddings]
+    formats: [{type: openai}]
+    config:
+      route:
+        paths: [/ai]
+        model: {values: [gpt]}
+    targets:
+      - name: text-embedding-3-large
+        provider: openai-prod
+model_providers:
+  - name: openai-prod
+    type: openai
+    config:
+      auth:
+        type: bearer
+        token: "{vault://env/openai-key}"

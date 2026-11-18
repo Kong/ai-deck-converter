@@ -27,6 +27,14 @@ services:
           - POST
           - OPTIONS
         strip_path: false
+      - name: openai-batches-4
+        paths:
+          - /three/batches
+        methods:
+          - GET
+          - POST
+          - OPTIONS
+        strip_path: false
 plugins:
   - name: ai-proxy-advanced
     config:
@@ -34,7 +42,7 @@ plugins:
         algorithm: round-robin
       genai_category: text/generation
       llm_format: openai
-      max_request_body_size: 20000000
+      max_request_body_size: 50000000
       model_name_header: false
       targets:
         - auth:
@@ -67,7 +75,7 @@ plugins:
         algorithm: round-robin
       genai_category: text/generation
       llm_format: openai
-      max_request_body_size: 20000000
+      max_request_body_size: 50000000
       model_name_header: false
       targets:
         - description: gpt-5.4
@@ -100,7 +108,6 @@ plugins:
         algorithm: round-robin
       genai_category: text/generation
       llm_format: openai
-      max_request_body_size: 50000000
       model_name_header: false
       targets:
         - description: gpt-5.4
@@ -123,6 +130,47 @@ plugins:
             provider: openai
           route_type: llm/v1/batches
     route: openai-batches-3
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      max_request_body_size: 60000000
+      model_name_header: false
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: false
+          model:
+            name: gpt-5.4
+            provider: openai
+          route_type: llm/v1/batches
+        - auth:
+            aws_access_key_id: '{vault://ai/aws-access-key-id}'
+            aws_secret_access_key: '{vault://ai/aws-secret-access-key}'
+          description: batch-api
+          logging:
+            log_payloads: false
+            log_statistics: false
+          model:
+            name: batch-api
+            options:
+              bedrock:
+                aws_region: us-east-1
+                batch_bucket_prefix: s3://kong-bedrock-batches/jobs/
+            provider: bedrock
+          route_type: llm/v1/batches
+        - description: gpt-5.4-mini
+          logging:
+            log_payloads: false
+            log_statistics: false
+          model:
+            name: gpt-5.4-mini
+            provider: openai
+          route_type: llm/v1/batches
+    route: openai-batches-4
 ai_models:
   - name: bedrock-first
   - name: openai-second
@@ -130,3 +178,6 @@ ai_models:
   - name: bedrock-second
   - name: azure-first
   - name: openai-after-azure
+  - name: three-openai
+  - name: three-bedrock
+  - name: three-explicit

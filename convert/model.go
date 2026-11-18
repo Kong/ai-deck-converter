@@ -2305,7 +2305,7 @@ func (c *Converter) modelBodySize(m *aigw.Model, targets []plannedTarget, pairs 
 	return nil
 }
 
-// mergeBodySize gives a shared route-scoped ai-proxy-advanced the smallest
+// mergeBodySize gives a shared route-scoped ai-proxy-advanced the highest
 // max_request_body_size of its models. A model with a different limit gets a
 // warning.
 func (c *Converter) mergeBodySize(src ConversionIssueSource, pg *proxyGroup, model string, size *int) {
@@ -2317,24 +2317,25 @@ func (c *Converter) mergeBodySize(src ConversionIssueSource, pg *proxyGroup, mod
 		return
 	}
 	prev := pg.maxBodySize
-	if bodySizeRank(size) < bodySizeRank(prev) {
+	if bodySizeRank(size) > bodySizeRank(prev) {
 		pg.maxBodySize = size
 	}
 	c.warn(src.at("config.max_request_body_size"), BehaviorMayDiffer,
 		"model %q has max_request_body_size %s, but route %q already shares an "+
 			"ai-proxy-advanced plugin with max_request_body_size %s. "+
-			"The plugin uses %s for every model on the route.",
-		model, formatBodySize(size), pg.routeName, formatBodySize(prev), formatBodySize(pg.maxBodySize))
+			"The plugin keeps the highest limit of its models for every model on the route. "+
+			"An unset limit counts as higher than every byte count. A limit of 0 is unlimited and counts highest.",
+		model, formatBodySize(size), pg.routeName, formatBodySize(prev))
 }
 
-// bodySizeRank orders limits from smallest to largest. The plugin reads 0 as
-// unlimited. A nil limit is unknown and ranks last.
+// bodySizeRank orders limits from smallest to largest. An unknown nil limit
+// ranks above every byte count. An unlimited limit of 0 ranks above nil.
 func bodySizeRank(size *int) int {
 	switch {
 	case size == nil:
-		return math.MaxInt
-	case *size == 0:
 		return math.MaxInt - 1
+	case *size == 0:
+		return math.MaxInt
 	}
 	return *size
 }

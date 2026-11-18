@@ -1,5 +1,5 @@
 - code: BEHAVIOR_MAY_DIFFER
-  reason: model "openai-second" has max_request_body_size 50000000, but route "openai-batches" already shares an ai-proxy-advanced plugin with max_request_body_size 20000000. The plugin uses 20000000 for every model on the route.
+  reason: model "openai-second" has max_request_body_size 50000000, but route "openai-batches" already shares an ai-proxy-advanced plugin with max_request_body_size 20000000. The plugin keeps the highest limit of its models for every model on the route. An unset limit counts as higher than every byte count. A limit of 0 is unlimited and counts highest.
   source:
     kind: model
     name: openai-second
@@ -7,7 +7,7 @@
       - config.max_request_body_size
   severity: WARNING
 - code: BEHAVIOR_MAY_DIFFER
-  reason: model "bedrock-second" has max_request_body_size 20000000, but route "openai-batches-2" already shares an ai-proxy-advanced plugin with max_request_body_size 50000000. The plugin uses 20000000 for every model on the route.
+  reason: model "bedrock-second" has max_request_body_size 20000000, but route "openai-batches-2" already shares an ai-proxy-advanced plugin with max_request_body_size 50000000. The plugin keeps the highest limit of its models for every model on the route. An unset limit counts as higher than every byte count. A limit of 0 is unlimited and counts highest.
   source:
     kind: model
     name: bedrock-second
@@ -15,10 +15,26 @@
       - config.max_request_body_size
   severity: WARNING
 - code: BEHAVIOR_MAY_DIFFER
-  reason: model "openai-after-azure" has max_request_body_size 50000000, but route "openai-batches-3" already shares an ai-proxy-advanced plugin with max_request_body_size unset. The plugin uses 50000000 for every model on the route.
+  reason: model "openai-after-azure" has max_request_body_size 50000000, but route "openai-batches-3" already shares an ai-proxy-advanced plugin with max_request_body_size unset. The plugin keeps the highest limit of its models for every model on the route. An unset limit counts as higher than every byte count. A limit of 0 is unlimited and counts highest.
   source:
     kind: model
     name: openai-after-azure
+    fields:
+      - config.max_request_body_size
+  severity: WARNING
+- code: BEHAVIOR_MAY_DIFFER
+  reason: model "three-bedrock" has max_request_body_size 20000000, but route "openai-batches-4" already shares an ai-proxy-advanced plugin with max_request_body_size 50000000. The plugin keeps the highest limit of its models for every model on the route. An unset limit counts as higher than every byte count. A limit of 0 is unlimited and counts highest.
+  source:
+    kind: model
+    name: three-bedrock
+    fields:
+      - config.max_request_body_size
+  severity: WARNING
+- code: BEHAVIOR_MAY_DIFFER
+  reason: model "three-explicit" has max_request_body_size 60000000, but route "openai-batches-4" already shares an ai-proxy-advanced plugin with max_request_body_size 50000000. The plugin keeps the highest limit of its models for every model on the route. An unset limit counts as higher than every byte count. A limit of 0 is unlimited and counts highest.
+  source:
+    kind: model
+    name: three-explicit
     fields:
       - config.max_request_body_size
   severity: WARNING

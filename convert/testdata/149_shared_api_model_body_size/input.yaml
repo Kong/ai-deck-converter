@@ -1,6 +1,6 @@
 # Type api models on one route share one route-scoped ai-proxy-advanced.
-# The plugin gets the smallest limit of its models in either model order.
-# A model without a published limit does not change the value.
+# The plugin gets the highest limit of its models in either model order.
+# A model without a published limit leaves the plugin without a value.
 models:
   - name: bedrock-first
     type: api
@@ -58,6 +58,35 @@ models:
       route: {paths: [/azure-first]}
     targets:
       - name: gpt-5.4
+        provider: openai-prod
+  - name: three-openai
+    type: api
+    capabilities: [batches]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/three]}
+    targets:
+      - name: gpt-5.4
+        provider: openai-prod
+  - name: three-bedrock
+    type: api
+    capabilities: [batches]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/three]}
+    targets:
+      - name: batch-api
+        provider: bedrock-prod
+        config: {type: bedrock, region: us-east-1, batch_bucket_prefix: "s3://kong-bedrock-batches/jobs/"}
+  - name: three-explicit
+    type: api
+    capabilities: [batches]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/three]}
+      max_request_body_size: 60000000
+    targets:
+      - name: gpt-5.4-mini
         provider: openai-prod
 model_providers:
   - name: openai-prod

@@ -16,7 +16,7 @@ var ProviderMaxBodySize = map[string]int{
 }
 
 // DefaultModelBodySize returns the max_request_body_size of a model that sets
-// none. It is the smallest published limit of the model's providers. It is
+// none. It is the highest published limit of the model's providers. It is
 // false when there is no provider or a provider publishes no limit.
 func DefaultModelBodySize(providerTypes []string) (int, bool) {
 	size := 0
@@ -25,7 +25,7 @@ func DefaultModelBodySize(providerTypes []string) (int, bool) {
 		if !ok {
 			return 0, false
 		}
-		if size == 0 || limit < size {
+		if limit > size {
 			size = limit
 		}
 	}
