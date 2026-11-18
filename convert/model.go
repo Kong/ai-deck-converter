@@ -1780,6 +1780,9 @@ func (c *Converter) buildTarget(
 		"model":      model,
 	}
 	if auth := resolveAuth(provider, cmp.Or(clientAuthOverride(provider), tm.AllowAuthOverride)); auth != nil {
+		if providerType == "bedrock" {
+			fillBedrockOverrideHeader(auth)
+		}
 		target["auth"] = auth
 	}
 	if tm.Weight != nil {

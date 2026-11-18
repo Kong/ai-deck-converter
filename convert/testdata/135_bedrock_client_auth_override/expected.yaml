@@ -58,6 +58,8 @@ plugins:
       targets:
         - auth:
             allow_override: true
+            header_name: Authorization
+            header_value: client-provided
           description: openai.gpt-oss-20b
           logging:
             log_payloads: false

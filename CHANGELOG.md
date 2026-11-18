@@ -11,6 +11,12 @@
 
 ### Bug Fixes
 
+- A Bedrock target with `allow_override: true` and no header now gets
+  `header_name: Authorization` and a placeholder `header_value`. The data plane
+  rejected the whole configuration without them. This affected every Bedrock
+  provider with `basic` auth and no header, which the converter marks as client
+  auth since #304. A request without a client key still uses IAM auth.
+
 - Model-scoped `response-transformer` and `response-transformer-advanced` policies
   now change the response body. `ai-proxy-advanced` wrote the body after them and
   discarded the change, so only header changes reached the client. The converter

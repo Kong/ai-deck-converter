@@ -3,6 +3,8 @@ package revert
 import (
 	"testing"
 
+	"github.com/Kong/ai-deck-converter/internal/aigw"
+	"github.com/Kong/ai-deck-converter/internal/aimap"
 	"github.com/stretchr/testify/require"
 )
 
@@ -22,4 +24,22 @@ func TestDefoldAuthAWSVariants(t *testing.T) {
 	require.Equal(t, "sagemaker", sagemaker.Type)
 	require.Equal(t, "session-token", sagemaker.SessionToken)
 	require.Empty(t, sagemaker.AWSSessionToken)
+}
+
+func TestDefoldAuthBedrockOverridePlaceholder(t *testing.T) {
+	auth := map[string]any{
+		"allow_override": true,
+		"header_name":    aimap.BedrockOverrideHeaderName,
+		"header_value":   aimap.BedrockOverrideHeaderValue,
+	}
+
+	bedrock, override := defoldAuth(auth, "bedrock")
+	require.Empty(t, bedrock.Headers)
+	require.Empty(t, bedrock.Type)
+	require.True(t, *override)
+
+	openai, _ := defoldAuth(auth, "openai")
+	require.Equal(t, []aigw.AuthHeader{{
+		Name: aimap.BedrockOverrideHeaderName, Value: aimap.BedrockOverrideHeaderValue,
+	}}, openai.Headers)
 }

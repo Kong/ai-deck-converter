@@ -19,6 +19,23 @@ func clientAuthOverride(p *aigw.Provider) *bool {
 	return new(true)
 }
 
+// fillBedrockOverrideHeader adds a placeholder Authorization header to a
+// Bedrock target auth that has allow_override and no header. The data plane
+// rejects allow_override without this header.
+func fillBedrockOverrideHeader(auth map[string]any) {
+	if override, _ := auth["allow_override"].(bool); !override {
+		return
+	}
+	if _, set := auth["header_name"]; set {
+		return
+	}
+	if _, set := auth["header_value"]; set {
+		return
+	}
+	auth["header_name"] = aimap.BedrockOverrideHeaderName
+	auth["header_value"] = aimap.BedrockOverrideHeaderValue
+}
+
 // resolveAuth folds a provider's auth configuration into an ai-proxy-advanced
 // target `auth` block. Returns nil when there is nothing to emit.
 func resolveAuth(p *aigw.Provider, allowOverride *bool) map[string]any {
