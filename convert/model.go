@@ -689,9 +689,9 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 				// gets no selector and its plugin is route-scoped with alias-less
 				// targets, exactly as a WebSocket endpoint does.
 				lifecycle := aimap.IsLifecycleEndpoint(spec)
-				if websocket && tokenVault != nil && !c.supports(aimap.FeatureTokenVaultExchangeWS) {
+				if websocket && tokenVault != nil && !c.supports(aimap.FeatureTokenVaultWS) {
 					return c.failUnsupported(src.at(capabilityField(m, capability)),
-						aimap.FeatureTokenVaultExchangeWS, capability)
+						aimap.FeatureTokenVaultWS, capability)
 				}
 				// A global plugin keeps Kong's http/https default protocols. A
 				// global authentication policy therefore cannot protect a ws or
