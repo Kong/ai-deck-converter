@@ -34,12 +34,21 @@ func (d *defoldedTarget) federation() *aigw.GCPWorkloadIdentityFederation {
 	return d.auth.WorkloadIdentityFederation
 }
 
+// isBedrockOverridePlaceholder reports whether a header is the placeholder that
+// the forward converter adds to a Bedrock target with allow_override.
+func isBedrockOverridePlaceholder(providerType, name, value string) bool {
+	return providerType == "bedrock" &&
+		name == aimap.BedrockOverrideHeaderName &&
+		value == aimap.BedrockOverrideHeaderValue
+}
+
 // defoldAuth reverses convert's resolveAuth: it reads an ai-proxy-advanced
 // target auth block back into provider auth fields plus the target-level
 // allow_override flag, inferring the auth type from which fields are present.
 func defoldAuth(auth map[string]any, providerType string) (aigw.ProviderAuth, *bool) {
 	var a aigw.ProviderAuth
-	if name, value := getStr(auth, "header_name"), getStr(auth, "header_value"); name != "" || value != "" {
+	if name, value := getStr(auth, "header_name"), getStr(auth, "header_value"); (name != "" || value != "") &&
+		!isBedrockOverridePlaceholder(providerType, name, value) {
 		a.Headers = []aigw.AuthHeader{{Name: name, Value: value}}
 	}
 	if name, value, loc := getStr(auth, "param_name"), getStr(auth, "param_value"),

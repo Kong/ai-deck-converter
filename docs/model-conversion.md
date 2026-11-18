@@ -231,6 +231,14 @@ such a provider send their own key. The data plane rejects that key unless
 `allow_override` is `true`, so the value replaces the target's `allow_auth_override`.
 Embeddings get the same value.
 
+**`fillBedrockOverrideHeader`** (`convert/provider.go`) completes a Bedrock
+target `auth` block that has `allow_override: true` and no header. The data plane
+rejects such a target unless `header_name` is `Authorization` and `header_value` is
+set. The converter adds `header_name: Authorization` and the placeholder
+`header_value: client-provided`. The data plane uses `header_value` as a Bedrock
+key only if it starts with `Bearer `, so a request without a client key keeps IAM
+auth. The reverse converter drops the placeholder header.
+
 **`mapOptions`** translates the free-form options map, renaming/nesting
 provider-specific keys:
 

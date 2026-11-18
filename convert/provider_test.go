@@ -387,3 +387,53 @@ func TestResolveEmbeddingsBedrockClientAuth(t *testing.T) {
 	require.Equal(t, map[string]any{"allow_override": true}, got.(map[string]any)["auth"])
 	require.Equal(t, false, raw["auth"].(map[string]any)["allow_override"], "source must stay unchanged")
 }
+
+func TestFillBedrockOverrideHeader(t *testing.T) {
+	placeholder := map[string]any{
+		"allow_override": true,
+		"header_name":    aimap.BedrockOverrideHeaderName,
+		"header_value":   aimap.BedrockOverrideHeaderValue,
+	}
+	tests := []struct {
+		name string
+		auth map[string]any
+		want map[string]any
+	}{
+		{"override without header", map[string]any{"allow_override": true}, placeholder},
+		{"override with aws keys", map[string]any{"allow_override": true, "aws_access_key_id": "k"}, map[string]any{
+			"allow_override":    true,
+			"aws_access_key_id": "k",
+			"header_name":       aimap.BedrockOverrideHeaderName,
+			"header_value":      aimap.BedrockOverrideHeaderValue,
+		}},
+		{"override with header", map[string]any{
+			"allow_override": true, "header_name": "Authorization", "header_value": "Bearer k",
+		}, map[string]any{"allow_override": true, "header_name": "Authorization", "header_value": "Bearer k"}},
+		{"no override", map[string]any{"allow_override": false}, map[string]any{"allow_override": false}},
+		{"override absent", map[string]any{"aws_access_key_id": "k"}, map[string]any{"aws_access_key_id": "k"}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			fillBedrockOverrideHeader(tc.auth)
+			require.Equal(t, tc.want, tc.auth)
+		})
+	}
+}
+
+func TestBuildTargetBedrockOverrideHeader(t *testing.T) {
+	c := newConverter(nil, Options{})
+	aws := &aigw.Provider{Type: "bedrock", Config: aigw.ProviderConfig{Auth: aigw.ProviderAuth{Type: "aws"}}}
+	tm := &aigw.TargetModel{Name: "anthropic.claude-3-5-sonnet", AllowAuthOverride: ptrBool(true)}
+
+	got := c.buildTarget(tm, aws, "bedrock", "llm/v1/chat", nil)
+	require.Equal(t, map[string]any{
+		"allow_override": true,
+		"header_name":    aimap.BedrockOverrideHeaderName,
+		"header_value":   aimap.BedrockOverrideHeaderValue,
+	}, got["auth"])
+
+	openai := &aigw.Provider{Type: "openai", Config: aigw.ProviderConfig{Auth: aigw.ProviderAuth{Type: "basic"}}}
+	got = c.buildTarget(&aigw.TargetModel{Name: "gpt-4o", AllowAuthOverride: ptrBool(true)},
+		openai, "openai", "llm/v1/chat", nil)
+	require.Equal(t, map[string]any{"allow_override": true}, got["auth"])
+}
