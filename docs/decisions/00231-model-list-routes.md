@@ -41,7 +41,8 @@ In scope:
   strategy.
 - No list where an agent route already answers `GET` at the list path
   (AIXSM-104).
-- A conversion option that turns lists on.
+- Lists on by default from 2.4, and a per-model setting,
+  `config.model.listed`, that takes a model off its lists.
 - The 2.4 runtime gate, and revert dropping list routes.
 
 Out of scope:
@@ -58,10 +59,9 @@ Out of scope:
   OpenAI format under `/v1` and `/openai/v1`, so its clients look for a list
   at paths that this RFC does not make. Anthropic-format mantle targets share
   the normal `<base>/v1/messages` route and list normally.
-- Display names, descriptions and token limits on list entries. See
-  [Entry fields](#entry-fields).
-- An admin switch for lists, and a per-model exclude. Either can follow if a
-  customer asks.
+- Display names, descriptions, token limits and prices on list entries. See
+  [Entry fields](#entry-fields) and [Follow-ups](#follow-ups).
+- A gateway-wide switch for lists. It can follow if a customer asks.
 
 # Guide-level explanation
 [guide-level-explanation]: #guide-level-explanation
@@ -201,8 +201,8 @@ Other requests get the OpenAI format, here from `GET /models`:
 }
 ```
 
-An entry also carries `cost` when the gateway knows the price of the target
-model. See [Entry fields](#entry-fields) for the fields it cannot carry yet.
+An entry carries no price. See [Entry fields](#entry-fields) for the fields
+it cannot carry yet.
 
 # Reference-level explanation
 [reference-level-explanation]: #reference-level-explanation
@@ -281,7 +281,8 @@ The converter copies the rule as it is. It has no CEL parser, so it matches
 the rule text against `http.`, `route.` and `service.`. On a match it reports
 one `BEHAVIOR_MAY_DIFFER` warning at `access.acls` that says the list hides
 the model. A match inside a string literal is a false positive, but it costs
-only a warning.
+only a warning. An admin clears the warning by setting
+`config.model.listed: false` on the model, which takes it off every list.
 
 ## Source ids
 
@@ -308,18 +309,9 @@ first hashes none, so configs without such a pair keep their ids.
 The gateway reads `display_name`, `description`, `max_input_tokens`,
 `max_tokens` and `capabilities` only from `targets[].metadata`. The converter
 writes no `metadata` record, and the AI Gateway model has no field for the
-limits. So a list entry carries the alias and, when the gateway knows
-the price, `cost`. Mapping the model's `display_name` into target `metadata`
-can follow in its own change.
-
-With dynamic pricing on, billing prices a target without its own prices from
-the LLM pricing service. `kong.llm.dynamic_pricing.price_loader` polls those
-rates at run time. The `serve-model-list` filter computes `cost` when the
-config loads, so today it advertises no `cost` for such a target.
-`ai-models-list` must look the rates up per request with
-`price_loader.get_entry_by_provider_model`, without markup, as billing does. A
-target missing from the polled catalog gets no `cost`, and a target with its
-own prices keeps them.
+limits. So a list entry carries only the alias. The `serve-model-list` filter
+also advertises `cost` from the target's prices. The kong-ee change must
+leave `cost` out of `ai-models-list`. See [Follow-ups](#follow-ups).
 
 ## Authentication
 
@@ -382,13 +374,11 @@ A group is one base path with one format, `openai` or `anthropic`.
 
 ```mermaid
 flowchart TD
-    A["Base path and format<br/>with at least one model"] --> B{"ModelListEndpoints set?"}
-    B -- no --> N1["No list"]
-    B -- yes --> E{"Any instance left to advertise?<br/>Not type: api, Gemini Interactions,<br/>realtime, Responses or video lifecycle,<br/>OpenAI-format mantle or passthrough"}
+    A["Base path and format<br/>with at least one model"] --> C{"min runtime version 2.4 or later?"}
+    C -- no --> N1["No list"]
+    C -- yes --> E{"Any instance left to advertise?<br/>From a model without listed: false.<br/>Not type: api, Gemini Interactions,<br/>realtime, Responses or video lifecycle,<br/>OpenAI-format mantle or passthrough"}
     E -- no --> N1
-    E -- yes --> C{"min runtime version 2.4 or later?"}
-    C -- no --> N2["No list.<br/>One UNSUPPORTED_IN_MIN_RUNTIME_VERSION<br/>warning per document"]
-    C -- yes --> D{"Enabled agent route overlaps<br/>GET on the list path?"}
+    E -- yes --> D{"Enabled agent route overlaps<br/>GET on the list path?"}
     D -- yes --> N3["No list.<br/>ROUTING_CONFLICT warning on the agent"]
     D -- no --> Y["List route with ai-models-list"]
 ```
@@ -435,25 +425,33 @@ agents:
   reason: <names the list path /claude-code/v1/models>
 ```
 
-## Conversion option
+An admin who wants the agent to serve the path without the warning sets
+`config.model.listed: false` on every model of the group.
 
-`Options.ModelListEndpoints` (`model_list_endpoints`) turns lists on. It
-defaults to false, as `PluginInstanceNames` does, because it changes the
-output. When it is not set, the converter makes no list route, gives no
-instance an `id` and reports no list issue. Konnect sets the option only for
-2.4 or later, from the resolved `min_runtime_version` that it already passes to
-the converter. So Konnect controls the rollout. Admins get no switch.
+## Per-model setting
+
+Lists are on by default from 2.4. A model sets `config.model.listed: false`
+to keep its instances out of every list. A group gets a list when at least
+one of its models is listed, so one model never removes the list of the
+others.
+
+`config.model.listed` is a boolean next to `config.model.name_header`, with
+`x-min-runtime-version: '2.4'`. An unset field means listed.
+
+Like other endpoints, lists come from the model's settings and the runtime
+version, not from a converter option. So Konnect needs no change where it
+calls the converter.
 
 ## Runtime gate
 
 `aimap.FeatureModelLists` gates the list on 2.4. A 2.3 data plane has no
 `ai-models-list` plugin and rejects the list route. Below the gate the
-converter makes no list route and gives no instance an `id`. When
-`ModelListEndpoints` is set, a document with at least one instance to
-advertise also gets one `UNSUPPORTED_IN_MIN_RUNTIME_VERSION` warning that
-names the minimum runtime version the list needs. Konnect does not set the
-option below 2.4, so only a CLI user who sets it sees this warning. A document
-with nothing to advertise gets no warning.
+converter makes no list route, gives no instance an `id` and reports no
+issue. Lists are on by default, so a warning there would follow every
+document, and an admin could not clear it. A model that sets
+`config.model.listed` below the gate gets the usual
+`UNSUPPORTED_IN_MIN_RUNTIME_VERSION` warning at that field. Konnect rejects
+such a request first, through `x-min-runtime-version`.
 
 ## Revert
 
@@ -472,7 +470,7 @@ The `ai-models-list` side is complete: the converter sets the only two fields
 of a source, `plugin_id` and `access`.
 
 A variant of the example's `claude-opus` that sets one alias in
-`model.values` and a price:
+`model.values`:
 
 ```yaml
 models:
@@ -488,7 +486,7 @@ models:
     targets:
       - name: claude-opus-4-7
         provider: anthropic-prod
-        config: {type: anthropic, input_cost: 5, output_cost: 25}
+        config: {type: anthropic}
     access:
       auth_strategies: [okta-oidc]
       acls: {deny: [contractors]}
@@ -521,7 +519,7 @@ plugins:
             model_alias: claude-opus-4-7
             name: claude-opus-4-7
             provider: anthropic
-            options: {anthropic_version: "2023-06-01", input_cost: 5, output_cost: 25}
+            options: {anthropic_version: "2023-06-01"}
           route_type: llm/v1/chat
   - name: acl
     route: anthropic-messages
@@ -540,7 +538,7 @@ plugins:
 ```
 
 A caller of `GET /claude-code/v1/models` outside `contractors` gets one entry,
-`claude-opus-4-7`, with `cost`. The entry has no `display_name`.
+`claude-opus-4-7`. The entry has no `display_name` and no `cost`.
 
 # Drawbacks
 [drawbacks]: #drawbacks
@@ -550,10 +548,12 @@ A caller of `GET /claude-code/v1/models` outside `contractors` gets one entry,
 - Anthropic-format clients such as Claude Code keep only ids that contain
   `claude` or `anthropic`. The gateway serves other ids, such as `gpt-5-4`,
   and logs a warning, but Claude Code does not show them.
-- When lists are on and the runtime is 2.4 or later, every advertised
-  `ai-proxy-advanced` instance carries an `id`. The field is valid in decK
-  and db-less output, but it widens the diff. Output with lists off or below
-  the gate does not change.
+- From 2.4, every advertised `ai-proxy-advanced` instance carries an `id`.
+  The field is valid in decK and db-less output, but it widens the diff.
+  Output below the gate does not change.
+- Lists are on by default, so a 2.4 gateway serves a list path that its admin
+  did not ask for. The list route carries the models' auth strategies, and
+  each source keeps the access rule of its model.
 - A model declared on several base paths is advertised on several lists, so
   the same instance id repeats. The gateway deduplicates per caller.
 - The gateway logs a warning on each rebuild for each id that more than one
@@ -603,17 +603,39 @@ A caller of `GET /claude-code/v1/models` outside `contractors` gets one entry,
   Rejected: two models that disagree would strip discovery from every model in
   their group. Merging keeps every per-model rule, because each source still
   carries the access rule of its model. The cost is the last drawback above.
+- A converter option that Konnect sets from the runtime version. Rejected:
+  other endpoints come from the model's settings and the runtime version, not
+  from options. An option also gives an admin no way to take one model off a
+  list.
+- A `models` capability. Rejected: capabilities and formats describe what one
+  model serves, and each routes to that model's provider. The list is one
+  endpoint for every model on a path.
 
 # Unresolved questions
 [unresolved-questions]: #unresolved-questions
 
 None.
 
+# Follow-ups
+[follow-ups]: #follow-ups
+
+- Prices on list entries. A virtual model can route to several targets with
+  different prices, so one price per entry can differ from what a request
+  costs. Most data planes also take target prices from the LLM pricing
+  service, not from the config. `kong.llm.dynamic_pricing.price_loader` polls
+  that service at run time. The follow-up decides which price an entry shows,
+  and `ai-models-list` reads that price per request with
+  `price_loader.get_entry_by_provider_model`.
+- Display names, token limits and capabilities on list entries. The converter
+  can pass the model's `display_name`. The polled catalog carries
+  `context_length` and `max_tokens` for each upstream model. A virtual model
+  with several targets would advertise the smallest value. A value set on the
+  model needs a new platform-api field.
+
 # Testing
 [testing]: #testing
 
-New golden cases, each with `model_list_endpoints: true` in its
-`options.yaml` unless it says otherwise:
+New golden cases, at the default runtime version 2.4:
 
 - `140_model_lists`: one model without `config.route.paths`, and two
   models on two other base paths, all with an auth strategy. One model has
@@ -631,8 +653,10 @@ New golden cases, each with `model_list_endpoints: true` in its
   disabled agent and an agent with `hosts` and `methods: [GET]` on the same
   path leave the list in place. An agent with `hosts` and no `methods` still
   suppresses it.
-- `144_model_lists_off`: the input of `140` without `model_list_endpoints`
-  makes no list route, gives no instance an `id` and reports no issue.
+- `144_model_lists_unlisted`: the input of `140` where every model sets
+  `config.model.listed: false` makes no list route, gives no instance an `id`
+  and reports no issue. A base path with one listed and one unlisted model
+  lists only the listed one.
 - `145_model_lists_no_auth`: a base path whose models set no auth strategy
   gets a list route with no auth plugin, and the converter reports no issue.
 - `146_model_lists_global_auth`: the same input with a global authentication
@@ -649,14 +673,14 @@ New golden cases, each with `model_list_endpoints: true` in its
   list with each instance id once, and a model with
   `config.route.protocols: [https]` gets an https-only list route.
 
-Existing golden cases keep their output, because `ModelListEndpoints` is off
-by default. A copy of each case below runs with the option set and asserts:
+Existing golden cases at 2.4 with an instance to advertise gain list routes
+and instance ids, so their expected output is regenerated. The golden cases
+also cover:
 
-- Every below-gate `min_runtime_*` golden case with an instance to advertise
-  asserts the 2.4 gate: no list route, no instance `id`, and one
-  `UNSUPPORTED_IN_MIN_RUNTIME_VERSION` warning for the list route. A
-  below-gate case with only passthrough or `type: api` models gets no
-  warning.
+- Every below-gate `min_runtime_*` golden case keeps its output: no list
+  route, no instance `id` and no list issue. A new below-gate case that sets
+  `config.model.listed` gets one `UNSUPPORTED_IN_MIN_RUNTIME_VERSION` warning
+  at that field.
 - The realtime golden cases (`100_wildcard_realtime_global_auth`,
   `102_wildcard_realtime_auth_strategies`, `107_realtime_log_payloads`)
   advertise no `ws`/`wss` instance. The case
@@ -684,3 +708,5 @@ End-to-end cases in `e2e/`, on a 2.4 gateway image:
 - On a base path with only passthrough models, the list request reaches the
   provider.
 - An agent on a list path keeps answering `GET` there.
+- A model with `config.model.listed: false` is not on the list, and its model
+  route still serves it.
