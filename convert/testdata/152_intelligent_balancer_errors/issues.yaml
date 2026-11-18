@@ -47,7 +47,7 @@
       - config.balancer.classifier.model
   severity: ERROR
 - code: CONFIG_FIELD_INVALID
-  reason: 'model "auto-not-decisions": classifier model "chat" does not serve the decisions capability in the typesafe format'
+  reason: 'model "auto-not-decisions": classifier.model must name a model with the decisions capability. Model "chat" does not have it.'
   source:
     kind: model
     name: auto-not-decisions
@@ -79,7 +79,7 @@
       - config.balancer.classifier.model
   severity: ERROR
 - code: CONFIG_FIELD_INVALID
-  reason: 'model "auto-openai-provider": target "gpt-5-mini" of classifier model "openai-classifier" has provider type "openai". A classifier must speak System One, which needs provider type "typesafe".'
+  reason: 'model "auto-openai-provider": target "gpt-5-mini" of classifier model "openai-classifier" has no upstream_url. The converter knows no default decisions endpoint for provider type "openai". Set upstream_url on the target.'
   source:
     kind: model
     name: auto-openai-provider

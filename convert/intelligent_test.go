@@ -121,3 +121,42 @@ models:` + intelligentModel + `
 		},
 	}, balancer)
 }
+
+// The classifier follows the decisions capability, not the provider type. A
+// target of any provider type with upstream_url gives a custom classifier.
+func TestIntelligentClassifierAnyProviderType(t *testing.T) {
+	src := intelligentProviders + `
+models:` + intelligentModel + `
+  - name: classifier
+    capabilities: [decisions]
+    formats: [{type: typesafe}]
+    config:
+      route: {paths: [/classifier]}
+    targets:
+      - name: decider
+        provider: openai
+        config: {upstream_url: "https://decide.example.com/api/decide"}
+`
+	result, err := Convert([]byte(src), testOptions)
+	require.NoError(t, err)
+	for _, issue := range result.Issues {
+		require.Equal(t, "classifier", issue.Source.Name, "issue: %v", issue)
+	}
+	var classifier map[string]any
+	for _, p := range result.Output.Plugins {
+		if p.Name == "ai-proxy-advanced" && p.Model != nil && string(*p.Model) == "auto" {
+			balancer, _ := p.Config["balancer"].(map[string]any)
+			classifier, _ = balancer["classifier"].(map[string]any)
+		}
+	}
+	require.Equal(t, map[string]any{
+		"type":   "custom",
+		"url":    "https://decide.example.com",
+		"format": "/api/decide",
+		"name":   "decider",
+		"auth": map[string]any{
+			"header_name":  "Authorization",
+			"header_value": "{vault://env/openai-key}",
+		},
+	}, classifier)
+}

@@ -38,7 +38,7 @@ converter changes one shape to the other.
 [guide-level-explanation]: #guide-level-explanation
 
 A model names a classifier model and a preset. The classifier model is an
-ordinary `decisions` model of the same document.
+ordinary model of the same document with the `decisions` capability.
 
 ```yaml
 models:
@@ -124,24 +124,34 @@ data chooses one algorithm.
 
 ## Classifier
 
-`classifier.model` names a model of the same document. The converter copies
-that model's target and its provider auth into the classifier record. One
-option covers TypeSafe's hosted API and a classifier the customer runs. The
-operator configures the provider, the auth and the URL once, on a model they
-can also call and watch.
+`classifier.model` must name a model with the `decisions` capability. The
+converter restricts the classifier by capability, not by provider type. The
+converter copies that model's one target and its provider auth into the
+classifier record. One option covers TypeSafe's hosted API and a classifier
+the customer runs. The operator configures the provider, the auth and the URL
+once, on a model they can also call and watch.
+
+Today the gateway serves `decisions` only through `typesafe` providers (RFC
+00230). When more provider types get the capability, the classifier follows
+them with no converter change.
 
 The model fails with an error at `config.balancer.classifier.model` when the
 classifier model:
 
 - does not exist, or is disabled;
-- does not serve the `decisions` capability in the `typesafe` format;
+- does not have the `decisions` capability;
 - has no target or more than one target;
-- has a target whose provider is unknown, or whose provider type is not
-  `typesafe`, the type that speaks System One;
+- has a target whose provider is unknown;
+- has a target with no `upstream_url` and a provider type with no known
+  default decisions endpoint. TypeSafe's hosted API is the only one today;
 - has a provider with auth other than one header, such as query `params`, or
   with a token vault. The data plane sends one fixed header;
 - has an `upstream_url` that the data plane rejects as a classifier URL: no
   `http` or `https`, no host, a query, a fragment, or user information.
+
+A target with no `upstream_url` uses its provider type's default decisions
+endpoint. For a `typesafe` target, the record is `type: model` with
+`provider: typesafe`. A target with `upstream_url` gives `type: custom`.
 
 A typesafe target sends to its `upstream_url` without a change. The data plane
 joins the classifier `url` and `format` with one slash. Hosts serve System One
@@ -161,8 +171,10 @@ strategy.
 
 Revert changes the classifier record back to `classifier.model`. It joins
 `url` and `format` as the data plane does. It picks the first reverted model
-that serves `decisions` with one typesafe target of the same name and auth
-header, whose `upstream_url` gives the same joined URL. When no model
+with the `decisions` capability and one target of the same name and auth
+header. For `type: model`, the target has the record's provider type and no
+`upstream_url`. For `type: custom`, the target's `upstream_url` gives the same
+joined URL. When no model
 matches, revert warns and leaves out `classifier.model`.
 
 ## Version gate

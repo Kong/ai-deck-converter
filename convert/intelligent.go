@@ -81,8 +81,8 @@ func (c *Converter) lowerIntelligentBalancer(src ConversionIssueSource, m *aigw.
 }
 
 // classifierConfig changes a balancer.classifier block to the data plane
-// classifier record. The block names a decisions model of the document. The
-// record copies that model's one target and its provider auth header.
+// classifier record. The block names a model with the decisions capability.
+// The record copies that model's one target and its provider auth header.
 func (c *Converter) classifierConfig(src ConversionIssueSource, m *aigw.Model, raw any) (map[string]any, error) {
 	if raw == nil {
 		return nil, c.fail(src.at(classifierField), MissingRequiredConfigField,
@@ -116,10 +116,10 @@ func (c *Converter) classifierConfig(src ConversionIssueSource, m *aigw.Model, r
 	case isDisabled(classifier):
 		return nil, c.fail(modelSrc, ConfigFieldInvalid,
 			"model %q: classifier model %q is disabled", m.Name, name)
-	case !servesDecisions(classifier):
+	case !hasDecisions(classifier):
 		return nil, c.fail(modelSrc, ConfigFieldInvalid,
-			"model %q: classifier model %q does not serve the decisions capability in the %s format",
-			m.Name, name, aimap.TypesafeProviderType)
+			"model %q: classifier.model must name a model with the decisions capability. Model %q does not have it.",
+			m.Name, name)
 	case len(classifier.TargetModels) != 1:
 		return nil, c.fail(modelSrc, ConfigFieldInvalid,
 			"model %q: classifier model %q has %d targets. A classifier model needs exactly one target.",
@@ -133,18 +133,13 @@ func (c *Converter) classifierConfig(src ConversionIssueSource, m *aigw.Model, r
 			"model %q: target %q of classifier model %q references unknown provider %q",
 			m.Name, tm.Name, name, tm.Provider)
 	}
-	if providerType := cmp.Or(tm.Config.Type, provider.Type); providerType != aimap.TypesafeProviderType {
-		return nil, c.fail(modelSrc, ConfigFieldInvalid,
-			"model %q: target %q of classifier model %q has provider type %q. "+
-				"A classifier must speak System One, which needs provider type %q.",
-			m.Name, tm.Name, name, providerType, aimap.TypesafeProviderType)
-	}
 	auth, err := c.classifierAuth(modelSrc, m, name, provider)
 	if err != nil {
 		return nil, err
 	}
 
 	out := map[string]any{"name": tm.Name}
+	providerType := cmp.Or(tm.Config.Type, provider.Type)
 	if raw, ok := tm.Config.Options["upstream_url"]; ok {
 		upstream, _ := raw.(string)
 		base, format, problem := aimap.SplitClassifierURL(upstream)
@@ -156,9 +151,15 @@ func (c *Converter) classifierConfig(src ConversionIssueSource, m *aigw.Model, r
 		out["type"] = "custom"
 		out["url"] = base
 		out["format"] = format
-	} else {
+	} else if aimap.HasHostedClassifier(providerType) {
 		out["type"] = "model"
-		out["provider"] = aimap.TypesafeProviderType
+		out["provider"] = providerType
+	} else {
+		return nil, c.fail(modelSrc, ConfigFieldInvalid,
+			"model %q: target %q of classifier model %q has no upstream_url. "+
+				"The converter knows no default decisions endpoint for provider type %q. "+
+				"Set upstream_url on the target.",
+			m.Name, tm.Name, name, providerType)
 	}
 	if auth != nil {
 		out["auth"] = auth
@@ -207,10 +208,8 @@ func (c *Converter) modelNamed(name string) *aigw.Model {
 	return nil
 }
 
-// servesDecisions reports whether m lists the decisions capability and the
-// typesafe format, by name or by "*".
-func servesDecisions(m *aigw.Model) bool {
-	capability := capabilitiesWildcard(m) || slices.Contains(explicitCapabilities(m), "decisions")
-	format := formatsWildcard(m) || slices.Contains(explicitFormats(m), aimap.TypesafeProviderType)
-	return capability && format
+// hasDecisions reports whether m lists the decisions capability, by name or
+// by "*".
+func hasDecisions(m *aigw.Model) bool {
+	return capabilitiesWildcard(m) || slices.Contains(explicitCapabilities(m), "decisions")
 }

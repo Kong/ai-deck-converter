@@ -20,8 +20,8 @@ func TestIntelligentBalancerWarnings(t *testing.T) {
 			`It becomes the nearest preset "balanced", with value 0.5.`,
 		`model "margin": margin 12 is not a preset value. It becomes the nearest preset "cost", with margin 15.`,
 		`model "margin": cost_quality_tradeoff 0.5 becomes 0.25, the value of preset "cost".`,
-		`model "orphan": no decisions model has the classifier target "kev". classifier.model is left out. ` +
-			`Set it to a decisions model with one typesafe target.`,
+		`model "orphan": no model with the decisions capability has the classifier target "kev". ` +
+			`classifier.model is left out. Set it to a model with the decisions capability and one target.`,
 	}, warnings)
 }
 

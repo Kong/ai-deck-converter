@@ -71,3 +71,8 @@ func TestClassifierURL(t *testing.T) {
 	require.Equal(t, "http://kev:8009/v1/systemone", JoinClassifierURL("http://kev:8009", ClassifierFormat))
 	require.Equal(t, "http://kev:8009/v1/systemone", JoinClassifierURL("http://kev:8009/", ClassifierFormat))
 }
+
+func TestHasHostedClassifier(t *testing.T) {
+	require.True(t, HasHostedClassifier(TypesafeProviderType))
+	require.False(t, HasHostedClassifier("openai"))
+}

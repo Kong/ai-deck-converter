@@ -122,7 +122,7 @@ func (r *Reverter) classifierRef(model string, block map[string]any) (map[string
 	name, problem := r.classifierModel(block)
 	if name == "" {
 		return out, r.warn("model %q: %s. classifier.model is left out. "+
-			"Set it to a decisions model with one typesafe target.", model, problem)
+			"Set it to a model with the decisions capability and one target.", model, problem)
 	}
 	out["model"] = name
 	return out, nil
@@ -132,11 +132,12 @@ func (r *Reverter) classifierRef(model string, block map[string]any) (map[string
 // classifier record. It returns why no model matches when name is "".
 func (r *Reverter) classifierModel(block map[string]any) (name, problem string) {
 	target := getStr(block, "name")
-	upstream := ""
+	providerType, upstream := "", ""
 	switch kind := getStr(block, "type"); kind {
 	case "model":
-		if p := getStr(block, "provider"); p != aimap.TypesafeProviderType {
-			return "", fmt.Sprintf("the classifier provider %q is not %s", p, aimap.TypesafeProviderType)
+		providerType = getStr(block, "provider")
+		if !aimap.HasHostedClassifier(providerType) {
+			return "", fmt.Sprintf("the classifier provider %q has no known decisions endpoint", providerType)
 		}
 	case "custom":
 		upstream = aimap.JoinClassifierURL(getStr(block, "url"), getStr(block, "format"))
@@ -146,18 +147,20 @@ func (r *Reverter) classifierModel(block map[string]any) (name, problem string) 
 	auth := getMap(block, "auth")
 	header := aigw.AuthHeader{Name: getStr(auth, "header_name"), Value: getStr(auth, "header_value")}
 	for _, m := range r.out.Models {
-		if r.servesClassifier(m, target, upstream, header) {
+		if r.servesClassifier(m, target, providerType, upstream, header) {
 			return m.Name, ""
 		}
 	}
-	return "", fmt.Sprintf("no decisions model has the classifier target %q", target)
+	return "", fmt.Sprintf("no model with the decisions capability has the classifier target %q", target)
 }
 
-// servesClassifier reports whether m has one typesafe target with the given
-// name, upstream_url and provider auth header.
-func (r *Reverter) servesClassifier(m aigw.Model, target, upstream string, header aigw.AuthHeader) bool {
-	if !slices.Contains(m.Capabilities, "decisions") || len(m.TargetModels) != 1 ||
-		!slices.Contains(m.Formats, aigw.Format{Type: aimap.TypesafeProviderType}) {
+// servesClassifier reports whether m has the decisions capability and one
+// target with the given name, upstream_url and provider auth header. An empty
+// providerType matches any provider type.
+func (r *Reverter) servesClassifier(
+	m aigw.Model, target, providerType, upstream string, header aigw.AuthHeader,
+) bool {
+	if !slices.Contains(m.Capabilities, "decisions") || len(m.TargetModels) != 1 {
 		return false
 	}
 	tm := m.TargetModels[0]
@@ -166,7 +169,7 @@ func (r *Reverter) servesClassifier(m aigw.Model, target, upstream string, heade
 		return false
 	}
 	provider := r.providers[i]
-	if cmp.Or(tm.Config.Type, provider.Type) != aimap.TypesafeProviderType {
+	if providerType != "" && cmp.Or(tm.Config.Type, provider.Type) != providerType {
 		return false
 	}
 	if got, _ := tm.Config.Options["upstream_url"].(string); classifierURL(got) != upstream {

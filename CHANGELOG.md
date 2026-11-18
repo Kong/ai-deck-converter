@@ -10,8 +10,8 @@
 
 - Models convert the `intelligent` balancer (AI Gateway 2.4+). A
   `cost_quality_tradeoff` preset becomes the data plane number, and
-  `classifier.model` names a `decisions` model whose target becomes the
-  classifier. See RFC 00231.
+  `classifier.model` names a model with the `decisions` capability, whose
+  one target becomes the classifier. See RFC 00231.
 
 ### Bug Fixes
 

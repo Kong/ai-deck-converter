@@ -2,6 +2,7 @@ package aimap
 
 import (
 	"math"
+	"slices"
 	"strings"
 )
 
@@ -105,6 +106,16 @@ var ClassifierFormat = "/" + typesafeDecisionsPath()
 func typesafeDecisionsPath() string {
 	specs, _ := EndpointsFor(TypesafeProviderType, "decisions")
 	return specs[0].PathSuffix
+}
+
+// hostedClassifiers are the provider types whose decisions endpoint the data
+// plane knows. The classifier record names the provider type.
+var hostedClassifiers = []string{TypesafeProviderType}
+
+// HasHostedClassifier reports whether the data plane knows the decisions
+// endpoint of providerType.
+func HasHostedClassifier(providerType string) bool {
+	return slices.Contains(hostedClassifiers, providerType)
 }
 
 // SplitClassifierURL returns scheme://host[:port] of a System One upstream_url
