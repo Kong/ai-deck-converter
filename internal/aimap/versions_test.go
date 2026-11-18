@@ -53,7 +53,7 @@ var allFeatures = []Feature{
 	FeatureBedrockEndpointType,
 	FeatureMCPTokenVault,
 	FeatureProviderTokenVault,
-	FeatureTokenVaultExchangeWS,
+	FeatureTokenVaultWS,
 	FeatureMCPRateLimiting,
 	FeatureMCPACLWhen,
 	FeatureBaseten,
