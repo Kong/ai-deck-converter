@@ -319,7 +319,7 @@ model_providers:
 	})
 }
 
-func TestProviderTokenVaultRejectsWebSocket(t *testing.T) {
+func TestProviderTokenVaultWebSocket(t *testing.T) {
 	src := providerTokenVaultDatastores + `
 models:
   - name: rt
@@ -337,11 +337,29 @@ model_providers:
     datastores: [{name: tv}]
     token_vault: {provider: openai}
 `
-	result, err := Convert([]byte(src), testOptions)
-	require.NoError(t, err)
-	issue := requireIssue(t, result.Issues, Error, ConfigFieldInvalid, kindModel, "rt", "capabilities[0]")
-	require.Contains(t, issue.Reason, "does not support the ws and wss protocols")
-	require.Empty(t, pluginsNamed(result.Output, tokenVaultExchangePlugin))
+	t.Run("below 2.4 fails the model", func(t *testing.T) {
+		result, err := Convert([]byte(src), Options{MinRuntimeVersion: "2.3"})
+		require.NoError(t, err)
+		requireIssue(t, result.Issues, Error, UnsupportedInMinRuntimeVersion, kindModel, "rt", "capabilities[0]")
+		require.Empty(t, pluginsNamed(result.Output, tokenVaultExchangePlugin))
+	})
+
+	t.Run("at 2.4 emits the WebSocket plugin", func(t *testing.T) {
+		result, err := Convert([]byte(src), testOptions)
+		require.NoError(t, err)
+		require.Empty(t, result.Issues)
+		var exchanges []kong.Plugin
+		for _, p := range pluginsNamed(result.Output, tokenVaultExchangePlugin) {
+			for _, protocol := range p.Protocols {
+				if protocol == "ws" {
+					exchanges = append(exchanges, p)
+					break
+				}
+			}
+		}
+		require.Len(t, exchanges, 1)
+		require.Equal(t, []string{"ws", "wss"}, exchanges[0].Protocols)
+	})
 }
 
 // Two api models on one route share a route-scoped ai-proxy-advanced, so they
