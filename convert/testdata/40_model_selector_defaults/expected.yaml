@@ -299,7 +299,7 @@ plugins:
   - id: cd4aa418-5dc5-57fe-860c-f5ddb6889d88
     name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 100000000
       sources:
         - path_pattern: 'models/([%w%.%-]+):'
           source: path
@@ -312,6 +312,7 @@ plugins:
         algorithm: round-robin
       genai_category: text/generation
       llm_format: gemini
+      max_request_body_size: 100000000
       targets:
         - description: gemini-2.5-pro
           logging:
@@ -329,7 +330,7 @@ plugins:
   - id: b5fb23d3-496f-532c-9b75-245ccfee68d3
     name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 100000000
       sources:
         - path_pattern: 'models/([%w%.%-]+):'
           source: path
@@ -342,6 +343,7 @@ plugins:
         algorithm: round-robin
       genai_category: text/generation
       llm_format: gemini
+      max_request_body_size: 100000000
       targets:
         - description: gemini-2.5-pro
           logging:
@@ -359,7 +361,7 @@ plugins:
   - id: 47b56eb4-93bb-5ba2-a7a7-1b24635b434e
     name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 100000000
       sources:
         - path_pattern: 'models/([%w%.%-]+):'
           source: path
@@ -372,6 +374,7 @@ plugins:
         algorithm: round-robin
       genai_category: text/generation
       llm_format: gemini
+      max_request_body_size: 100000000
       targets:
         - description: gemini-2.5-pro
           logging:
@@ -389,7 +392,7 @@ plugins:
   - id: b21a1b0e-3d70-5c23-84a5-d25fee046ce9
     name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 100000000
       sources:
         - path_pattern: 'models/([%w%.%-]+):'
           source: path
@@ -402,6 +405,7 @@ plugins:
         algorithm: round-robin
       genai_category: text/generation
       llm_format: gemini
+      max_request_body_size: 100000000
       targets:
         - description: gemini-2.5-pro
           logging:
@@ -419,7 +423,7 @@ plugins:
   - id: ea5f9246-1910-58d8-9d91-68ca8f388d7d
     name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 100000000
       sources:
         - path_pattern: 'models/([%w%.%-]+):'
           source: path
@@ -432,6 +436,7 @@ plugins:
         algorithm: round-robin
       genai_category: text/generation
       llm_format: gemini
+      max_request_body_size: 100000000
       targets:
         - description: gemini-2.5-pro
           logging:
@@ -449,7 +454,7 @@ plugins:
   - id: 4c3c42b4-138d-5f50-b141-efb32541e17c
     name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 100000000
       sources:
         - path_pattern: 'models/([%w%.%-]+):'
           source: path
@@ -462,6 +467,7 @@ plugins:
         algorithm: round-robin
       genai_category: text/generation
       llm_format: gemini
+      max_request_body_size: 100000000
       targets:
         - description: gemini-2.5-pro
           logging:
@@ -479,7 +485,7 @@ plugins:
   - id: 5a7abd23-205f-5c84-b7f1-035c47aaeaf5
     name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 100000000
       sources:
         - path_pattern: 'models/([%w%.%-]+):'
           source: path
@@ -492,6 +498,7 @@ plugins:
         algorithm: round-robin
       genai_category: text/generation
       llm_format: gemini
+      max_request_body_size: 100000000
       targets:
         - description: gemini-2.5-pro
           logging:
@@ -509,7 +516,7 @@ plugins:
   - id: 4ea90c46-4e21-5a47-b656-f67c908b7483
     name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 100000000
       sources:
         - path_pattern: 'models/([%w%.%-]+):'
           source: path
@@ -522,6 +529,7 @@ plugins:
         algorithm: round-robin
       genai_category: text/generation
       llm_format: gemini
+      max_request_body_size: 100000000
       targets:
         - description: gemini-2.5-pro
           logging:

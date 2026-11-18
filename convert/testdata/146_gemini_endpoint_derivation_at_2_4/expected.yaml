@@ -49,7 +49,7 @@ plugins:
           provider: gemini
   - name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 100000000
       sources:
         - body_path: model
           source: body
@@ -60,6 +60,7 @@ plugins:
         algorithm: round-robin
       genai_category: text/generation
       llm_format: gemini
+      max_request_body_size: 100000000
       targets:
         - auth:
             header_name: Authorization
@@ -180,7 +181,7 @@ plugins:
     model: gemini-agentic
   - name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 100000000
       sources:
         - body_path: model
           source: body
@@ -191,6 +192,7 @@ plugins:
         algorithm: round-robin
       genai_category: text/generation
       llm_format: gemini
+      max_request_body_size: 100000000
       targets:
         - auth:
             header_name: Authorization
@@ -311,7 +313,7 @@ plugins:
     model: gemini-agentic
   - name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 50000000
       sources:
         - body_path: model
           source: body
@@ -333,6 +335,7 @@ plugins:
           provider: gemini
       genai_category: text/generation
       llm_format: openai
+      max_request_body_size: 50000000
       targets:
         - auth:
             header_name: Authorization

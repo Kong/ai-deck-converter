@@ -52,6 +52,7 @@ plugins:
         algorithm: round-robin
       genai_category: text/generation
       llm_format: bedrock
+      max_request_body_size: 20000000
       model_name_header: false
       targets:
         - auth:

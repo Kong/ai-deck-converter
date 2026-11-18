@@ -66,6 +66,7 @@ plugins:
         algorithm: round-robin
       genai_category: realtime/generation
       llm_format: gemini
+      max_request_body_size: 100000000
       targets:
         - auth:
             header_name: x-goog-api-key
