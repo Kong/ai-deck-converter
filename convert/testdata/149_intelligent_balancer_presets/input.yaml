@@ -1,0 +1,82 @@
+# The intelligent balancer with the weighted strategy at each preset. The
+# classifier is a decisions model on TypeSafe's hosted API.
+model_providers:
+  - name: jev-typesafe
+    type: typesafe
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://env/typesafe-token}"
+  - name: anthropic
+    type: anthropic
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: x-api-key
+            value: "{vault://env/anthropic-key}"
+models:
+  - name: task-classifier
+    type: model
+    capabilities: [decisions]
+    formats: [{type: typesafe}]
+    config:
+      route: {paths: [/classifier]}
+    targets:
+      - name: jev-latest
+        provider: jev-typesafe
+        config: {type: typesafe}
+  - name: auto-cost
+    type: model
+    capabilities: [generate]
+    formats: [{type: anthropic}]
+    config:
+      route: {paths: [/cost]}
+      balancer:
+        algorithm: intelligent
+        version: v1
+        cost_quality_tradeoff: cost
+        classifier:
+          model: task-classifier
+    targets:
+      - name: claude-haiku-4-5
+        provider: anthropic
+      - name: claude-opus-4-6
+        provider: anthropic
+  - name: auto-balanced
+    type: model
+    capabilities: [generate]
+    formats: [{type: anthropic}]
+    config:
+      route: {paths: [/balanced]}
+      balancer:
+        algorithm: intelligent
+        retries: 2
+        classifier:
+          model: task-classifier
+          timeout: 5000
+          context_window: 32768
+    targets:
+      - name: claude-haiku-4-5
+        provider: anthropic
+      - name: claude-opus-4-6
+        provider: anthropic
+  - name: auto-quality
+    type: model
+    capabilities: [generate]
+    formats: [{type: anthropic}]
+    config:
+      route: {paths: [/quality]}
+      balancer:
+        algorithm: intelligent
+        strategy: weighted
+        cost_quality_tradeoff: quality
+        classifier:
+          model: task-classifier
+    targets:
+      - name: claude-haiku-4-5
+        provider: anthropic
+      - name: claude-opus-4-6
+        provider: anthropic

@@ -1,0 +1,88 @@
+# Balancer fields that the converter cannot change to data plane values. Each
+# auto-* model is absent with an error.
+model_providers:
+  - name: jev-typesafe
+    type: typesafe
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://env/typesafe-token}"
+  - name: openai
+    type: openai
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://env/openai-key}"
+models:
+  - name: task-classifier
+    capabilities: [decisions]
+    formats: [{type: typesafe}]
+    config:
+      route: {paths: [/classifier]}
+    targets:
+      - name: jev-latest
+        provider: jev-typesafe
+  - name: auto-bad-preset
+    capabilities: [generate]
+    config:
+      route: {paths: [/a1]}
+      balancer:
+        algorithm: intelligent
+        cost_quality_tradeoff: fast
+        classifier: {model: task-classifier}
+    targets:
+      - {name: gpt-5, provider: openai}
+  - name: auto-number-preset
+    capabilities: [generate]
+    config:
+      route: {paths: [/a2]}
+      balancer:
+        algorithm: intelligent
+        cost_quality_tradeoff: 0.5
+        classifier: {model: task-classifier}
+    targets:
+      - {name: gpt-5, provider: openai}
+  - name: auto-bad-strategy
+    capabilities: [generate]
+    config:
+      route: {paths: [/a3]}
+      balancer:
+        algorithm: intelligent
+        strategy: greedy
+        classifier: {model: task-classifier}
+    targets:
+      - {name: gpt-5, provider: openai}
+  - name: auto-bad-version
+    capabilities: [generate]
+    config:
+      route: {paths: [/a4]}
+      balancer:
+        algorithm: intelligent
+        version: v2
+        classifier: {model: task-classifier}
+    targets:
+      - {name: gpt-5, provider: openai}
+  - name: auto-passthrough
+    formats: [{type: passthrough}]
+    config:
+      route: {paths: [/a5]}
+      balancer:
+        algorithm: intelligent
+        classifier: {model: task-classifier}
+    targets:
+      - {name: gpt-5, provider: openai}
+  - name: auto-margin-value
+    capabilities: [generate]
+    config:
+      route: {paths: [/a6]}
+      balancer:
+        algorithm: intelligent
+        strategy: margin
+        margin: 10
+        classifier: {model: task-classifier}
+    targets:
+      - {name: gpt-5, provider: openai}

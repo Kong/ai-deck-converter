@@ -1,0 +1,38 @@
+# The intelligent balancer needs 2.4. At 2.3 the model is absent with an
+# error. Its classifier model needs only 2.2 and converts.
+model_providers:
+  - name: jev-typesafe
+    type: typesafe
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://env/typesafe-token}"
+  - name: openai
+    type: openai
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://env/openai-key}"
+models:
+  - name: task-classifier
+    capabilities: [decisions]
+    formats: [{type: typesafe}]
+    config:
+      route: {paths: [/classifier]}
+    targets:
+      - name: jev-latest
+        provider: jev-typesafe
+  - name: auto
+    capabilities: [generate]
+    config:
+      route: {paths: [/auto]}
+      balancer:
+        algorithm: intelligent
+        classifier: {model: task-classifier}
+    targets:
+      - {name: gpt-5-mini, provider: openai}
+      - {name: gpt-5, provider: openai}

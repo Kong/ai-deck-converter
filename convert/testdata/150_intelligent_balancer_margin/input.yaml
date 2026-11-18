@@ -1,0 +1,80 @@
+# The margin strategy takes its margin from the preset: cost 15, balanced 5
+# and quality 0 points of pass rate.
+model_providers:
+  - name: jev-typesafe
+    type: typesafe
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://env/typesafe-token}"
+  - name: openai
+    type: openai
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://env/openai-key}"
+models:
+  - name: task-classifier
+    type: model
+    capabilities: [decisions]
+    formats: [{type: typesafe}]
+    config:
+      route: {paths: [/classifier]}
+    targets:
+      - name: jev-latest
+        provider: jev-typesafe
+        config: {type: typesafe}
+  - name: margin-cost
+    type: model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/margin-cost]}
+      balancer:
+        algorithm: intelligent
+        strategy: margin
+        cost_quality_tradeoff: cost
+        classifier:
+          model: task-classifier
+    targets:
+      - name: gpt-5-mini
+        provider: openai
+      - name: gpt-5
+        provider: openai
+  - name: margin-balanced
+    type: model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/margin-balanced]}
+      balancer:
+        algorithm: intelligent
+        strategy: margin
+        classifier:
+          model: task-classifier
+    targets:
+      - name: gpt-5-mini
+        provider: openai
+      - name: gpt-5
+        provider: openai
+  - name: margin-quality
+    type: model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/margin-quality]}
+      balancer:
+        algorithm: intelligent
+        strategy: margin
+        cost_quality_tradeoff: quality
+        classifier:
+          model: task-classifier
+    targets:
+      - name: gpt-5-mini
+        provider: openai
+      - name: gpt-5
+        provider: openai

@@ -1,0 +1,122 @@
+# Numbers that no preset has lift to the nearest preset. A classifier record
+# lifts to the model with the same target, upstream URL and auth header. A
+# record that no model serves loses its model reference.
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: typesafe-decisions
+        paths: [~/jev/v1/systemone]
+        methods: [POST, OPTIONS]
+        strip_path: false
+      - name: typesafe-decisions-2
+        paths: [~/kev/v1/systemone]
+        methods: [POST, OPTIONS]
+        strip_path: false
+      - name: openai-chat
+        paths: [/near/chat/completions]
+        methods: [POST, OPTIONS]
+        strip_path: false
+      - name: openai-chat-2
+        paths: [/margin/chat/completions]
+        methods: [POST, OPTIONS]
+        strip_path: false
+      - name: openai-chat-3
+        paths: [/orphan/chat/completions]
+        methods: [POST, OPTIONS]
+        strip_path: false
+plugins:
+  - name: ai-proxy-advanced
+    route: typesafe-decisions
+    model: jev
+    config:
+      balancer: {algorithm: round-robin}
+      genai_category: text/generation
+      llm_format: typesafe
+      targets:
+        - auth: {header_name: Authorization, header_value: "{vault://env/typesafe-token}"}
+          model: {model_alias: jev, name: jev-latest, provider: typesafe}
+          route_type: llm/v1/chat
+  - name: ai-proxy-advanced
+    route: typesafe-decisions-2
+    model: kev
+    config:
+      balancer: {algorithm: round-robin}
+      genai_category: text/generation
+      llm_format: typesafe
+      targets:
+        - auth: {header_name: x-api-key, header_value: "{vault://env/kev-key}"}
+          model:
+            model_alias: kev
+            name: kev-latest
+            provider: typesafe
+            options: {upstream_url: "http://kev.internal:8009/v1/systemone"}
+          route_type: llm/v1/chat
+  - name: ai-proxy-advanced
+    route: openai-chat
+    model: near
+    config:
+      balancer:
+        algorithm: intelligent
+        cost_quality_tradeoff: 0.4
+        classifier:
+          type: model
+          provider: typesafe
+          name: jev-latest
+          auth: {header_name: Authorization, header_value: "{vault://env/typesafe-token}"}
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth: {header_name: Authorization, header_value: "{vault://env/openai-key}"}
+          model: {model_alias: near, name: gpt-5-mini, provider: openai}
+          route_type: llm/v1/chat
+        - auth: {header_name: Authorization, header_value: "{vault://env/openai-key}"}
+          model: {model_alias: near, name: gpt-5, provider: openai}
+          route_type: llm/v1/chat
+  - name: ai-proxy-advanced
+    route: openai-chat-2
+    model: margin
+    config:
+      balancer:
+        algorithm: intelligent
+        strategy: margin
+        margin: 12
+        cost_quality_tradeoff: 0.5
+        classifier:
+          type: custom
+          url: "http://kev.internal:8009/"
+          format: /v1/systemone
+          name: kev-latest
+          timeout: 2000
+          auth: {header_name: x-api-key, header_value: "{vault://env/kev-key}"}
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth: {header_name: Authorization, header_value: "{vault://env/openai-key}"}
+          model: {model_alias: margin, name: gpt-5-mini, provider: openai}
+          route_type: llm/v1/chat
+  - name: ai-proxy-advanced
+    route: openai-chat-3
+    model: orphan
+    config:
+      balancer:
+        algorithm: intelligent
+        cost_quality_tradeoff: 0.75
+        classifier:
+          type: custom
+          url: "https://classifier.example.com"
+          format: /v1/systemone
+          name: kev
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth: {header_name: Authorization, header_value: "{vault://env/openai-key}"}
+          model: {model_alias: orphan, name: gpt-5-mini, provider: openai}
+          route_type: llm/v1/chat
+ai_models:
+  - name: jev
+  - name: kev
+  - name: near
+  - name: margin
+  - name: orphan

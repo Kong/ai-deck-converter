@@ -1,0 +1,49 @@
+- code: CONFIG_FIELD_INVALID
+  reason: 'model "auto-bad-preset": cost_quality_tradeoff "fast" is not one of cost, balanced, quality'
+  source:
+    kind: model
+    name: auto-bad-preset
+    fields:
+      - config.balancer.cost_quality_tradeoff
+  severity: ERROR
+- code: CONFIG_FIELD_INVALID
+  reason: 'model "auto-number-preset": cost_quality_tradeoff 0.5 is not one of cost, balanced, quality'
+  source:
+    kind: model
+    name: auto-number-preset
+    fields:
+      - config.balancer.cost_quality_tradeoff
+  severity: ERROR
+- code: CONFIG_FIELD_INVALID
+  reason: 'model "auto-bad-strategy": intelligent balancer strategy "greedy" is not one of weighted, margin'
+  source:
+    kind: model
+    name: auto-bad-strategy
+    fields:
+      - config.balancer.strategy
+  severity: ERROR
+- code: CONFIG_FIELD_INVALID
+  reason: 'model "auto-bad-version": intelligent balancer version "v2" is not supported. Use "v1".'
+  source:
+    kind: model
+    name: auto-bad-version
+    fields:
+      - config.balancer.version
+  severity: ERROR
+- code: CONFIG_FIELD_INVALID
+  reason: 'model "auto-passthrough": the passthrough format cannot use the intelligent balancer algorithm'
+  source:
+    kind: model
+    name: auto-passthrough
+    fields:
+      - formats
+      - config.balancer.algorithm
+  severity: ERROR
+- code: CONFIG_FIELD_INVALID
+  reason: 'model "auto-margin-value": config.balancer.margin is not a model field. The cost_quality_tradeoff preset sets it.'
+  source:
+    kind: model
+    name: auto-margin-value
+    fields:
+      - config.balancer.margin
+  severity: ERROR

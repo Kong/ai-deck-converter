@@ -1,0 +1,112 @@
+- code: UNDEFINED_REFERENCE
+  reason: model "unknown-provider-classifier" target "jev-latest" references unknown provider "jev-nowhere"; the target is omitted
+  source:
+    kind: model
+    name: unknown-provider-classifier
+    fields:
+      - targets[0].provider
+  severity: WARNING
+- code: MISSING_REQUIRED_CONFIG_FIELD
+  reason: model "unknown-provider-classifier" has no target that the converter can convert
+  source:
+    kind: model
+    name: unknown-provider-classifier
+    fields:
+      - targets
+  severity: ERROR
+- code: CONFIG_FIELD_INVALID
+  reason: 'model "openai-classifier": no target can serve capability "decisions" with llm_format "typesafe"'
+  source:
+    kind: model
+    name: openai-classifier
+    fields:
+      - capabilities[0]
+  severity: ERROR
+- code: MISSING_REQUIRED_CONFIG_FIELD
+  reason: 'model "auto-no-classifier": the intelligent balancer needs config.balancer.classifier.model, the name of a decisions model'
+  source:
+    kind: model
+    name: auto-no-classifier
+    fields:
+      - config.balancer.classifier
+  severity: ERROR
+- code: CONFIG_FIELD_INVALID
+  reason: 'model "auto-provider-shape": config.balancer.classifier.name is not a classifier field. The fields are context_window, model, timeout.'
+  source:
+    kind: model
+    name: auto-provider-shape
+    fields:
+      - config.balancer.classifier.name
+  severity: ERROR
+- code: UNDEFINED_REFERENCE
+  reason: 'model "auto-unknown": classifier model "missing-classifier" does not exist'
+  source:
+    kind: model
+    name: auto-unknown
+    fields:
+      - config.balancer.classifier.model
+  severity: ERROR
+- code: CONFIG_FIELD_INVALID
+  reason: 'model "auto-not-decisions": classifier model "chat" does not serve the decisions capability in the typesafe format'
+  source:
+    kind: model
+    name: auto-not-decisions
+    fields:
+      - config.balancer.classifier.model
+  severity: ERROR
+- code: CONFIG_FIELD_INVALID
+  reason: 'model "auto-disabled": classifier model "disabled-classifier" is disabled'
+  source:
+    kind: model
+    name: auto-disabled
+    fields:
+      - config.balancer.classifier.model
+  severity: ERROR
+- code: CONFIG_FIELD_INVALID
+  reason: 'model "auto-two-targets": classifier model "two-target-classifier" has 2 targets. A classifier model needs exactly one target.'
+  source:
+    kind: model
+    name: auto-two-targets
+    fields:
+      - config.balancer.classifier.model
+  severity: ERROR
+- code: UNDEFINED_REFERENCE
+  reason: 'model "auto-unknown-provider": target "jev-latest" of classifier model "unknown-provider-classifier" references unknown provider "jev-nowhere"'
+  source:
+    kind: model
+    name: auto-unknown-provider
+    fields:
+      - config.balancer.classifier.model
+  severity: ERROR
+- code: CONFIG_FIELD_INVALID
+  reason: 'model "auto-openai-provider": target "gpt-5-mini" of classifier model "openai-classifier" has provider type "openai". A classifier must speak System One, which needs provider type "typesafe".'
+  source:
+    kind: model
+    name: auto-openai-provider
+    fields:
+      - config.balancer.classifier.model
+  severity: ERROR
+- code: CONFIG_FIELD_INVALID
+  reason: 'model "auto-query-key": provider "jev-query-key" of classifier model "query-key-classifier" sets auth param_location, param_name, param_value. The classifier sends one auth header only.'
+  source:
+    kind: model
+    name: auto-query-key
+    fields:
+      - config.balancer.classifier.model
+  severity: ERROR
+- code: CONFIG_FIELD_INVALID
+  reason: 'model "auto-other-path": target "typesafe/jev-1.13" of classifier model "other-path-classifier" has upstream_url "https://openrouter.ai/api/alpha/decisions". A classifier upstream_url must end with /v1/systemone.'
+  source:
+    kind: model
+    name: auto-other-path
+    fields:
+      - config.balancer.classifier.model
+  severity: ERROR
+- code: CONFIG_FIELD_INVALID
+  reason: 'model "auto-user-info": the data plane rejects the classifier base URL "https://user@kev.internal" of classifier model "user-info-classifier": it has user information'
+  source:
+    kind: model
+    name: auto-user-info
+    fields:
+      - config.balancer.classifier.model
+  severity: ERROR

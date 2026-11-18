@@ -1,0 +1,108 @@
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: anthropic-messages
+        paths:
+          - /auto/v1/messages
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: typesafe-decisions
+        paths:
+          - ~/kev/v1/systemone
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+plugins:
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: anthropic-messages
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: intelligent
+        classifier:
+          auth:
+            header_name: x-api-key
+            header_value: '{vault://env/kev-key}'
+          format: /v1/systemone
+          name: kev-latest
+          timeout: 2000
+          type: custom
+          url: http://kev.internal:8009
+        cost_quality_tradeoff: 0.25
+        strategy: weighted
+      genai_category: text/generation
+      llm_format: anthropic
+      targets:
+        - auth:
+            header_name: x-api-key
+            header_value: '{vault://env/anthropic-key}'
+          description: claude-haiku-4-5
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: auto
+            name: claude-haiku-4-5
+            options:
+              anthropic_version: "2023-06-01"
+            provider: anthropic
+          route_type: llm/v1/chat
+        - auth:
+            header_name: x-api-key
+            header_value: '{vault://env/anthropic-key}'
+          description: claude-sonnet-4-6
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: auto
+            name: claude-sonnet-4-6
+            options:
+              anthropic_version: "2023-06-01"
+            provider: anthropic
+          route_type: llm/v1/chat
+    route: anthropic-messages
+    model: auto
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: typesafe-decisions
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: typesafe
+      targets:
+        - auth:
+            header_name: x-api-key
+            header_value: '{vault://env/kev-key}'
+          description: kev-latest
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: kev-classifier
+            name: kev-latest
+            options:
+              upstream_url: http://kev.internal:8009/v1/systemone
+            provider: typesafe
+          route_type: llm/v1/chat
+    route: typesafe-decisions
+    model: kev-classifier
+ai_models:
+  - name: auto
+  - name: kev-classifier

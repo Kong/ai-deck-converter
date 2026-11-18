@@ -1,0 +1,50 @@
+# The decisions model of a self-run classifier sets upstream_url on its target.
+# The classifier gets that URL without its /v1/systemone suffix. The data plane
+# adds the suffix again.
+model_providers:
+  - name: kev-sidecar
+    type: typesafe
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: x-api-key
+            value: "{vault://env/kev-key}"
+  - name: anthropic
+    type: anthropic
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: x-api-key
+            value: "{vault://env/anthropic-key}"
+models:
+  - name: auto
+    type: model
+    capabilities: [generate]
+    formats: [{type: anthropic}]
+    config:
+      route: {paths: [/auto]}
+      balancer:
+        algorithm: intelligent
+        cost_quality_tradeoff: cost
+        classifier:
+          model: kev-classifier
+          timeout: 2000
+    targets:
+      - name: claude-haiku-4-5
+        provider: anthropic
+      - name: claude-sonnet-4-6
+        provider: anthropic
+  - name: kev-classifier
+    type: model
+    capabilities: [decisions]
+    formats: [{type: typesafe}]
+    config:
+      route: {paths: [/kev]}
+    targets:
+      - name: kev-latest
+        provider: kev-sidecar
+        config:
+          type: typesafe
+          upstream_url: http://kev.internal:8009/v1/systemone

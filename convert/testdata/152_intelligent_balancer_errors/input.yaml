@@ -1,0 +1,210 @@
+# Each auto-* model names a classifier that the data plane cannot use. Each
+# auto-* model is absent with an error at config.balancer.classifier.model.
+# The classifier models themselves convert where they can.
+model_providers:
+  - name: jev-typesafe
+    type: typesafe
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://env/typesafe-token}"
+  - name: jev-query-key
+    type: typesafe
+    config:
+      auth:
+        type: basic
+        params:
+          - name: key
+            value: "{vault://env/typesafe-token}"
+            location: query
+  - name: openai
+    type: openai
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://env/openai-key}"
+models:
+  # The classifier models.
+  - name: chat
+    type: model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/chat]}
+    targets:
+      - name: gpt-5-mini
+        provider: openai
+  - name: disabled-classifier
+    type: model
+    enabled: false
+    capabilities: [decisions]
+    formats: [{type: typesafe}]
+    config:
+      route: {paths: [/disabled]}
+    targets:
+      - name: jev-latest
+        provider: jev-typesafe
+  - name: two-target-classifier
+    type: model
+    capabilities: [decisions]
+    formats: [{type: typesafe}]
+    config:
+      route: {paths: [/two-targets]}
+    targets:
+      - name: jev-latest
+        provider: jev-typesafe
+      - name: jev-1.13
+        provider: jev-typesafe
+  - name: unknown-provider-classifier
+    type: model
+    capabilities: [decisions]
+    formats: [{type: typesafe}]
+    config:
+      route: {paths: [/unknown-provider]}
+    targets:
+      - name: jev-latest
+        provider: jev-nowhere
+  - name: openai-classifier
+    type: model
+    capabilities: [decisions]
+    formats: [{type: typesafe}]
+    config:
+      route: {paths: [/openai-classifier]}
+    targets:
+      - name: gpt-5-mini
+        provider: openai
+  - name: query-key-classifier
+    type: model
+    capabilities: [decisions]
+    formats: [{type: typesafe}]
+    config:
+      route: {paths: [/query-key]}
+    targets:
+      - name: jev-latest
+        provider: jev-query-key
+  - name: other-path-classifier
+    type: model
+    capabilities: [decisions]
+    formats: [{type: typesafe}]
+    config:
+      route: {paths: [/other-path]}
+    targets:
+      - name: typesafe/jev-1.13
+        provider: jev-typesafe
+        config:
+          type: typesafe
+          upstream_url: https://openrouter.ai/api/alpha/decisions
+  - name: user-info-classifier
+    type: model
+    capabilities: [decisions]
+    formats: [{type: typesafe}]
+    config:
+      route: {paths: [/user-info]}
+    targets:
+      - name: kev-latest
+        provider: jev-typesafe
+        config:
+          type: typesafe
+          upstream_url: https://user@kev.internal/v1/systemone
+  # The intelligent models.
+  - name: auto-no-classifier
+    capabilities: [generate]
+    config:
+      route: {paths: [/a1]}
+      balancer: {algorithm: intelligent}
+    targets:
+      - {name: gpt-5, provider: openai}
+  - name: auto-provider-shape
+    capabilities: [generate]
+    config:
+      route: {paths: [/a2]}
+      balancer:
+        algorithm: intelligent
+        classifier: {type: model, provider: typesafe, name: jev-latest}
+    targets:
+      - {name: gpt-5, provider: openai}
+  - name: auto-unknown
+    capabilities: [generate]
+    config:
+      route: {paths: [/a3]}
+      balancer:
+        algorithm: intelligent
+        classifier: {model: missing-classifier}
+    targets:
+      - {name: gpt-5, provider: openai}
+  - name: auto-not-decisions
+    capabilities: [generate]
+    config:
+      route: {paths: [/a4]}
+      balancer:
+        algorithm: intelligent
+        classifier: {model: chat}
+    targets:
+      - {name: gpt-5, provider: openai}
+  - name: auto-disabled
+    capabilities: [generate]
+    config:
+      route: {paths: [/a5]}
+      balancer:
+        algorithm: intelligent
+        classifier: {model: disabled-classifier}
+    targets:
+      - {name: gpt-5, provider: openai}
+  - name: auto-two-targets
+    capabilities: [generate]
+    config:
+      route: {paths: [/a7]}
+      balancer:
+        algorithm: intelligent
+        classifier: {model: two-target-classifier}
+    targets:
+      - {name: gpt-5, provider: openai}
+  - name: auto-unknown-provider
+    capabilities: [generate]
+    config:
+      route: {paths: [/a8]}
+      balancer:
+        algorithm: intelligent
+        classifier: {model: unknown-provider-classifier}
+    targets:
+      - {name: gpt-5, provider: openai}
+  - name: auto-openai-provider
+    capabilities: [generate]
+    config:
+      route: {paths: [/a9]}
+      balancer:
+        algorithm: intelligent
+        classifier: {model: openai-classifier}
+    targets:
+      - {name: gpt-5, provider: openai}
+  - name: auto-query-key
+    capabilities: [generate]
+    config:
+      route: {paths: [/a10]}
+      balancer:
+        algorithm: intelligent
+        classifier: {model: query-key-classifier}
+    targets:
+      - {name: gpt-5, provider: openai}
+  - name: auto-other-path
+    capabilities: [generate]
+    config:
+      route: {paths: [/a11]}
+      balancer:
+        algorithm: intelligent
+        classifier: {model: other-path-classifier}
+    targets:
+      - {name: gpt-5, provider: openai}
+  - name: auto-user-info
+    capabilities: [generate]
+    config:
+      route: {paths: [/a12]}
+      balancer:
+        algorithm: intelligent
+        classifier: {model: user-info-classifier}
+    targets:
+      - {name: gpt-5, provider: openai}

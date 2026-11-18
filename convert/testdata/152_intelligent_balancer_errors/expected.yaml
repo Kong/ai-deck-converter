@@ -1,0 +1,204 @@
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: openai-chat
+        paths:
+          - /chat/chat/completions
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: typesafe-decisions
+        paths:
+          - ~/two-targets/v1/systemone
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: typesafe-decisions-2
+        paths:
+          - ~/query-key/v1/systemone
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: typesafe-decisions-3
+        paths:
+          - ~/other-path/v1/systemone
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: typesafe-decisions-4
+        paths:
+          - ~/user-info/v1/systemone
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+plugins:
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-chat
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://env/openai-key}'
+          description: gpt-5-mini
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: chat
+            name: gpt-5-mini
+            provider: openai
+          route_type: llm/v1/chat
+    route: openai-chat
+    model: chat
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: typesafe-decisions
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: typesafe
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://env/typesafe-token}'
+          description: jev-latest
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: two-target-classifier
+            name: jev-latest
+            provider: typesafe
+          route_type: llm/v1/chat
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://env/typesafe-token}'
+          description: jev-1.13
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: two-target-classifier
+            name: jev-1.13
+            provider: typesafe
+          route_type: llm/v1/chat
+    route: typesafe-decisions
+    model: two-target-classifier
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: typesafe-decisions-2
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: typesafe
+      targets:
+        - auth:
+            param_location: query
+            param_name: key
+            param_value: '{vault://env/typesafe-token}'
+          description: jev-latest
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: query-key-classifier
+            name: jev-latest
+            provider: typesafe
+          route_type: llm/v1/chat
+    route: typesafe-decisions-2
+    model: query-key-classifier
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: typesafe-decisions-3
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: typesafe
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://env/typesafe-token}'
+          description: typesafe/jev-1.13
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: other-path-classifier
+            name: typesafe/jev-1.13
+            options:
+              upstream_url: https://openrouter.ai/api/alpha/decisions
+            provider: typesafe
+          route_type: llm/v1/chat
+    route: typesafe-decisions-3
+    model: other-path-classifier
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: typesafe-decisions-4
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: typesafe
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://env/typesafe-token}'
+          description: kev-latest
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: user-info-classifier
+            name: kev-latest
+            options:
+              upstream_url: https://user@kev.internal/v1/systemone
+            provider: typesafe
+          route_type: llm/v1/chat
+    route: typesafe-decisions-4
+    model: user-info-classifier
+ai_models:
+  - name: chat
+  - name: two-target-classifier
+  - name: query-key-classifier
+  - name: other-path-classifier
+  - name: user-info-classifier
