@@ -1,0 +1,24 @@
+- code: BEHAVIOR_MAY_DIFFER
+  reason: model "openai-second" has max_request_body_size 50000000, but route "openai-batches" already shares an ai-proxy-advanced plugin with max_request_body_size 20000000. The plugin uses 20000000 for every model on the route.
+  source:
+    kind: model
+    name: openai-second
+    fields:
+      - config.max_request_body_size
+  severity: WARNING
+- code: BEHAVIOR_MAY_DIFFER
+  reason: model "bedrock-second" has max_request_body_size 20000000, but route "openai-batches-2" already shares an ai-proxy-advanced plugin with max_request_body_size 50000000. The plugin uses 20000000 for every model on the route.
+  source:
+    kind: model
+    name: bedrock-second
+    fields:
+      - config.max_request_body_size
+  severity: WARNING
+- code: BEHAVIOR_MAY_DIFFER
+  reason: model "openai-after-azure" has max_request_body_size 50000000, but route "openai-batches-3" already shares an ai-proxy-advanced plugin with max_request_body_size unset. The plugin uses 50000000 for every model on the route.
+  source:
+    kind: model
+    name: openai-after-azure
+    fields:
+      - config.max_request_body_size
+  severity: WARNING

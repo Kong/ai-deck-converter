@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
+	"math"
 	"reflect"
 	"regexp"
 	"slices"
@@ -150,6 +151,8 @@ type proxyGroup struct {
 	targetSources     []kong.TargetSource
 	source            *kong.Source
 	seen              map[string]int // target fingerprint -> index into targets/targetSources
+	// bodySizeModels holds the models whose limit maxBodySize includes.
+	bodySizeModels []string
 }
 
 type videoLifecycleTarget struct {
@@ -759,6 +762,7 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 							"model %q cannot share route %q with another model that uses "+
 								"a different provider token_vault", m.Name, g.route.Name)
 					}
+					c.mergeBodySize(src, pg, m.Name, bodySize)
 				}
 				if pg == nil {
 					embeddings, err := c.resolveEmbeddings(src, balancerExtra(m.Config.Balancer, "embeddings"))
@@ -812,6 +816,7 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 						responseStreaming: m.Config.ResponseStreaming,
 						modelNameHeader:   modelNameHeader,
 						maxBodySize:       bodySize,
+						bodySizeModels:    []string{m.Name},
 						proxy:             proxyConfigBlock(m.Config.Proxy),
 						source: source("model", m.Name, "config",
 							kong.FieldMapping{GeneratedPrefix: "config.proxy_config", SourcePrefix: "config.proxy"},
@@ -2300,15 +2305,57 @@ func (c *Converter) modelBodySize(m *aigw.Model, targets []plannedTarget, pairs 
 	return nil
 }
 
-// bodySizeOrDefault returns the ai-model-selector's max_request_body_size: at
-// least aimap.DefaultMaxBodySize, raised to the model's own
-// max_request_body_size (destined for ai-proxy-advanced) only if that value
-// is larger, so the selector never reads less of the body than the proxy
-// itself is configured to accept. The plugin reads 0 as unlimited, so a
-// model value of 0 returns 0.
-func bodySizeOrDefault(size *int) int {
-	if size != nil && (*size == 0 || *size > aimap.DefaultMaxBodySize) {
-		return *size
+// mergeBodySize gives a shared route-scoped ai-proxy-advanced the smallest
+// max_request_body_size of its models. A model with a different limit gets a
+// warning.
+func (c *Converter) mergeBodySize(src ConversionIssueSource, pg *proxyGroup, model string, size *int) {
+	if slices.Contains(pg.bodySizeModels, model) {
+		return
+	}
+	pg.bodySizeModels = append(pg.bodySizeModels, model)
+	if bodySizeRank(size) == bodySizeRank(pg.maxBodySize) {
+		return
+	}
+	prev := pg.maxBodySize
+	if bodySizeRank(size) < bodySizeRank(prev) {
+		pg.maxBodySize = size
+	}
+	c.warn(src.at("config.max_request_body_size"), BehaviorMayDiffer,
+		"model %q has max_request_body_size %s, but route %q already shares an "+
+			"ai-proxy-advanced plugin with max_request_body_size %s. "+
+			"The plugin uses %s for every model on the route.",
+		model, formatBodySize(size), pg.routeName, formatBodySize(prev), formatBodySize(pg.maxBodySize))
+}
+
+// bodySizeRank orders limits from smallest to largest. The plugin reads 0 as
+// unlimited. A nil limit is unknown and ranks last.
+func bodySizeRank(size *int) int {
+	switch {
+	case size == nil:
+		return math.MaxInt
+	case *size == 0:
+		return math.MaxInt - 1
+	}
+	return *size
+}
+
+func formatBodySize(size *int) string {
+	switch {
+	case size == nil:
+		return "unset"
+	case *size == 0:
+		return "0, unlimited"
+	}
+	return strconv.Itoa(*size)
+}
+
+// bodySizeOrDefault returns the ai-model-selector's max_request_body_size.
+// proxyLimit is the model's authored ai-proxy-advanced limit or its provider
+// default. A larger proxyLimit or an unlimited proxyLimit of 0 replaces
+// aimap.DefaultMaxBodySize.
+func bodySizeOrDefault(proxyLimit *int) int {
+	if proxyLimit != nil && (*proxyLimit == 0 || *proxyLimit > aimap.DefaultMaxBodySize) {
+		return *proxyLimit
 	}
 	return aimap.DefaultMaxBodySize
 }
