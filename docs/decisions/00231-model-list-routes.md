@@ -321,6 +321,20 @@ onto it. With more than one strategy, the same anonymous consumer and
 matches no strategy reaches the anonymous consumer, which answers 401. With
 one strategy, the strategy's own plugin rejects such a caller.
 
+The union can hold more than one strategy of a type, such as two
+`openid-connect` strategies with different issuers. Kong runs only one plugin
+of a name on a route, so the converter puts each extra strategy on a clone:
+`<type>-2` for the second, `<type>-3` for the third, and so on. A clone keeps
+the priority of its type and goes in `cloned_plugins`, as the
+`response-transformer` clones do. Each plugin falls back to the anonymous
+consumer, so a caller that one strategy rejects can still authenticate with
+the next. Revert maps a clone back to its type.
+
+A model route has the same gap today: a model with
+`auth_strategies: [oidc-a, oidc-b]` gets two `openid-connect` plugins on one
+route. The clone rule fixes it there too, in a change that can ship on its
+own.
+
 With no strategy and no global authentication policy, the model routes carry
 no auth plugin, and neither does the list route. The list is then public,
 like its models. `ai-models-list` serves an unidentified caller only the
@@ -598,7 +612,11 @@ A caller of `GET /claude-code/v1/models` outside `contractors` gets one entry,
   list.
 - Split a list by auth strategy, as the model routes split. Rejected: a list
   route matches on its path only, so two lists on one path would match the
-  same requests: the routing conflict RFC 00229 reports.
+  same requests: the routing conflict RFC 00229 reports. Copying the `hosts`
+  and `headers` of the model routes onto the lists works only where models
+  differ by them. It also makes the converter compute which model routes
+  overlap each list route. A model with two strategies of one type needs the
+  clone either way.
 - Suppress the list of a group whose models disagree on auth strategies.
   Rejected: two models that disagree would strip discovery from every model in
   their group. Merging keeps every per-model rule, because each source still
@@ -672,6 +690,9 @@ New golden cases, at the default runtime version 2.4:
 - `150_model_lists_paths`: a model on `/team` and `/team/` gets one
   list with each instance id once, and a model with
   `config.route.protocols: [https]` gets an https-only list route.
+- `151_model_lists_same_type_strategies`: two models on one base path, each
+  with a header rule and its own `openid-connect` strategy, get one list route
+  with `openid-connect` and the clone `openid-connect-2`.
 
 Existing golden cases at 2.4 with an instance to advertise gain list routes
 and instance ids, so their expected output is regenerated. The golden cases
@@ -703,6 +724,8 @@ End-to-end cases in `e2e/`, on a 2.4 gateway image:
 - The root list shows only the models declared on `/` to an authenticated
   caller.
 - A caller that matches no key-auth strategy gets 401.
+- On a base path with two `openid-connect` strategies, a caller with a token
+  from either issuer gets the list.
 - On a base path whose models set no auth strategy, a caller without
   credentials gets the models without an access rule.
 - On a base path with only passthrough models, the list request reaches the
