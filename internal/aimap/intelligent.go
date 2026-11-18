@@ -98,8 +98,8 @@ func nearestPreset(v float64, value func(IntelligentPreset) float64) (Intelligen
 	return best, bestDistance == 0
 }
 
-// ClassifierFormat is the classifier format path. The data plane joins it to
-// the classifier base URL.
+// ClassifierFormat is the format of a classifier URL with no path. The data
+// plane joins the format to the classifier url.
 var ClassifierFormat = "/" + typesafeDecisionsPath()
 
 func typesafeDecisionsPath() string {
@@ -107,34 +107,36 @@ func typesafeDecisionsPath() string {
 	return specs[0].PathSuffix
 }
 
-// ClassifierBaseURL returns upstreamURL without its ClassifierFormat suffix. A
-// typesafe target sends to its upstream_url without a change. The classifier
-// adds ClassifierFormat to a base URL.
-func ClassifierBaseURL(upstreamURL string) (base string, ok bool) {
-	return strings.CutSuffix(upstreamURL, ClassifierFormat)
+// SplitClassifierURL returns scheme://host[:port] of a System One upstream_url
+// as the classifier url. The format is the path without a change. problem tells
+// why the data plane rejects upstreamURL.
+func SplitClassifierURL(upstreamURL string) (base, format, problem string) {
+	rest, ok := strings.CutPrefix(upstreamURL, "https://")
+	if !ok {
+		rest, ok = strings.CutPrefix(upstreamURL, "http://")
+	}
+	if !ok {
+		return "", "", "it does not use http or https"
+	}
+	if strings.ContainsAny(rest, "?#") {
+		return "", "", "it has a query or a fragment"
+	}
+	if strings.Contains(rest, "@") {
+		return "", "", "it has user information"
+	}
+	host, path, _ := strings.Cut(rest, "/")
+	if host == "" {
+		return "", "", "it has no host"
+	}
+	base = strings.TrimSuffix(upstreamURL, rest) + host
+	if path == "" {
+		return base, ClassifierFormat, ""
+	}
+	return base, "/" + path, ""
 }
 
 // JoinClassifierURL returns the URL the data plane sends a classifier request
 // to. The two parts meet at one slash.
 func JoinClassifierURL(base, format string) string {
 	return strings.TrimRight(base, "/") + "/" + strings.TrimLeft(format, "/")
-}
-
-// ClassifierBaseURLProblem returns why the data plane rejects base as a
-// classifier URL. It returns "" for a valid base.
-func ClassifierBaseURLProblem(base string) string {
-	rest, ok := strings.CutPrefix(base, "https://")
-	if !ok {
-		rest, ok = strings.CutPrefix(base, "http://")
-	}
-	if !ok || rest == "" {
-		return "it does not use http or https"
-	}
-	if strings.ContainsAny(rest, "?#") {
-		return "it has a query or a fragment"
-	}
-	if strings.Contains(rest, "@") {
-		return "it has user information"
-	}
-	return ""
 }

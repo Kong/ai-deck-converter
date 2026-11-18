@@ -26,13 +26,6 @@ services:
         strip_path: false
       - name: typesafe-decisions-3
         paths:
-          - ~/other-path/v1/systemone
-        methods:
-          - POST
-          - OPTIONS
-        strip_path: false
-      - name: typesafe-decisions-4
-        paths:
           - ~/user-info/v1/systemone
         methods:
           - POST
@@ -153,36 +146,6 @@ plugins:
         - auth:
             header_name: Authorization
             header_value: '{vault://env/typesafe-token}'
-          description: typesafe/jev-1.13
-          logging:
-            log_payloads: false
-            log_statistics: true
-          model:
-            model_alias: other-path-classifier
-            name: typesafe/jev-1.13
-            options:
-              upstream_url: https://openrouter.ai/api/alpha/decisions
-            provider: typesafe
-          route_type: llm/v1/chat
-    route: typesafe-decisions-3
-    model: other-path-classifier
-  - name: ai-model-selector
-    config:
-      max_request_body_size: 8388608
-      sources:
-        - body_path: model
-          source: body
-    route: typesafe-decisions-4
-  - name: ai-proxy-advanced
-    config:
-      balancer:
-        algorithm: round-robin
-      genai_category: text/generation
-      llm_format: typesafe
-      targets:
-        - auth:
-            header_name: Authorization
-            header_value: '{vault://env/typesafe-token}'
           description: kev-latest
           logging:
             log_payloads: false
@@ -194,11 +157,10 @@ plugins:
               upstream_url: https://user@kev.internal/v1/systemone
             provider: typesafe
           route_type: llm/v1/chat
-    route: typesafe-decisions-4
+    route: typesafe-decisions-3
     model: user-info-classifier
 ai_models:
   - name: chat
   - name: two-target-classifier
   - name: query-key-classifier
-  - name: other-path-classifier
   - name: user-info-classifier

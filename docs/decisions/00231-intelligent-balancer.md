@@ -82,7 +82,10 @@ balancer:
 
 A self-run classifier is the same model with `upstream_url` on its target, for
 example `http://kev.internal:8009/v1/systemone`. The classifier record then has
-`type: custom`, `url: http://kev.internal:8009` and `format: /v1/systemone`.
+`type: custom`, `url: http://kev.internal:8009` and `format: /v1/systemone`. A
+host that serves System One at another path keeps that path. For example,
+`https://openrouter.ai/api/alpha/decisions` gives `url: https://openrouter.ai`
+and `format: /api/alpha/decisions`.
 
 # Reference-level explanation
 [reference-level-explanation]: #reference-level-explanation
@@ -137,13 +140,16 @@ classifier model:
   `typesafe`, the type that speaks System One;
 - has a provider with auth other than one header, such as query `params`, or
   with a token vault. The data plane sends one fixed header;
-- has an `upstream_url` that does not end with `/v1/systemone`, or whose base
-  the data plane rejects (no `http` or `https`, a query, a fragment, or user
-  information).
+- has an `upstream_url` that the data plane rejects as a classifier URL: no
+  `http` or `https`, no host, a query, a fragment, or user information.
 
 A typesafe target sends to its `upstream_url` without a change. The data plane
-adds `/v1/systemone` to a classifier base URL. The converter therefore removes
-that suffix to get `url`.
+joins the classifier `url` and `format` with one slash. Hosts serve System One
+at different paths. The converter therefore splits `upstream_url`:
+
+- `url` is `scheme://host[:port]`.
+- `format` is the path, kept exactly, for example `/api/alpha/decisions`.
+- An `upstream_url` with no path, or with only `/`, gets `format: /v1/systemone`.
 
 ## Revert
 
@@ -153,9 +159,10 @@ strategy reads `margin`, and the weighted strategy reads
 `cost_quality_tradeoff`. Revert drops the default preset and the default
 strategy.
 
-Revert changes the classifier record back to `classifier.model`. It picks the
-first reverted model that serves `decisions` with one typesafe target of the
-same name, the same `upstream_url` and the same auth header. When no model
+Revert changes the classifier record back to `classifier.model`. It joins
+`url` and `format` as the data plane does. It picks the first reverted model
+that serves `decisions` with one typesafe target of the same name and auth
+header, whose `upstream_url` gives the same joined URL. When no model
 matches, revert warns and leaves out `classifier.model`.
 
 ## Version gate

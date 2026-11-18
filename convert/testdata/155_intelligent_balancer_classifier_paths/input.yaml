@@ -1,0 +1,71 @@
+# Hosts serve System One at different paths. The classifier format keeps the
+# path of the target upstream_url. A URL with no path gets /v1/systemone.
+model_providers:
+  - name: jev-openrouter
+    type: typesafe
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://env/openrouter-token}"
+  - name: kev-sidecar
+    type: typesafe
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: x-api-key
+            value: "{vault://env/kev-key}"
+  - name: openai
+    type: openai
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://env/openai-key}"
+models:
+  - name: jev-openrouter
+    capabilities: [decisions]
+    formats: [{type: typesafe}]
+    config:
+      route: {paths: [/jev]}
+    targets:
+      - name: typesafe/jev-1.13-20260917
+        provider: jev-openrouter
+        config:
+          type: typesafe
+          upstream_url: https://openrouter.ai/api/alpha/decisions
+  - name: kev-bare-host
+    capabilities: [decisions]
+    formats: [{type: typesafe}]
+    config:
+      route: {paths: [/kev]}
+    targets:
+      - name: kev-latest
+        provider: kev-sidecar
+        config:
+          type: typesafe
+          upstream_url: http://kev.internal:8009
+  - name: auto-openrouter
+    capabilities: [generate]
+    config:
+      route: {paths: [/auto-openrouter]}
+      balancer:
+        algorithm: intelligent
+        classifier: {model: jev-openrouter}
+    targets:
+      - {name: gpt-5-mini, provider: openai}
+      - {name: gpt-5, provider: openai}
+  - name: auto-bare-host
+    capabilities: [generate]
+    config:
+      route: {paths: [/auto-bare-host]}
+      balancer:
+        algorithm: intelligent
+        cost_quality_tradeoff: quality
+        classifier: {model: kev-bare-host}
+    targets:
+      - {name: gpt-5-mini, provider: openai}
+      - {name: gpt-5, provider: openai}

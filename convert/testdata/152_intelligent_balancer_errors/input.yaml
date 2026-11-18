@@ -86,18 +86,6 @@ models:
     targets:
       - name: jev-latest
         provider: jev-query-key
-  - name: other-path-classifier
-    type: model
-    capabilities: [decisions]
-    formats: [{type: typesafe}]
-    config:
-      route: {paths: [/other-path]}
-    targets:
-      - name: typesafe/jev-1.13
-        provider: jev-typesafe
-        config:
-          type: typesafe
-          upstream_url: https://openrouter.ai/api/alpha/decisions
   - name: user-info-classifier
     type: model
     capabilities: [decisions]
@@ -188,15 +176,6 @@ models:
       balancer:
         algorithm: intelligent
         classifier: {model: query-key-classifier}
-    targets:
-      - {name: gpt-5, provider: openai}
-  - name: auto-other-path
-    capabilities: [generate]
-    config:
-      route: {paths: [/a11]}
-      balancer:
-        algorithm: intelligent
-        classifier: {model: other-path-classifier}
     targets:
       - {name: gpt-5, provider: openai}
   - name: auto-user-info

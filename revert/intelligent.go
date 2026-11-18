@@ -139,11 +139,7 @@ func (r *Reverter) classifierModel(block map[string]any) (name, problem string) 
 			return "", fmt.Sprintf("the classifier provider %q is not %s", p, aimap.TypesafeProviderType)
 		}
 	case "custom":
-		format := getStr(block, "format")
-		if format != aimap.ClassifierFormat {
-			return "", fmt.Sprintf("the classifier format %q is not %s", format, aimap.ClassifierFormat)
-		}
-		upstream = aimap.JoinClassifierURL(getStr(block, "url"), format)
+		upstream = aimap.JoinClassifierURL(getStr(block, "url"), getStr(block, "format"))
 	default:
 		return "", fmt.Sprintf("the classifier type %q is not model or custom", kind)
 	}
@@ -173,7 +169,7 @@ func (r *Reverter) servesClassifier(m aigw.Model, target, upstream string, heade
 	if cmp.Or(tm.Config.Type, provider.Type) != aimap.TypesafeProviderType {
 		return false
 	}
-	if got, _ := tm.Config.Options["upstream_url"].(string); got != upstream {
+	if got, _ := tm.Config.Options["upstream_url"].(string); classifierURL(got) != upstream {
 		return false
 	}
 	auth := provider.Config.Auth
@@ -182,6 +178,19 @@ func (r *Reverter) servesClassifier(m aigw.Model, target, upstream string, heade
 		got = auth.Headers[0]
 	}
 	return len(auth.Params) == 0 && got == header
+}
+
+// classifierURL returns the URL that a classifier made from a target
+// upstream_url calls. It returns "" for a target with no upstream_url.
+func classifierURL(upstream string) string {
+	if upstream == "" {
+		return ""
+	}
+	base, format, problem := aimap.SplitClassifierURL(upstream)
+	if problem != "" {
+		return upstream
+	}
+	return aimap.JoinClassifierURL(base, format)
 }
 
 // number returns a YAML number as a float64.

@@ -147,21 +147,15 @@ func (c *Converter) classifierConfig(src ConversionIssueSource, m *aigw.Model, r
 	out := map[string]any{"name": tm.Name}
 	if raw, ok := tm.Config.Options["upstream_url"]; ok {
 		upstream, _ := raw.(string)
-		base, ok := aimap.ClassifierBaseURL(upstream)
-		if !ok {
+		base, format, problem := aimap.SplitClassifierURL(upstream)
+		if problem != "" {
 			return nil, c.fail(modelSrc, ConfigFieldInvalid,
-				"model %q: target %q of classifier model %q has upstream_url %q. "+
-					"A classifier upstream_url must end with %s.",
-				m.Name, tm.Name, name, upstream, aimap.ClassifierFormat)
-		}
-		if problem := aimap.ClassifierBaseURLProblem(base); problem != "" {
-			return nil, c.fail(modelSrc, ConfigFieldInvalid,
-				"model %q: the data plane rejects the classifier base URL %q of classifier model %q: %s",
-				m.Name, base, name, problem)
+				"model %q: the data plane rejects upstream_url %q of classifier model %q as a classifier URL: %s",
+				m.Name, upstream, name, problem)
 		}
 		out["type"] = "custom"
 		out["url"] = base
-		out["format"] = aimap.ClassifierFormat
+		out["format"] = format
 	} else {
 		out["type"] = "model"
 		out["provider"] = aimap.TypesafeProviderType

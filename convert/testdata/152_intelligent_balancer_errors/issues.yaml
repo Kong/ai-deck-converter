@@ -95,15 +95,7 @@
       - config.balancer.classifier.model
   severity: ERROR
 - code: CONFIG_FIELD_INVALID
-  reason: 'model "auto-other-path": target "typesafe/jev-1.13" of classifier model "other-path-classifier" has upstream_url "https://openrouter.ai/api/alpha/decisions". A classifier upstream_url must end with /v1/systemone.'
-  source:
-    kind: model
-    name: auto-other-path
-    fields:
-      - config.balancer.classifier.model
-  severity: ERROR
-- code: CONFIG_FIELD_INVALID
-  reason: 'model "auto-user-info": the data plane rejects the classifier base URL "https://user@kev.internal" of classifier model "user-info-classifier": it has user information'
+  reason: 'model "auto-user-info": the data plane rejects upstream_url "https://user@kev.internal/v1/systemone" of classifier model "user-info-classifier" as a classifier URL: it has user information'
   source:
     kind: model
     name: auto-user-info

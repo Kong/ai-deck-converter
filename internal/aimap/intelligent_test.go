@@ -48,23 +48,26 @@ func TestNearestIntelligentPreset(t *testing.T) {
 func TestClassifierURL(t *testing.T) {
 	require.Equal(t, "/v1/systemone", ClassifierFormat)
 
-	base, ok := ClassifierBaseURL("http://kev.internal:8009/v1/systemone")
-	require.True(t, ok)
-	require.Equal(t, "http://kev.internal:8009", base)
-	base, ok = ClassifierBaseURL("https://gw.example.com/decide/v1/systemone")
-	require.True(t, ok)
-	require.Equal(t, "https://gw.example.com/decide", base)
-	_, ok = ClassifierBaseURL("https://openrouter.ai/api/alpha/decisions")
-	require.False(t, ok)
+	split := map[string][2]string{
+		"http://kev.internal:8009/v1/systemone":       {"http://kev.internal:8009", "/v1/systemone"},
+		"https://openrouter.ai/api/alpha/decisions":   {"https://openrouter.ai", "/api/alpha/decisions"},
+		"https://gw.example.com/decide/v1/systemone/": {"https://gw.example.com", "/decide/v1/systemone/"},
+		"http://kev.internal:8009":                    {"http://kev.internal:8009", "/v1/systemone"},
+		"https://kev.internal/":                       {"https://kev.internal", "/v1/systemone"},
+	}
+	for in, want := range split {
+		base, format, problem := SplitClassifierURL(in)
+		require.Empty(t, problem, in)
+		require.Equal(t, want, [2]string{base, format}, in)
+	}
+	for _, in := range []string{
+		"ftp://kev.internal", "https://", "https:///v1/systemone", "https://kev.internal/x?a=b",
+		"https://kev.internal/x#f", "https://user@kev.internal",
+	} {
+		_, _, problem := SplitClassifierURL(in)
+		require.NotEmpty(t, problem, in)
+	}
 
 	require.Equal(t, "http://kev:8009/v1/systemone", JoinClassifierURL("http://kev:8009", ClassifierFormat))
 	require.Equal(t, "http://kev:8009/v1/systemone", JoinClassifierURL("http://kev:8009/", ClassifierFormat))
-
-	require.Empty(t, ClassifierBaseURLProblem("https://kev.internal"))
-	require.Empty(t, ClassifierBaseURLProblem("http://kev.internal:8009/prefix"))
-	require.NotEmpty(t, ClassifierBaseURLProblem("ftp://kev.internal"))
-	require.NotEmpty(t, ClassifierBaseURLProblem("https://"))
-	require.NotEmpty(t, ClassifierBaseURLProblem("https://kev.internal/x?a=b"))
-	require.NotEmpty(t, ClassifierBaseURLProblem("https://kev.internal/x#f"))
-	require.NotEmpty(t, ClassifierBaseURLProblem("https://user@kev.internal"))
 }
