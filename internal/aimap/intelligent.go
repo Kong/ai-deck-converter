@@ -100,6 +100,11 @@ func nearestPreset(v float64, value func(IntelligentPreset) float64) (Intelligen
 	return best, bestDistance == 0
 }
 
+// ClassifierContextWindow is the context window the data plane uses when a
+// classifier record has none. Revert sets it on a classifier block that the
+// AI Gateway API requires it on.
+const ClassifierContextWindow = 32768
+
 // ClassifierFormat is the format of a classifier URL with no path. The data
 // plane joins the format to the classifier url.
 var ClassifierFormat = "/" + typesafeDecisionsPath()

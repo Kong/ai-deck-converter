@@ -33,6 +33,7 @@ plugins:
           auth:
             header_name: x-api-key
             header_value: '{vault://env/kev-key}'
+          context_window: 8192
           format: /v1/systemone
           name: kev-latest
           timeout: 2000

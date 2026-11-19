@@ -54,7 +54,7 @@ models:
       route: {paths: [/auto-openrouter]}
       balancer:
         algorithm: intelligent
-        classifier: {model: jev-openrouter}
+        classifier: {model: jev-openrouter, context_window: 32768}
     targets:
       - {name: gpt-5-mini, provider: openai}
       - {name: gpt-5, provider: openai}
@@ -65,7 +65,7 @@ models:
       balancer:
         algorithm: intelligent
         cost_quality_tradeoff: quality
-        classifier: {model: kev-bare-host}
+        classifier: {model: kev-bare-host, context_window: 32768}
     targets:
       - {name: gpt-5-mini, provider: openai}
       - {name: gpt-5, provider: openai}

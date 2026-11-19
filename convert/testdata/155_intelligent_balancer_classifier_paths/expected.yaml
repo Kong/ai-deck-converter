@@ -107,6 +107,7 @@ plugins:
           auth:
             header_name: Authorization
             header_value: '{vault://env/openrouter-token}'
+          context_window: 32768
           format: /api/alpha/decisions
           name: typesafe/jev-1.13-20260917
           type: custom
@@ -157,6 +158,7 @@ plugins:
           auth:
             header_name: x-api-key
             header_value: '{vault://env/kev-key}'
+          context_window: 32768
           format: /v1/systemone
           name: kev-latest
           type: custom

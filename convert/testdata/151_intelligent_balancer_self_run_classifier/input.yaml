@@ -31,6 +31,7 @@ models:
         classifier:
           model: kev-classifier
           timeout: 2000
+          context_window: 8192
     targets:
       - name: claude-haiku-4-5
         provider: anthropic

@@ -40,6 +40,7 @@ models:
         cost_quality_tradeoff: cost
         classifier:
           model: task-classifier
+          context_window: 32768
     targets:
       - name: claude-haiku-4-5
         provider: anthropic
@@ -75,6 +76,7 @@ models:
         cost_quality_tradeoff: quality
         classifier:
           model: task-classifier
+          context_window: 32768
     targets:
       - name: claude-haiku-4-5
         provider: anthropic

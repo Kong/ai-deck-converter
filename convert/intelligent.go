@@ -138,6 +138,12 @@ func (c *Converter) classifierConfig(src ConversionIssueSource, m *aigw.Model, r
 		return nil, err
 	}
 
+	if _, ok := block["context_window"]; !ok {
+		return nil, c.fail(src.at(classifierField+".context_window"), MissingRequiredConfigField,
+			"model %q: the intelligent balancer needs %s.context_window, the number of tokens classifier model %q reads",
+			m.Name, classifierField, name)
+	}
+
 	out := map[string]any{"name": tm.Name}
 	providerType := cmp.Or(tm.Config.Type, provider.Type)
 	if raw, ok := tm.Config.Options["upstream_url"]; ok {

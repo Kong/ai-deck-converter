@@ -121,7 +121,7 @@ models:
       route: {paths: [/a3]}
       balancer:
         algorithm: intelligent
-        classifier: {model: missing-classifier}
+        classifier: {model: missing-classifier, context_window: 32768}
     targets:
       - {name: gpt-5, provider: openai}
   - name: auto-not-decisions
@@ -130,7 +130,7 @@ models:
       route: {paths: [/a4]}
       balancer:
         algorithm: intelligent
-        classifier: {model: chat}
+        classifier: {model: chat, context_window: 32768}
     targets:
       - {name: gpt-5, provider: openai}
   - name: auto-disabled
@@ -139,7 +139,7 @@ models:
       route: {paths: [/a5]}
       balancer:
         algorithm: intelligent
-        classifier: {model: disabled-classifier}
+        classifier: {model: disabled-classifier, context_window: 32768}
     targets:
       - {name: gpt-5, provider: openai}
   - name: auto-two-targets
@@ -148,7 +148,7 @@ models:
       route: {paths: [/a7]}
       balancer:
         algorithm: intelligent
-        classifier: {model: two-target-classifier}
+        classifier: {model: two-target-classifier, context_window: 32768}
     targets:
       - {name: gpt-5, provider: openai}
   - name: auto-unknown-provider
@@ -157,7 +157,7 @@ models:
       route: {paths: [/a8]}
       balancer:
         algorithm: intelligent
-        classifier: {model: unknown-provider-classifier}
+        classifier: {model: unknown-provider-classifier, context_window: 32768}
     targets:
       - {name: gpt-5, provider: openai}
   - name: auto-openai-provider
@@ -166,7 +166,7 @@ models:
       route: {paths: [/a9]}
       balancer:
         algorithm: intelligent
-        classifier: {model: openai-classifier}
+        classifier: {model: openai-classifier, context_window: 32768}
     targets:
       - {name: gpt-5, provider: openai}
   - name: auto-query-key
@@ -175,7 +175,7 @@ models:
       route: {paths: [/a10]}
       balancer:
         algorithm: intelligent
-        classifier: {model: query-key-classifier}
+        classifier: {model: query-key-classifier, context_window: 32768}
     targets:
       - {name: gpt-5, provider: openai}
   - name: auto-user-info
@@ -184,6 +184,6 @@ models:
       route: {paths: [/a12]}
       balancer:
         algorithm: intelligent
-        classifier: {model: user-info-classifier}
+        classifier: {model: user-info-classifier, context_window: 32768}
     targets:
       - {name: gpt-5, provider: openai}

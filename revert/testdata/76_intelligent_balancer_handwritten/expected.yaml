@@ -61,6 +61,7 @@ models:
       balancer:
         algorithm: intelligent
         classifier:
+          context_window: 32768
           model: jev
   - type: model
     name: margin
@@ -83,6 +84,7 @@ models:
       balancer:
         algorithm: intelligent
         classifier:
+          context_window: 32768
           model: kev
           timeout: 2000
         cost_quality_tradeoff: cost

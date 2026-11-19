@@ -125,6 +125,11 @@ func (r *Reverter) classifierRef(model string, block map[string]any) (map[string
 			"Set it to a model with the decisions capability and one target.", model, problem)
 	}
 	out["model"] = name
+	if _, ok := out["context_window"]; !ok {
+		// The API requires context_window. The data plane reads this value
+		// when the record has none, so setting it changes nothing.
+		out["context_window"] = aimap.ClassifierContextWindow
+	}
 	return out, nil
 }
 

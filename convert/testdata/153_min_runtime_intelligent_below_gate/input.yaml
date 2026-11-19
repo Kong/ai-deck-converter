@@ -32,7 +32,7 @@ models:
       route: {paths: [/auto]}
       balancer:
         algorithm: intelligent
-        classifier: {model: task-classifier}
+        classifier: {model: task-classifier, context_window: 32768}
     targets:
       - {name: gpt-5-mini, provider: openai}
       - {name: gpt-5, provider: openai}

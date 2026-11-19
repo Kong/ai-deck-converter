@@ -30,7 +30,7 @@ const intelligentModel = `
       balancer:
         algorithm: intelligent
         cost_quality_tradeoff: cost
-        classifier: {model: classifier}
+        classifier: {model: classifier, context_window: 32768}
     targets:
       - {name: gpt-5-mini, provider: openai}
       - {name: gpt-5, provider: openai}
@@ -111,9 +111,10 @@ models:` + intelligentModel + `
 		"cost_quality_tradeoff": 0.25,
 		"strategy":              "weighted",
 		"classifier": map[string]any{
-			"type":     "model",
-			"provider": "typesafe",
-			"name":     "jev-latest",
+			"type":           "model",
+			"provider":       "typesafe",
+			"name":           "jev-latest",
+			"context_window": 32768,
 			"auth": map[string]any{
 				"header_name":  "Authorization",
 				"header_value": "{vault://env/typesafe-token}",
@@ -150,10 +151,11 @@ models:` + intelligentModel + `
 		}
 	}
 	require.Equal(t, map[string]any{
-		"type":   "custom",
-		"url":    "https://decide.example.com",
-		"format": "/api/decide",
-		"name":   "decider",
+		"type":           "custom",
+		"url":            "https://decide.example.com",
+		"format":         "/api/decide",
+		"name":           "decider",
+		"context_window": 32768,
 		"auth": map[string]any{
 			"header_name":  "Authorization",
 			"header_value": "{vault://env/openai-key}",

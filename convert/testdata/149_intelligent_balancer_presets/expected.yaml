@@ -75,6 +75,7 @@ plugins:
           auth:
             header_name: Authorization
             header_value: '{vault://env/typesafe-token}'
+          context_window: 32768
           name: jev-latest
           provider: typesafe
           type: model
@@ -184,6 +185,7 @@ plugins:
           auth:
             header_name: Authorization
             header_value: '{vault://env/typesafe-token}'
+          context_window: 32768
           name: jev-latest
           provider: typesafe
           type: model
