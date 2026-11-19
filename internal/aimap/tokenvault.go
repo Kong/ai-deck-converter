@@ -105,6 +105,15 @@ func TokenVaultNeedsInbound(tv *aigw.TokenVaultConfig) bool {
 	return tv != nil && (tv.Credential == nil || tv.Credential.Inbound == nil)
 }
 
+// TokenVaultPluginNeedsInbound reports whether a token-vault plugin config
+// block exists and names no inbound credential location. The token-vault-
+// exchange path works on the emitted plugin config, so it branches on this
+// rule the same way the ai-mcp-proxy path branches on TokenVaultNeedsInbound.
+func TokenVaultPluginNeedsInbound(cfg map[string]any) bool {
+	cred := getAnyMap(cfg, "credential")
+	return cred == nil || getAnyMap(cred, "inbound") == nil
+}
+
 // TokenVaultInboundFromKeyAuth derives the token_vault inbound credential
 // location from a key-auth plugin config. Key-auth sends the raw key in the
 // header with no prefix. The empty prefix differs from the plugin default
