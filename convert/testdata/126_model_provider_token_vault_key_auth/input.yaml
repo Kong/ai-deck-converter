@@ -26,6 +26,11 @@ auth_strategies:
     config:
       key_in_header: false
       key_in_body: true
+  - name: api-key-multi
+    type: key-auth
+    display_name: API Key Multi
+    config:
+      key_names: [multi-first, multi-second]
 
 models:
   - name: claude
@@ -90,6 +95,22 @@ models:
           type: anthropic
     access:
       auth_strategies: [api-key-body]
+  # several key names: the first one is derived
+  - name: claude-multi
+    type: model
+    capabilities: [generate]
+    formats:
+      - type: anthropic
+    config:
+      route:
+        paths: [/ai/claude-multi]
+    targets:
+      - name: claude-sonnet
+        provider: anthropic-vault
+        config:
+          type: anthropic
+    access:
+      auth_strategies: [api-key-multi]
   # only the outbound is set: the inbound is derived and the outbound survives
   - name: claude-outbound
     type: model

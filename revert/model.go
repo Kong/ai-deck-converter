@@ -110,9 +110,9 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 	// empty for a plugin that reads no header key.
 	if tvx := findPlugin(plugins, "token-vault-exchange"); tvx != nil {
 		keyAuth := findPlugin(plugins, "key-auth")
-		if keyAuth != nil && getMap(getMap(tvx.Config, "credential"), "inbound") == nil {
+		if keyAuth != nil && aimap.TokenVaultPluginNeedsInbound(tvx.Config) {
 			if loc := aimap.TokenVaultInboundFromKeyAuth(keyAuth.Config); loc != nil {
-				if err := r.warn("model route %q: the route's key-auth plugin reads the key from header %q, "+
+				if err := r.warn("model route %q: the key-auth plugin reads the key from header %q, "+
 					"but the token-vault-exchange plugin has no credential.inbound; the data plane reads the "+
 					"inbound credential from Authorization: Bearer, which key-auth does not use",
 					rt.Name, loc.Name); err != nil {
