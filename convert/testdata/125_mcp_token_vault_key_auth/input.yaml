@@ -20,6 +20,11 @@ auth_strategies:
     config:
       key_in_header: false
       key_in_body: true
+  - name: api-key-multi
+    type: key-auth
+    display_name: API Key Multi
+    config:
+      key_names: [multi-first, multi-second]
 
 mcp_servers:
   - type: conversion-listener
@@ -74,6 +79,19 @@ mcp_servers:
       auth_strategies: [api-key-body]
     tools:
       - name: toolD
+        description: A tool
+  # several key names: the first one is derived
+  - type: conversion-listener
+    display_name: Derived Multi Key
+    name: derived-multi-key
+    config: {route: {paths: [/mcp/derived-multi-key]}}
+    datastores: [{name: vault-konnect-prod}]
+    token_vault:
+      provider: outbound-api
+    access:
+      auth_strategies: [api-key-multi]
+    tools:
+      - name: toolF
         description: A tool
   # only the outbound is set: the inbound is derived and the outbound survives
   - type: conversion-listener

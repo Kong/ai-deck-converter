@@ -143,6 +143,44 @@ services:
               hide_credentials: false
               key_in_body: true
               key_in_header: false
+  - name: derived-multi-key
+    host: localhost
+    routes:
+      - name: derived-multi-key-route
+        paths:
+          - /mcp/derived-multi-key
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              auth:
+                provider: token_vault
+                token_vault:
+                  credential:
+                    inbound:
+                      location: header
+                      name: multi-first
+                      prefix: ""
+                  directory: my-directory
+                  provider: outbound-api
+                  storage:
+                    backend: konnect
+              include_consumer_groups: true
+              logging:
+                log_audits: false
+                log_payloads: false
+                log_statistics: true
+              mode: conversion-listener
+              server:
+                forward_client_headers: true
+              tools:
+                - description: A tool
+                  name: toolF
+          - name: key-auth
+            config:
+              hide_credentials: false
+              key_names:
+                - multi-first
+                - multi-second
   - name: outbound-only
     host: localhost
     routes:

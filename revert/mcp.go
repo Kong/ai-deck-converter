@@ -160,7 +160,7 @@ func (r *Reverter) revertMCPServer(svc *kong.Service, rt *kong.Route, plugins, s
 		keyAuth := findPlugin(allPlugins, "key-auth")
 		if keyAuth != nil && aimap.TokenVaultNeedsInbound(tokenVault) {
 			if loc := aimap.TokenVaultInboundFromKeyAuth(keyAuth.Config); loc != nil {
-				if err := r.warn("MCP server %q: the route's key-auth plugin reads the key from header %q, "+
+				if err := r.warn("MCP server %q: the key-auth plugin reads the key from header %q, "+
 					"but the token-vault auth record has no credential.inbound; the data plane reads the "+
 					"inbound credential from Authorization: Bearer, which key-auth does not use",
 					svc.Name, loc.Name); err != nil {
