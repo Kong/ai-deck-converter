@@ -1,9 +1,7 @@
-# The anthropic provider gets its credential from the Token Vault. Each model
-# that targets it and reads its caller key with key-auth gets the derived
-# inbound credential in its token-vault-exchange plugin. The models show the
-# derived default name, a custom key name, an explicit inbound left untouched,
-# a body-only key warning, and an outbound-only credential that keeps its
-# outbound while gaining the derived inbound.
+# The anthropic provider gets its credential from the Token Vault. A key-auth
+# model derives the inbound in its token-vault-exchange plugin. The models
+# cover the derived names, an explicit inbound, a body-only key, and an
+# outbound-only credential.
 datastores:
   - name: vault-konnect-prod
     type: token-vault
