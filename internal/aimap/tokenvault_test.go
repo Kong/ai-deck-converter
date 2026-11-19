@@ -341,5 +341,8 @@ func TestTokenVaultInboundFromKeyAuth(t *testing.T) {
 	require.Equal(t, want("apikey"), TokenVaultInboundFromKeyAuth(map[string]any{}))
 	require.Equal(t, want("x-custom-key"),
 		TokenVaultInboundFromKeyAuth(map[string]any{"key_names": []any{"x-custom-key"}}))
+	require.Equal(t, want("first-key"),
+		TokenVaultInboundFromKeyAuth(map[string]any{"key_names": []any{"first-key", "second-key"}}),
+		"several key names take the first")
 	require.Nil(t, TokenVaultInboundFromKeyAuth(map[string]any{"key_in_header": false, "key_in_body": true}))
 }

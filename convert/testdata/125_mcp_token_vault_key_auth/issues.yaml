@@ -23,6 +23,14 @@
       - token_vault.credential.inbound
   severity: WARNING
 - code: CONFIG_FIELD_OVERRIDDEN
+  reason: 'MCP server "derived-multi-key": token_vault.credential.inbound is derived from the key-auth strategy "api-key-multi" (header "multi-first", its first key name, no prefix), because the plugin default Authorization: Bearer does not match where key-auth reads the key.'
+  source:
+    kind: mcp_server
+    name: derived-multi-key
+    fields:
+      - token_vault.credential.inbound
+  severity: WARNING
+- code: CONFIG_FIELD_OVERRIDDEN
   reason: 'MCP server "outbound-only": token_vault.credential.inbound is derived from the key-auth strategy "api-key-default" (header "apikey", its first key name, no prefix), because the plugin default Authorization: Bearer does not match where key-auth reads the key.'
   source:
     kind: mcp_server

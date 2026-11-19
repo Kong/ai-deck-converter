@@ -121,7 +121,7 @@ const mcpAuthStrategyField = "access.auth_strategies[0]"
 // deriveTokenVaultInbound fills the ai-mcp-proxy token_vault inbound
 // credential from the server's key-auth strategy. The plugin default inbound
 // Authorization Bearer does not match where key-auth expects the credential.
-// An explicit inbound is never touched. The caller passes a key-auth strategy.
+// An explicit inbound is never touched.
 func (c *Converter) deriveTokenVaultInbound(
 	src ConversionIssueSource, m *aigw.MCPServer, idp *aigw.AuthStrategy, route *kong.Route,
 ) {
@@ -131,7 +131,7 @@ func (c *Converter) deriveTokenVaultInbound(
 	loc := aimap.TokenVaultInboundFromKeyAuth(idp.Config)
 	if loc == nil {
 		// The warning recurs on a re-conversion. The reverter synthesizes
-		// strategy names, so it names no strategy.
+		// strategy names. It therefore names no strategy.
 		c.warn(src.at("token_vault.credential.inbound"), BehaviorMayDiffer,
 			"MCP server %q: the key-auth strategy does not read its key from the headers, so "+
 				"token_vault.credential.inbound cannot be derived from it. The data plane keeps "+
@@ -140,9 +140,6 @@ func (c *Converter) deriveTokenVaultInbound(
 		return
 	}
 	pi := slices.IndexFunc(route.Plugins, func(p kong.Plugin) bool { return p.Name == "ai-mcp-proxy" })
-	if pi < 0 {
-		return
-	}
 	auth, _ := route.Plugins[pi].Config["auth"].(map[string]any)
 	// mcpPlugin lowers token_vault into this plugin before the auth plugins.
 	block, _ := auth["token_vault"].(map[string]any)
