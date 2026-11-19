@@ -390,28 +390,39 @@ func (c *Converter) appendTokenVaultExchange(pg *proxyGroup, model *kong.StringR
 }
 
 // deriveTokenVaultExchangeInbound fills the token-vault-exchange inbound
-// credential from the model's first key-auth strategy. The plugin default
-// inbound Authorization Bearer does not match where key-auth expects the
-// credential. An explicit inbound is never touched.
+// credential from the model's first key-auth strategy that reads a header.
+// The plugin default inbound Authorization Bearer does not match where
+// key-auth expects the credential. An explicit inbound is never touched.
 func (c *Converter) deriveTokenVaultExchangeInbound(
 	src ConversionIssueSource, m *aigw.Model, provider, field string, cfg map[string]any,
 ) {
 	if !aimap.TokenVaultPluginNeedsInbound(cfg) {
 		return
 	}
-	idp := c.firstKeyAuthStrategy(m.Access.AuthStrategies)
-	if idp == nil {
-		return
+	var idp *aigw.AuthStrategy
+	var loc *aigw.TokenVaultCredentialLocation
+	var keyAuthSeen bool
+	for _, ref := range m.Access.AuthStrategies {
+		s := c.authStrategies[ref]
+		if s == nil || s.Type != "key-auth" {
+			continue
+		}
+		keyAuthSeen = true
+		if l := aimap.TokenVaultInboundFromKeyAuth(s.Config); l != nil {
+			idp, loc = s, l
+			break
+		}
 	}
-	loc := aimap.TokenVaultInboundFromKeyAuth(idp.Config)
-	if loc == nil {
-		// The warning recurs on a re-conversion. The reverter synthesizes
-		// strategy names. It therefore names no strategy.
-		c.warn(src.at(field), BehaviorMayDiffer,
-			"Model %q: the key-auth strategy does not read its key from the headers, so "+
-				"token_vault.credential.inbound cannot be derived from it. The data plane keeps "+
-				"the default inbound (Authorization: Bearer), which the exchange will not find.",
-			m.Name)
+	if idp == nil {
+		// The model keeps the default inbound. No key-auth strategy can
+		// supply a header location for the exchange.
+		if keyAuthSeen {
+			c.warn(src.at(field), BehaviorMayDiffer,
+				"Model %q: no key-auth strategy reads its key from the headers, so "+
+					"token_vault.credential.inbound cannot be derived from one. The data plane keeps "+
+					"the default inbound (Authorization: Bearer), which the exchange will not find.",
+				m.Name)
+		}
 		return
 	}
 	cred, _ := cfg["credential"].(map[string]any)
@@ -425,16 +436,6 @@ func (c *Converter) deriveTokenVaultExchangeInbound(
 			"(header %q, its first key name, no prefix), because the plugin default "+
 			"Authorization: Bearer does not match where key-auth reads the key.",
 		m.Name, provider, idp.Name, loc.Name)
-}
-
-// firstKeyAuthStrategy returns the first key-auth strategy of refs, or nil.
-func (c *Converter) firstKeyAuthStrategy(refs []string) *aigw.AuthStrategy {
-	for _, ref := range refs {
-		if idp := c.authStrategies[ref]; idp != nil && idp.Type == "key-auth" {
-			return idp
-		}
-	}
-	return nil
 }
 
 // convertModelOnce runs fn for the model at index i. A skipped model only
