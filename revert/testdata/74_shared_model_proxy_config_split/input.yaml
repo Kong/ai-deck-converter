@@ -1,0 +1,81 @@
+# The chat and embeddings plugins share one model config.
+# The transcription plugin has a different max_request_body_size.
+# Revert makes it a second model.
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: openai-chat
+        paths:
+          - /ai/chat/completions
+        methods:
+          - POST
+        strip_path: false
+      - name: openai-embeddings
+        paths:
+          - /ai/embeddings
+        methods:
+          - POST
+        strip_path: false
+      - name: openai-audio-transcribe
+        paths:
+          - /ai/audio/transcriptions
+        methods:
+          - POST
+        strip_path: false
+plugins:
+  - name: ai-proxy-advanced
+    config:
+      genai_category: text/generation
+      llm_format: openai
+      max_request_body_size: 52428800
+      response_streaming: allow
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: Bearer {vault://env/openai-key}
+          model:
+            model_alias: gpt
+            name: gpt-5.2
+            provider: openai
+          route_type: llm/v1/chat
+    route: openai-chat
+    model: gpt
+  - name: ai-proxy-advanced
+    config:
+      genai_category: text/embeddings
+      llm_format: openai
+      max_request_body_size: 52428800
+      response_streaming: allow
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: Bearer {vault://env/openai-key}
+          model:
+            model_alias: gpt
+            name: text-embedding-3-large
+            provider: openai
+          route_type: llm/v1/embeddings
+    route: openai-embeddings
+    model: gpt
+  - name: ai-proxy-advanced
+    config:
+      genai_category: audio/transcription
+      llm_format: openai
+      max_request_body_size: 26214400
+      response_streaming: deny
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: Bearer {vault://env/openai-key}
+          model:
+            model_alias: gpt
+            name: whisper-1
+            provider: openai
+          route_type: audio/v1/audio/transcriptions
+    route: openai-audio-transcribe
+    model: gpt
+ai_models:
+  - name: gpt
+    alias: gpt

@@ -1,0 +1,110 @@
+# Type api models on one route share one route-scoped ai-proxy-advanced.
+# The plugin gets the highest limit of its models in either model order.
+# A model without a published limit leaves the plugin without a value.
+models:
+  - name: bedrock-first
+    type: api
+    capabilities: [batches]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/bedrock-first]}
+    targets:
+      - name: batch-api
+        provider: bedrock-prod
+        config: {type: bedrock, region: us-east-1, batch_bucket_prefix: "s3://kong-bedrock-batches/jobs/"}
+  - name: openai-second
+    type: api
+    capabilities: [batches]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/bedrock-first]}
+    targets:
+      - name: gpt-5.4
+        provider: openai-prod
+  - name: openai-first
+    type: api
+    capabilities: [batches]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/openai-first]}
+    targets:
+      - name: gpt-5.4
+        provider: openai-prod
+  - name: bedrock-second
+    type: api
+    capabilities: [batches]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/openai-first]}
+    targets:
+      - name: batch-api
+        provider: bedrock-prod
+        config: {type: bedrock, region: us-east-1, batch_bucket_prefix: "s3://kong-bedrock-batches/jobs/"}
+  - name: azure-first
+    type: api
+    capabilities: [batches]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/azure-first]}
+    targets:
+      - name: gpt-5.4
+        provider: azure-prod
+        config: {type: azure, instance: kong-ai, deployment_id: gpt-5.4}
+  - name: openai-after-azure
+    type: api
+    capabilities: [batches]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/azure-first]}
+    targets:
+      - name: gpt-5.4
+        provider: openai-prod
+  - name: three-openai
+    type: api
+    capabilities: [batches]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/three]}
+    targets:
+      - name: gpt-5.4
+        provider: openai-prod
+  - name: three-bedrock
+    type: api
+    capabilities: [batches]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/three]}
+    targets:
+      - name: batch-api
+        provider: bedrock-prod
+        config: {type: bedrock, region: us-east-1, batch_bucket_prefix: "s3://kong-bedrock-batches/jobs/"}
+  - name: three-explicit
+    type: api
+    capabilities: [batches]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/three]}
+      max_request_body_size: 60000000
+    targets:
+      - name: gpt-5.4-mini
+        provider: openai-prod
+model_providers:
+  - name: openai-prod
+    type: openai
+    config:
+      auth:
+        type: bearer
+        token: "{vault://ai/openai-key}"
+  - name: azure-prod
+    type: azure
+    config:
+      auth:
+        type: bearer
+        token: "{vault://ai/azure-key}"
+  - name: bedrock-prod
+    type: bedrock
+    config:
+      auth:
+        type: aws
+        access_key_id: "{vault://ai/aws-access-key-id}"
+        secret_access_key: "{vault://ai/aws-secret-access-key}"

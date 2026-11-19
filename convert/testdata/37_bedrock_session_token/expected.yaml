@@ -36,7 +36,7 @@ services:
 plugins:
   - name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 20000000
       sources:
         - path_pattern: model/([^/]+)/
           source: path
@@ -47,6 +47,7 @@ plugins:
         algorithm: round-robin
       genai_category: text/generation
       llm_format: bedrock
+      max_request_body_size: 20000000
       targets:
         - auth:
             aws_access_key_id: '{vault://env/aws-key-id}'
@@ -72,7 +73,7 @@ plugins:
     model: claude-bedrock
   - name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 20000000
       sources:
         - path_pattern: model/([^/]+)/
           source: path
@@ -83,6 +84,7 @@ plugins:
         algorithm: round-robin
       genai_category: text/generation
       llm_format: bedrock
+      max_request_body_size: 20000000
       targets:
         - auth:
             aws_access_key_id: '{vault://env/aws-key-id}'
@@ -108,7 +110,7 @@ plugins:
     model: claude-bedrock
   - name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 20000000
       sources:
         - body_path: model
           source: body
@@ -119,6 +121,7 @@ plugins:
         algorithm: round-robin
       genai_category: text/generation
       llm_format: bedrock
+      max_request_body_size: 20000000
       targets:
         - auth:
             aws_access_key_id: '{vault://env/aws-key-id}'
@@ -144,7 +147,7 @@ plugins:
     model: claude-bedrock
   - name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 20000000
       sources:
         - body_path: model
           source: body
@@ -155,6 +158,7 @@ plugins:
         algorithm: round-robin
       genai_category: text/generation
       llm_format: bedrock
+      max_request_body_size: 20000000
       targets:
         - auth:
             aws_access_key_id: '{vault://env/aws-key-id}'

@@ -42,6 +42,7 @@ plugins:
         algorithm: round-robin
       genai_category: text/generation
       llm_format: gemini
+      max_request_body_size: 100000000
       model_name_header: false
       targets:
         - description: gemini-batch-target
@@ -59,6 +60,7 @@ plugins:
         algorithm: round-robin
       genai_category: text/generation
       llm_format: gemini
+      max_request_body_size: 100000000
       model_name_header: false
       targets:
         - description: gemini-batch-target
@@ -76,6 +78,7 @@ plugins:
         algorithm: round-robin
       genai_category: text/generation
       llm_format: gemini
+      max_request_body_size: 100000000
       model_name_header: false
       targets:
         - auth:
@@ -96,6 +99,7 @@ plugins:
         algorithm: round-robin
       genai_category: text/generation
       llm_format: gemini
+      max_request_body_size: 100000000
       model_name_header: false
       targets:
         - auth:

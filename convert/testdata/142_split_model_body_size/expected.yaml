@@ -1,0 +1,74 @@
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: openai-chat
+        paths:
+          - /ai/chat/completions
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-audio-transcribe
+        paths:
+          - /ai/audio/transcriptions
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+plugins:
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 52428800
+      sources:
+        - body_path: model
+          source: body
+    route: openai-chat
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      max_request_body_size: 52428800
+      targets:
+        - description: gpt-5.2
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: gpt-5.2
+            name: gpt-5.2
+            provider: openai
+          route_type: llm/v1/chat
+    route: openai-chat
+    model: gpt-5.2
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 26214400
+      sources:
+        - body_path: model
+          source: body
+    route: openai-audio-transcribe
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: audio/transcription
+      llm_format: openai
+      max_request_body_size: 26214400
+      targets:
+        - description: whisper-1
+          logging:
+            log_payloads: false
+            log_statistics: false
+          model:
+            model_alias: gpt-5.2
+            name: whisper-1
+            provider: openai
+          route_type: audio/v1/audio/transcriptions
+    route: openai-audio-transcribe
+    model: gpt-5.2
+ai_models:
+  - name: gpt-5.2

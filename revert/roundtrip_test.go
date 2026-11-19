@@ -25,6 +25,7 @@ var roundTripSkip = map[string]string{
 	"95_auth_strategy_token_vault":               "revert does not lift auth strategy token_vault or the callback route",
 	"98_auth_strategy_token_vault_callback_only": "revert does not lift auth strategy datastores or the callback route",
 	"111_auth_strategy_token_vault_redirect_uri": "revert does not lift auth strategy token_vault or the callback route",
+	"149_shared_api_model_body_size":             "revert does not split type api models that share one route",
 }
 
 // TestRoundTrip verifies that reverting the forward converter's output and

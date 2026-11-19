@@ -34,6 +34,7 @@ plugins:
         algorithm: round-robin
       genai_category: text/generation
       llm_format: openai
+      max_request_body_size: 50000000
       targets:
         - description: gpt-4.1-mini
           logging:
@@ -52,6 +53,7 @@ plugins:
         algorithm: round-robin
       genai_category: text/generation
       llm_format: openai
+      max_request_body_size: 50000000
       targets:
         - description: gpt-4.1-mini
           logging:

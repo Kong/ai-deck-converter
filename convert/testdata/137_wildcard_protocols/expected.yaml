@@ -314,7 +314,7 @@ services:
 plugins:
   - name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 50000000
       sources:
         - body_path: model
           source: body
@@ -325,6 +325,7 @@ plugins:
         algorithm: round-robin
       genai_category: text/generation
       llm_format: openai
+      max_request_body_size: 50000000
       targets:
         - description: gpt-5.4
           logging:
@@ -339,7 +340,7 @@ plugins:
     model: default-protocols
   - name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 50000000
       sources:
         - body_path: model
           source: body
@@ -350,6 +351,7 @@ plugins:
         algorithm: round-robin
       genai_category: text/generation
       llm_format: openai
+      max_request_body_size: 50000000
       targets:
         - description: gpt-5.4
           logging:
@@ -368,6 +370,7 @@ plugins:
         algorithm: round-robin
       genai_category: text/generation
       llm_format: openai
+      max_request_body_size: 50000000
       targets:
         - description: gpt-5.4
           logging:
@@ -380,7 +383,7 @@ plugins:
     route: openai-responses-lifecycle
   - name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 50000000
       sources:
         - body_path: model
           source: body
@@ -391,6 +394,7 @@ plugins:
         algorithm: round-robin
       genai_category: audio/speech
       llm_format: openai
+      max_request_body_size: 50000000
       targets:
         - description: gpt-5.4
           logging:
@@ -405,7 +409,7 @@ plugins:
     model: default-protocols
   - name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 50000000
       sources:
         - body_path: model
           source: body
@@ -416,6 +420,7 @@ plugins:
         algorithm: round-robin
       genai_category: audio/transcription
       llm_format: openai
+      max_request_body_size: 50000000
       targets:
         - description: gpt-5.4
           logging:
@@ -430,7 +435,7 @@ plugins:
     model: default-protocols
   - name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 50000000
       sources:
         - body_path: model
           source: body
@@ -441,6 +446,7 @@ plugins:
         algorithm: round-robin
       genai_category: audio/transcription
       llm_format: openai
+      max_request_body_size: 50000000
       targets:
         - description: gpt-5.4
           logging:
@@ -455,7 +461,7 @@ plugins:
     model: default-protocols
   - name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 50000000
       sources:
         - body_path: model
           source: body
@@ -466,6 +472,7 @@ plugins:
         algorithm: round-robin
       genai_category: text/embeddings
       llm_format: openai
+      max_request_body_size: 50000000
       targets:
         - description: gpt-5.4
           logging:
@@ -480,7 +487,7 @@ plugins:
     model: default-protocols
   - name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 50000000
       sources:
         - body_path: model
           source: body
@@ -491,6 +498,7 @@ plugins:
         algorithm: round-robin
       genai_category: image/generation
       llm_format: openai
+      max_request_body_size: 50000000
       targets:
         - description: gpt-5.4
           logging:
@@ -505,7 +513,7 @@ plugins:
     model: default-protocols
   - name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 50000000
       sources:
         - body_path: model
           source: body
@@ -516,6 +524,7 @@ plugins:
         algorithm: round-robin
       genai_category: image/generation
       llm_format: openai
+      max_request_body_size: 50000000
       targets:
         - description: gpt-5.4
           logging:
@@ -530,7 +539,7 @@ plugins:
     model: default-protocols
   - name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 50000000
       sources:
         - body_path: model
           source: body
@@ -541,6 +550,7 @@ plugins:
         algorithm: round-robin
       genai_category: video/generation
       llm_format: openai
+      max_request_body_size: 50000000
       targets:
         - description: gpt-5.4
           logging:
@@ -555,7 +565,7 @@ plugins:
     model: default-protocols
   - name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 50000000
       sources:
         - body_path: model
           source: body
@@ -566,6 +576,7 @@ plugins:
         algorithm: round-robin
       genai_category: text/generation
       llm_format: openai
+      max_request_body_size: 50000000
       targets:
         - description: gpt-5.4
           logging:
@@ -580,7 +591,7 @@ plugins:
     model: https-only
   - name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 50000000
       sources:
         - body_path: model
           source: body
@@ -591,6 +602,7 @@ plugins:
         algorithm: round-robin
       genai_category: text/generation
       llm_format: openai
+      max_request_body_size: 50000000
       targets:
         - description: gpt-5.4
           logging:
@@ -609,6 +621,7 @@ plugins:
         algorithm: round-robin
       genai_category: text/generation
       llm_format: openai
+      max_request_body_size: 50000000
       targets:
         - description: gpt-5.4
           logging:
@@ -621,7 +634,7 @@ plugins:
     route: openai-responses-lifecycle-2
   - name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 50000000
       sources:
         - body_path: model
           source: body
@@ -632,6 +645,7 @@ plugins:
         algorithm: round-robin
       genai_category: audio/speech
       llm_format: openai
+      max_request_body_size: 50000000
       targets:
         - description: gpt-5.4
           logging:
@@ -646,7 +660,7 @@ plugins:
     model: https-only
   - name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 50000000
       sources:
         - body_path: model
           source: body
@@ -657,6 +671,7 @@ plugins:
         algorithm: round-robin
       genai_category: audio/transcription
       llm_format: openai
+      max_request_body_size: 50000000
       targets:
         - description: gpt-5.4
           logging:
@@ -671,7 +686,7 @@ plugins:
     model: https-only
   - name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 50000000
       sources:
         - body_path: model
           source: body
@@ -682,6 +697,7 @@ plugins:
         algorithm: round-robin
       genai_category: audio/transcription
       llm_format: openai
+      max_request_body_size: 50000000
       targets:
         - description: gpt-5.4
           logging:
@@ -696,7 +712,7 @@ plugins:
     model: https-only
   - name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 50000000
       sources:
         - body_path: model
           source: body
@@ -707,6 +723,7 @@ plugins:
         algorithm: round-robin
       genai_category: text/embeddings
       llm_format: openai
+      max_request_body_size: 50000000
       targets:
         - description: gpt-5.4
           logging:
@@ -721,7 +738,7 @@ plugins:
     model: https-only
   - name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 50000000
       sources:
         - body_path: model
           source: body
@@ -732,6 +749,7 @@ plugins:
         algorithm: round-robin
       genai_category: image/generation
       llm_format: openai
+      max_request_body_size: 50000000
       targets:
         - description: gpt-5.4
           logging:
@@ -746,7 +764,7 @@ plugins:
     model: https-only
   - name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 50000000
       sources:
         - body_path: model
           source: body
@@ -757,6 +775,7 @@ plugins:
         algorithm: round-robin
       genai_category: image/generation
       llm_format: openai
+      max_request_body_size: 50000000
       targets:
         - description: gpt-5.4
           logging:
@@ -771,7 +790,7 @@ plugins:
     model: https-only
   - name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 50000000
       sources:
         - body_path: model
           source: body
@@ -782,6 +801,7 @@ plugins:
         algorithm: round-robin
       genai_category: video/generation
       llm_format: openai
+      max_request_body_size: 50000000
       targets:
         - description: gpt-5.4
           logging:
@@ -796,7 +816,7 @@ plugins:
     model: https-only
   - name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 50000000
       sources:
         - body_path: model
           source: body
@@ -807,6 +827,7 @@ plugins:
         algorithm: round-robin
       genai_category: text/generation
       llm_format: openai
+      max_request_body_size: 50000000
       targets:
         - description: gpt-5.4
           logging:
@@ -821,7 +842,7 @@ plugins:
     model: both-transports
   - name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 50000000
       sources:
         - body_path: model
           source: body
@@ -832,6 +853,7 @@ plugins:
         algorithm: round-robin
       genai_category: text/generation
       llm_format: openai
+      max_request_body_size: 50000000
       targets:
         - description: gpt-5.4
           logging:
@@ -850,6 +872,7 @@ plugins:
         algorithm: round-robin
       genai_category: text/generation
       llm_format: openai
+      max_request_body_size: 50000000
       targets:
         - description: gpt-5.4
           logging:
@@ -862,7 +885,7 @@ plugins:
     route: openai-responses-lifecycle-3
   - name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 50000000
       sources:
         - body_path: model
           source: body
@@ -873,6 +896,7 @@ plugins:
         algorithm: round-robin
       genai_category: audio/speech
       llm_format: openai
+      max_request_body_size: 50000000
       targets:
         - description: gpt-5.4
           logging:
@@ -887,7 +911,7 @@ plugins:
     model: both-transports
   - name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 50000000
       sources:
         - body_path: model
           source: body
@@ -898,6 +922,7 @@ plugins:
         algorithm: round-robin
       genai_category: audio/transcription
       llm_format: openai
+      max_request_body_size: 50000000
       targets:
         - description: gpt-5.4
           logging:
@@ -912,7 +937,7 @@ plugins:
     model: both-transports
   - name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 50000000
       sources:
         - body_path: model
           source: body
@@ -923,6 +948,7 @@ plugins:
         algorithm: round-robin
       genai_category: audio/transcription
       llm_format: openai
+      max_request_body_size: 50000000
       targets:
         - description: gpt-5.4
           logging:
@@ -937,7 +963,7 @@ plugins:
     model: both-transports
   - name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 50000000
       sources:
         - body_path: model
           source: body
@@ -948,6 +974,7 @@ plugins:
         algorithm: round-robin
       genai_category: text/embeddings
       llm_format: openai
+      max_request_body_size: 50000000
       targets:
         - description: gpt-5.4
           logging:
@@ -962,7 +989,7 @@ plugins:
     model: both-transports
   - name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 50000000
       sources:
         - body_path: model
           source: body
@@ -973,6 +1000,7 @@ plugins:
         algorithm: round-robin
       genai_category: image/generation
       llm_format: openai
+      max_request_body_size: 50000000
       targets:
         - description: gpt-5.4
           logging:
@@ -987,7 +1015,7 @@ plugins:
     model: both-transports
   - name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 50000000
       sources:
         - body_path: model
           source: body
@@ -998,6 +1026,7 @@ plugins:
         algorithm: round-robin
       genai_category: image/generation
       llm_format: openai
+      max_request_body_size: 50000000
       targets:
         - description: gpt-5.4
           logging:
@@ -1018,6 +1047,7 @@ plugins:
         algorithm: round-robin
       genai_category: realtime/generation
       llm_format: openai
+      max_request_body_size: 50000000
       targets:
         - description: gpt-5.4
           logging:
@@ -1032,7 +1062,7 @@ plugins:
       - ai-gateway-realtime-model:both-transports
   - name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 50000000
       sources:
         - body_path: model
           source: body
@@ -1043,6 +1073,7 @@ plugins:
         algorithm: round-robin
       genai_category: video/generation
       llm_format: openai
+      max_request_body_size: 50000000
       targets:
         - description: gpt-5.4
           logging:
@@ -1063,6 +1094,7 @@ plugins:
         algorithm: round-robin
       genai_category: realtime/generation
       llm_format: openai
+      max_request_body_size: 50000000
       targets:
         - description: gpt-realtime
           logging:
@@ -1081,6 +1113,7 @@ plugins:
         algorithm: round-robin
       genai_category: video/generation
       llm_format: openai
+      max_request_body_size: 50000000
       model_name_header: false
       targets:
         - description: gpt-5.4
@@ -1098,6 +1131,7 @@ plugins:
         algorithm: round-robin
       genai_category: video/generation
       llm_format: openai
+      max_request_body_size: 50000000
       model_name_header: false
       targets:
         - description: gpt-5.4
@@ -1115,6 +1149,7 @@ plugins:
         algorithm: round-robin
       genai_category: video/generation
       llm_format: openai
+      max_request_body_size: 50000000
       model_name_header: false
       targets:
         - description: gpt-5.4

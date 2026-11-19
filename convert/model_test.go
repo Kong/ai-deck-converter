@@ -4,7 +4,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Kong/ai-deck-converter/internal/aigw"
 	"github.com/Kong/ai-deck-converter/internal/aimap"
 	"github.com/Kong/ai-deck-converter/internal/kong"
 	"github.com/stretchr/testify/require"
@@ -668,8 +667,7 @@ func TestBodySizeOrDefault(t *testing.T) {
 		"above default":     {in: size(16777216), want: 16777216},
 	} {
 		t.Run(name, func(t *testing.T) {
-			m := &aigw.Model{Config: aigw.ModelConfig{MaxRequestBodySize: tc.in}}
-			require.Equal(t, tc.want, bodySizeOrDefault(m))
+			require.Equal(t, tc.want, bodySizeOrDefault(tc.in))
 		})
 	}
 }

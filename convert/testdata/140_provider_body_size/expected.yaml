@@ -1,0 +1,181 @@
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: anthropic-messages
+        paths:
+          - /claude/v1/messages
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: anthropic-messages-2
+        paths:
+          - /claude-small/v1/messages
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-chat
+        paths:
+          - /mixed/chat/completions
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-chat-2
+        paths:
+          - /unpublished/chat/completions
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+plugins:
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 32000000
+      sources:
+        - body_path: model
+          source: body
+    route: anthropic-messages
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      max_request_body_size: 32000000
+      targets:
+        - auth:
+            header_name: x-api-key
+            header_value: '{vault://ai/anthropic-key}'
+          description: claude-sonnet-4-5
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: claude-default
+            name: claude-sonnet-4-5
+            options:
+              anthropic_version: "2023-06-01"
+            provider: anthropic
+          route_type: llm/v1/chat
+    route: anthropic-messages
+    model: claude-default
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: anthropic-messages-2
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      max_request_body_size: 1048576
+      targets:
+        - auth:
+            header_name: x-api-key
+            header_value: '{vault://ai/anthropic-key}'
+          description: claude-haiku-4-5
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: claude-explicit
+            name: claude-haiku-4-5
+            options:
+              anthropic_version: "2023-06-01"
+            provider: anthropic
+          route_type: llm/v1/chat
+    route: anthropic-messages-2
+    model: claude-explicit
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 50000000
+      sources:
+        - body_path: model
+          source: body
+    route: openai-chat
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      max_request_body_size: 50000000
+      targets:
+        - auth:
+            header_name: x-api-key
+            header_value: '{vault://ai/anthropic-key}'
+          description: claude-sonnet-4-5
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: mixed
+            name: claude-sonnet-4-5
+            options:
+              anthropic_version: "2023-06-01"
+            provider: anthropic
+          route_type: llm/v1/chat
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-5.2
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: mixed
+            name: gpt-5.2
+            provider: openai
+          route_type: llm/v1/chat
+    route: openai-chat
+    model: mixed
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-chat-2
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-5.2
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: unpublished
+            name: gpt-5.2
+            provider: openai
+          route_type: llm/v1/chat
+        - description: mistral-large
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: unpublished
+            name: mistral-large
+            provider: mistral
+          route_type: llm/v1/chat
+    route: openai-chat-2
+    model: unpublished
+ai_models:
+  - name: claude-default
+  - name: claude-explicit
+  - name: mixed
+  - name: unpublished

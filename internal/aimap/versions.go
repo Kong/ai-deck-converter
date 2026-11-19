@@ -84,14 +84,17 @@ const (
 	FeatureMCPRateLimiting            Feature = "mcp-rate-limiting"
 	FeatureMCPACLWhen                 Feature = "mcp-acl-when"
 	FeatureGeminiAgenticCapability    Feature = "gemini-agentic-capability"
+	FeatureBedrockRuntimeResponses    Feature = "bedrock-runtime-responses"
+	FeatureBaseten                    Feature = "baseten"
+	FeatureSagemaker                  Feature = "sagemaker"
+	FeatureAuthStrategyTokenVault     Feature = "auth-strategy-token-vault"
+	FeatureAgentTargets               Feature = "agent-targets"
+	// FeatureProviderBodySize gives a model without max_request_body_size the
+	// limit of its providers. Older releases keep the plugin default.
+	FeatureProviderBodySize Feature = "provider-body-size"
 	// FeatureGeminiEndpointDerivation adds api_endpoint below its release.
 	// The data plane derives the host from location_id from then on.
 	FeatureGeminiEndpointDerivation Feature = "gemini-endpoint-derivation"
-	FeatureBedrockRuntimeResponses  Feature = "bedrock-runtime-responses"
-	FeatureBaseten                  Feature = "baseten"
-	FeatureSagemaker                Feature = "sagemaker"
-	FeatureAuthStrategyTokenVault   Feature = "auth-strategy-token-vault"
-	FeatureAgentTargets             Feature = "agent-targets"
 	FeatureMCPTargets               Feature = "mcp-targets"
 	// FeatureOIDCProtectedResourceMetadata is the openid-connect plugin field
 	// protected_resource_metadata. It is a plugin schema gate, not an API field.
@@ -133,6 +136,7 @@ var featureSince = map[Feature]Version{
 	FeatureSagemaker:                     mustVersion("2.1"),
 	FeatureAuthStrategyTokenVault:        mustVersion("2.3"),
 	FeatureAgentTargets:                  mustVersion("2.4"),
+	FeatureProviderBodySize:              mustVersion("2.4"),
 	FeatureMCPTargets:                    mustVersion("2.4"),
 	FeatureOIDCProtectedResourceMetadata: mustVersion("2.3"),
 	FeatureSanitizerAllWithCredentials:   mustVersion("2.3"),
