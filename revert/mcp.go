@@ -158,8 +158,7 @@ func (r *Reverter) revertMCPServer(svc *kong.Service, rt *kong.Route, plugins, s
 		// read. The plugin default Authorization Bearer does not match it.
 		// The derivation is empty for a plugin that reads no header key.
 		keyAuth := findPlugin(allPlugins, "key-auth")
-		if keyAuth != nil && tokenVault != nil &&
-			(tokenVault.Credential == nil || tokenVault.Credential.Inbound == nil) {
+		if keyAuth != nil && aimap.TokenVaultNeedsInbound(tokenVault) {
 			if loc := aimap.TokenVaultInboundFromKeyAuth(keyAuth.Config); loc != nil {
 				if err := r.warn("MCP server %q: the route's key-auth plugin reads the key from header %q, "+
 					"but the token-vault auth record has no credential.inbound; the data plane reads the "+

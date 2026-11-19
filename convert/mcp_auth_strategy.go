@@ -121,16 +121,11 @@ const mcpAuthStrategyField = "access.auth_strategies[0]"
 // deriveTokenVaultInbound fills the ai-mcp-proxy token_vault inbound
 // credential from the server's key-auth strategy. The plugin default inbound
 // Authorization Bearer does not match where key-auth expects the credential.
-// An explicit inbound is never touched. A non-key-auth strategy matches the
-// plugin default, so the derivation stays silent for one.
+// An explicit inbound is never touched. The caller passes a key-auth strategy.
 func (c *Converter) deriveTokenVaultInbound(
 	src ConversionIssueSource, m *aigw.MCPServer, idp *aigw.AuthStrategy, route *kong.Route,
 ) {
-	tv := m.TokenVault
-	if tv == nil || (tv.Credential != nil && tv.Credential.Inbound != nil) {
-		return
-	}
-	if idp == nil || idp.Type != "key-auth" {
+	if !aimap.TokenVaultNeedsInbound(m.TokenVault) {
 		return
 	}
 	loc := aimap.TokenVaultInboundFromKeyAuth(idp.Config)
@@ -229,7 +224,7 @@ func mcpEffectiveScopes(
 	meta *aigw.MCPProtectedResourceMetadata, idp *aigw.AuthStrategy,
 ) []string {
 	if len(meta.ScopesSupported) == 0 && idp != nil {
-		return configStrings(idp.Config, "scopes")
+		return aimap.ConfigStrings(idp.Config, "scopes")
 	}
 	return meta.ScopesSupported
 }
@@ -297,7 +292,7 @@ func (c *Converter) mcpOIDCPlugin(
 	maps.Copy(cfg, idp.Config)
 
 	// Interactive flows would break the MCP authorization challenge.
-	if methods := configStrings(idp.Config, "auth_methods"); len(methods) > 1 ||
+	if methods := aimap.ConfigStrings(idp.Config, "auth_methods"); len(methods) > 1 ||
 		(len(methods) == 1 && methods[0] != "bearer") {
 		c.warn(src.at(mcpAuthStrategyField), ConfigFieldOverridden,
 			"MCP server %q auth strategy %q sets auth_methods beyond bearer. This will be overridden to "+
@@ -426,11 +421,6 @@ func firstConfigString(config map[string]any, key string) string {
 		}
 	}
 	return ""
-}
-
-// configStrings reads config[key] as a []string (see aimap.ConfigStrings).
-func configStrings(config map[string]any, key string) []string {
-	return aimap.ConfigStrings(config, key)
 }
 
 // mcpKeyAuthRevealReason returns why the key-auth plugin of m must send the
