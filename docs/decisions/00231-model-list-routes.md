@@ -22,21 +22,23 @@ The list this RFC adds returns the virtual models that an admin declares, one
 entry per model alias. It does not return the upstream targets behind a model.
 
 The data plane learns to serve the list in a new `ai-models-list` plugin. The
-converter emits one list route per base path and format with that plugin on
-it. Nothing on the control plane makes such a route today, so Konnect cannot
-offer the list.
+converter emits list routes with that plugin on them, one for each base path,
+format and set of model route rules. Nothing on the control plane makes such a
+route today, so Konnect cannot offer the list.
 
 # Scope
 [scope]: #scope
 
 In scope:
 
-- One list route per model base path and format, for the `openai` and the
-  `anthropic` formats. The root `/` is a base path like any other.
+- One list route for each base path, format and set of model route rules,
+  for the `openai` and the `anthropic` formats. The root `/` is a base path
+  like any other.
 - One `ai-models-list` plugin on each list route, with one source per
   `ai-proxy-advanced` instance that its models emit. Each source carries the
   model's `access.acls` as its access rule.
-- The auth strategies of the listed models on the list route.
+- On each list route, the route rules and auth strategies of its model
+  routes.
 - A public list, with no auth plugin, on a base path whose models set no auth
   strategy.
 - No list where an agent route already answers `GET` at the list path
@@ -51,8 +53,9 @@ Out of scope:
   per caller. A kong-ee change builds it from the `serve-model-list` filters
   that kong-ee #24216 added to `ai-proxy-advanced`, and removes
   `route_type: llm/v1/models` from `ai-proxy-advanced` before 2.4 ships.
-  [Entry fields](#entry-fields) and [Authentication](#authentication) say
-  where the plugin must differ from the filters.
+  [List routes](#list-routes), [Entry fields](#entry-fields) and
+  [Authentication](#authentication) say where the plugin must differ from the
+  filters.
 - Lists for the other formats, such as `gemini` and `bedrock`. Their clients
   use other list paths.
 - OpenAI-format lists for Bedrock mantle targets. A mantle route serves the
@@ -96,12 +99,14 @@ path that also has virtual models, the list shows only the virtual models.
 A model's `access.acls` becomes the access rule of its list sources. The
 gateway hides a model from a caller the rule excludes, as the acl plugin
 rejects that caller on the model route. One exception: a CEL rule that reads
-the request (`http.*`, `route.*` or `service.*`) hides the model from every
+the request (`http.*`, `route.*` or `service.*`) shows the model to every
 caller, and the converter warns the admin.
 
-A list uses the auth strategies of its models. A base path whose models set
-no auth strategy gets a public list, because its models are public too. A
-public list shows only the models without an access rule.
+A list matches the same hosts, headers and SNIs as its model routes, and uses
+their auth strategies. So a caller sees the models that its requests reach. A
+base path whose models set no auth strategy gets a public list, because its
+models are public too. A public list shows only the models without an access
+rule.
 
 Some admins already answer the list path with an agent. Konnect keeps that
 agent route, makes no list on its path and warns the admin.
@@ -210,16 +215,38 @@ it cannot carry yet.
 ## List routes
 
 `convertModelLists` runs after the agent pass and before the routing conflict
-check. It groups the instance ids that each model emits by list path, which
-it computes from the base path and the instance's `llm_format`. Only the
-`openai` and `anthropic` groups make a list. The key is the computed path, not
-the raw base path: `aimap.RoutePath` trims a trailing slash, so `/team` and
-`/team/` share one list. Each instance id appears once in a list's `sources`,
-because the gateway rejects a config with a repeated `plugin_id`.
+check. It groups the instance ids that each model emits by a key with three
+parts:
+
+- The list path, which it computes from the base path and the instance's
+  `llm_format`. Only the `openai` and `anthropic` formats make a list. The key
+  holds the computed path, not the raw base path: `aimap.RoutePath` trims a
+  trailing slash, so `/team` and `/team/` share one list.
+- The route rules of the model route: `hosts`, `headers`, `snis`, `sources`,
+  `destinations` and `protocols` from `config.route`. Paths and methods stay
+  out, because the list route has its own.
+- The auth strategies of the model, the `authStrategyKey` that the model routes
+  already split on.
+
+So models share a list route only when their model routes match requests the
+same way. Kong picks a list route by the same rules as a model route, so a
+caller sees the models that its requests reach. A model on an internal host
+does not appear on the list of a public host.
+
+An OpenAI-format model on `/v1` and an Anthropic-format model on `/` with
+equal rules share the list path `/v1/models`, so they share one list route.
+`ai-models-list` picks the response format per request from the
+`anthropic-version` header. The kong-ee change must also make it serve only
+the sources whose `llm_format` matches that format: an OpenAI client on `/v1`
+cannot call the Anthropic model, whose route is `/v1/messages`.
+
+Each instance id appears once in a list's `sources`, because the gateway
+rejects a config with a repeated `plugin_id`.
 
 Each group with at least one source emits one route, `<format>-models` for the
-root and `<format>-models-<base>` for the others. The `<base>` part replaces
-each character that a Kong name does not accept with `-`. A name that another
+root and `<format>-models-<base>` for the others. A route that serves both
+formats takes the `openai` name. The `<base>` part replaces each character
+that a Kong name does not accept with `-`. A name that another
 route already uses takes a counter suffix, as `uniqueModelRouteName` gives
 model routes. The route matches `GET` on
 `aimap.RoutePath(base, aimap.ModelListSpecs[format])`, where `ModelListSpecs`
@@ -272,16 +299,17 @@ cannot hold the CEL rules (`allow_when`, `deny_when`) that a model's access
 rule can hold. `sources[].access` carries all four acl fields.
 
 The gateway cannot evaluate a CEL rule that reads `http.*`, `route.*` or
-`service.*` on a list request, so it hides such a source from every caller,
-for `allow_when` and `deny_when` alike. The acl plugin still evaluates the
-rule on the model route. The gateway decides, so the list never shows the
-model to a caller the rule could exclude.
+`service.*` on a list request, so it shows such a source to every caller, for
+`allow_when` and `deny_when` alike. The acl plugin still evaluates the rule on
+the model route. A hidden model gives the caller no reason. A refusal on the
+model route says why. Today the `serve-model-list` filter hides such a
+source, so the kong-ee change must make `ai-models-list` show it.
 
-The converter copies the rule as it is. It has no CEL parser, so it matches
-the rule text against `http.`, `route.` and `service.`. On a match it reports
-one `BEHAVIOR_MAY_DIFFER` warning at `access.acls` that says the list hides
-the model. A match inside a string literal is a false positive, but it costs
-only a warning. An admin clears the warning by setting
+The converter copies the rule as it is. It has no CEL parser, so it matches the
+rule text against `http.`, `route.` and `service.`. On a match it reports one
+`BEHAVIOR_MAY_DIFFER` warning at `access.acls` that says the list shows the
+model to every caller. A match inside a string literal is a false positive, but
+it costs only a warning. An admin clears the warning by setting
 `config.model.listed: false` on the model, which takes it off every list.
 
 ## Source ids
@@ -315,25 +343,13 @@ leave `cost` out of `ai-models-list`. See [Follow-ups](#follow-ups).
 
 ## Authentication
 
-The list route carries the union of the auth strategies of the models grouped
-onto it. With more than one strategy, the same anonymous consumer and
-`request-termination` the model routes use protect the route: a caller that
-matches no strategy reaches the anonymous consumer, which answers 401. With
-one strategy, the strategy's own plugin rejects such a caller.
-
-The union can hold more than one strategy of a type, such as two
-`openid-connect` strategies with different issuers. Kong runs only one plugin
-of a name on a route, so the converter puts each extra strategy on a clone:
-`<type>-2` for the second, `<type>-3` for the third, and so on. A clone keeps
-the priority of its type and goes in `cloned_plugins`, as the
-`response-transformer` clones do. Each plugin falls back to the anonymous
-consumer, so a caller that one strategy rejects can still authenticate with
-the next. Revert maps a clone back to its type.
-
-A model route has the same gap today: a model with
-`auth_strategies: [oidc-a, oidc-b]` gets two `openid-connect` plugins on one
-route. The clone rule fixes it there too, in a change that can ship on its
-own.
+The models of a list route share one set of auth strategies, so the list
+route gets the auth plugins of their model routes. With more than one
+strategy, the same anonymous consumer and `request-termination` the model
+routes use protect the route: a caller that matches no strategy reaches the
+anonymous consumer, which answers 401. With one strategy, the strategy's own
+plugin rejects such a caller. A list route never needs two plugins of one
+name, because platform-api allows a model at most one strategy of each type.
 
 With no strategy and no global authentication policy, the model routes carry
 no auth plugin, and neither does the list route. The list is then public,
@@ -344,22 +360,19 @@ match, and the acl plugin rejects that caller on the model route. Today the
 must remove that check. A global authentication policy
 covers the list route as it covers the model routes.
 
-When only some models of a group set a strategy, the union is not empty and
-the list stays. A caller without credentials can then call a model that sets
-no strategy, but cannot read the list.
+Models with equal route rules and different auth strategies get separate
+model routes that match the same requests. The converter reports them as a
+`ROUTING_CONFLICT` today (golden case `92_routing_conflicts`). Their list
+routes match the same requests too, and the routing conflict check reports
+them the same way.
 
 A model whose `access.acls` sets more than one of `allow`, `deny`,
 `allow_when` and `deny_when` never reaches this step: its acl plugin fails, so
 the model fails first.
 
-A list route matches on its path only. A model route also matches on hosts,
-SNIs and headers, so a caller those rules exclude can still read the list.
-The list is a discovery surface, not an inference surface.
-
-The list route accepts `https` only when a model route of its group excludes
-`http` through `config.route.protocols`. Otherwise it accepts `http` and
-`https`. A caller then cannot send credentials in plain text to a list whose
-models accept only TLS.
+The list route copies `config.route.protocols` with the other route rules, so
+a caller cannot send credentials in plain text to a list whose models accept
+only TLS.
 
 ## Instances left out
 
@@ -378,17 +391,16 @@ leaves these instances out of every list:
 - OpenAI-format Bedrock mantle. Its routes keep mantle targets in their own
   instance. See [Scope](#scope).
 
-A model whose instances are all left out appears on no list, but its auth
-strategies still join the union of the lists it was grouped onto. A group
-whose instances are all left out gets no list.
+A model whose instances are all left out appears on no list. A group whose
+instances are all left out gets no list.
 
 ## Which groups get a list
 
-A group is one base path with one format, `openai` or `anthropic`.
+A group is one list path with one set of route rules and auth strategies.
 
 ```mermaid
 flowchart TD
-    A["Base path and format<br/>with at least one model"] --> C{"min runtime version 2.4 or later?"}
+    A["List path, route rules and<br/>auth strategies with at least one model"] --> C{"min runtime version 2.4 or later?"}
     C -- no --> N1["No list"]
     C -- yes --> E{"Any instance left to advertise?<br/>From a model without listed: false.<br/>Not type: api, Gemini Interactions,<br/>realtime, Responses or video lifecycle,<br/>OpenAI-format mantle or passthrough"}
     E -- no --> N1
@@ -566,17 +578,18 @@ A caller of `GET /claude-code/v1/models` outside `contractors` gets one entry,
   The field is valid in decK and db-less output, but it widens the diff.
   Output below the gate does not change.
 - Lists are on by default, so a 2.4 gateway serves a list path that its admin
-  did not ask for. The list route carries the models' auth strategies, and
-  each source keeps the access rule of its model.
+  did not ask for. The list route carries the route rules and auth strategies
+  of its model routes, and each source keeps the access rule of its model.
 - A model declared on several base paths is advertised on several lists, so
   the same instance id repeats. The gateway deduplicates per caller.
 - The gateway logs a warning on each rebuild for each id that more than one
   source advertises. Every model with several capabilities logs one. The
   kong-ee change can drop that warning for instances of one alias.
-- Two models in one group with different auth strategies share one route and
-  one union of strategies. A caller authenticated by one strategy
-  can discover a model the other strategy guards, unless the model also sets
-  an access rule.
+- Two models on one base path with equal route rules and different auth
+  strategies get list routes that match the same requests. Kong sends each
+  list request to one of them, so the callers of the other strategy get no
+  list. Their model routes have the same conflict today, and the converter
+  warns for both.
 
 # Rationale and alternatives
 [rationale-and-alternatives]: #rationale-and-alternatives
@@ -610,17 +623,12 @@ A caller of `GET /claude-code/v1/models` outside `contractors` gets one entry,
 - Put the model's ACL plugins on the list route. Rejected: the gateway reads a
   source's rule per model, so a route-scoped rule would hide or show the whole
   list.
-- Split a list by auth strategy, as the model routes split. Rejected: a list
-  route matches on its path only, so two lists on one path would match the
-  same requests: the routing conflict RFC 00229 reports. Copying the `hosts`
-  and `headers` of the model routes onto the lists works only where models
-  differ by them. It also makes the converter compute which model routes
-  overlap each list route. A model with two strategies of one type needs the
-  clone either way.
-- Suppress the list of a group whose models disagree on auth strategies.
-  Rejected: two models that disagree would strip discovery from every model in
-  their group. Merging keeps every per-model rule, because each source still
-  carries the access rule of its model. The cost is the last drawback above.
+- One list route per base path and format that matches on its path only,
+  with the union of its models' auth strategies. Rejected: it shows a model to
+  callers that its model route's hosts or headers exclude, so a model on an
+  internal host appears on the list of a public host. The union can also hold
+  two `openid-connect` strategies, and Kong runs only one plugin of a name on
+  a route.
 - A converter option that Konnect sets from the runtime version. Rejected:
   other endpoints come from the model's settings and the runtime version, not
   from options. An option also gives an admin no way to take one model off a
@@ -683,16 +691,21 @@ New golden cases, at the default runtime version 2.4:
   gets two entries, and a base path with only `type: api` models gets no list.
 - `148_model_lists_request_conditions`: a model whose `deny_when` reads
   `http.headers` gets a source that carries the rule as it is, and one
-  `BEHAVIOR_MAY_DIFFER` warning. A `deny_when` that reads none of `http.`,
-  `route.` and `service.` gets no warning.
+  `BEHAVIOR_MAY_DIFFER` warning that says the list shows the model. A
+  `deny_when` that reads none of `http.`, `route.` and `service.` gets no
+  warning.
 - `149_model_lists_duplicate_alias`: two models with the same alias,
   route and targets get two distinct instance ids.
 - `150_model_lists_paths`: a model on `/team` and `/team/` gets one
   list with each instance id once, and a model with
   `config.route.protocols: [https]` gets an https-only list route.
-- `151_model_lists_same_type_strategies`: two models on one base path, each
-  with a header rule and its own `openid-connect` strategy, get one list route
-  with `openid-connect` and the clone `openid-connect-2`.
+- `151_model_lists_route_rules`: two models on `/` with different `hosts` get
+  two list routes, each with the hosts of its model route and only its own
+  model. Two models with equal route rules and different auth strategies get
+  two list routes and a `ROUTING_CONFLICT` warning.
+- `152_model_lists_shared_path`: an OpenAI-format model on `/v1` and an
+  Anthropic-format model on `/` share one `GET /v1/models` list route with
+  both sources.
 
 Existing golden cases at 2.4 with an instance to advertise gain list routes
 and instance ids, so their expected output is regenerated. The golden cases
@@ -724,8 +737,12 @@ End-to-end cases in `e2e/`, on a 2.4 gateway image:
 - The root list shows only the models declared on `/` to an authenticated
   caller.
 - A caller that matches no key-auth strategy gets 401.
-- On a base path with two `openid-connect` strategies, a caller with a token
-  from either issuer gets the list.
+- A caller on one host does not see a model whose route matches another host.
+- On `GET /v1/models` shared by both formats, an Anthropic client sees only
+  the Anthropic-format models, and an OpenAI client only the OpenAI-format
+  models.
+- A model whose access rule reads `http.headers` is on the list for every
+  caller.
 - On a base path whose models set no auth strategy, a caller without
   credentials gets the models without an access rule.
 - On a base path with only passthrough models, the list request reaches the
