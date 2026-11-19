@@ -98,6 +98,13 @@ func TokenVaultFromPlugin(block map[string]any) *aigw.TokenVaultConfig {
 	return tv
 }
 
+// TokenVaultNeedsInbound reports whether tv exists and names no inbound
+// credential location. Convert derives the inbound when this holds, and
+// revert warns for the same shape, so both directions branch on one rule.
+func TokenVaultNeedsInbound(tv *aigw.TokenVaultConfig) bool {
+	return tv != nil && (tv.Credential == nil || tv.Credential.Inbound == nil)
+}
+
 // TokenVaultInboundFromKeyAuth derives the token_vault inbound credential
 // location from a key-auth plugin config. The key-auth header carries the raw
 // key, so the derived prefix is empty rather than the plugin default
@@ -445,10 +452,10 @@ func tokenVaultCredentialToPlugin(c *aigw.TokenVaultCredential) map[string]any {
 		return nil
 	}
 	out := map[string]any{}
-	if in := tokenVaultLocationToPlugin(c.Inbound); in != nil {
+	if in := TokenVaultLocationToPlugin(c.Inbound); in != nil {
 		out["inbound"] = in
 	}
-	if o := tokenVaultLocationToPlugin(c.Outbound); o != nil {
+	if o := TokenVaultLocationToPlugin(c.Outbound); o != nil {
 		out["outbound"] = o
 	}
 	if len(out) == 0 {
@@ -459,12 +466,8 @@ func tokenVaultCredentialToPlugin(c *aigw.TokenVaultCredential) map[string]any {
 
 // TokenVaultLocationToPlugin lowers one credential location into the plugin's
 // location block. An empty Prefix differs from the plugin default "Bearer ",
-// so a non-nil empty Prefix emits prefix: "".
+// so a non-nil empty Prefix emits prefix: "". A nil location lowers to nil.
 func TokenVaultLocationToPlugin(l *aigw.TokenVaultCredentialLocation) map[string]any {
-	return tokenVaultLocationToPlugin(l)
-}
-
-func tokenVaultLocationToPlugin(l *aigw.TokenVaultCredentialLocation) map[string]any {
 	if l == nil {
 		return nil
 	}
