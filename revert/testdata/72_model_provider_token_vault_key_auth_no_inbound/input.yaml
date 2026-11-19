@@ -1,0 +1,57 @@
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    host: localhost
+    routes:
+      - name: anthropic-messages
+        paths:
+          - /ai/claude/v1/messages
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+        plugins:
+          - name: key-auth
+            config:
+              key_names:
+                - apikey
+          - name: token-vault-exchange
+            config:
+              directory: my-directory
+              provider: anthropic
+              storage:
+                backend: konnect
+              subject_token_type: api_key
+          - name: ai-proxy-advanced
+            config:
+              balancer:
+                algorithm: round-robin
+              genai_category: text/generation
+              llm_format: anthropic
+              targets:
+                - description: claude-sonnet
+                  logging:
+                    log_payloads: false
+                    log_statistics: true
+                  model:
+                    model_alias: claude
+                    name: claude-sonnet
+                    options:
+                      anthropic_version: "2023-06-01"
+                    provider: anthropic
+                  route_type: llm/v1/chat
+  - name: token-vault-callback
+    host: localhost
+    routes:
+      - name: token-vault-callback-handler
+        paths:
+          - /_vault
+        protocols:
+          - http
+          - https
+        plugins:
+          - name: token-vault-callback-handler
+            config:
+              directory: my-directory
+              storage:
+                backend: konnect

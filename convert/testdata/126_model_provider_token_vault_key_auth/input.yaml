@@ -1,0 +1,134 @@
+# The anthropic provider gets its credential from the Token Vault. Each model
+# that targets it and reads its caller key with key-auth gets the derived
+# inbound credential in its token-vault-exchange plugin. The models show the
+# derived default name, a custom key name, an explicit inbound left untouched,
+# a body-only key warning, and an outbound-only credential that keeps its
+# outbound while gaining the derived inbound.
+datastores:
+  - name: vault-konnect-prod
+    type: token-vault
+    config:
+      directory: my-directory
+
+auth_strategies:
+  # no config: the key-auth default key name (apikey) is derived
+  - name: api-key-default
+    type: key-auth
+    display_name: API Key Default
+  - name: api-key-custom
+    type: key-auth
+    display_name: API Key Custom
+    config:
+      key_names: [x-custom-key]
+  - name: api-key-body
+    type: key-auth
+    display_name: API Key Body
+    config:
+      key_in_header: false
+      key_in_body: true
+
+models:
+  - name: claude
+    type: model
+    capabilities: [generate]
+    formats:
+      - type: anthropic
+    config:
+      route:
+        paths: [/ai/claude]
+    targets:
+      - name: claude-sonnet
+        provider: anthropic-vault
+        config:
+          type: anthropic
+    access:
+      auth_strategies: [api-key-default]
+  - name: claude-custom
+    type: model
+    capabilities: [generate]
+    formats:
+      - type: anthropic
+    config:
+      route:
+        paths: [/ai/claude-custom]
+    targets:
+      - name: claude-sonnet
+        provider: anthropic-vault
+        config:
+          type: anthropic
+    access:
+      auth_strategies: [api-key-custom]
+  # the explicit inbound wins; nothing is derived or warned
+  - name: claude-explicit
+    type: model
+    capabilities: [generate]
+    formats:
+      - type: anthropic
+    config:
+      route:
+        paths: [/ai/claude-explicit]
+    targets:
+      - name: claude-sonnet
+        provider: anthropic-explicit
+        config:
+          type: anthropic
+    access:
+      auth_strategies: [api-key-default]
+  # the strategy reads its key from the body, so nothing can be derived
+  - name: claude-body
+    type: model
+    capabilities: [generate]
+    formats:
+      - type: anthropic
+    config:
+      route:
+        paths: [/ai/claude-body]
+    targets:
+      - name: claude-sonnet
+        provider: anthropic-vault
+        config:
+          type: anthropic
+    access:
+      auth_strategies: [api-key-body]
+  # only the outbound is set: the inbound is derived and the outbound survives
+  - name: claude-outbound
+    type: model
+    capabilities: [generate]
+    formats:
+      - type: anthropic
+    config:
+      route:
+        paths: [/ai/claude-outbound]
+    targets:
+      - name: claude-sonnet
+        provider: anthropic-outbound
+        config:
+          type: anthropic
+    access:
+      auth_strategies: [api-key-default]
+
+model_providers:
+  - name: anthropic-vault
+    type: anthropic
+    datastores: [{name: vault-konnect-prod}]
+    token_vault:
+      provider: anthropic
+      subject_token_type: api_key
+  # the explicit inbound wins; nothing is derived
+  - name: anthropic-explicit
+    type: anthropic
+    datastores: [{name: vault-konnect-prod}]
+    token_vault:
+      provider: anthropic
+      subject_token_type: api_key
+      credential:
+        inbound: {location: header, name: Authorization, prefix: Bearer}
+  # only the outbound is set: the inbound is derived and the outbound survives
+  - name: anthropic-outbound
+    type: anthropic
+    datastores: [{name: vault-konnect-prod}]
+    token_vault:
+      provider: anthropic
+      subject_token_type: api_key
+      credential:
+        outbound: {location: header, name: X-Upstream-Key, prefix: ""}

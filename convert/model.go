@@ -389,6 +389,56 @@ func (c *Converter) appendTokenVaultExchange(pg *proxyGroup, model *kong.StringR
 	})
 }
 
+// deriveTokenVaultExchangeInbound fills the token-vault-exchange inbound
+// credential from the model's first key-auth strategy. The plugin default
+// inbound Authorization Bearer does not match where key-auth expects the
+// credential. An explicit inbound is never touched. A model without a
+// key-auth strategy matches the plugin default, so the derivation stays
+// silent for one.
+func (c *Converter) deriveTokenVaultExchangeInbound(
+	src ConversionIssueSource, m *aigw.Model, provider, field string, cfg map[string]any,
+) {
+	cred, _ := cfg["credential"].(map[string]any)
+	if cred != nil && cred["inbound"] != nil {
+		return
+	}
+	idp := c.firstKeyAuthStrategy(m.Access.AuthStrategies)
+	if idp == nil {
+		return
+	}
+	loc := aimap.TokenVaultInboundFromKeyAuth(idp.Config)
+	if loc == nil {
+		// The warning recurs on a re-conversion. The reverter synthesizes
+		// strategy names, so it names no strategy.
+		c.warn(src.at(field), BehaviorMayDiffer,
+			"Model %q: the key-auth strategy does not read its key from the headers, so "+
+				"token_vault.credential.inbound cannot be derived from it. The data plane keeps "+
+				"the default inbound (Authorization: Bearer), which the exchange will not find.",
+			m.Name)
+		return
+	}
+	if cred == nil {
+		cred = map[string]any{}
+		cfg["credential"] = cred
+	}
+	cred["inbound"] = aimap.TokenVaultLocationToPlugin(loc)
+	c.warn(src.at(field), ConfigFieldOverridden,
+		"Model %q: token_vault.credential.inbound of provider %q is derived from the key-auth strategy %q "+
+			"(header %q, its first key name, no prefix), because the plugin default "+
+			"Authorization: Bearer does not match where key-auth reads the key.",
+		m.Name, provider, idp.Name, loc.Name)
+}
+
+// firstKeyAuthStrategy returns the first key-auth strategy of refs, or nil.
+func (c *Converter) firstKeyAuthStrategy(refs []string) *aigw.AuthStrategy {
+	for _, ref := range refs {
+		if idp := c.authStrategies[ref]; idp != nil && idp.Type == "key-auth" {
+			return idp
+		}
+	}
+	return nil
+}
+
 // convertModelOnce runs fn for the model at index i. A skipped model only
 // replays its issues. When fn fails, it records the model as skipped and
 // returns false.
@@ -563,6 +613,15 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 					m.Name, tm.Name, passthroughFormat, passthroughFormat, format)
 			}
 		}
+	}
+
+	// Every route of the model carries the same auth strategies. One
+	// derivation therefore serves the whole model. The token vault is the
+	// first target's, so targets[0] is its producing target.
+	if tokenVault != nil {
+		c.deriveTokenVaultExchangeInbound(src, m, targets[0].provider.Name,
+			fmt.Sprintf("targets[%d].provider.token_vault.credential.inbound", targets[0].index),
+			tokenVault)
 	}
 
 	formats := c.effectiveFormats(lists, targets)
