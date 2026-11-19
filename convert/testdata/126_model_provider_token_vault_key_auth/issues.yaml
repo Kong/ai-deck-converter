@@ -1,0 +1,32 @@
+- code: CONFIG_FIELD_OVERRIDDEN
+  reason: 'Model "claude": token_vault.credential.inbound of provider "anthropic-vault" is derived from the key-auth strategy "api-key-default" (header "apikey", its first key name, no prefix), because the plugin default Authorization: Bearer does not match where key-auth reads the key.'
+  source:
+    kind: model
+    name: claude
+    fields:
+      - targets[0].provider.token_vault.credential.inbound
+  severity: WARNING
+- code: CONFIG_FIELD_OVERRIDDEN
+  reason: 'Model "claude-custom": token_vault.credential.inbound of provider "anthropic-vault" is derived from the key-auth strategy "api-key-custom" (header "x-custom-key", its first key name, no prefix), because the plugin default Authorization: Bearer does not match where key-auth reads the key.'
+  source:
+    kind: model
+    name: claude-custom
+    fields:
+      - targets[0].provider.token_vault.credential.inbound
+  severity: WARNING
+- code: BEHAVIOR_MAY_DIFFER
+  reason: 'Model "claude-body": the key-auth strategy does not read its key from the headers, so token_vault.credential.inbound cannot be derived from it. The data plane keeps the default inbound (Authorization: Bearer), which the exchange will not find.'
+  source:
+    kind: model
+    name: claude-body
+    fields:
+      - targets[0].provider.token_vault.credential.inbound
+  severity: WARNING
+- code: CONFIG_FIELD_OVERRIDDEN
+  reason: 'Model "claude-outbound": token_vault.credential.inbound of provider "anthropic-outbound" is derived from the key-auth strategy "api-key-default" (header "apikey", its first key name, no prefix), because the plugin default Authorization: Bearer does not match where key-auth reads the key.'
+  source:
+    kind: model
+    name: claude-outbound
+    fields:
+      - targets[0].provider.token_vault.credential.inbound
+  severity: WARNING
