@@ -20,6 +20,7 @@ type Document struct {
 	CACertificates []CACertificate `yaml:"ca_certificates,omitempty"`
 	Certificates   []Certificate   `yaml:"certificates,omitempty"`
 	SNIs           []SNI           `yaml:"snis,omitempty"`
+	BudgetStatus   *BudgetStatus   `yaml:"budget_status,omitempty"`
 }
 
 // documentFields mirrors Document without its UnmarshalYAML, so the decoder

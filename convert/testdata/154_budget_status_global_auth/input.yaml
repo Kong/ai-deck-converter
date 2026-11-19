@@ -1,0 +1,31 @@
+budget_status:
+  enabled: true
+models:
+  - name: open
+    type: model
+    capabilities: [generate]
+    formats:
+      - type: openai
+    config:
+      route:
+        paths: [/open]
+    targets:
+      - name: gpt-5.4
+        provider: openai-prod
+        config:
+          type: openai
+model_providers:
+  - name: openai-prod
+    type: openai
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://ai/openai-token}"
+policies:
+  - name: global-keys
+    type: key-auth
+    global: true
+    config:
+      key_names: [x-api-key]

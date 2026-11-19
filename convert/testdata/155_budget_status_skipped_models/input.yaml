@@ -1,0 +1,67 @@
+budget_status:
+  enabled: true
+models:
+  - name: keys
+    type: model
+    capabilities: [generate]
+    formats:
+      - type: openai
+    config:
+      route:
+        paths: [/keys]
+    targets:
+      - name: gpt-5.4
+        provider: openai-prod
+        config:
+          type: openai
+    access:
+      auth_strategies: [team-keys]
+  - name: off
+    type: model
+    enabled: false
+    capabilities: [generate]
+    formats:
+      - type: openai
+    config:
+      route:
+        paths: [/off]
+    targets:
+      - name: gpt-5.4
+        provider: openai-prod
+        config:
+          type: openai
+    access:
+      auth_strategies: [okta-oidc]
+  - name: broken
+    type: model
+    capabilities: [generate]
+    formats:
+      - type: openai
+    config:
+      route:
+        paths: [/broken]
+    targets:
+      - name: gpt-5.4
+        provider: missing-provider
+        config:
+          type: openai
+    access:
+      auth_strategies: [okta-oidc]
+model_providers:
+  - name: openai-prod
+    type: openai
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://ai/openai-token}"
+auth_strategies:
+  - name: team-keys
+    type: key-auth
+    config:
+      key_names: [x-api-key]
+  - name: okta-oidc
+    type: openid-connect
+    config:
+      issuer: https://dev-123456.okta.com/oauth2/default

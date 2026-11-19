@@ -114,6 +114,7 @@ const (
 	kindConsumer         = "consumer"
 	kindConsumerGroup    = "consumer_group"
 	kindSNI              = "sni"
+	kindBudgetStatus     = "budget_status"
 	kindConversionOption = "option"
 )
 

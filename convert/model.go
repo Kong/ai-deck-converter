@@ -242,6 +242,7 @@ func (c *Converter) convertModels() {
 		*c.out = out
 		c.issues = c.issues[:issueCount]
 	}
+	c.skippedModels = skipped
 }
 
 // convertModelsPass converts every model not in skipped. When a model fails,

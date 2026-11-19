@@ -1,0 +1,8 @@
+- code: UNSUPPORTED_IN_MIN_RUNTIME_VERSION
+  reason: budget_status requires minimum runtime version "2.4", but the configured minimum is "2.3"
+  source:
+    kind: budget_status
+    name: budget-status
+    fields:
+      - enabled
+  severity: ERROR
