@@ -331,7 +331,10 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 			}
 			if g == nil {
 				var err error
-				g, err = r.modelGroupFor(acc, rt, spec, groupFK, alias, llmFormat, section, capability, bases, cfg, nextEntry, refs, acls, idpRefs)
+				g, err = r.modelGroupFor(
+					acc, rt, spec, groupFK, alias, llmFormat, section, capability, bases, cfg, nextEntry,
+					refs, acls, idpRefs,
+				)
 				if err != nil {
 					return err
 				}
