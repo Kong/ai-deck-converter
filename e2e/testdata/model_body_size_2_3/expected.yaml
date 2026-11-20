@@ -1,0 +1,258 @@
+_format_version: "3.0"
+_transform: false
+services:
+  - id: 947a4e23-b483-5a65-8165-da9aed24565b
+    name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    host: ai-gateway.upstream.local
+    port: 80
+    protocol: http
+routes:
+  - id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+    name: openai-chat
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /openai-default/chat/completions
+    methods:
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: 2384fe9d-eacc-5ac2-ae4c-4752cc597f81
+    name: openai-chat-2
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /anthropic-default/chat/completions
+    methods:
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: 10bf6bcb-e990-5997-afc1-265030165eed
+    name: openai-chat-3
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /unpublished-default/chat/completions
+    methods:
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: ef4e4a2f-dd25-5098-9807-b856c5ab0b97
+    name: openai-chat-4
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /openai-api-default/chat/completions
+    methods:
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: 921e9a44-12ad-531b-b10e-bdaad96450a9
+    name: openai-chat-5
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /openai-configured/chat/completions
+    methods:
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+plugins:
+  - id: 17fa8192-4b9f-5b5a-8379-20ad8bc836a7
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+  - id: f3adc007-171c-5519-8763-3a0eef79bde3
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-5.2
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: openai-default
+            name: gpt-5.2
+            provider: openai
+          route_type: llm/v1/chat
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+    model:
+      id: d4f8c8db-b0c8-5ccc-9244-27254caf35aa
+  - id: dcebfb31-cc0f-5469-b6d7-9d8807a4e8d2
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route:
+      id: 2384fe9d-eacc-5ac2-ae4c-4752cc597f81
+  - id: 75ff22ed-6245-594b-895f-6a9fa36f4581
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: x-api-key
+            header_value: '{vault://ai/anthropic-key}'
+          description: claude-sonnet-4-5
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: anthropic-default
+            name: claude-sonnet-4-5
+            options:
+              anthropic_version: "2023-06-01"
+            provider: anthropic
+          route_type: llm/v1/chat
+    route:
+      id: 2384fe9d-eacc-5ac2-ae4c-4752cc597f81
+    model:
+      id: da980f2b-0aee-5c1a-9d5c-be936d2e6d06
+  - id: 5477cac7-3c38-581b-899b-f9d520e9d5e4
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route:
+      id: 10bf6bcb-e990-5997-afc1-265030165eed
+  - id: 628550fd-b362-5247-b3ba-f2f6fa95de13
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/mistral-key}'
+          description: mistral-large
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: unpublished-default
+            name: mistral-large
+            options:
+              mistral_format: openai
+            provider: mistral
+          route_type: llm/v1/chat
+    route:
+      id: 10bf6bcb-e990-5997-afc1-265030165eed
+    model:
+      id: dbb12399-359c-5242-9ad6-062797ca805a
+  - id: 3912bf60-1edb-5602-89ae-a8a2e41177f4
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route:
+      id: ef4e4a2f-dd25-5098-9807-b856c5ab0b97
+  - id: ccc68bd9-2622-5864-b026-137e5c06c755
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      max_request_body_size: 8388608
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-5.2
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: openai-api-default
+            name: gpt-5.2
+            provider: openai
+          route_type: llm/v1/chat
+    route:
+      id: ef4e4a2f-dd25-5098-9807-b856c5ab0b97
+    model:
+      id: e25d36dc-394f-5225-a926-a6c0d235c625
+  - id: cd4aa418-5dc5-57fe-860c-f5ddb6889d88
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route:
+      id: 921e9a44-12ad-531b-b10e-bdaad96450a9
+  - id: d7038ac4-55db-505a-824e-d2a548ec7424
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      max_request_body_size: 1048576
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-5.2
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: openai-configured
+            name: gpt-5.2
+            provider: openai
+          route_type: llm/v1/chat
+    route:
+      id: 921e9a44-12ad-531b-b10e-bdaad96450a9
+    model:
+      id: 445ea898-bd70-59f3-aff0-984aad583fce
+ai_models:
+  - id: d4f8c8db-b0c8-5ccc-9244-27254caf35aa
+    name: openai-default
+  - id: da980f2b-0aee-5c1a-9d5c-be936d2e6d06
+    name: anthropic-default
+  - id: dbb12399-359c-5242-9ad6-062797ca805a
+    name: unpublished-default
+  - id: e25d36dc-394f-5225-a926-a6c0d235c625
+    name: openai-api-default
+  - id: 445ea898-bd70-59f3-aff0-984aad583fce
+    name: openai-configured
