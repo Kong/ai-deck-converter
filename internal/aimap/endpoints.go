@@ -344,6 +344,12 @@ var EndpointTable = map[string]map[string]EndpointEntry{
 				},
 			},
 		},
+		"decisions": {
+			Primary: EndpointSpec{
+				"decisions", "/decisions", false, mPost, "llm/v1/decisions", catTextGen,
+				&defaultBodyModelSelectorConfig, true,
+			},
+		},
 		"realtime": {
 			Primary: EndpointSpec{
 				"realtime", "/realtime", false, nil, RealtimeRouteType, catRealtime,

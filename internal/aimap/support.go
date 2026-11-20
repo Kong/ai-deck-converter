@@ -48,6 +48,7 @@ var supportedRouteTypes = map[string][]string{
 	"llm/v1/batches":                {"openai", "azure", "bedrock", "anthropic", "gemini", "kimi"},
 	"llm/v1/files":                  {"openai", "azure", "kimi"},
 	"llm/v1/skills":                 {"openai", "anthropic"},
+	"llm/v1/decisions":              {"openai"},
 	"image/v1/images/generations":   {"openai", "azure", "bedrock", "gemini", "dashscope", "xai", "vercel"},
 	"image/v1/images/edits":         {"openai", "azure", "bedrock", "gemini", "dashscope"},
 	"audio/v1/audio/speech":         {"openai", "azure"},
