@@ -242,6 +242,25 @@ func TestEndpointsForAndSectionEndpoints(t *testing.T) {
 
 	// openai's agentic capability carries the generated lifecycle secondary that
 	// serves the ID-addressed Responses operations.
+	agentic, ok := EndpointsFor("openai", "agentic")
+	require.True(t, ok)
+	require.Len(t, agentic, 2, "openai agentic has a create route and a lifecycle route")
+	require.Equal(t, "/responses", agentic[0].PathSuffix)
+	require.Equal(t, mPost, agentic[0].Methods, "the create route keeps its own methods")
+	require.NotNil(t, agentic[0].DefaultModelSelectorConfig, "a create request carries the model")
+	require.Equal(t, ResponsesLifecycleRouteLabel, agentic[1].RouteLabel)
+	require.True(t, agentic[1].IsRegex)
+	require.Nil(t, agentic[1].DefaultModelSelectorConfig, "an ID-addressed request carries no model")
+	require.Equal(t, mGetPostDelete, agentic[1].Methods)
+	// The optional slash group spans the bare path and every sub-path.
+	require.Equal(t, "responses(/)?", agentic[1].PathSuffix)
+	require.True(t, StripsOwnPath("openai", "agentic"),
+		"the Responses routes strip their own path")
+	require.False(t, StripsOwnPath("bedrock", "agentic"),
+		"the bedrock Responses endpoint keeps the route prefix")
+	require.False(t, StripsOwnPath("openai", "generate"),
+		"a chat route does not strip")
+
 	wantOpenAI := 0
 	for _, entry := range EndpointTable["openai"] {
 		wantOpenAI += 1 + len(entry.Secondary)

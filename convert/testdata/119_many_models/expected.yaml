@@ -68,7 +68,7 @@ services:
         response_buffering: true
       - name: openai-responses-lifecycle
         paths:
-          - ~/responses/.+
+          - ~/responses(/)?
         methods:
           - GET
           - POST
@@ -195,7 +195,7 @@ services:
         response_buffering: true
       - name: openai-responses-lifecycle-2
         paths:
-          - ~/compat/responses/.+
+          - ~/compat/responses(/)?
         methods:
           - GET
           - POST

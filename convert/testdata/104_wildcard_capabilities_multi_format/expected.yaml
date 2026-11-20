@@ -16,16 +16,16 @@ services:
         methods:
           - POST
           - OPTIONS
-        strip_path: false
+        strip_path: true
       - name: openai-responses-lifecycle
         paths:
-          - ~/chat/responses/.+
+          - ~/chat/responses(/)?
         methods:
           - GET
           - POST
           - DELETE
           - OPTIONS
-        strip_path: false
+        strip_path: true
         tags:
           - aigw:responses-lifecycle
       - name: openai-audio-speech
