@@ -13,8 +13,9 @@ const IntelligentAlgorithm = "intelligent"
 // data plane has no field for it.
 const IntelligentVersion = "v1"
 
-// The strategy field selects the algorithm during the tech preview. The
-// public API spec leaves it out. It goes away when one algorithm ships at GA.
+// The strategy field selects the algorithm. During the tech preview only Kong
+// sets it, and the public API spec leaves it out. At GA Kong sets the default
+// and the field stays accepted.
 const (
 	IntelligentStrategyWeighted = "weighted"
 	IntelligentStrategyMargin   = "margin"
