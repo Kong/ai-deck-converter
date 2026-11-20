@@ -67,6 +67,16 @@ services:
           - http
           - https
         strip_path: false
+      - name: openai-decisions
+        paths:
+          - /ai/v1/decisions
+        methods:
+          - POST
+          - OPTIONS
+        protocols:
+          - http
+          - https
+        strip_path: false
       - name: openai-embeddings
         paths:
           - /ai/embeddings
@@ -270,6 +280,32 @@ plugins:
             provider: openai
           route_type: audio/v1/audio/translations
     route: openai-audio-translate
+    model: everything
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 50000000
+      sources:
+        - body_path: model
+          source: body
+    route: openai-decisions
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/decisions
+      llm_format: openai
+      max_request_body_size: 50000000
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: everything
+            name: gpt-5.4
+            provider: openai
+          route_type: llm/v1/decisions
+    route: openai-decisions
     model: everything
   - name: ai-model-selector
     config:

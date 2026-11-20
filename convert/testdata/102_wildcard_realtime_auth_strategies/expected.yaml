@@ -67,6 +67,16 @@ services:
           - http
           - https
         strip_path: false
+      - name: openai-decisions
+        paths:
+          - /two/v1/decisions
+        methods:
+          - POST
+          - OPTIONS
+        protocols:
+          - http
+          - https
+        strip_path: false
       - name: openai-embeddings
         paths:
           - /two/embeddings
@@ -164,6 +174,16 @@ services:
       - name: openai-audio-translate-2
         paths:
           - /one/audio/translations
+        methods:
+          - POST
+          - OPTIONS
+        protocols:
+          - http
+          - https
+        strip_path: false
+      - name: openai-decisions-2
+        paths:
+          - /one/v1/decisions
         methods:
           - POST
           - OPTIONS
@@ -401,6 +421,32 @@ plugins:
             provider: openai
           route_type: audio/v1/audio/translations
     route: openai-audio-translate
+    model: two-strategies
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 50000000
+      sources:
+        - body_path: model
+          source: body
+    route: openai-decisions
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/decisions
+      llm_format: openai
+      max_request_body_size: 50000000
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: two-strategies
+            name: gpt-5.4
+            provider: openai
+          route_type: llm/v1/decisions
+    route: openai-decisions
     model: two-strategies
   - name: ai-model-selector
     config:
@@ -652,6 +698,32 @@ plugins:
             provider: openai
           route_type: audio/v1/audio/translations
     route: openai-audio-translate-2
+    model: one-strategy
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 50000000
+      sources:
+        - body_path: model
+          source: body
+    route: openai-decisions-2
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/decisions
+      llm_format: openai
+      max_request_body_size: 50000000
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: one-strategy
+            name: gpt-5.4
+            provider: openai
+          route_type: llm/v1/decisions
+    route: openai-decisions-2
     model: one-strategy
   - name: ai-model-selector
     config:
@@ -900,6 +972,17 @@ plugins:
     config:
       anonymous: anonymous
       issuer: https://dev-123456.okta.com/oauth2/default
+    route: openai-decisions
+  - name: key-auth
+    config:
+      anonymous: anonymous
+      key_names:
+        - x-api-key
+    route: openai-decisions
+  - name: openid-connect
+    config:
+      anonymous: anonymous
+      issuer: https://dev-123456.okta.com/oauth2/default
     route: openai-embeddings
   - name: key-auth
     config:
@@ -964,6 +1047,10 @@ plugins:
     config:
       issuer: https://dev-123456.okta.com/oauth2/default
     route: openai-audio-translate-2
+  - name: openid-connect
+    config:
+      issuer: https://dev-123456.okta.com/oauth2/default
+    route: openai-decisions-2
   - name: openid-connect
     config:
       issuer: https://dev-123456.okta.com/oauth2/default

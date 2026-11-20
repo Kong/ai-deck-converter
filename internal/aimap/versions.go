@@ -76,6 +76,7 @@ const (
 	FeatureTypesafe                   Feature = "typesafe"
 	FeatureDecisionsCapability        Feature = "decisions-capability"
 	FeatureSkillsCapability           Feature = "skills-capability"
+	FeatureOpenAIDecisions            Feature = "openai-decisions"
 	FeatureFailoverHTTPCodes          Feature = "failover-http-codes"
 	FeatureBedrockVPCEndpoint         Feature = "bedrock-vpc-endpoint"
 	FeatureBedrockEndpointType        Feature = "bedrock-endpoint-type"
@@ -156,6 +157,7 @@ var featureSince = map[Feature]Version{
 	FeatureSessionAffinity:               mustVersion("2.4"),
 	FeatureIntelligentBalancer:           mustVersion("2.5"),
 	FeatureMeta:                          mustVersion("2.4"),
+	FeatureOpenAIDecisions:               mustVersion("2.4"),
 }
 
 // Since returns the first AI Gateway release that has f. It panics for an
@@ -236,11 +238,12 @@ var capabilityFeatures = map[string]Feature{
 	"skills":    FeatureSkillsCapability,
 }
 
-// geminiCapabilityFeatures gates a capability only in the gemini section.
+// sectionCapabilityFeatures gates a capability in one section.
 // Bedrock and OpenAI also serve "agentic", but neither needs the gate: both
 // shipped it before this feature existed.
-var geminiCapabilityFeatures = map[string]Feature{
-	"agentic": FeatureGeminiAgenticCapability,
+var sectionCapabilityFeatures = map[string]Feature{
+	"gemini/agentic":   FeatureGeminiAgenticCapability,
+	"openai/decisions": FeatureOpenAIDecisions,
 }
 
 // gatedEndpoints gates one endpoint of a capability that shipped later than
@@ -259,10 +262,8 @@ func EndpointFeature(section, routeLabel string) (Feature, bool) {
 // CapabilityFeature returns the feature that gates the canonical capability
 // in the given endpoint section (aimap.SectionFor).
 func CapabilityFeature(section, capability string) (Feature, bool) {
-	if section == "gemini" {
-		if f, ok := geminiCapabilityFeatures[capability]; ok {
-			return f, true
-		}
+	if f, ok := sectionCapabilityFeatures[section+"/"+capability]; ok {
+		return f, true
 	}
 	f, ok := capabilityFeatures[capability]
 	return f, ok
