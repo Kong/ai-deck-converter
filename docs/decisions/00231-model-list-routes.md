@@ -34,8 +34,8 @@ In scope:
 - One list route for each base path, format and set of model route rules,
   for the `openai` and the `anthropic` formats. The root `/` is a base path
   like any other.
-- One `ai-models-list` plugin on each list route, with one source per
-  `ai-proxy-advanced` instance that its models emit. Each source carries the
+- One `ai-models-list` plugin on each list route, with one entry per alias
+  that its models serve. Each entry carries the alias, the format and the
   model's `access.acls` as its access rule.
 - On each list route, the route rules and auth strategies of its model
   routes.
@@ -90,13 +90,13 @@ A list shows virtual models only, one entry per alias however many targets
 the model has. The entry id is the alias that a client sends to select the
 model. A model without `config.route.model.values` uses its name as its alias.
 A model with several values gets one entry for each value, and its name does
-not appear. The gateway builds each entry from the model's targets, so the
-list needs no second source of truth.
+not appear. The converter writes each entry from the model, so the list needs
+no second source of truth.
 
 A passthrough model is not listed. A base path whose models are all passthrough gets no list, its passthrough route already forwards the list request to the provider's own list. On a base
 path that also has virtual models, the list shows only the virtual models.
 
-A model's `access.acls` becomes the access rule of its list sources. The
+A model's `access.acls` becomes the access rule of its list entries. The
 gateway hides a model from a caller the rule excludes, as the acl plugin
 rejects that caller on the model route. One exception: a CEL rule that reads
 the request (`http.*`, `route.*` or `service.*`) shows the model to every
@@ -175,8 +175,8 @@ sequenceDiagram
     C->>R: GET /claude-code/v1/models
     R->>R: openid-connect authenticates the caller
     R->>L: authenticated request
-    L->>L: claude-sonnet source has no rule, so show it
-    L->>L: claude-opus source denies contractors, so hide it
+    L->>L: claude-sonnet entry has no rule, so show it
+    L->>L: claude-opus entry denies contractors, so hide it
     L-->>C: 200 [claude-sonnet]
 ```
 
@@ -215,8 +215,8 @@ it cannot carry yet.
 ## List routes
 
 `convertModelLists` runs after the agent pass and before the routing conflict
-check. It groups the instance ids that each model emits by a key with three
-parts:
+check. It groups the aliases that each model's `ai-proxy-advanced` instances
+serve by a key with three parts:
 
 - The list path, which it computes from the base path and the instance's
   `llm_format`. Only the `openai` and `anthropic` formats make a list. The key
@@ -237,13 +237,10 @@ An OpenAI-format model on `/v1` and an Anthropic-format model on `/` with
 equal rules share the list path `/v1/models`, so they share one list route.
 `ai-models-list` picks the response format per request from the
 `anthropic-version` header. The kong-ee change must also make it serve only
-the sources whose `llm_format` matches that format: an OpenAI client on `/v1`
+the entries whose `format` matches that format: an OpenAI client on `/v1`
 cannot call the Anthropic model, whose route is `/v1/messages`.
 
-Each instance id appears once in a list's `sources`, because the gateway
-rejects a config with a repeated `plugin_id`.
-
-Each group with at least one source emits one route, `<format>-models` for the
+Each group with at least one entry emits one route, `<format>-models` for the
 root and `<format>-models-<base>` for the others. A route that serves both
 formats takes the `openai` name. The `<base>` part replaces each character
 that a Kong name does not accept with `-`. A name that another
@@ -258,21 +255,22 @@ plugins:
   - name: ai-models-list
     route: anthropic-models-team-a
     config:
-      sources:
-        - plugin_id: c32e7c3e-b43c-56b9-bf90-d660df5cd572
+      models:
+        - name: claude-opus
+          format: anthropic
           access: {deny: [contractors]}
 ```
 
 A model emits one `ai-proxy-advanced` instance for each route and alias it
 makes, for example one per capability and one per value of
-`config.route.model.values`. Those instances stay on the model routes and
-never answer a list request. The list plugin names each of them as a source.
-All instances of one alias advertise the same id. The gateway keeps the first
-entry for an id that the caller may see, so a model with several capabilities
-still gets one entry per alias.
+`config.route.model.values`. The converter writes each alias of a model once
+per list, however many instances serve it. Two models with the same alias on
+one list each get an entry, and the gateway shows the alias once, from the
+first entry that the caller may see.
 
 For the `/claude-code` models of the example, the output looks like this.
-Each box is a route with its plugins. Dashed lines are list sources:
+Each box is a route with its plugins. Dashed lines join each entry to the
+model it lists:
 
 ```mermaid
 flowchart LR
@@ -286,24 +284,24 @@ flowchart LR
         O["ai-proxy-advanced<br/>model: claude-opus"]
         A["acl deny: contractors<br/>model: claude-opus"]
     end
-    L -. "source, no access rule" .-> S
-    L -. "source, deny: contractors" .-> O
+    L -. "entry, no access rule" .-> S
+    L -. "entry, deny: contractors" .-> O
 ```
 
-The list never sends a request through the `ai-proxy-advanced` instances. It
-reads their targets from the gateway configuration. The `acl` plugin keeps
-guarding inference on the model route.
+The list never sends a request through the `ai-proxy-advanced` instances, and
+it does not read them. The `acl` plugin keeps guarding inference on the model
+route.
 
 `ai-models-list` has no `acls` field. The `config.acls` of `ai-proxy-advanced`
 cannot hold the CEL rules (`allow_when`, `deny_when`) that a model's access
-rule can hold. `sources[].access` carries all four acl fields.
+rule can hold. `models[].access` carries all four acl fields.
 
 The gateway cannot evaluate a CEL rule that reads `http.*`, `route.*` or
-`service.*` on a list request, so it shows such a source to every caller, for
+`service.*` on a list request, so it shows such an entry to every caller, for
 `allow_when` and `deny_when` alike. The acl plugin still evaluates the rule on
 the model route. A hidden model gives the caller no reason. A refusal on the
-model route says why. Today the `serve-model-list` filter hides such a
-source, so the kong-ee change must make `ai-models-list` show it.
+model route says why. Today the `serve-model-list` filter hides such a model,
+so the kong-ee change must make `ai-models-list` show it.
 
 The converter copies the rule as it is. It has no CEL parser, so it matches the
 rule text against `http.`, `route.` and `service.`. On a match it reports one
@@ -312,34 +310,13 @@ model to every caller. A match inside a string literal is a false positive, but
 it costs only a warning. An admin clears the warning by setting
 `config.model.listed: false` on the model, which takes it off every list.
 
-## Source ids
-
-`sources[].plugin_id` needs an id that survives a reload, so each advertised
-`ai-proxy-advanced` instance carries an `id` derived from its route name and
-rendered config (`kong.StableUUID`). The rendered config decides it, not the
-model name or alias, because revert recovers those differently and the round
-trip must stay byte-identical.
-
-The db-less encoder (`internal/kong/to_dbless.go`) gives a plugin without an
-`id` the id `StableUUID("plugin:top:<name>:<index>")`, but it keeps an
-explicit `id`. So an advertised instance has the same id in decK and db-less
-output. The index-based id cannot be a source id: decK output carries no id,
-and the index changes when a plugin is added before it.
-
-Two models with the same alias, route and targets render the same config.
-RFC 00229 reports that input as a `ROUTING_CONFLICT`, but the data plane
-accepts it, and equal ids would make it reject the whole config. So the
-second such instance also hashes an occurrence count (`2`, then `3`). The
-first hashes none, so configs without such a pair keep their ids.
-
 ## Entry fields
 
-The gateway reads `display_name`, `description`, `max_input_tokens`,
-`max_tokens` and `capabilities` only from `targets[].metadata`. The converter
-writes no `metadata` record, and the AI Gateway model has no field for the
-limits. So a list entry carries only the alias. The `serve-model-list` filter
-also advertises `cost` from the target's prices. The kong-ee change must
-leave `cost` out of `ai-models-list`. See [Follow-ups](#follow-ups).
+An entry has three fields: `name`, the alias; `format`, the instance's
+`llm_format`; and `access`, the model's `access.acls`. The `serve-model-list`
+filter reads `display_name`, `description`, `max_input_tokens`, `max_tokens`,
+`capabilities` and `cost` from the targets. `ai-models-list` does not read the
+targets, so a list response carries none of these fields. See [Follow-ups](#follow-ups).
 
 ## Authentication
 
@@ -354,7 +331,7 @@ name, because platform-api allows a model at most one strategy of each type.
 With no strategy and no global authentication policy, the model routes carry
 no auth plugin, and neither does the list route. The list is then public,
 like its models. `ai-models-list` serves an unidentified caller only the
-sources without an access rule. A source with a rule needs consumer groups to
+entries without an access rule. An entry with a rule needs consumer groups to
 match, and the acl plugin rejects that caller on the model route. Today the
 `serve-model-list` filter answers 401 to such a caller, so the kong-ee change
 must remove that check. A global authentication policy
@@ -376,8 +353,8 @@ only TLS.
 
 ## Instances left out
 
-The gateway advertises a target only by its `model_alias`. The converter
-leaves these instances out of every list:
+The converter lists the alias of an instance only when a client can select a
+model by it. It leaves these instances out of every list:
 
 - `type: api` (files, batches). Its requests carry no model, so its targets
   stay alias-less to remain in the gateway's default balancer pool.
@@ -402,7 +379,7 @@ A group is one list path with one set of route rules and auth strategies.
 flowchart TD
     A["List path, route rules and<br/>auth strategies with at least one model"] --> C{"min runtime version 2.4 or later?"}
     C -- no --> N1["No list"]
-    C -- yes --> E{"Any instance left to advertise?<br/>From a model without listed: false.<br/>Not type: api, Gemini Interactions,<br/>realtime, Responses or video lifecycle,<br/>OpenAI-format mantle or passthrough"}
+    C -- yes --> E{"Any instance left to list?<br/>From a model without listed: false.<br/>Not type: api, Gemini Interactions,<br/>realtime, Responses or video lifecycle,<br/>OpenAI-format mantle or passthrough"}
     E -- no --> N1
     E -- yes --> D{"Enabled agent route overlaps<br/>GET on the list path?"}
     D -- yes --> N3["No list.<br/>ROUTING_CONFLICT warning on the agent"]
@@ -411,7 +388,7 @@ flowchart TD
 
 ## Existing GET route
 
-For a group with an instance to advertise, the converter checks the agent
+For a group with an instance to list, the converter checks the agent
 routes with the overlap rules of RFC 00229. An agent route that matches `GET`
 on the list path keeps its path. The converter makes no list for that group
 and reports a `ROUTING_CONFLICT` warning on the agent that names the list
@@ -472,10 +449,9 @@ calls the converter.
 
 `aimap.FeatureModelLists` gates the list on 2.4. A 2.3 data plane has no
 `ai-models-list` plugin and rejects the list route. Below the gate the
-converter makes no list route, gives no instance an `id` and reports no
-issue. Lists are on by default, so a warning there would follow every
-document, and an admin could not clear it. A model that sets
-`config.model.listed` below the gate gets the usual
+converter makes no list route and reports no issue. Lists are on by default,
+so a warning there would follow every document, and an admin could not clear
+it. A model that sets `config.model.listed` below the gate gets the usual
 `UNSUPPORTED_IN_MIN_RUNTIME_VERSION` warning at that field. Konnect rejects
 such a request first, through `x-min-runtime-version`.
 
@@ -492,8 +468,8 @@ by both directions.
 This example maps a platform-api model (`AIGatewayModelModel`, ai-gateways
 v2) to the data plane config the converter emits for it.
 
-The `ai-models-list` side is complete: the converter sets the only two fields
-of a source, `plugin_id` and `access`.
+The `ai-models-list` side is complete: the converter sets all three fields of
+an entry, `name`, `format` and `access`.
 
 A variant of the example's `claude-opus` that sets one alias in
 `model.values`:
@@ -519,8 +495,7 @@ models:
 ```
 
 converts to this output. Plugins and fields that do not affect the list are
-left out. The `id` is illustrative: the real one hashes the full rendered
-config:
+left out:
 
 ```yaml
 services:
@@ -535,7 +510,6 @@ services:
         protocols: [http, https]
 plugins:
   - name: ai-proxy-advanced
-    id: 6f1c0b9e-0d3a-5c47-9f2e-3b8a1d7e4c21  # kong.StableUUID
     route: anthropic-messages
     model: claude-opus-4-7
     config:
@@ -556,15 +530,17 @@ plugins:
   - name: ai-models-list
     route: anthropic-models-claude-code
     config:
-      sources:
-        - plugin_id: 6f1c0b9e-0d3a-5c47-9f2e-3b8a1d7e4c21
+      models:
+        - name: claude-opus-4-7
+          format: anthropic
           access: {deny: [contractors]}
   - name: openid-connect
     route: anthropic-models-claude-code
 ```
 
 A caller of `GET /claude-code/v1/models` outside `contractors` gets one entry,
-`claude-opus-4-7`. The entry has no `display_name` and no `cost`.
+`claude-opus-4-7`, the alias from `model.values`, not the model name. The
+entry has no `display_name` and no `cost`.
 
 # Drawbacks
 [drawbacks]: #drawbacks
@@ -574,17 +550,9 @@ A caller of `GET /claude-code/v1/models` outside `contractors` gets one entry,
 - Anthropic-format clients such as Claude Code keep only ids that contain
   `claude` or `anthropic`. The gateway serves other ids, such as `gpt-5-4`,
   and logs a warning, but Claude Code does not show them.
-- From 2.4, every advertised `ai-proxy-advanced` instance carries an `id`.
-  The field is valid in decK and db-less output, but it widens the diff.
-  Output below the gate does not change.
 - Lists are on by default, so a 2.4 gateway serves a list path that its admin
   did not ask for. The list route carries the route rules and auth strategies
-  of its model routes, and each source keeps the access rule of its model.
-- A model declared on several base paths is advertised on several lists, so
-  the same instance id repeats. The gateway deduplicates per caller.
-- The gateway logs a warning on each rebuild for each id that more than one
-  source advertises. Every model with several capabilities logs one. The
-  kong-ee change can drop that warning for instances of one alias.
+  of its model routes, and each entry keeps the access rule of its model.
 - Two models on one base path with equal route rules and different auth
   strategies get list routes that match the same requests. Kong sends each
   list request to one of them, so the callers of the other strategy get no
@@ -618,11 +586,14 @@ A caller of `GET /claude-code/v1/models` outside `contractors` gets one entry,
 - List every model of the gateway at the root. Rejected: the root route would
   carry the union of the auth strategies of every model. A root that acts like
   any other base path lists only the models declared on it.
-- Reference the source instances by name. Rejected: the `sources` schema
-  accepts a plugin id only.
-- Put the model's ACL plugins on the list route. Rejected: the gateway reads a
-  source's rule per model, so a route-scoped rule would hide or show the whole
-  list.
+- Name the `ai-proxy-advanced` instances as sources by plugin id, as the
+  `serve-model-list` filter does. Rejected: the list needs only the alias and
+  the format from them, and the converter knows both. A plugin id needs a
+  stable `id` on every listed instance, and a tie-break for two instances
+  that render the same config.
+- Put the model's ACL plugins on the list route. Rejected: the gateway reads
+  an entry's rule per model, so a route-scoped rule would hide or show the
+  whole list.
 - One list route per base path and format that matches on its path only,
   with the union of its models' auth strategies. Rejected: it shows a model to
   callers that its model route's hosts or headers exclude, so a model on an
@@ -649,13 +620,14 @@ None.
   different prices, so one price per entry can differ from what a request
   costs. Most data planes also take target prices from the LLM pricing
   service, not from the config. `kong.llm.dynamic_pricing.price_loader` polls
-  that service at run time. The follow-up decides which price an entry shows,
-  and `ai-models-list` reads that price per request with
+  that service at run time. The follow-up decides which price an entry shows.
+  The converter can add the provider and upstream model of each target to
+  the entry, and `ai-models-list` can read the price per request with
   `price_loader.get_entry_by_provider_model`.
 - Display names, token limits and capabilities on list entries. The converter
-  can pass the model's `display_name`. The polled catalog carries
+  can add the model's `display_name` to the entry. The polled catalog carries
   `context_length` and `max_tokens` for each upstream model. A virtual model
-  with several targets would advertise the smallest value. A value set on the
+  with several targets would show the smallest value. A value set on the
   model needs a new platform-api field.
 
 # Testing
@@ -666,7 +638,7 @@ New golden cases, at the default runtime version 2.4:
 - `140_model_lists`: one model without `config.route.paths`, and two
   models on two other base paths, all with an auth strategy. One model has
   `access.acls` that denies a consumer group. Its output covers a root list
-  with only the root model, one list per base path and a source access rule.
+  with only the root model, one list per base path and an entry access rule.
 - `141_model_lists_formats`: a model with the `openai` and the
   `anthropic` format is on `<base>/models` and on `<base>/v1/models`. A
   `gemini`-format model makes no list.
@@ -680,9 +652,8 @@ New golden cases, at the default runtime version 2.4:
   path leave the list in place. An agent with `hosts` and no `methods` still
   suppresses it.
 - `144_model_lists_unlisted`: the input of `140` where every model sets
-  `config.model.listed: false` makes no list route, gives no instance an `id`
-  and reports no issue. A base path with one listed and one unlisted model
-  lists only the listed one.
+  `config.model.listed: false` makes no list route and reports no issue. A
+  base path with one listed and one unlisted model lists only the listed one.
 - `145_model_lists_no_auth`: a base path whose models set no auth strategy
   gets a list route with no auth plugin, and the converter reports no issue.
 - `146_model_lists_global_auth`: the same input with a global authentication
@@ -690,14 +661,15 @@ New golden cases, at the default runtime version 2.4:
 - `147_model_lists_aliases`: a model with two `config.route.model.values`
   gets two entries, and a base path with only `type: api` models gets no list.
 - `148_model_lists_request_conditions`: a model whose `deny_when` reads
-  `http.headers` gets a source that carries the rule as it is, and one
+  `http.headers` gets an entry that carries the rule as it is, and one
   `BEHAVIOR_MAY_DIFFER` warning that says the list shows the model. A
   `deny_when` that reads none of `http.`, `route.` and `service.` gets no
   warning.
-- `149_model_lists_duplicate_alias`: two models with the same alias,
-  route and targets get two distinct instance ids.
+- `149_model_lists_duplicate_alias`: two models with the same alias on one
+  base path get one entry each, and a model with two capabilities gets one
+  entry.
 - `150_model_lists_paths`: a model on `/team` and `/team/` gets one
-  list with each instance id once, and a model with
+  list with each alias once, and a model with
   `config.route.protocols: [https]` gets an https-only list route.
 - `151_model_lists_route_rules`: two models on `/` with different `hosts` get
   two list routes, each with the hosts of its model route and only its own
@@ -705,22 +677,21 @@ New golden cases, at the default runtime version 2.4:
   two list routes and a `ROUTING_CONFLICT` warning.
 - `152_model_lists_shared_path`: an OpenAI-format model on `/v1` and an
   Anthropic-format model on `/` share one `GET /v1/models` list route with
-  both sources.
+  an entry of each format.
 
-Existing golden cases at 2.4 with an instance to advertise gain list routes
-and instance ids, so their expected output is regenerated. The golden cases
-also cover:
+Existing golden cases at 2.4 with an instance to list gain list routes, so
+their expected output is regenerated. The golden cases also cover:
 
 - Every below-gate `min_runtime_*` golden case keeps its output: no list
-  route, no instance `id` and no list issue. A new below-gate case that sets
+  route and no list issue. A new below-gate case that sets
   `config.model.listed` gets one `UNSUPPORTED_IN_MIN_RUNTIME_VERSION` warning
   at that field.
 - The realtime golden cases (`100_wildcard_realtime_global_auth`,
   `102_wildcard_realtime_auth_strategies`, `107_realtime_log_payloads`)
-  advertise no `ws`/`wss` instance. The case
-  `101_wildcard_targets_and_video` advertises neither its video lifecycle nor
+  list no `ws`/`wss` instance. The case
+  `101_wildcard_targets_and_video` lists neither its video lifecycle nor
   its `openai-responses-lifecycle` instance. `105_wildcard_bedrock_mantle`
-  advertises no OpenAI-format mantle instance.
+  lists no OpenAI-format mantle instance.
 - The auth-strategy golden cases (`51_auth_strategies`,
   `52_auth_strategies_multi`, `24_identity_providers`,
   `25_identity_providers_multi`, `102_wildcard_realtime_auth_strategies`)
