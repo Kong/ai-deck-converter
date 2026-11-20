@@ -181,6 +181,9 @@ func (r *Reverter) run() error {
 	if err := r.revertServices(); err != nil {
 		return err
 	}
+	if err := r.liftIntelligentBalancers(); err != nil {
+		return err
+	}
 	r.out.ModelProviders = r.providers
 	r.out.Policies = r.policies
 	r.out.AuthStrategies = r.authStrategies

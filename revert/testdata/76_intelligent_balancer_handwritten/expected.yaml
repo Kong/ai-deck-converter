@@ -1,0 +1,99 @@
+models:
+  - type: model
+    name: near
+    capabilities:
+      - generate
+    formats:
+      - type: openai
+    targets:
+      - name: gpt-5-mini
+        provider: openai-env
+        config:
+          type: openai
+      - name: gpt-5
+        provider: openai-env
+        config:
+          type: openai
+    config:
+      route:
+        paths:
+          - /near
+      logging:
+        payloads: false
+        statistics: true
+      balancer:
+        algorithm: intelligent
+        classifier:
+          auth:
+            headers:
+              - name: Authorization
+                value: '{vault://env/typesafe-token}'
+            type: basic
+          context_window: 32768
+          name: jev-latest
+          type: custom
+          url: https://api.typesafe.ai
+  - type: model
+    name: margin
+    capabilities:
+      - generate
+    formats:
+      - type: openai
+    targets:
+      - name: gpt-5-mini
+        provider: openai-env
+        config:
+          type: openai
+    config:
+      route:
+        paths:
+          - /margin
+      logging:
+        payloads: false
+        statistics: true
+      balancer:
+        algorithm: intelligent
+        classifier:
+          auth:
+            headers:
+              - name: x-api-key
+                value: '{vault://env/kev-key}'
+            type: basic
+          context_window: 8192
+          format: /decide/v1/systemone
+          name: kev-latest
+          timeout: 2000
+          type: custom
+          url: http://kev.internal:8009/
+        cost_quality_tradeoff: cost
+        strategy: margin
+  - type: model
+    name: old-shape
+    capabilities:
+      - generate
+    formats:
+      - type: openai
+    targets:
+      - name: gpt-5-mini
+        provider: openai-env
+        config:
+          type: openai
+    config:
+      route:
+        paths:
+          - /old-shape
+      logging:
+        payloads: false
+        statistics: true
+      balancer:
+        algorithm: intelligent
+        cost_quality_tradeoff: quality
+model_providers:
+  - type: openai
+    name: openai-env
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: '{vault://env/openai-key}'

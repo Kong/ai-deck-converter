@@ -447,10 +447,12 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 		// ai-proxy-advanced refuses the semantic algorithm alongside a passthrough
 		// target: choosing semantically means reading a request body whose shape
 		// passthrough does not define.
-		if balancerAlgorithm(m.Config.Balancer) == "semantic" {
+		// ai-proxy-advanced refuses the intelligent algorithm there too.
+		if algorithm := balancerAlgorithm(m.Config.Balancer); algorithm == "semantic" ||
+			algorithm == aimap.IntelligentAlgorithm {
 			return c.fail(src.at("formats", "config.balancer.algorithm"), ConfigFieldInvalid,
-				"model %q: the passthrough format cannot use the semantic balancer algorithm",
-				m.Name)
+				"model %q: the passthrough format cannot use the %s balancer algorithm",
+				m.Name, algorithm)
 		}
 		// Kong allows one plugin of a name per route, and without a selector nothing
 		// tells two ai-proxy-advanced plugins on one route apart. Two passthrough
@@ -493,6 +495,10 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 		return err
 	}
 	if err := c.checkEmbeddingsTokenVault(src, m); err != nil {
+		return err
+	}
+	balancer, err := c.modelBalancer(src, m)
+	if err != nil {
 		return err
 	}
 	if m.Config.Route.Name != "" {
@@ -808,7 +814,7 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 						realtimeModel:     realtimeModel,
 						llmFormat:         format,
 						genaiCategory:     spec.GenaiCategory,
-						balancer:          c.balancerConfig(m.Config.Balancer),
+						balancer:          maps.Clone(balancer),
 						vectordb:          vectordb,
 						datastoreName:     datastoreName,
 						tokenVault:        tokenVault,
@@ -1223,11 +1229,15 @@ func (c *Converter) convertVideoLifecycle(
 	if err != nil {
 		return err
 	}
+	lifecycleBalancer, err := c.modelBalancer(src, candidate.model)
+	if err != nil {
+		return err
+	}
 	pg := &proxyGroup{
 		routeName:         routeName,
 		llmFormat:         candidate.section,
 		genaiCategory:     candidate.spec.GenaiCategory,
-		balancer:          c.balancerConfig(candidate.model.Config.Balancer),
+		balancer:          lifecycleBalancer,
 		vectordb:          lifecycleVectorDB,
 		tokenVault:        st.tokenVaults[candidate.model],
 		responseStreaming: candidate.model.Config.ResponseStreaming,

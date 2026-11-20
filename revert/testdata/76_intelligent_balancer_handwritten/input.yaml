@@ -1,0 +1,90 @@
+# Numbers that no preset has lift to the nearest preset. A custom classifier
+# record lifts to a custom classifier block. Its auth header becomes one
+# headers entry. A record with no context_window gets 32768, the data plane
+# default. The default format /v1/systemone is dropped. A record with type
+# model has no API shape and loses its classifier.
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: openai-chat
+        paths: [/near/chat/completions]
+        methods: [POST, OPTIONS]
+        strip_path: false
+      - name: openai-chat-2
+        paths: [/margin/chat/completions]
+        methods: [POST, OPTIONS]
+        strip_path: false
+      - name: openai-chat-3
+        paths: [/old-shape/chat/completions]
+        methods: [POST, OPTIONS]
+        strip_path: false
+plugins:
+  - name: ai-proxy-advanced
+    route: openai-chat
+    model: near
+    config:
+      balancer:
+        algorithm: intelligent
+        cost_quality_tradeoff: 0.4
+        classifier:
+          type: custom
+          url: "https://api.typesafe.ai"
+          format: /v1/systemone
+          name: jev-latest
+          auth: {header_name: Authorization, header_value: "{vault://env/typesafe-token}"}
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth: {header_name: Authorization, header_value: "{vault://env/openai-key}"}
+          model: {model_alias: near, name: gpt-5-mini, provider: openai}
+          route_type: llm/v1/chat
+        - auth: {header_name: Authorization, header_value: "{vault://env/openai-key}"}
+          model: {model_alias: near, name: gpt-5, provider: openai}
+          route_type: llm/v1/chat
+  - name: ai-proxy-advanced
+    route: openai-chat-2
+    model: margin
+    config:
+      balancer:
+        algorithm: intelligent
+        strategy: margin
+        margin: 12
+        cost_quality_tradeoff: 0.5
+        classifier:
+          type: custom
+          url: "http://kev.internal:8009/"
+          format: /decide/v1/systemone
+          name: kev-latest
+          timeout: 2000
+          context_window: 8192
+          auth: {header_name: x-api-key, header_value: "{vault://env/kev-key}"}
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth: {header_name: Authorization, header_value: "{vault://env/openai-key}"}
+          model: {model_alias: margin, name: gpt-5-mini, provider: openai}
+          route_type: llm/v1/chat
+  - name: ai-proxy-advanced
+    route: openai-chat-3
+    model: old-shape
+    config:
+      balancer:
+        algorithm: intelligent
+        cost_quality_tradeoff: 0.75
+        classifier:
+          type: model
+          provider: typesafe
+          name: jev-latest
+          auth: {header_name: Authorization, header_value: "{vault://env/typesafe-token}"}
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth: {header_name: Authorization, header_value: "{vault://env/openai-key}"}
+          model: {model_alias: old-shape, name: gpt-5-mini, provider: openai}
+          route_type: llm/v1/chat
+ai_models:
+  - name: near
+  - name: margin
+  - name: old-shape

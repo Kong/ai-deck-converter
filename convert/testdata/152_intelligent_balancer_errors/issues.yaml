@@ -1,0 +1,96 @@
+- code: MISSING_REQUIRED_CONFIG_FIELD
+  reason: 'model "auto-no-classifier": the intelligent balancer needs config.balancer.classifier'
+  source:
+    kind: model
+    name: auto-no-classifier
+    fields:
+      - config.balancer.classifier
+  severity: ERROR
+- code: CONFIG_FIELD_INVALID
+  reason: 'model "auto-model-reference": config.balancer.classifier.model is not a classifier field. The fields are auth, context_window, format, name, timeout, type, url.'
+  source:
+    kind: model
+    name: auto-model-reference
+    fields:
+      - config.balancer.classifier.model
+  severity: ERROR
+- code: MISSING_REQUIRED_CONFIG_FIELD
+  reason: 'model "auto-no-type": the intelligent balancer needs config.balancer.classifier.type, set to "custom"'
+  source:
+    kind: model
+    name: auto-no-type
+    fields:
+      - config.balancer.classifier.type
+  severity: ERROR
+- code: CONFIG_FIELD_INVALID
+  reason: 'model "auto-model-type": classifier type "model" is not supported. The only type is "custom".'
+  source:
+    kind: model
+    name: auto-model-type
+    fields:
+      - config.balancer.classifier.type
+  severity: ERROR
+- code: MISSING_REQUIRED_CONFIG_FIELD
+  reason: 'model "auto-no-url": the intelligent balancer needs config.balancer.classifier.url, the base URL of the classifier'
+  source:
+    kind: model
+    name: auto-no-url
+    fields:
+      - config.balancer.classifier.url
+  severity: ERROR
+- code: CONFIG_FIELD_INVALID
+  reason: 'model "auto-user-info": the data plane rejects classifier url "https://user@kev.internal": it has user information'
+  source:
+    kind: model
+    name: auto-user-info
+    fields:
+      - config.balancer.classifier.url
+  severity: ERROR
+- code: MISSING_REQUIRED_CONFIG_FIELD
+  reason: 'model "auto-no-name": the intelligent balancer needs config.balancer.classifier.name, the classifier model name'
+  source:
+    kind: model
+    name: auto-no-name
+    fields:
+      - config.balancer.classifier.name
+  severity: ERROR
+- code: CONFIG_FIELD_INVALID
+  reason: 'model "auto-empty-name": config.balancer.classifier.name is empty or not a string'
+  source:
+    kind: model
+    name: auto-empty-name
+    fields:
+      - config.balancer.classifier.name
+  severity: ERROR
+- code: CONFIG_FIELD_INVALID
+  reason: 'model "auto-empty-format": config.balancer.classifier.format is empty or not a string'
+  source:
+    kind: model
+    name: auto-empty-format
+    fields:
+      - config.balancer.classifier.format
+  severity: ERROR
+- code: CONFIG_FIELD_INVALID
+  reason: 'model "auto-auth-param": config.balancer.classifier.auth.params is not supported. The classifier sends one auth header only.'
+  source:
+    kind: model
+    name: auto-auth-param
+    fields:
+      - config.balancer.classifier.auth.params
+  severity: ERROR
+- code: CONFIG_FIELD_INVALID
+  reason: 'model "auto-auth-two-headers": config.balancer.classifier.auth.headers has 2 entries. The classifier sends one auth header only.'
+  source:
+    kind: model
+    name: auto-auth-two-headers
+    fields:
+      - config.balancer.classifier.auth.headers
+  severity: ERROR
+- code: MISSING_REQUIRED_CONFIG_FIELD
+  reason: 'model "auto-auth-no-value": the classifier auth header needs a value. The data plane needs both name and value.'
+  source:
+    kind: model
+    name: auto-auth-no-value
+    fields:
+      - config.balancer.classifier.auth.headers[0].value
+  severity: ERROR

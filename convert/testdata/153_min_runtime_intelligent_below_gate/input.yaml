@@ -1,0 +1,22 @@
+# The intelligent balancer needs 2.4. At 2.3 the model is absent with an
+# error.
+model_providers:
+  - name: openai
+    type: openai
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://env/openai-key}"
+models:
+  - name: auto
+    capabilities: [generate]
+    config:
+      route: {paths: [/auto]}
+      balancer:
+        algorithm: intelligent
+        classifier: {type: custom, url: "https://api.typesafe.ai", name: jev-latest, context_window: 32768}
+    targets:
+      - {name: gpt-5-mini, provider: openai}
+      - {name: gpt-5, provider: openai}

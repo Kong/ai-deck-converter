@@ -1,0 +1,81 @@
+# Balancer fields that the converter cannot change to data plane values. Each
+# auto-* model is absent with an error.
+model_providers:
+  - name: openai
+    type: openai
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://env/openai-key}"
+models:
+  - name: auto-no-context-window
+    capabilities: [generate]
+    config:
+      route: {paths: [/a0]}
+      balancer:
+        algorithm: intelligent
+        classifier: {type: custom, url: "https://api.typesafe.ai", name: jev-latest}
+    targets:
+      - {name: gpt-5, provider: openai}
+  - name: auto-bad-preset
+    capabilities: [generate]
+    config:
+      route: {paths: [/a1]}
+      balancer:
+        algorithm: intelligent
+        cost_quality_tradeoff: fast
+        classifier: {type: custom, url: "https://api.typesafe.ai", name: jev-latest, context_window: 32768}
+    targets:
+      - {name: gpt-5, provider: openai}
+  - name: auto-number-preset
+    capabilities: [generate]
+    config:
+      route: {paths: [/a2]}
+      balancer:
+        algorithm: intelligent
+        cost_quality_tradeoff: 0.5
+        classifier: {type: custom, url: "https://api.typesafe.ai", name: jev-latest, context_window: 32768}
+    targets:
+      - {name: gpt-5, provider: openai}
+  - name: auto-bad-strategy
+    capabilities: [generate]
+    config:
+      route: {paths: [/a3]}
+      balancer:
+        algorithm: intelligent
+        strategy: greedy
+        classifier: {type: custom, url: "https://api.typesafe.ai", name: jev-latest, context_window: 32768}
+    targets:
+      - {name: gpt-5, provider: openai}
+  - name: auto-bad-version
+    capabilities: [generate]
+    config:
+      route: {paths: [/a4]}
+      balancer:
+        algorithm: intelligent
+        version: v2
+        classifier: {type: custom, url: "https://api.typesafe.ai", name: jev-latest, context_window: 32768}
+    targets:
+      - {name: gpt-5, provider: openai}
+  - name: auto-passthrough
+    formats: [{type: passthrough}]
+    config:
+      route: {paths: [/a5]}
+      balancer:
+        algorithm: intelligent
+        classifier: {type: custom, url: "https://api.typesafe.ai", name: jev-latest, context_window: 32768}
+    targets:
+      - {name: gpt-5, provider: openai}
+  - name: auto-margin-value
+    capabilities: [generate]
+    config:
+      route: {paths: [/a6]}
+      balancer:
+        algorithm: intelligent
+        strategy: margin
+        margin: 10
+        classifier: {type: custom, url: "https://api.typesafe.ai", name: jev-latest, context_window: 32768}
+    targets:
+      - {name: gpt-5, provider: openai}

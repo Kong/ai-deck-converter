@@ -1,0 +1,145 @@
+# Each auto-* model has a classifier block that the data plane cannot use.
+# Each auto-* model is absent with an error at the classifier field.
+model_providers:
+  - name: openai
+    type: openai
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://env/openai-key}"
+models:
+  - name: auto-no-classifier
+    capabilities: [generate]
+    config:
+      route: {paths: [/a1]}
+      balancer: {algorithm: intelligent}
+    targets:
+      - {name: gpt-5, provider: openai}
+  # The classifier names another model. That shape is not supported.
+  - name: auto-model-reference
+    capabilities: [generate]
+    config:
+      route: {paths: [/a2]}
+      balancer:
+        algorithm: intelligent
+        classifier: {model: task-classifier, context_window: 32768}
+    targets:
+      - {name: gpt-5, provider: openai}
+  - name: auto-no-type
+    capabilities: [generate]
+    config:
+      route: {paths: [/a3]}
+      balancer:
+        algorithm: intelligent
+        classifier: {url: "https://api.typesafe.ai", name: jev-latest, context_window: 32768}
+    targets:
+      - {name: gpt-5, provider: openai}
+  - name: auto-model-type
+    capabilities: [generate]
+    config:
+      route: {paths: [/a4]}
+      balancer:
+        algorithm: intelligent
+        classifier: {type: model, url: "https://api.typesafe.ai", name: jev-latest, context_window: 32768}
+    targets:
+      - {name: gpt-5, provider: openai}
+  - name: auto-no-url
+    capabilities: [generate]
+    config:
+      route: {paths: [/a5]}
+      balancer:
+        algorithm: intelligent
+        classifier: {type: custom, name: jev-latest, context_window: 32768}
+    targets:
+      - {name: gpt-5, provider: openai}
+  - name: auto-user-info
+    capabilities: [generate]
+    config:
+      route: {paths: [/a6]}
+      balancer:
+        algorithm: intelligent
+        classifier: {type: custom, url: "https://user@kev.internal", name: kev-latest, context_window: 32768}
+    targets:
+      - {name: gpt-5, provider: openai}
+  - name: auto-no-name
+    capabilities: [generate]
+    config:
+      route: {paths: [/a7]}
+      balancer:
+        algorithm: intelligent
+        classifier: {type: custom, url: "https://api.typesafe.ai", context_window: 32768}
+    targets:
+      - {name: gpt-5, provider: openai}
+  - name: auto-empty-name
+    capabilities: [generate]
+    config:
+      route: {paths: [/a8]}
+      balancer:
+        algorithm: intelligent
+        classifier: {type: custom, url: "https://api.typesafe.ai", name: "", context_window: 32768}
+    targets:
+      - {name: gpt-5, provider: openai}
+  - name: auto-empty-format
+    capabilities: [generate]
+    config:
+      route: {paths: [/a9]}
+      balancer:
+        algorithm: intelligent
+        classifier:
+          {type: custom, url: "https://api.typesafe.ai", format: "", name: jev-latest, context_window: 32768}
+    targets:
+      - {name: gpt-5, provider: openai}
+  - name: auto-auth-param
+    capabilities: [generate]
+    config:
+      route: {paths: [/a10]}
+      balancer:
+        algorithm: intelligent
+        classifier:
+          type: custom
+          url: https://api.typesafe.ai
+          name: jev-latest
+          context_window: 32768
+          auth:
+            type: basic
+            params:
+              - {name: key, value: "{vault://env/typesafe-token}", location: query}
+    targets:
+      - {name: gpt-5, provider: openai}
+  - name: auto-auth-two-headers
+    capabilities: [generate]
+    config:
+      route: {paths: [/a11]}
+      balancer:
+        algorithm: intelligent
+        classifier:
+          type: custom
+          url: https://api.typesafe.ai
+          name: jev-latest
+          context_window: 32768
+          auth:
+            type: basic
+            headers:
+              - {name: Authorization, value: "{vault://env/typesafe-token}"}
+              - {name: x-tenant, value: acme}
+    targets:
+      - {name: gpt-5, provider: openai}
+  - name: auto-auth-no-value
+    capabilities: [generate]
+    config:
+      route: {paths: [/a12]}
+      balancer:
+        algorithm: intelligent
+        classifier:
+          type: custom
+          url: https://api.typesafe.ai
+          name: jev-latest
+          context_window: 32768
+          auth:
+            type: basic
+            headers:
+              - {name: Authorization}
+    targets:
+      - {name: gpt-5, provider: openai}

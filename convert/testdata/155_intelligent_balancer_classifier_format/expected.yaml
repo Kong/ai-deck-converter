@@ -1,0 +1,124 @@
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: openai-chat
+        paths:
+          - /auto-openrouter/chat/completions
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-chat-2
+        paths:
+          - /auto-bare-host/chat/completions
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+plugins:
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 50000000
+      sources:
+        - body_path: model
+          source: body
+    route: openai-chat
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: intelligent
+        classifier:
+          auth:
+            header_name: Authorization
+            header_value: '{vault://env/openrouter-token}'
+          context_window: 32768
+          format: /api/alpha/decisions
+          name: typesafe/jev-1.13-20260917
+          type: custom
+          url: https://openrouter.ai
+        cost_quality_tradeoff: 0.5
+        strategy: weighted
+      genai_category: text/generation
+      llm_format: openai
+      max_request_body_size: 50000000
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://env/openai-key}'
+          description: gpt-5-mini
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: auto-openrouter
+            name: gpt-5-mini
+            provider: openai
+          route_type: llm/v1/chat
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://env/openai-key}'
+          description: gpt-5
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: auto-openrouter
+            name: gpt-5
+            provider: openai
+          route_type: llm/v1/chat
+    route: openai-chat
+    model: auto-openrouter
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 50000000
+      sources:
+        - body_path: model
+          source: body
+    route: openai-chat-2
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: intelligent
+        classifier:
+          context_window: 32768
+          format: /v1/systemone
+          name: kev-latest
+          type: custom
+          url: http://kev.internal:8009
+        cost_quality_tradeoff: 0.75
+        strategy: weighted
+      genai_category: text/generation
+      llm_format: openai
+      max_request_body_size: 50000000
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://env/openai-key}'
+          description: gpt-5-mini
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: auto-bare-host
+            name: gpt-5-mini
+            provider: openai
+          route_type: llm/v1/chat
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://env/openai-key}'
+          description: gpt-5
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: auto-bare-host
+            name: gpt-5
+            provider: openai
+          route_type: llm/v1/chat
+    route: openai-chat-2
+    model: auto-bare-host
+ai_models:
+  - name: auto-openrouter
+  - name: auto-bare-host

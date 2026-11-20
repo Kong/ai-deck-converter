@@ -1,0 +1,190 @@
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: openai-chat
+        paths:
+          - /margin-cost/chat/completions
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-chat-2
+        paths:
+          - /margin-balanced/chat/completions
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-chat-3
+        paths:
+          - /margin-quality/chat/completions
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+plugins:
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 50000000
+      sources:
+        - body_path: model
+          source: body
+    route: openai-chat
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: intelligent
+        classifier:
+          auth:
+            header_name: Authorization
+            header_value: '{vault://env/typesafe-token}'
+          context_window: 32768
+          format: /v1/systemone
+          name: jev-latest
+          type: custom
+          url: https://api.typesafe.ai
+        cost_quality_tradeoff: 0.25
+        margin: 15
+        strategy: margin
+      genai_category: text/generation
+      llm_format: openai
+      max_request_body_size: 50000000
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://env/openai-key}'
+          description: gpt-5-mini
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: margin-cost
+            name: gpt-5-mini
+            provider: openai
+          route_type: llm/v1/chat
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://env/openai-key}'
+          description: gpt-5
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: margin-cost
+            name: gpt-5
+            provider: openai
+          route_type: llm/v1/chat
+    route: openai-chat
+    model: margin-cost
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 50000000
+      sources:
+        - body_path: model
+          source: body
+    route: openai-chat-2
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: intelligent
+        classifier:
+          auth:
+            header_name: Authorization
+            header_value: '{vault://env/typesafe-token}'
+          context_window: 32768
+          format: /v1/systemone
+          name: jev-latest
+          type: custom
+          url: https://api.typesafe.ai
+        cost_quality_tradeoff: 0.5
+        margin: 5
+        strategy: margin
+      genai_category: text/generation
+      llm_format: openai
+      max_request_body_size: 50000000
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://env/openai-key}'
+          description: gpt-5-mini
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: margin-balanced
+            name: gpt-5-mini
+            provider: openai
+          route_type: llm/v1/chat
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://env/openai-key}'
+          description: gpt-5
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: margin-balanced
+            name: gpt-5
+            provider: openai
+          route_type: llm/v1/chat
+    route: openai-chat-2
+    model: margin-balanced
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 50000000
+      sources:
+        - body_path: model
+          source: body
+    route: openai-chat-3
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: intelligent
+        classifier:
+          auth:
+            header_name: Authorization
+            header_value: '{vault://env/typesafe-token}'
+          context_window: 32768
+          format: /v1/systemone
+          name: jev-latest
+          type: custom
+          url: https://api.typesafe.ai
+        cost_quality_tradeoff: 0.75
+        margin: 0
+        strategy: margin
+      genai_category: text/generation
+      llm_format: openai
+      max_request_body_size: 50000000
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://env/openai-key}'
+          description: gpt-5-mini
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: margin-quality
+            name: gpt-5-mini
+            provider: openai
+          route_type: llm/v1/chat
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://env/openai-key}'
+          description: gpt-5
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: margin-quality
+            name: gpt-5
+            provider: openai
+          route_type: llm/v1/chat
+    route: openai-chat-3
+    model: margin-quality
+ai_models:
+  - name: margin-cost
+  - name: margin-balanced
+  - name: margin-quality

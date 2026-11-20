@@ -1,0 +1,88 @@
+# The intelligent balancer with the weighted strategy at each preset. The
+# classifier is TypeSafe's hosted API. Its format is absent, so the data plane
+# record gets /v1/systemone.
+model_providers:
+  - name: anthropic
+    type: anthropic
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: x-api-key
+            value: "{vault://env/anthropic-key}"
+models:
+  - name: auto-cost
+    type: model
+    capabilities: [generate]
+    formats: [{type: anthropic}]
+    config:
+      route: {paths: [/cost]}
+      balancer:
+        algorithm: intelligent
+        version: v1
+        cost_quality_tradeoff: cost
+        classifier:
+          type: custom
+          url: https://api.typesafe.ai
+          name: jev-latest
+          context_window: 32768
+          auth:
+            type: basic
+            headers:
+              - name: Authorization
+                value: "{vault://env/typesafe-token}"
+    targets:
+      - name: claude-haiku-4-5
+        provider: anthropic
+      - name: claude-opus-4-6
+        provider: anthropic
+  - name: auto-balanced
+    type: model
+    capabilities: [generate]
+    formats: [{type: anthropic}]
+    config:
+      route: {paths: [/balanced]}
+      balancer:
+        algorithm: intelligent
+        retries: 2
+        classifier:
+          type: custom
+          url: https://api.typesafe.ai
+          name: jev-latest
+          timeout: 5000
+          context_window: 32768
+          auth:
+            type: basic
+            headers:
+              - name: Authorization
+                value: "{vault://env/typesafe-token}"
+    targets:
+      - name: claude-haiku-4-5
+        provider: anthropic
+      - name: claude-opus-4-6
+        provider: anthropic
+  - name: auto-quality
+    type: model
+    capabilities: [generate]
+    formats: [{type: anthropic}]
+    config:
+      route: {paths: [/quality]}
+      balancer:
+        algorithm: intelligent
+        strategy: weighted
+        cost_quality_tradeoff: quality
+        classifier:
+          type: custom
+          url: https://api.typesafe.ai
+          name: jev-latest
+          context_window: 32768
+          auth:
+            type: basic
+            headers:
+              - name: Authorization
+                value: "{vault://env/typesafe-token}"
+    targets:
+      - name: claude-haiku-4-5
+        provider: anthropic
+      - name: claude-opus-4-6
+        provider: anthropic
