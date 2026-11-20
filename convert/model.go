@@ -687,9 +687,15 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 						paths = append(paths, aimap.RoutePaths(b, spec, format, mantlePaths)...)
 					}
 					routeName := uniqueModelRouteName(sec+"-"+spec.RouteLabel, st.usedRouteNames)
+					routeConfig := m.Config.Route
+					// A Responses endpoint appends the path it receives to
+					// the target upstream. Its route strips the prefix.
+					if routeConfig.StripPath == nil && aimap.StripsOwnPath(sec, capability) {
+						routeConfig.StripPath = new(true)
+					}
 					g = &routeGroup{
 						route: buildModelRoute(
-							m.Config.Route, routeName,
+							routeConfig, routeName,
 							paths, spec.Methods, websocket),
 						websocket:    websocket,
 						proxyByOwner: map[string]*proxyGroup{},

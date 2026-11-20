@@ -13,8 +13,9 @@ import (
 
 // liftModelRoute changes a model route back into the route config that made
 // it. It leaves out the name, the paths, and the model selector. It drops the
-// values that convert.buildModelRoute sets as defaults.
-func liftModelRoute(rt *kong.Route, spec *aimap.EndpointSpec) aigw.ModelRouteConfig {
+// values that convert.buildModelRoute sets as defaults, including the
+// endpoint's strip_path.
+func liftModelRoute(rt *kong.Route, spec *aimap.EndpointSpec, section, capability string) aigw.ModelRouteConfig {
 	rc := aigw.ModelRouteConfig{
 		Hosts:                   rt.Hosts,
 		Methods:                 rt.Methods,
@@ -39,7 +40,7 @@ func liftModelRoute(rt *kong.Route, spec *aimap.EndpointSpec) aigw.ModelRouteCon
 		// The WebSocket transport rewrites the protocols of the source config.
 		rc.Protocols = nil
 	}
-	if rc.StripPath != nil && !*rc.StripPath {
+	if rc.StripPath != nil && *rc.StripPath == aimap.StripsOwnPath(section, capability) {
 		rc.StripPath = nil
 	}
 	return rc
