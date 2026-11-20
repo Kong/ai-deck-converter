@@ -196,7 +196,7 @@ func TestSupportedCapabilities(t *testing.T) {
 	require.Equal(t,
 		[]aigw.Capability{
 			"generate", "agentic", "audio/speech", "audio/transcription", "audio/translation",
-			"embeddings", "image", "realtime", "video",
+			"decisions", "embeddings", "image", "realtime", "video",
 		},
 		SupportedCapabilities(aigw.Format{Type: "openai"}, openai, "model", []string{"https", "wss"}, LatestVersion))
 	// The Kong default protocols select no WebSocket endpoint.

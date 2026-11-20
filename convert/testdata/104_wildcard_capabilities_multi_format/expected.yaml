@@ -49,6 +49,13 @@ services:
           - POST
           - OPTIONS
         strip_path: false
+      - name: openai-decisions
+        paths:
+          - /chat/decisions
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
       - name: openai-embeddings
         paths:
           - /chat/embeddings
@@ -292,6 +299,32 @@ plugins:
             provider: openai
           route_type: audio/v1/audio/translations
     route: openai-audio-translate
+    model: chat
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 50000000
+      sources:
+        - body_path: model
+          source: body
+    route: openai-decisions
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      max_request_body_size: 50000000
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: chat
+            name: gpt-5.4
+            provider: openai
+          route_type: llm/v1/decisions
+    route: openai-decisions
     model: chat
   - name: ai-model-selector
     config:

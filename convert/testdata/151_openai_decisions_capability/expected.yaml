@@ -1,0 +1,66 @@
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: openai-decisions
+        paths:
+          - /openai/decisions
+        methods:
+          - POST
+          - OPTIONS
+        protocols:
+          - http
+          - https
+        strip_path: true
+        preserve_host: false
+        https_redirect_status_code: 426
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+plugins:
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-decisions
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+        connect_timeout: 60000
+        fail_timeout: 10000
+        failover_criteria:
+          - error
+          - timeout
+        max_fails: 0
+        read_timeout: 60000
+        retries: 5
+        slots: 10000
+        write_timeout: 60000
+      genai_category: text/generation
+      llm_format: openai
+      max_request_body_size: 8388608
+      model_name_header: true
+      response_streaming: allow
+      targets:
+        - auth:
+            allow_override: false
+            header_name: Authorization
+            header_value: Bearer {vault://ai/openai-token}
+          description: gpt-6-luna
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: gpt-6-luna
+            name: gpt-6-luna
+            provider: openai
+          route_type: llm/v1/decisions
+          weight: 100
+    route: openai-decisions
+    model: gpt-6-luna
+ai_models:
+  - name: gpt-6-luna
