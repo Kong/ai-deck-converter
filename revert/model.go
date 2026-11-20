@@ -301,7 +301,10 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 			}
 			if g == nil {
 				var err error
-				g, err = r.modelGroupFor(acc, rt, spec, groupFK, alias, llmFormat, bases, cfg, nextEntry, refs, acls, idpRefs)
+				g, err = r.modelGroupFor(
+					acc, rt, spec, groupFK, alias, llmFormat, section, capability, bases, cfg, nextEntry,
+					refs, acls, idpRefs,
+				)
 				if err != nil {
 					return err
 				}
@@ -480,8 +483,8 @@ func hasTag(tags []string, want string) bool {
 // Models on different routes can share one ai-models entry. Each base path
 // and route config of the entry then gets its own group.
 func (r *Reverter) modelGroupFor(
-	acc *modelAcc, rt *kong.Route, spec *aimap.EndpointSpec, fkName, alias, llmFormat string, bases []string,
-	cfg map[string]any, nextEntry func() map[string]any, refs []string, acls aigw.ACLs, idpRefs []string,
+	acc *modelAcc, rt *kong.Route, spec *aimap.EndpointSpec, fkName, alias, llmFormat, section, capability string,
+	bases []string, cfg map[string]any, nextEntry func() map[string]any, refs []string, acls aigw.ACLs, idpRefs []string,
 ) (*modelGroup, error) {
 	var key string
 	switch {
@@ -492,7 +495,7 @@ func (r *Reverter) modelGroupFor(
 	default:
 		key = "route:" + rt.Name
 	}
-	lifted := liftModelRoute(rt, spec)
+	lifted := liftModelRoute(rt, spec, section, capability)
 	paths := modelRoutePaths(bases)
 	split, familyKey := false, ""
 	if g, ok := acc.groups[key]; ok {

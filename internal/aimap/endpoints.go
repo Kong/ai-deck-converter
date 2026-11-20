@@ -114,6 +114,14 @@ func IsLifecycleEndpoint(spec EndpointSpec) bool {
 	return spec.RouteLabel == ResponsesLifecycleRouteLabel
 }
 
+// StripsOwnPath reports whether the routes of a section and capability strip
+// their own path, so the gateway receives the path below the route prefix.
+// A Responses endpoint appends the path it receives to the target upstream_url,
+// so its route must not pass the route prefix on.
+func StripsOwnPath(section, capability string) bool {
+	return section == "openai" && capability == "agentic"
+}
+
 // SectionFor selects the endpoint section from the model's llm_format (the
 // client-facing wire format that determines the request paths). The provider
 // type only matters for passthrough, which has no client format of its own
@@ -333,13 +341,13 @@ var EndpointTable = map[string]map[string]EndpointEntry{
 				"responses", "/responses", false, mPost, "llm/v1/responses", catTextGen,
 				&defaultBodyModelSelectorConfig, true,
 			},
-			// The regex matches a sub-path only. The create route above still
-			// serves "POST <base>/responses". Kong ranks a regex route above a
-			// prefix route of equal weight per REGEX_URL_BIT in
-			// kong/router/transform.lua.
+			// The optional slash group spans the bare path and every sub-path.
+			// Kong rejects look-around in a route path. The group replaces a
+			// lookahead. This route shadows the create route above, a regex
+			// route outranking a prefix route of equal weight.
 			Secondary: []EndpointSpec{
 				{
-					"responses-lifecycle", "responses/.+", true, mGetPostDelete,
+					"responses-lifecycle", "responses(/)?", true, mGetPostDelete,
 					"llm/v1/responses", catTextGen, nil, true,
 				},
 			},

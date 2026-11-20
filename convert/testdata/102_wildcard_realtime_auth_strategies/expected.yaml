@@ -22,10 +22,10 @@ services:
         protocols:
           - http
           - https
-        strip_path: false
+        strip_path: true
       - name: openai-responses-lifecycle
         paths:
-          - ~/two/responses/.+
+          - ~/two/responses(/)?
         methods:
           - GET
           - POST
@@ -34,7 +34,7 @@ services:
         protocols:
           - http
           - https
-        strip_path: false
+        strip_path: true
         tags:
           - aigw:responses-lifecycle
       - name: openai-audio-speech
@@ -126,10 +126,10 @@ services:
         protocols:
           - http
           - https
-        strip_path: false
+        strip_path: true
       - name: openai-responses-lifecycle-2
         paths:
-          - ~/one/responses/.+
+          - ~/one/responses(/)?
         methods:
           - GET
           - POST
@@ -138,7 +138,7 @@ services:
         protocols:
           - http
           - https
-        strip_path: false
+        strip_path: true
         tags:
           - aigw:responses-lifecycle
       - name: openai-audio-speech-2
