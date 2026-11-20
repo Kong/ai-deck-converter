@@ -44,7 +44,7 @@ services:
 plugins:
   - name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 20000000
       sources:
         - body_path: model
           source: body
@@ -55,9 +55,12 @@ plugins:
         algorithm: round-robin
       genai_category: text/generation
       llm_format: openai
+      max_request_body_size: 20000000
       targets:
         - auth:
             allow_override: true
+            header_name: Authorization
+            header_value: client-provided
           description: openai.gpt-oss-20b
           logging:
             log_payloads: false
@@ -76,7 +79,7 @@ plugins:
     model: client-key-mantle
   - name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 20000000
       sources:
         - path_pattern: model/([^/]+)/
           source: path
@@ -87,6 +90,7 @@ plugins:
         algorithm: round-robin
       genai_category: text/generation
       llm_format: bedrock
+      max_request_body_size: 20000000
       targets:
         - auth:
             allow_override: false
@@ -122,7 +126,7 @@ plugins:
     model: gateway-credentials
   - name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 20000000
       sources:
         - path_pattern: model/([^/]+)/
           source: path
@@ -133,6 +137,7 @@ plugins:
         algorithm: round-robin
       genai_category: text/generation
       llm_format: bedrock
+      max_request_body_size: 20000000
       targets:
         - auth:
             allow_override: false
@@ -168,7 +173,7 @@ plugins:
     model: gateway-credentials
   - name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 20000000
       sources:
         - body_path: model
           source: body
@@ -179,6 +184,7 @@ plugins:
         algorithm: round-robin
       genai_category: text/generation
       llm_format: bedrock
+      max_request_body_size: 20000000
       targets:
         - auth:
             allow_override: false
@@ -214,7 +220,7 @@ plugins:
     model: gateway-credentials
   - name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 20000000
       sources:
         - body_path: model
           source: body
@@ -225,6 +231,7 @@ plugins:
         algorithm: round-robin
       genai_category: text/generation
       llm_format: bedrock
+      max_request_body_size: 20000000
       targets:
         - auth:
             allow_override: false

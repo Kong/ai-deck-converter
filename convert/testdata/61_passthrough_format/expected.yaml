@@ -14,6 +14,7 @@ plugins:
         algorithm: round-robin
       genai_category: text/generation
       llm_format: openai
+      max_request_body_size: 50000000
       response_streaming: allow
       targets:
         - auth:

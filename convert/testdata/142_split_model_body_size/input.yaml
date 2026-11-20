@@ -1,0 +1,28 @@
+# Two models share one alias on different routes with different
+# max_request_body_size values. Revert keeps them as two models.
+models:
+  - name: gpt-chat
+    type: model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/ai], model: {values: [gpt-5.2]}}
+      max_request_body_size: 52428800
+    targets:
+      - name: gpt-5.2
+        provider: openai-prod
+  - name: gpt-audio
+    type: model
+    capabilities: [audio/transcription]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/ai], model: {values: [gpt-5.2]}}
+      max_request_body_size: 26214400
+    targets:
+      - name: whisper-1
+        provider: openai-prod
+model_providers:
+  - name: openai-prod
+    type: openai
+    config:
+      auth: {type: bearer, token: "{vault://ai/openai-key}"}

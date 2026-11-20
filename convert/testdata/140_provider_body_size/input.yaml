@@ -1,0 +1,73 @@
+models:
+  - name: claude-default
+    type: model
+    capabilities: [generate]
+    formats:
+      - type: anthropic
+    config:
+      route:
+        paths: [/claude]
+    targets:
+      - name: claude-sonnet-4-5
+        provider: anthropic-prod
+  - name: claude-explicit
+    type: model
+    capabilities: [generate]
+    formats:
+      - type: anthropic
+    config:
+      route:
+        paths: [/claude-small]
+      max_request_body_size: 1048576
+    targets:
+      - name: claude-haiku-4-5
+        provider: anthropic-prod
+  - name: mixed
+    type: model
+    capabilities: [generate]
+    formats:
+      - type: openai
+    config:
+      route:
+        paths: [/mixed]
+    targets:
+      - name: claude-sonnet-4-5
+        provider: anthropic-prod
+      - name: gpt-5.2
+        provider: openai-prod
+  - name: unpublished
+    type: model
+    capabilities: [generate]
+    formats:
+      - type: openai
+    config:
+      route:
+        paths: [/unpublished]
+    targets:
+      - name: gpt-5.2
+        provider: openai-prod
+      - name: mistral-large
+        provider: mistral-prod
+model_providers:
+  - name: anthropic-prod
+    type: anthropic
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: x-api-key
+            value: "{vault://ai/anthropic-key}"
+  - name: openai-prod
+    type: openai
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://ai/openai-token}"
+  - name: mistral-prod
+    type: mistral
+    config:
+      auth:
+        type: bearer
+        token: "{vault://ai/mistral-key}"

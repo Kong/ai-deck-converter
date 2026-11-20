@@ -21,7 +21,7 @@ services:
 plugins:
   - name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 20000000
       sources:
         - body_path: modelId
           source: body
@@ -32,6 +32,7 @@ plugins:
         algorithm: round-robin
       genai_category: video/generation
       llm_format: bedrock
+      max_request_body_size: 20000000
       targets:
         - auth:
             aws_access_key_id: '{vault://ai/aws-access-key-id}'
@@ -57,6 +58,7 @@ plugins:
         algorithm: round-robin
       genai_category: video/generation
       llm_format: bedrock
+      max_request_body_size: 20000000
       model_name_header: false
       targets:
         - auth:

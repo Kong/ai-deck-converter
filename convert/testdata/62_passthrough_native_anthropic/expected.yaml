@@ -14,6 +14,7 @@ plugins:
         algorithm: round-robin
       genai_category: text/generation
       llm_format: anthropic
+      max_request_body_size: 32000000
       targets:
         - auth:
             header_name: x-api-key

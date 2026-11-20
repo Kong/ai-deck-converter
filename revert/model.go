@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
+	"reflect"
 	"slices"
 	"sort"
 	"strings"
@@ -29,6 +30,9 @@ type modelGroup struct {
 	// group of familyKey.
 	split     bool
 	familyKey string
+	// proxyConfig holds the modelProxyKeys values of the group's first
+	// ai-proxy-advanced plugin.
+	proxyConfig map[string]any
 	// alias is the ai-models entry name that the targets of g use.
 	alias string
 	// hasEntry is true when an ai-models entry has the name of g.
@@ -496,7 +500,8 @@ func (r *Reverter) modelGroupFor(
 		for _, k := range append([]string{base}, acc.splits[base]...) {
 			g := acc.groups[k]
 			if slices.Equal(g.model.Config.Route.Paths, paths) && sameModelRoute(g.model.Config.Route, lifted) &&
-				g.methodsAgree(spec, rt) {
+				g.methodsAgree(spec, rt) && maps.EqualFunc(g.proxyConfig, modelProxyConfig(cfg), reflect.DeepEqual) &&
+				g.headerAgrees(spec, cfg) {
 				fillModelRoute(&g.model.Config.Route, lifted)
 				g.recordMethods(spec, rt)
 				mergeAliasIntoGroup(g, alias, refs, acls, idpRefs)
@@ -557,6 +562,7 @@ func (r *Reverter) modelGroupFor(
 		firstRoute:  acc.routes,
 		split:       split,
 		familyKey:   familyKey,
+		proxyConfig: modelProxyConfig(cfg),
 		alias:       cmp.Or(alias, fkName),
 		model: aigw.Model{
 			Type:     "model",
@@ -584,6 +590,32 @@ func (r *Reverter) modelGroupFor(
 	acc.groups[key] = g
 	acc.order = append(acc.order, key)
 	return g, nil
+}
+
+// modelProxyKeys are the ai-proxy-advanced config keys that come from one
+// model config. Plugins with different values belong to different models.
+var modelProxyKeys = []string{
+	"max_request_body_size", "response_streaming", "proxy_config", "balancer", "vectordb", "embeddings",
+}
+
+// headerAgrees reports whether a plugin with cfg can join g by its
+// model_name_header. modelProxyKeys leaves out this key. Forward writes false
+// on every endpoint without name header support.
+func (g *modelGroup) headerAgrees(spec *aimap.EndpointSpec, cfg map[string]any) bool {
+	if !g.headerSet || (spec != nil && !aimap.SupportsModelNameHeader(*spec)) {
+		return true
+	}
+	return reflect.DeepEqual(g.model.Config.Model.NameHeader, getBool(cfg, "model_name_header"))
+}
+
+func modelProxyConfig(cfg map[string]any) map[string]any {
+	out := map[string]any{}
+	for _, k := range modelProxyKeys {
+		if v, ok := cfg[k]; ok {
+			out[k] = v
+		}
+	}
+	return out
 }
 
 // splitModelName returns a model name for a split group of base. The name

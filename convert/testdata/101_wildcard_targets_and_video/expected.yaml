@@ -464,7 +464,7 @@ plugins:
     model: a
   - name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 50000000
       sources:
         - body_path: model
           source: body
@@ -509,6 +509,7 @@ plugins:
         algorithm: round-robin
       genai_category: video/generation
       llm_format: openai
+      max_request_body_size: 50000000
       targets:
         - description: sora-2
           logging:
@@ -600,6 +601,7 @@ plugins:
         algorithm: round-robin
       genai_category: video/generation
       llm_format: openai
+      max_request_body_size: 50000000
       model_name_header: false
       targets:
         - description: sora-2

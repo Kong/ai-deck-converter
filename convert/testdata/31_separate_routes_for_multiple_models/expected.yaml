@@ -20,7 +20,7 @@ services:
 plugins:
   - name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 50000000
       sources:
         - body_path: model
           source: body
@@ -31,6 +31,7 @@ plugins:
         algorithm: round-robin
       genai_category: audio/transcription
       llm_format: openai
+      max_request_body_size: 50000000
       response_streaming: allow
       targets:
         - auth:
@@ -52,7 +53,7 @@ plugins:
     model: gpt-5-2
   - name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 50000000
       sources:
         - body_path: model
           source: body
@@ -63,6 +64,7 @@ plugins:
         algorithm: round-robin
       genai_category: audio/transcription
       llm_format: openai
+      max_request_body_size: 50000000
       response_streaming: allow
       targets:
         - auth:

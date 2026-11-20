@@ -61,7 +61,7 @@ services:
 plugins:
   - name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 50000000
       sources:
         - body_path: model
           source: body
@@ -72,6 +72,7 @@ plugins:
         algorithm: round-robin
       genai_category: text/generation
       llm_format: openai
+      max_request_body_size: 50000000
       targets:
         - description: gpt-5.2
           logging:
@@ -86,7 +87,7 @@ plugins:
     model: mantle-openai
   - name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 50000000
       sources:
         - body_path: model
           source: body
@@ -97,6 +98,7 @@ plugins:
         algorithm: round-robin
       genai_category: text/generation
       llm_format: openai
+      max_request_body_size: 50000000
       targets:
         - description: gpt-5.2
           logging:
@@ -115,6 +117,7 @@ plugins:
         algorithm: round-robin
       genai_category: text/generation
       llm_format: openai
+      max_request_body_size: 50000000
       targets:
         - description: gpt-5.2
           logging:
@@ -143,7 +146,7 @@ plugins:
     route: openai-responses-lifecycle
   - name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 50000000
       sources:
         - body_path: model
           source: body
@@ -154,6 +157,7 @@ plugins:
         algorithm: round-robin
       genai_category: text/embeddings
       llm_format: openai
+      max_request_body_size: 50000000
       targets:
         - description: gpt-5.2
           logging:
@@ -168,7 +172,7 @@ plugins:
     model: mantle-openai
   - name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 50000000
       sources:
         - body_path: model
           source: body
@@ -179,6 +183,7 @@ plugins:
         algorithm: round-robin
       genai_category: text/generation
       llm_format: openai
+      max_request_body_size: 50000000
       targets:
         - auth:
             aws_access_key_id: '{vault://ai/aws-access-key-id}'
@@ -201,7 +206,7 @@ plugins:
     model: mantle-openai
   - name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 50000000
       sources:
         - body_path: model
           source: body
@@ -212,6 +217,7 @@ plugins:
         algorithm: round-robin
       genai_category: text/generation
       llm_format: openai
+      max_request_body_size: 50000000
       targets:
         - auth:
             aws_access_key_id: '{vault://ai/aws-access-key-id}'
@@ -234,7 +240,7 @@ plugins:
     model: mantle-openai
   - name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 20000000
       sources:
         - body_path: model
           source: body
@@ -245,6 +251,7 @@ plugins:
         algorithm: round-robin
       genai_category: text/generation
       llm_format: anthropic
+      max_request_body_size: 20000000
       targets:
         - auth:
             aws_access_key_id: '{vault://ai/aws-access-key-id}'

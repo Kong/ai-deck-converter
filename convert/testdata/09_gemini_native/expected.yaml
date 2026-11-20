@@ -38,7 +38,7 @@ services:
 plugins:
   - name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 100000000
       sources:
         - path_pattern: 'models/([%w%.%-]+):'
           source: path
@@ -49,6 +49,7 @@ plugins:
         algorithm: round-robin
       genai_category: text/generation
       llm_format: gemini
+      max_request_body_size: 100000000
       targets:
         - auth:
             gcp_service_account_json: '{vault://ai/gcp-service-account-json}'
@@ -88,7 +89,7 @@ plugins:
     model: gemini-2-5-pro
   - name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 100000000
       sources:
         - path_pattern: 'models/([%w%.%-]+):'
           source: path
@@ -99,6 +100,7 @@ plugins:
         algorithm: round-robin
       genai_category: text/generation
       llm_format: gemini
+      max_request_body_size: 100000000
       targets:
         - auth:
             gcp_service_account_json: '{vault://ai/gcp-service-account-json}'
@@ -138,7 +140,7 @@ plugins:
     model: gemini-2-5-pro
   - name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 100000000
       sources:
         - path_pattern: 'models/([%w%.%-]+):'
           source: path
@@ -149,6 +151,7 @@ plugins:
         algorithm: round-robin
       genai_category: text/embeddings
       llm_format: gemini
+      max_request_body_size: 100000000
       targets:
         - auth:
             gcp_service_account_json: '{vault://ai/gcp-service-account-json}'
@@ -184,7 +187,7 @@ plugins:
     model: text-embedding-005
   - name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 100000000
       sources:
         - path_pattern: 'models/([%w%.%-]+):'
           source: path
@@ -195,6 +198,7 @@ plugins:
         algorithm: round-robin
       genai_category: text/embeddings
       llm_format: gemini
+      max_request_body_size: 100000000
       targets:
         - auth:
             gcp_service_account_json: '{vault://ai/gcp-service-account-json}'
