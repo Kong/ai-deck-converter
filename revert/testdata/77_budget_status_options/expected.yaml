@@ -1,0 +1,44 @@
+models:
+  - type: model
+    name: openai-gpt-5-4
+    capabilities:
+      - generate
+    formats:
+      - type: openai
+    targets:
+      - name: gpt-5.4
+        provider: openai-ai
+        config:
+          type: openai
+    access:
+      auth_strategies:
+        - key-auth-1
+    config:
+      route:
+        paths:
+          - /ai
+      logging:
+        payloads: false
+        statistics: true
+      max_request_body_size: 50000000
+model_providers:
+  - type: openai
+    name: openai-ai
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: '{vault://ai/openai-token}'
+auth_strategies:
+  - type: key-auth
+    name: key-auth-1
+    config:
+      key_names:
+        - x-api-key
+budget_status:
+  enabled: true
+  options:
+    timeout: 1000
+    document: '{"currency":"USD","budgets":[]}'
+    resource: /budgets

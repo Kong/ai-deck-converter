@@ -1,0 +1,8 @@
+- code: CONFIG_FIELD_INVALID
+  reason: options.resource "budgets" must start with "/" or be an http or https URL
+  source:
+    kind: budget_status
+    name: budget-status
+    fields:
+      - options.resource
+  severity: ERROR

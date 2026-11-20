@@ -107,6 +107,9 @@ type Converter struct {
 
 	issues []ConversionIssue
 
+	// skippedModels holds the indexes of the models that convertModels left
+	// out.
+	skippedModels map[int][]ConversionIssue
 	// modelRouteModels holds the names of the models on each model route.
 	modelRouteModels map[string][]string
 
@@ -157,6 +160,7 @@ func (c *Converter) run() {
 	c.warnUnreorderedResponseTransformers()
 	c.convertMCPServers()
 	c.convertAgents()
+	c.convertBudgetStatus()
 	c.convertCredentialManagers()
 	c.secureTokenVaultCallbackRoute()
 	c.revealTokenVaultCredentials()

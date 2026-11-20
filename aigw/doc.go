@@ -37,6 +37,7 @@ type (
 	Certificate       = internal.Certificate
 	CACertificate     = internal.CACertificate
 	SNI               = internal.SNI
+	BudgetStatus      = internal.BudgetStatus
 )
 
 func Parse(data []byte) (*Document, error) {

@@ -32,7 +32,7 @@ One direction of dependency (`convert`/`revert` → `internal/*`):
 
 ### Conversion flow
 
-`Converter.run()` (in `convert.go`) executes a **fixed ordering**: registries → global policies → vaults → consumer groups → consumers → models → MCP servers → agents → routing conflict check. Each step lives in its own file (`policy.go`, `vault.go`, `consumer.go`, `model.go`, `mcp.go`, `agent.go`, `lint.go`).
+`Converter.run()` (in `convert.go`) executes a **fixed ordering**: registries → global policies → vaults → consumer groups → consumers → models → MCP servers → agents → budget status → routing conflict check. Each step lives in its own file (`policy.go`, `vault.go`, `consumer.go`, `model.go`, `mcp.go`, `agent.go`, `budget_status.go`, `lint.go`).
 
 Routing conflicts follow `docs/decisions/00229-routing-conflict-detection.md`. `warnRoutingConflicts` compares each pair of routes of the output and gives a `ROUTING_CONFLICT` `WARNING` to each owner of the later route. Every model on a shared model route owns it (`c.modelRouteModels`). The model pass warns (and keeps the model, because the data plane accepts it) when a model uses an alias that another model on the same route already uses, warns when models on different routes share an `ai_models` entry that cannot keep a later model's ID or labels, or when a later multi-alias model shares one (a model puts its ID and group marker on the first entry it makes; `writeAIModels`), and warns when models on one route read the model name from different `ai-model-selector` sources. A disabled model (`enabled: false`) makes no output.
 
