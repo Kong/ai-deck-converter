@@ -693,6 +693,13 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 					return c.failUnsupported(src.at(capabilityField(m, capability)),
 						aimap.FeatureTokenVaultWS, capability)
 				}
+				// A WebSocket route has no model selector, so it cannot read the
+				// model from the request body.
+				if websocket && m.Config.Route.Model.Body.BodyParam != "" {
+					return c.fail(src.at("config.route.model.body.body_param"), ConfigFieldInvalid,
+						"model %q: capability %q needs a WebSocket route, but the body is not a "+
+							"permissible model location on it", m.Name, capability)
+				}
 				// A global plugin keeps Kong's http/https default protocols. A
 				// global authentication policy therefore cannot protect a ws or
 				// wss route, so the model fails closed.

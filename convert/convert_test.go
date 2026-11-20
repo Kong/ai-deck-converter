@@ -3158,6 +3158,28 @@ models:
 	require.Equal(t, "chat", result.Output.AIModels[0].Name)
 }
 
+// TestRealtimeModelRejectsBodyModelLocation pins that a WebSocket route has
+// no selector and rejects the body model location.
+func TestRealtimeModelRejectsBodyModelLocation(t *testing.T) {
+	result, err := Convert([]byte(`
+models:
+  - name: m
+    capabilities: [realtime]
+    config:
+      route:
+        paths: [/ai]
+        model:
+          body: {body_param: model}
+    targets: [{name: t, provider: openai-prod, config: {type: openai}}]
+`+overrideProvider), testOptions)
+	require.NoError(t, err)
+	require.Len(t, result.Issues, 1)
+	issue := requireIssue(t, result.Issues, Error, ConfigFieldInvalid, kindModel, "m",
+		"config.route.model.body.body_param")
+	require.Contains(t, issue.Reason, "the body is not a permissible model location")
+	require.Empty(t, result.Output.AIModels, "the WebSocket model is left out")
+}
+
 // TestGlobalPolicyWarnsOnRealtimeDocument pins that a non-auth global policy
 // only warns, since it still protects every HTTP route; it just never runs
 // against the document's WebSocket traffic.
