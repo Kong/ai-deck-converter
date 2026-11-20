@@ -362,6 +362,45 @@ model_providers:
 	})
 }
 
+func TestProviderTokenVaultWebSocketRejectsBodyPlacement(t *testing.T) {
+	for _, tc := range []struct {
+		where  string
+		source string
+	}{
+		{"inbound", `credential: {inbound: {location: body, name: token}}`},
+		{"outbound", `credential: {outbound: {location: body, name: token}}`},
+	} {
+		t.Run(tc.where, func(t *testing.T) {
+			src := providerTokenVaultDatastores + `
+models:
+  - name: rt
+    type: model
+    capabilities: [realtime]
+    formats: [{type: openai}]
+    config: {route: {paths: [/ai]}}
+    targets:
+      - name: gpt-realtime
+        provider: vault
+        config: {type: openai}
+model_providers:
+  - name: vault
+    type: openai
+    datastores: [{name: tv}]
+    token_vault:
+      provider: openai
+      ` + tc.source + `
+`
+			result, err := Convert([]byte(src), testOptions)
+			require.NoError(t, err)
+			issue := requireIssue(t, result.Issues, Error, ConfigFieldInvalid, kindModel, "rt",
+				"targets[0].provider.token_vault.credential."+tc.where+".location")
+			require.Contains(t, issue.Reason,
+				"does not apply a "+tc.where+" credential from the body")
+			require.Empty(t, pluginsNamed(result.Output, tokenVaultExchangePlugin))
+		})
+	}
+}
+
 // Two api models on one route share a route-scoped ai-proxy-advanced, so they
 // must agree on the token vault.
 func TestProviderTokenVaultSharedAPIRoute(t *testing.T) {

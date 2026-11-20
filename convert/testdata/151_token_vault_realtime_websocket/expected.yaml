@@ -55,6 +55,13 @@ plugins:
       - ws
       - wss
     config:
+      credential:
+        inbound:
+          location: header
+          name: Authorization
+        outbound:
+          location: header
+          name: Authorization
       directory: d
       provider: openai
       storage:
