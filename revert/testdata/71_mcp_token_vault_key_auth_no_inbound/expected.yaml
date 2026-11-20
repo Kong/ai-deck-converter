@@ -1,0 +1,32 @@
+mcp_servers:
+  - type: listener
+    name: vaulted-key-auth
+    config:
+      route:
+        paths:
+          - /mcp/vaulted-key-auth
+      logging:
+        payloads: false
+        statistics: true
+        audits: false
+    tools:
+      - name: report
+        description: Get a report
+        method: GET
+        path: /report
+    datastores:
+      - name: token-vault
+    access:
+      auth_strategies:
+        - key-auth-1
+    token_vault:
+      provider: outbound-api
+datastores:
+  - type: token-vault
+    name: token-vault
+auth_strategies:
+  - type: key-auth
+    name: key-auth-1
+    config:
+      key_names:
+        - apikey
