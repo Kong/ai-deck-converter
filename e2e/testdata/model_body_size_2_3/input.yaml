@@ -1,0 +1,94 @@
+models:
+  - name: openai-default
+    type: model
+    capabilities: [generate]
+    formats:
+      - type: openai
+    config:
+      route:
+        paths: [/openai-default]
+    targets:
+      - name: gpt-5.2
+        provider: openai-prod
+        config:
+          type: openai
+  - name: anthropic-default
+    type: model
+    capabilities: [generate]
+    formats:
+      - type: openai
+    config:
+      route:
+        paths: [/anthropic-default]
+    targets:
+      - name: claude-sonnet-4-5
+        provider: anthropic-prod
+        config:
+          type: anthropic
+  - name: unpublished-default
+    type: model
+    capabilities: [generate]
+    formats:
+      - type: openai
+    config:
+      route:
+        paths: [/unpublished-default]
+    targets:
+      - name: mistral-large
+        provider: mistral-prod
+        config:
+          type: mistral
+          format: openai
+  - name: openai-api-default
+    type: model
+    capabilities: [generate]
+    formats:
+      - type: openai
+    config:
+      route:
+        paths: [/openai-api-default]
+      max_request_body_size: 8388608
+    targets:
+      - name: gpt-5.2
+        provider: openai-prod
+        config:
+          type: openai
+  - name: openai-configured
+    type: model
+    capabilities: [generate]
+    formats:
+      - type: openai
+    config:
+      route:
+        paths: [/openai-configured]
+      max_request_body_size: 1048576
+    targets:
+      - name: gpt-5.2
+        provider: openai-prod
+        config:
+          type: openai
+model_providers:
+  - name: openai-prod
+    type: openai
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://ai/openai-token}"
+  - name: anthropic-prod
+    type: anthropic
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: x-api-key
+            value: "{vault://ai/anthropic-key}"
+  - name: mistral-prod
+    type: mistral
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://ai/mistral-key}"

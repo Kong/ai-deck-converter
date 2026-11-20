@@ -69,6 +69,24 @@ func TestE2E(t *testing.T) {
 		{"token_vault_callback_oidc_enrollment", func(t *testing.T) { testTokenVaultCallbackOIDCEnrollment(t, license) }},
 		{"token_vault_manager_session_enrollment", func(t *testing.T) { testTokenVaultManagerSessionEnrollment(t, license) }},
 		{"agent_targets_failover", func(t *testing.T) { testAgentTargetsFailover(t, license) }},
+		{"model_body_size_2_3", func(t *testing.T) {
+			testModelBodySize(t, license, "model_body_size_2_3", "2.3", "kong/kong-ai-gateway:2.3.0", []bodySizeModel{
+				{name: "openai-default", limit: 8388608, selectorLimit: 8388608},
+				{name: "anthropic-default", limit: 8388608, selectorLimit: 8388608},
+				{name: "unpublished-default", limit: 8388608, selectorLimit: 8388608},
+				{name: "openai-api-default", limit: 8388608, selectorLimit: 8388608},
+				{name: "openai-configured", limit: 1048576, selectorLimit: 8388608},
+			})
+		}},
+		{"model_body_size_2_4", func(t *testing.T) {
+			testModelBodySize(t, license, "model_body_size_2_4", "2.4", "kong/kong-ai-gateway-dev:latest", []bodySizeModel{
+				{name: "openai-default", limit: 50000000, selectorLimit: 50000000},
+				{name: "anthropic-default", limit: 32000000, selectorLimit: 32000000},
+				{name: "unpublished-default", limit: 8388608, selectorLimit: 8388608},
+				{name: "openai-api-default", limit: 8388608, selectorLimit: 8388608},
+				{name: "openai-configured", limit: 1048576, selectorLimit: 8388608},
+			})
+		}},
 	}
 	for _, c := range cases {
 		c := c
