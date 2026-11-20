@@ -25,4 +25,8 @@ model_providers:
   - name: vault
     type: openai
     datastores: [{name: tv}]
-    token_vault: {provider: openai}
+    token_vault:
+      provider: openai
+      credential:
+        inbound: {location: header, name: Authorization}
+        outbound: {location: header, name: Authorization}
