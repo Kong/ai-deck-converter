@@ -14,10 +14,6 @@
   its route. Below 2.4 the model fails with an `UNSUPPORTED_IN_MIN_RUNTIME_VERSION`
   issue, as before.
 
-- A model that needs a WebSocket route and sets `config.route.model.body` now
-  fails with a `CONFIG_FIELD_INVALID` issue. A WebSocket route has no model
-  selector, so the body is not a permissible model location on it.
-
 - A Bedrock target with `allow_override: true` and no header now gets
   `header_name: Authorization` and a placeholder `header_value`. The data plane
   rejected the whole configuration without them. This affected every Bedrock
