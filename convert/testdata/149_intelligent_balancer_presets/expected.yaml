@@ -27,7 +27,7 @@ services:
 plugins:
   - name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 32000000
       sources:
         - body_path: model
           source: body
@@ -49,6 +49,7 @@ plugins:
         strategy: weighted
       genai_category: text/generation
       llm_format: anthropic
+      max_request_body_size: 32000000
       targets:
         - auth:
             header_name: x-api-key
@@ -82,7 +83,7 @@ plugins:
     model: auto-cost
   - name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 32000000
       sources:
         - body_path: model
           source: body
@@ -106,6 +107,7 @@ plugins:
         strategy: weighted
       genai_category: text/generation
       llm_format: anthropic
+      max_request_body_size: 32000000
       targets:
         - auth:
             header_name: x-api-key
@@ -139,7 +141,7 @@ plugins:
     model: auto-balanced
   - name: ai-model-selector
     config:
-      max_request_body_size: 8388608
+      max_request_body_size: 32000000
       sources:
         - body_path: model
           source: body
@@ -161,6 +163,7 @@ plugins:
         strategy: weighted
       genai_category: text/generation
       llm_format: anthropic
+      max_request_body_size: 32000000
       targets:
         - auth:
             header_name: x-api-key
