@@ -318,7 +318,7 @@ model_providers:
 	})
 }
 
-func TestProviderTokenVaultRejectsWebSocket(t *testing.T) {
+func TestProviderTokenVaultWebSocket(t *testing.T) {
 	src := providerTokenVaultDatastores + `
 models:
   - name: rt
@@ -336,11 +336,68 @@ model_providers:
     datastores: [{name: tv}]
     token_vault: {provider: openai}
 `
-	result, err := Convert([]byte(src), testOptions)
-	require.NoError(t, err)
-	issue := requireIssue(t, result.Issues, Error, ConfigFieldInvalid, kindModel, "rt", "capabilities[0]")
-	require.Contains(t, issue.Reason, "does not support the ws and wss protocols")
-	require.Empty(t, pluginsNamed(result.Output, tokenVaultExchangePlugin))
+	t.Run("below 2.4 fails the model", func(t *testing.T) {
+		result, err := Convert([]byte(src), Options{MinRuntimeVersion: "2.3"})
+		require.NoError(t, err)
+		requireIssue(t, result.Issues, Error, UnsupportedInMinRuntimeVersion, kindModel, "rt", "capabilities[0]")
+		require.Empty(t, pluginsNamed(result.Output, tokenVaultExchangePlugin))
+	})
+
+	t.Run("at 2.4 emits the WebSocket plugin", func(t *testing.T) {
+		result, err := Convert([]byte(src), testOptions)
+		require.NoError(t, err)
+		require.Empty(t, result.Issues)
+		var exchanges []kong.Plugin
+		for _, p := range pluginsNamed(result.Output, tokenVaultExchangePlugin) {
+			for _, protocol := range p.Protocols {
+				if protocol == "ws" {
+					exchanges = append(exchanges, p)
+					break
+				}
+			}
+		}
+		require.Len(t, exchanges, 1)
+		require.Equal(t, []string{"ws", "wss"}, exchanges[0].Protocols)
+	})
+}
+
+func TestProviderTokenVaultWebSocketRejectsBodyPlacement(t *testing.T) {
+	for _, tc := range []struct {
+		where  string
+		source string
+	}{
+		{"inbound", `credential: {inbound: {location: body, name: token}}`},
+		{"outbound", `credential: {outbound: {location: body, name: token}}`},
+	} {
+		t.Run(tc.where, func(t *testing.T) {
+			src := providerTokenVaultDatastores + `
+models:
+  - name: rt
+    type: model
+    capabilities: [realtime]
+    formats: [{type: openai}]
+    config: {route: {paths: [/ai]}}
+    targets:
+      - name: gpt-realtime
+        provider: vault
+        config: {type: openai}
+model_providers:
+  - name: vault
+    type: openai
+    datastores: [{name: tv}]
+    token_vault:
+      provider: openai
+      ` + tc.source + `
+`
+			result, err := Convert([]byte(src), testOptions)
+			require.NoError(t, err)
+			issue := requireIssue(t, result.Issues, Error, ConfigFieldInvalid, kindModel, "rt",
+				"targets[0].provider.token_vault.credential."+tc.where+".location")
+			require.Contains(t, issue.Reason,
+				"does not apply a "+tc.where+" credential from the body")
+			require.Empty(t, pluginsNamed(result.Output, tokenVaultExchangePlugin))
+		})
+	}
 }
 
 // Two api models on one route share a route-scoped ai-proxy-advanced, so they

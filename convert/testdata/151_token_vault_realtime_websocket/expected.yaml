@@ -1,0 +1,75 @@
+_format_version: "3.0"
+services:
+  - name: ai-gateway-websocket
+    url: ws://ai-gateway.upstream.local
+    routes:
+      - name: openai-realtime
+        paths:
+          - /ai/realtime
+        protocols:
+          - ws
+          - wss
+        strip_path: false
+routes:
+  - name: token-vault-callback-handler
+    paths:
+      - /_vault
+    protocols:
+      - http
+      - https
+    plugins:
+      - name: token-vault-callback-handler
+        config:
+          directory: d
+          storage:
+            backend: konnect
+            current_version: v1
+            keys:
+              - key: k
+                version: v1
+plugins:
+  - name: ai-proxy-advanced
+    protocols:
+      - ws
+      - wss
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: realtime/generation
+      llm_format: openai
+      max_request_body_size: 50000000
+      targets:
+        - description: gpt-realtime
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: gpt-realtime
+            provider: openai
+          route_type: realtime/v1/realtime
+    route: openai-realtime
+    tags:
+      - ai-gateway-realtime-model:rt
+  - name: token-vault-exchange
+    protocols:
+      - ws
+      - wss
+    config:
+      credential:
+        inbound:
+          location: header
+          name: Authorization
+        outbound:
+          location: header
+          name: Authorization
+      directory: d
+      provider: openai
+      storage:
+        backend: konnect
+        current_version: v1
+        keys:
+          - key: k
+            version: v1
+    route: openai-realtime
+ai_models:
+  - name: rt

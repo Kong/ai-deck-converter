@@ -598,3 +598,29 @@ func (c *Converter) checkEmbeddingsTokenVault(src ConversionIssueSource, m *aigw
 	}
 	return nil
 }
+
+// checkTokenVaultWSBody fails the model when a provider reads or sends the
+// vault credential from a body. The gateway applies only the header and query
+// placements on a WebSocket route and fails closed on a body.
+func (c *Converter) checkTokenVaultWSBody(
+	src ConversionIssueSource, m *aigw.Model, capability string, t plannedTarget,
+) error {
+	tv := t.provider.TokenVault
+	if tv == nil || tv.Credential == nil {
+		return nil
+	}
+	for _, place := range []struct {
+		where  string
+		config *aigw.TokenVaultCredentialLocation
+	}{{"inbound", tv.Credential.Inbound}, {"outbound", tv.Credential.Outbound}} {
+		if place.config == nil || place.config.Location != "body" {
+			continue
+		}
+		field := fmt.Sprintf("targets[%d].provider.token_vault.credential.%s.location",
+			t.index, place.where)
+		return c.fail(src.at(field), ConfigFieldInvalid,
+			"model %q: capability %q needs a WebSocket route, but the gateway does not apply "+
+				"a %s credential from the body on one", m.Name, capability, place.where)
+	}
+	return nil
+}
