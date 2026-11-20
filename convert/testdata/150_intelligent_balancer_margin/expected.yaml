@@ -3,13 +3,6 @@ services:
   - name: ai-gateway
     url: http://ai-gateway.upstream.local
     routes:
-      - name: typesafe-decisions
-        paths:
-          - ~/classifier/v1/systemone
-        methods:
-          - POST
-          - OPTIONS
-        strip_path: false
       - name: openai-chat
         paths:
           - /margin-cost/chat/completions
@@ -38,34 +31,6 @@ plugins:
       sources:
         - body_path: model
           source: body
-    route: typesafe-decisions
-  - name: ai-proxy-advanced
-    config:
-      balancer:
-        algorithm: round-robin
-      genai_category: text/generation
-      llm_format: typesafe
-      targets:
-        - auth:
-            header_name: Authorization
-            header_value: '{vault://env/typesafe-token}'
-          description: jev-latest
-          logging:
-            log_payloads: false
-            log_statistics: true
-          model:
-            model_alias: task-classifier
-            name: jev-latest
-            provider: typesafe
-          route_type: llm/v1/chat
-    route: typesafe-decisions
-    model: task-classifier
-  - name: ai-model-selector
-    config:
-      max_request_body_size: 8388608
-      sources:
-        - body_path: model
-          source: body
     route: openai-chat
   - name: ai-proxy-advanced
     config:
@@ -76,9 +41,10 @@ plugins:
             header_name: Authorization
             header_value: '{vault://env/typesafe-token}'
           context_window: 32768
+          format: /v1/systemone
           name: jev-latest
-          provider: typesafe
-          type: model
+          type: custom
+          url: https://api.typesafe.ai
         cost_quality_tradeoff: 0.25
         margin: 15
         strategy: margin
@@ -127,9 +93,10 @@ plugins:
             header_name: Authorization
             header_value: '{vault://env/typesafe-token}'
           context_window: 32768
+          format: /v1/systemone
           name: jev-latest
-          provider: typesafe
-          type: model
+          type: custom
+          url: https://api.typesafe.ai
         cost_quality_tradeoff: 0.5
         margin: 5
         strategy: margin
@@ -178,9 +145,10 @@ plugins:
             header_name: Authorization
             header_value: '{vault://env/typesafe-token}'
           context_window: 32768
+          format: /v1/systemone
           name: jev-latest
-          provider: typesafe
-          type: model
+          type: custom
+          url: https://api.typesafe.ai
         cost_quality_tradeoff: 0.75
         margin: 0
         strategy: margin
@@ -214,7 +182,6 @@ plugins:
     route: openai-chat-3
     model: margin-quality
 ai_models:
-  - name: task-classifier
   - name: margin-cost
   - name: margin-balanced
   - name: margin-quality

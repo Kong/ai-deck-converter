@@ -1,14 +1,6 @@
 # Balancer fields that the converter cannot change to data plane values. Each
 # auto-* model is absent with an error.
 model_providers:
-  - name: jev-typesafe
-    type: typesafe
-    config:
-      auth:
-        type: basic
-        headers:
-          - name: Authorization
-            value: "{vault://env/typesafe-token}"
   - name: openai
     type: openai
     config:
@@ -18,21 +10,13 @@ model_providers:
           - name: Authorization
             value: "{vault://env/openai-key}"
 models:
-  - name: task-classifier
-    capabilities: [decisions]
-    formats: [{type: typesafe}]
-    config:
-      route: {paths: [/classifier]}
-    targets:
-      - name: jev-latest
-        provider: jev-typesafe
   - name: auto-no-context-window
     capabilities: [generate]
     config:
       route: {paths: [/a0]}
       balancer:
         algorithm: intelligent
-        classifier: {model: task-classifier}
+        classifier: {type: custom, url: "https://api.typesafe.ai", name: jev-latest}
     targets:
       - {name: gpt-5, provider: openai}
   - name: auto-bad-preset
@@ -42,7 +26,7 @@ models:
       balancer:
         algorithm: intelligent
         cost_quality_tradeoff: fast
-        classifier: {model: task-classifier, context_window: 32768}
+        classifier: {type: custom, url: "https://api.typesafe.ai", name: jev-latest, context_window: 32768}
     targets:
       - {name: gpt-5, provider: openai}
   - name: auto-number-preset
@@ -52,7 +36,7 @@ models:
       balancer:
         algorithm: intelligent
         cost_quality_tradeoff: 0.5
-        classifier: {model: task-classifier, context_window: 32768}
+        classifier: {type: custom, url: "https://api.typesafe.ai", name: jev-latest, context_window: 32768}
     targets:
       - {name: gpt-5, provider: openai}
   - name: auto-bad-strategy
@@ -62,7 +46,7 @@ models:
       balancer:
         algorithm: intelligent
         strategy: greedy
-        classifier: {model: task-classifier, context_window: 32768}
+        classifier: {type: custom, url: "https://api.typesafe.ai", name: jev-latest, context_window: 32768}
     targets:
       - {name: gpt-5, provider: openai}
   - name: auto-bad-version
@@ -72,7 +56,7 @@ models:
       balancer:
         algorithm: intelligent
         version: v2
-        classifier: {model: task-classifier, context_window: 32768}
+        classifier: {type: custom, url: "https://api.typesafe.ai", name: jev-latest, context_window: 32768}
     targets:
       - {name: gpt-5, provider: openai}
   - name: auto-passthrough
@@ -81,7 +65,7 @@ models:
       route: {paths: [/a5]}
       balancer:
         algorithm: intelligent
-        classifier: {model: task-classifier, context_window: 32768}
+        classifier: {type: custom, url: "https://api.typesafe.ai", name: jev-latest, context_window: 32768}
     targets:
       - {name: gpt-5, provider: openai}
   - name: auto-margin-value
@@ -92,6 +76,6 @@ models:
         algorithm: intelligent
         strategy: margin
         margin: 10
-        classifier: {model: task-classifier, context_window: 32768}
+        classifier: {type: custom, url: "https://api.typesafe.ai", name: jev-latest, context_window: 32768}
     targets:
       - {name: gpt-5, provider: openai}

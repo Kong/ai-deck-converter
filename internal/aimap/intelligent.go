@@ -2,7 +2,6 @@ package aimap
 
 import (
 	"math"
-	"slices"
 	"strings"
 )
 
@@ -105,55 +104,30 @@ func nearestPreset(v float64, value func(IntelligentPreset) float64) (Intelligen
 // AI Gateway API requires it on.
 const ClassifierContextWindow = 32768
 
-// ClassifierFormat is the format of a classifier URL with no path. The data
-// plane joins the format to the classifier url.
-var ClassifierFormat = "/" + typesafeDecisionsPath()
+// ClassifierTypeCustom is the only classifier type. The classifier block
+// states the URL, model name and credential of the classifier.
+const ClassifierTypeCustom = "custom"
 
-func typesafeDecisionsPath() string {
-	specs, _ := EndpointsFor(TypesafeProviderType, "decisions")
-	return specs[0].PathSuffix
-}
+// ClassifierFormat is the API default of classifier.format. The data plane
+// has no default and requires a format.
+const ClassifierFormat = "/v1/systemone"
 
-// hostedClassifiers are the provider types whose decisions endpoint the data
-// plane knows. The classifier record names the provider type.
-var hostedClassifiers = []string{TypesafeProviderType}
-
-// HasHostedClassifier reports whether the data plane knows the decisions
-// endpoint of providerType.
-func HasHostedClassifier(providerType string) bool {
-	return slices.Contains(hostedClassifiers, providerType)
-}
-
-// SplitClassifierURL returns scheme://host[:port] of a System One upstream_url
-// as the classifier url. The format is the path without a change. problem tells
-// why the data plane rejects upstreamURL.
-func SplitClassifierURL(upstreamURL string) (base, format, problem string) {
-	rest, ok := strings.CutPrefix(upstreamURL, "https://")
+// ClassifierURLProblem tells why the data plane rejects url as a classifier
+// base URL. It returns "" for a URL that the data plane accepts.
+func ClassifierURLProblem(url string) string {
+	rest, ok := strings.CutPrefix(url, "https://")
 	if !ok {
-		rest, ok = strings.CutPrefix(upstreamURL, "http://")
+		rest, ok = strings.CutPrefix(url, "http://")
 	}
-	if !ok {
-		return "", "", "it does not use http or https"
+	switch {
+	case !ok:
+		return "it does not use http or https"
+	case strings.ContainsAny(rest, "?#"):
+		return "it has a query or a fragment"
+	case strings.Contains(rest, "@"):
+		return "it has user information"
+	case strings.HasPrefix(rest, "/") || rest == "":
+		return "it has no host"
 	}
-	if strings.ContainsAny(rest, "?#") {
-		return "", "", "it has a query or a fragment"
-	}
-	if strings.Contains(rest, "@") {
-		return "", "", "it has user information"
-	}
-	host, path, _ := strings.Cut(rest, "/")
-	if host == "" {
-		return "", "", "it has no host"
-	}
-	base = strings.TrimSuffix(upstreamURL, rest) + host
-	if path == "" {
-		return base, ClassifierFormat, ""
-	}
-	return base, "/" + path, ""
-}
-
-// JoinClassifierURL returns the URL the data plane sends a classifier request
-// to. The two parts meet at one slash.
-func JoinClassifierURL(base, format string) string {
-	return strings.TrimRight(base, "/") + "/" + strings.TrimLeft(format, "/")
+	return ""
 }

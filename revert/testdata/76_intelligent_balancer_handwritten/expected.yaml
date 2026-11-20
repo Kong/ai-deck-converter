@@ -1,42 +1,5 @@
 models:
   - type: model
-    name: jev
-    capabilities:
-      - decisions
-    formats:
-      - type: typesafe
-    targets:
-      - name: jev-latest
-        provider: typesafe-env
-        config:
-          type: typesafe
-    config:
-      route:
-        paths:
-          - /jev
-      logging:
-        payloads: false
-        statistics: true
-  - type: model
-    name: kev
-    capabilities:
-      - decisions
-    formats:
-      - type: typesafe
-    targets:
-      - name: kev-latest
-        provider: typesafe-1
-        config:
-          type: typesafe
-          upstream_url: http://kev.internal:8009/v1/systemone
-    config:
-      route:
-        paths:
-          - /kev
-      logging:
-        payloads: false
-        statistics: true
-  - type: model
     name: near
     capabilities:
       - generate
@@ -61,8 +24,15 @@ models:
       balancer:
         algorithm: intelligent
         classifier:
+          auth:
+            headers:
+              - name: Authorization
+                value: '{vault://env/typesafe-token}'
+            type: basic
           context_window: 32768
-          model: jev
+          name: jev-latest
+          type: custom
+          url: https://api.typesafe.ai
   - type: model
     name: margin
     capabilities:
@@ -84,13 +54,21 @@ models:
       balancer:
         algorithm: intelligent
         classifier:
-          context_window: 32768
-          model: kev
+          auth:
+            headers:
+              - name: x-api-key
+                value: '{vault://env/kev-key}'
+            type: basic
+          context_window: 8192
+          format: /decide/v1/systemone
+          name: kev-latest
           timeout: 2000
+          type: custom
+          url: http://kev.internal:8009/
         cost_quality_tradeoff: cost
         strategy: margin
   - type: model
-    name: orphan
+    name: old-shape
     capabilities:
       - generate
     formats:
@@ -103,7 +81,7 @@ models:
     config:
       route:
         paths:
-          - /orphan
+          - /old-shape
       logging:
         payloads: false
         statistics: true
@@ -111,22 +89,6 @@ models:
         algorithm: intelligent
         cost_quality_tradeoff: quality
 model_providers:
-  - type: typesafe
-    name: typesafe-env
-    config:
-      auth:
-        type: basic
-        headers:
-          - name: Authorization
-            value: '{vault://env/typesafe-token}'
-  - type: typesafe
-    name: typesafe-1
-    config:
-      auth:
-        type: basic
-        headers:
-          - name: x-api-key
-            value: '{vault://env/kev-key}'
   - type: openai
     name: openai-env
     config:

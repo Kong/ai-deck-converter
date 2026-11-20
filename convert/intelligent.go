@@ -1,7 +1,6 @@
 package convert
 
 import (
-	"cmp"
 	"maps"
 	"slices"
 	"strings"
@@ -13,7 +12,19 @@ import (
 const classifierField = "config.balancer.classifier"
 
 // classifierKeys are the fields a balancer.classifier block can hold.
-var classifierKeys = []string{"context_window", "model", "timeout"}
+var classifierKeys = []string{"auth", "context_window", "format", "name", "timeout", "type", "url"}
+
+// classifierRequired are the classifier fields that the API requires. The
+// second value goes in the issue reason.
+var classifierRequired = [][2]string{
+	{"type", `set to "custom"`},
+	{"url", "the base URL of the classifier"},
+	{"name", "the classifier model name"},
+	{"context_window", "the number of tokens the classifier reads"},
+}
+
+// classifierAuthKeys are the fields a classifier auth block can hold.
+var classifierAuthKeys = []string{"headers", "type"}
 
 // modelBalancer returns the ai-proxy-advanced balancer block of m. It fails m
 // for an intelligent balancer that the data plane cannot run.
@@ -81,141 +92,125 @@ func (c *Converter) lowerIntelligentBalancer(src ConversionIssueSource, m *aigw.
 }
 
 // classifierConfig changes a balancer.classifier block to the data plane
-// classifier record. The block names a model with the decisions capability.
-// The record copies that model's one target and its provider auth header.
+// classifier record.
 func (c *Converter) classifierConfig(src ConversionIssueSource, m *aigw.Model, raw any) (map[string]any, error) {
 	if raw == nil {
 		return nil, c.fail(src.at(classifierField), MissingRequiredConfigField,
-			"model %q: the intelligent balancer needs %s.model, the name of a decisions model",
-			m.Name, classifierField)
+			"model %q: the intelligent balancer needs %s", m.Name, classifierField)
 	}
 	block, ok := raw.(map[string]any)
 	if !ok {
 		return nil, c.fail(src.at(classifierField), ConfigFieldInvalid,
 			"model %q: %s is not a map", m.Name, classifierField)
 	}
-	for _, key := range slices.Sorted(maps.Keys(block)) {
-		if !slices.Contains(classifierKeys, key) {
-			return nil, c.fail(src.at(classifierField+"."+key), ConfigFieldInvalid,
-				"model %q: %s.%s is not a classifier field. The fields are %s.",
-				m.Name, classifierField, key, strings.Join(classifierKeys, ", "))
+	if key, ok := unknownKey(block, classifierKeys); ok {
+		return nil, c.fail(src.at(classifierField+"."+key), ConfigFieldInvalid,
+			"model %q: %s.%s is not a classifier field. The fields are %s.",
+			m.Name, classifierField, key, strings.Join(classifierKeys, ", "))
+	}
+	for _, field := range classifierRequired {
+		if _, ok := block[field[0]]; !ok {
+			return nil, c.fail(src.at(classifierField+"."+field[0]), MissingRequiredConfigField,
+				"model %q: the intelligent balancer needs %s.%s, %s",
+				m.Name, classifierField, field[0], field[1])
 		}
 	}
-	modelSrc := src.at(classifierField + ".model")
-	name, _ := block["model"].(string)
+	if block["type"] != aimap.ClassifierTypeCustom {
+		return nil, c.fail(src.at(classifierField+".type"), ConfigFieldInvalid,
+			"model %q: classifier type %#v is not supported. The only type is %q.",
+			m.Name, block["type"], aimap.ClassifierTypeCustom)
+	}
+	url, _ := block["url"].(string)
+	if problem := aimap.ClassifierURLProblem(url); problem != "" {
+		return nil, c.fail(src.at(classifierField+".url"), ConfigFieldInvalid,
+			"model %q: the data plane rejects classifier url %#v: %s", m.Name, block["url"], problem)
+	}
+	name, _ := block["name"].(string)
 	if name == "" {
-		return nil, c.fail(modelSrc, MissingRequiredConfigField,
-			"model %q: the intelligent balancer needs %s.model, the name of a decisions model",
-			m.Name, classifierField)
+		return nil, c.fail(src.at(classifierField+".name"), ConfigFieldInvalid,
+			"model %q: %s.name is empty or not a string", m.Name, classifierField)
 	}
-	classifier := c.modelNamed(name)
-	switch {
-	case classifier == nil:
-		return nil, c.fail(modelSrc, UndefinedReference,
-			"model %q: classifier model %q does not exist", m.Name, name)
-	case isDisabled(classifier):
-		return nil, c.fail(modelSrc, ConfigFieldInvalid,
-			"model %q: classifier model %q is disabled", m.Name, name)
-	case !hasDecisions(classifier):
-		return nil, c.fail(modelSrc, ConfigFieldInvalid,
-			"model %q: classifier.model must name a model with the decisions capability. Model %q does not have it.",
-			m.Name, name)
-	case len(classifier.TargetModels) != 1:
-		return nil, c.fail(modelSrc, ConfigFieldInvalid,
-			"model %q: classifier model %q has %d targets. A classifier model needs exactly one target.",
-			m.Name, name, len(classifier.TargetModels))
-	}
-
-	tm := &classifier.TargetModels[0]
-	provider := c.providers[tm.Provider]
-	if provider == nil {
-		return nil, c.fail(modelSrc, UndefinedReference,
-			"model %q: target %q of classifier model %q references unknown provider %q",
-			m.Name, tm.Name, name, tm.Provider)
-	}
-	auth, err := c.classifierAuth(modelSrc, m, name, provider)
-	if err != nil {
-		return nil, err
-	}
-
-	if _, ok := block["context_window"]; !ok {
-		return nil, c.fail(src.at(classifierField+".context_window"), MissingRequiredConfigField,
-			"model %q: the intelligent balancer needs %s.context_window, the number of tokens classifier model %q reads",
-			m.Name, classifierField, name)
-	}
-
-	out := map[string]any{"name": tm.Name}
-	providerType := cmp.Or(tm.Config.Type, provider.Type)
-	if raw, ok := tm.Config.Options["upstream_url"]; ok {
-		upstream, _ := raw.(string)
-		base, format, problem := aimap.SplitClassifierURL(upstream)
-		if problem != "" {
-			return nil, c.fail(modelSrc, ConfigFieldInvalid,
-				"model %q: the data plane rejects upstream_url %q of classifier model %q as a classifier URL: %s",
-				m.Name, upstream, name, problem)
+	format := aimap.ClassifierFormat
+	if v, ok := block["format"]; ok {
+		if format, _ = v.(string); format == "" {
+			return nil, c.fail(src.at(classifierField+".format"), ConfigFieldInvalid,
+				"model %q: %s.format is empty or not a string", m.Name, classifierField)
 		}
-		out["type"] = "custom"
-		out["url"] = base
-		out["format"] = format
-	} else if aimap.HasHostedClassifier(providerType) {
-		out["type"] = "model"
-		out["provider"] = providerType
-	} else {
-		return nil, c.fail(modelSrc, ConfigFieldInvalid,
-			"model %q: target %q of classifier model %q has no upstream_url. "+
-				"The converter knows no default decisions endpoint for provider type %q. "+
-				"Set upstream_url on the target.",
-			m.Name, tm.Name, name, providerType)
 	}
-	if auth != nil {
-		out["auth"] = auth
+
+	out := map[string]any{
+		"type":           aimap.ClassifierTypeCustom,
+		"url":            url,
+		"format":         format,
+		"name":           name,
+		"context_window": block["context_window"],
 	}
-	for _, key := range []string{"timeout", "context_window"} {
-		if v, ok := block[key]; ok {
-			out[key] = v
+	if v, ok := block["timeout"]; ok {
+		out["timeout"] = v
+	}
+	if v, ok := block["auth"]; ok {
+		auth, err := c.classifierAuth(src, m, v)
+		if err != nil {
+			return nil, err
+		}
+		if auth != nil {
+			out["auth"] = auth
 		}
 	}
 	return out, nil
 }
 
-// classifierAuth returns the auth header of the classifier provider. The
-// data plane sends one classifier header and no other credential.
-func (c *Converter) classifierAuth(
-	src ConversionIssueSource, m *aigw.Model, classifier string, provider *aigw.Provider,
-) (map[string]any, error) {
-	if provider.TokenVault != nil {
-		return nil, c.fail(src, ConfigFieldInvalid,
-			"model %q: provider %q of classifier model %q uses a token vault. "+
-				"The classifier sends a fixed auth header only.",
-			m.Name, provider.Name, classifier)
+// classifierAuth changes a classifier auth block to the data plane auth
+// record. The data plane sends one classifier header and no other credential.
+func (c *Converter) classifierAuth(src ConversionIssueSource, m *aigw.Model, raw any) (map[string]any, error) {
+	const field = classifierField + ".auth"
+	block, ok := raw.(map[string]any)
+	if !ok {
+		return nil, c.fail(src.at(field), ConfigFieldInvalid, "model %q: %s is not a map", m.Name, field)
 	}
-	auth := resolveAuth(provider, nil)
-	var other []string
-	for _, key := range slices.Sorted(maps.Keys(auth)) {
-		if key != "header_name" && key != "header_value" {
-			other = append(other, key)
+	if key, ok := unknownKey(block, classifierAuthKeys); ok {
+		return nil, c.fail(src.at(field+"."+key), ConfigFieldInvalid,
+			"model %q: %s.%s is not supported. The classifier sends one auth header only.",
+			m.Name, field, key)
+	}
+	if block["type"] != "basic" {
+		return nil, c.fail(src.at(field+".type"), ConfigFieldInvalid,
+			"model %q: classifier auth type %#v is not supported. Use \"basic\".", m.Name, block["type"])
+	}
+	rawHeaders, ok := block["headers"]
+	if !ok {
+		return nil, nil
+	}
+	headers, ok := rawHeaders.([]any)
+	switch {
+	case !ok:
+		return nil, c.fail(src.at(field+".headers"), ConfigFieldInvalid,
+			"model %q: %s.headers is not a list", m.Name, field)
+	case len(headers) == 0:
+		return nil, nil
+	case len(headers) > 1:
+		return nil, c.fail(src.at(field+".headers"), ConfigFieldInvalid,
+			"model %q: %s.headers has %d entries. The classifier sends one auth header only.",
+			m.Name, field, len(headers))
+	}
+	header, _ := headers[0].(map[string]any)
+	for _, key := range []string{"name", "value"} {
+		if v, _ := header[key].(string); v == "" {
+			return nil, c.fail(src.at(field+".headers[0]."+key), MissingRequiredConfigField,
+				"model %q: the classifier auth header needs a %s. The data plane needs both name and value.",
+				m.Name, key)
 		}
 	}
-	if len(other) > 0 {
-		return nil, c.fail(src, ConfigFieldInvalid,
-			"model %q: provider %q of classifier model %q sets auth %s. "+
-				"The classifier sends one auth header only.",
-			m.Name, provider.Name, classifier, strings.Join(other, ", "))
-	}
-	return auth, nil
+	return map[string]any{"header_name": header["name"], "header_value": header["value"]}, nil
 }
 
-func (c *Converter) modelNamed(name string) *aigw.Model {
-	for i := range c.src.Models {
-		if c.src.Models[i].Name == name {
-			return &c.src.Models[i]
+// unknownKey returns the first key of block, in sorted order, that keys does
+// not hold.
+func unknownKey(block map[string]any, keys []string) (string, bool) {
+	for _, key := range slices.Sorted(maps.Keys(block)) {
+		if !slices.Contains(keys, key) {
+			return key, true
 		}
 	}
-	return nil
-}
-
-// hasDecisions reports whether m lists the decisions capability, by name or
-// by "*".
-func hasDecisions(m *aigw.Model) bool {
-	return capabilitiesWildcard(m) || slices.Contains(explicitCapabilities(m), "decisions")
+	return "", false
 }

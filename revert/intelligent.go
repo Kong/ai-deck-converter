@@ -1,8 +1,6 @@
 package revert
 
 import (
-	"cmp"
-	"fmt"
 	"maps"
 	"slices"
 
@@ -11,8 +9,7 @@ import (
 )
 
 // liftIntelligentBalancers changes the intelligent balancer of each reverted
-// model to the AI Gateway shape. A classifier names another model. This runs
-// after every model and provider exists.
+// model to the AI Gateway shape.
 func (r *Reverter) liftIntelligentBalancers() error {
 	for i := range r.out.Models {
 		m := &r.out.Models[i]
@@ -52,7 +49,7 @@ func (r *Reverter) liftIntelligentFields(model string, in map[string]any) (map[s
 	if strategy != "" && strategy != aimap.IntelligentStrategies[0] {
 		fields["strategy"] = strategy
 	}
-	classifier, err := r.classifierRef(model, getMap(in, "classifier"))
+	classifier, err := r.classifierBlock(model, getMap(in, "classifier"))
 	if err != nil {
 		return nil, err
 	}
@@ -106,99 +103,41 @@ func (r *Reverter) intelligentPreset(
 	return p, nil
 }
 
-// classifierRef changes a data plane classifier record to a balancer
-// classifier block. The block names the reverted model that serves the
-// classifier.
-func (r *Reverter) classifierRef(model string, block map[string]any) (map[string]any, error) {
-	if block == nil {
+// classifierBlock changes a data plane classifier record to a balancer
+// classifier block. It drops the default format.
+func (r *Reverter) classifierBlock(model string, record map[string]any) (map[string]any, error) {
+	if record == nil {
 		return nil, r.warn("model %q: the intelligent balancer has no classifier", model)
 	}
-	out := map[string]any{}
-	for _, key := range []string{"timeout", "context_window"} {
-		if v, ok := block[key]; ok {
+	if kind := getStr(record, "type"); kind != aimap.ClassifierTypeCustom {
+		return nil, r.warn("model %q: classifier type %q is not supported. "+
+			"The AI Gateway API has only type %q. config.balancer.classifier is left out.",
+			model, kind, aimap.ClassifierTypeCustom)
+	}
+	out := map[string]any{"type": aimap.ClassifierTypeCustom}
+	for _, key := range []string{"url", "format", "name", "timeout", "context_window"} {
+		if v, ok := record[key]; ok {
 			out[key] = v
 		}
 	}
-	name, problem := r.classifierModel(block)
-	if name == "" {
-		return out, r.warn("model %q: %s. classifier.model is left out. "+
-			"Set it to a model with the decisions capability and one target.", model, problem)
+	if out["format"] == aimap.ClassifierFormat {
+		delete(out, "format")
 	}
-	out["model"] = name
 	if _, ok := out["context_window"]; !ok {
 		// The API requires context_window. The data plane reads this value
 		// when the record has none, so setting it changes nothing.
 		out["context_window"] = aimap.ClassifierContextWindow
 	}
+	if auth := getMap(record, "auth"); len(auth) > 0 {
+		header := map[string]any{}
+		for key, field := range map[string]string{"name": "header_name", "value": "header_value"} {
+			if v, ok := auth[field]; ok {
+				header[key] = v
+			}
+		}
+		out["auth"] = map[string]any{"type": "basic", "headers": []any{header}}
+	}
 	return out, nil
-}
-
-// classifierModel returns the first reverted model that serves the
-// classifier record. It returns why no model matches when name is "".
-func (r *Reverter) classifierModel(block map[string]any) (name, problem string) {
-	target := getStr(block, "name")
-	providerType, upstream := "", ""
-	switch kind := getStr(block, "type"); kind {
-	case "model":
-		providerType = getStr(block, "provider")
-		if !aimap.HasHostedClassifier(providerType) {
-			return "", fmt.Sprintf("the classifier provider %q has no known decisions endpoint", providerType)
-		}
-	case "custom":
-		upstream = aimap.JoinClassifierURL(getStr(block, "url"), getStr(block, "format"))
-	default:
-		return "", fmt.Sprintf("the classifier type %q is not model or custom", kind)
-	}
-	auth := getMap(block, "auth")
-	header := aigw.AuthHeader{Name: getStr(auth, "header_name"), Value: getStr(auth, "header_value")}
-	for _, m := range r.out.Models {
-		if r.servesClassifier(m, target, providerType, upstream, header) {
-			return m.Name, ""
-		}
-	}
-	return "", fmt.Sprintf("no model with the decisions capability has the classifier target %q", target)
-}
-
-// servesClassifier reports whether m has the decisions capability and one
-// target with the given name, upstream_url and provider auth header. An empty
-// providerType matches any provider type.
-func (r *Reverter) servesClassifier(
-	m aigw.Model, target, providerType, upstream string, header aigw.AuthHeader,
-) bool {
-	if !slices.Contains(m.Capabilities, "decisions") || len(m.TargetModels) != 1 {
-		return false
-	}
-	tm := m.TargetModels[0]
-	i := slices.IndexFunc(r.providers, func(p aigw.Provider) bool { return p.Name == tm.Provider })
-	if i < 0 || tm.Name != target {
-		return false
-	}
-	provider := r.providers[i]
-	if providerType != "" && cmp.Or(tm.Config.Type, provider.Type) != providerType {
-		return false
-	}
-	if got, _ := tm.Config.Options["upstream_url"].(string); classifierURL(got) != upstream {
-		return false
-	}
-	auth := provider.Config.Auth
-	var got aigw.AuthHeader
-	if len(auth.Headers) > 0 {
-		got = auth.Headers[0]
-	}
-	return len(auth.Params) == 0 && got == header
-}
-
-// classifierURL returns the URL that a classifier made from a target
-// upstream_url calls. It returns "" for a target with no upstream_url.
-func classifierURL(upstream string) string {
-	if upstream == "" {
-		return ""
-	}
-	base, format, problem := aimap.SplitClassifierURL(upstream)
-	if problem != "" {
-		return upstream
-	}
-	return aimap.JoinClassifierURL(base, format)
 }
 
 // number returns a YAML number as a float64.

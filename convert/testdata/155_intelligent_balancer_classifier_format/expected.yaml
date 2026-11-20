@@ -3,20 +3,6 @@ services:
   - name: ai-gateway
     url: http://ai-gateway.upstream.local
     routes:
-      - name: typesafe-decisions
-        paths:
-          - ~/jev/v1/systemone
-        methods:
-          - POST
-          - OPTIONS
-        strip_path: false
-      - name: typesafe-decisions-2
-        paths:
-          - ~/kev/v1/systemone
-        methods:
-          - POST
-          - OPTIONS
-        strip_path: false
       - name: openai-chat
         paths:
           - /auto-openrouter/chat/completions
@@ -32,66 +18,6 @@ services:
           - OPTIONS
         strip_path: false
 plugins:
-  - name: ai-model-selector
-    config:
-      max_request_body_size: 8388608
-      sources:
-        - body_path: model
-          source: body
-    route: typesafe-decisions
-  - name: ai-proxy-advanced
-    config:
-      balancer:
-        algorithm: round-robin
-      genai_category: text/generation
-      llm_format: typesafe
-      targets:
-        - auth:
-            header_name: Authorization
-            header_value: '{vault://env/openrouter-token}'
-          description: typesafe/jev-1.13-20260917
-          logging:
-            log_payloads: false
-            log_statistics: true
-          model:
-            model_alias: jev-openrouter
-            name: typesafe/jev-1.13-20260917
-            options:
-              upstream_url: https://openrouter.ai/api/alpha/decisions
-            provider: typesafe
-          route_type: llm/v1/chat
-    route: typesafe-decisions
-    model: jev-openrouter
-  - name: ai-model-selector
-    config:
-      max_request_body_size: 8388608
-      sources:
-        - body_path: model
-          source: body
-    route: typesafe-decisions-2
-  - name: ai-proxy-advanced
-    config:
-      balancer:
-        algorithm: round-robin
-      genai_category: text/generation
-      llm_format: typesafe
-      targets:
-        - auth:
-            header_name: x-api-key
-            header_value: '{vault://env/kev-key}'
-          description: kev-latest
-          logging:
-            log_payloads: false
-            log_statistics: true
-          model:
-            model_alias: kev-bare-host
-            name: kev-latest
-            options:
-              upstream_url: http://kev.internal:8009
-            provider: typesafe
-          route_type: llm/v1/chat
-    route: typesafe-decisions-2
-    model: kev-bare-host
   - name: ai-model-selector
     config:
       max_request_body_size: 8388608
@@ -155,9 +81,6 @@ plugins:
       balancer:
         algorithm: intelligent
         classifier:
-          auth:
-            header_name: x-api-key
-            header_value: '{vault://env/kev-key}'
           context_window: 32768
           format: /v1/systemone
           name: kev-latest
@@ -195,7 +118,5 @@ plugins:
     route: openai-chat-2
     model: auto-bare-host
 ai_models:
-  - name: jev-openrouter
-  - name: kev-bare-host
   - name: auto-openrouter
   - name: auto-bare-host

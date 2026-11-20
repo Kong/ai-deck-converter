@@ -9,9 +9,10 @@
 ### Features
 
 - Models convert the `intelligent` balancer (AI Gateway 2.4+). A
-  `cost_quality_tradeoff` preset becomes the data plane number, and
-  `classifier.model` names a model with the `decisions` capability, whose
-  one target becomes the classifier. `classifier.context_window` is required.
+  `cost_quality_tradeoff` preset becomes the data plane number. The classifier
+  is set by hand (`type: custom` with `url`, `name` and `context_window`, and
+  an optional `format`, `timeout` and one auth header). Its fields map one to
+  one to the data plane classifier record.
 
 ### Bug Fixes
 

@@ -1,14 +1,7 @@
 # The intelligent balancer with the weighted strategy at each preset. The
-# classifier is a decisions model on TypeSafe's hosted API.
+# classifier is TypeSafe's hosted API. Its format is absent, so the data plane
+# record gets /v1/systemone.
 model_providers:
-  - name: jev-typesafe
-    type: typesafe
-    config:
-      auth:
-        type: basic
-        headers:
-          - name: Authorization
-            value: "{vault://env/typesafe-token}"
   - name: anthropic
     type: anthropic
     config:
@@ -18,16 +11,6 @@ model_providers:
           - name: x-api-key
             value: "{vault://env/anthropic-key}"
 models:
-  - name: task-classifier
-    type: model
-    capabilities: [decisions]
-    formats: [{type: typesafe}]
-    config:
-      route: {paths: [/classifier]}
-    targets:
-      - name: jev-latest
-        provider: jev-typesafe
-        config: {type: typesafe}
   - name: auto-cost
     type: model
     capabilities: [generate]
@@ -39,8 +22,15 @@ models:
         version: v1
         cost_quality_tradeoff: cost
         classifier:
-          model: task-classifier
+          type: custom
+          url: https://api.typesafe.ai
+          name: jev-latest
           context_window: 32768
+          auth:
+            type: basic
+            headers:
+              - name: Authorization
+                value: "{vault://env/typesafe-token}"
     targets:
       - name: claude-haiku-4-5
         provider: anthropic
@@ -56,9 +46,16 @@ models:
         algorithm: intelligent
         retries: 2
         classifier:
-          model: task-classifier
+          type: custom
+          url: https://api.typesafe.ai
+          name: jev-latest
           timeout: 5000
           context_window: 32768
+          auth:
+            type: basic
+            headers:
+              - name: Authorization
+                value: "{vault://env/typesafe-token}"
     targets:
       - name: claude-haiku-4-5
         provider: anthropic
@@ -75,8 +72,15 @@ models:
         strategy: weighted
         cost_quality_tradeoff: quality
         classifier:
-          model: task-classifier
+          type: custom
+          url: https://api.typesafe.ai
+          name: jev-latest
           context_window: 32768
+          auth:
+            type: basic
+            headers:
+              - name: Authorization
+                value: "{vault://env/typesafe-token}"
     targets:
       - name: claude-haiku-4-5
         provider: anthropic

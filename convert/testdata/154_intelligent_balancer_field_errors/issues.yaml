@@ -1,5 +1,5 @@
 - code: MISSING_REQUIRED_CONFIG_FIELD
-  reason: 'model "auto-no-context-window": the intelligent balancer needs config.balancer.classifier.context_window, the number of tokens classifier model "task-classifier" reads'
+  reason: 'model "auto-no-context-window": the intelligent balancer needs config.balancer.classifier.context_window, the number of tokens the classifier reads'
   source:
     kind: model
     name: auto-no-context-window

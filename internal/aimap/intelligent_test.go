@@ -45,34 +45,17 @@ func TestNearestIntelligentPreset(t *testing.T) {
 	}
 }
 
-func TestClassifierURL(t *testing.T) {
-	require.Equal(t, "/v1/systemone", ClassifierFormat)
-
-	split := map[string][2]string{
-		"http://kev.internal:8009/v1/systemone":       {"http://kev.internal:8009", "/v1/systemone"},
-		"https://openrouter.ai/api/alpha/decisions":   {"https://openrouter.ai", "/api/alpha/decisions"},
-		"https://gw.example.com/decide/v1/systemone/": {"https://gw.example.com", "/decide/v1/systemone/"},
-		"http://kev.internal:8009":                    {"http://kev.internal:8009", "/v1/systemone"},
-		"https://kev.internal/":                       {"https://kev.internal", "/v1/systemone"},
-	}
-	for in, want := range split {
-		base, format, problem := SplitClassifierURL(in)
-		require.Empty(t, problem, in)
-		require.Equal(t, want, [2]string{base, format}, in)
-	}
-	for _, in := range []string{
-		"ftp://kev.internal", "https://", "https:///v1/systemone", "https://kev.internal/x?a=b",
-		"https://kev.internal/x#f", "https://user@kev.internal",
+func TestClassifierURLProblem(t *testing.T) {
+	for _, url := range []string{
+		"https://api.typesafe.ai", "http://kev.internal:8009", "https://kev.internal/",
+		"https://openrouter.ai/api",
 	} {
-		_, _, problem := SplitClassifierURL(in)
-		require.NotEmpty(t, problem, in)
+		require.Empty(t, ClassifierURLProblem(url), url)
 	}
-
-	require.Equal(t, "http://kev:8009/v1/systemone", JoinClassifierURL("http://kev:8009", ClassifierFormat))
-	require.Equal(t, "http://kev:8009/v1/systemone", JoinClassifierURL("http://kev:8009/", ClassifierFormat))
-}
-
-func TestHasHostedClassifier(t *testing.T) {
-	require.True(t, HasHostedClassifier(TypesafeProviderType))
-	require.False(t, HasHostedClassifier("openai"))
+	for _, url := range []string{
+		"ftp://kev.internal", "kev.internal", "https://", "https:///v1/systemone",
+		"https://kev.internal/x?a=b", "https://kev.internal/x#f", "https://user@kev.internal",
+	} {
+		require.NotEmpty(t, ClassifierURLProblem(url), url)
+	}
 }
