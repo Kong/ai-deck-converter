@@ -98,6 +98,48 @@ func TokenVaultFromPlugin(block map[string]any) *aigw.TokenVaultConfig {
 	return tv
 }
 
+// TokenVaultNeedsInbound reports whether tv exists and names no inbound
+// credential location. Convert derives the inbound when this holds. Revert
+// warns for the shapes it can pair with a key-auth plugin.
+func TokenVaultNeedsInbound(tv *aigw.TokenVaultConfig) bool {
+	return tv != nil && (tv.Credential == nil || tv.Credential.Inbound == nil)
+}
+
+// TokenVaultInboundFromKeyAuth derives the token_vault inbound credential
+// location from a key-auth plugin config. Key-auth sends the raw key in the
+// header with no prefix. The empty prefix differs from the plugin default
+// "Bearer ". Returns nil when the config cannot serve a header key, for
+// example key_in_header: false.
+func TokenVaultInboundFromKeyAuth(cfg map[string]any) *aigw.TokenVaultCredentialLocation {
+	// A nil config means the key-auth defaults: header, key name apikey.
+	if inHeader, ok := cfg["key_in_header"].(bool); ok && !inHeader {
+		return nil
+	}
+	names := ConfigStrings(cfg, "key_names")
+	if len(names) == 0 {
+		names = []string{"apikey"}
+	}
+	return &aigw.TokenVaultCredentialLocation{Location: "header", Name: names[0], Prefix: new("")}
+}
+
+// ConfigStrings reads config[key] as a []string, accepting []string or []any
+// and dropping non-string elements. Returns nil when the key holds neither.
+func ConfigStrings(cfg map[string]any, key string) []string {
+	switch v := cfg[key].(type) {
+	case []string:
+		return v
+	case []any:
+		out := make([]string, 0, len(v))
+		for _, e := range v {
+			if s, ok := e.(string); ok {
+				out = append(out, s)
+			}
+		}
+		return out
+	}
+	return nil
+}
+
 // TokenVaultRedisToPlugin flattens a RedisCloudConfig (the API model's nested
 // AIGatewayRedisCloudConfiguration shape) into the Kong redis-ee config
 // schema's flat field surface: nested keepalive/sentinel/cluster blocks become
@@ -410,10 +452,10 @@ func tokenVaultCredentialToPlugin(c *aigw.TokenVaultCredential) map[string]any {
 		return nil
 	}
 	out := map[string]any{}
-	if in := tokenVaultLocationToPlugin(c.Inbound); in != nil {
+	if in := TokenVaultLocationToPlugin(c.Inbound); in != nil {
 		out["inbound"] = in
 	}
-	if o := tokenVaultLocationToPlugin(c.Outbound); o != nil {
+	if o := TokenVaultLocationToPlugin(c.Outbound); o != nil {
 		out["outbound"] = o
 	}
 	if len(out) == 0 {
@@ -422,7 +464,10 @@ func tokenVaultCredentialToPlugin(c *aigw.TokenVaultCredential) map[string]any {
 	return out
 }
 
-func tokenVaultLocationToPlugin(l *aigw.TokenVaultCredentialLocation) map[string]any {
+// TokenVaultLocationToPlugin lowers one credential location into the plugin's
+// location block. An empty Prefix differs from the plugin default "Bearer ".
+// A non-nil empty Prefix therefore emits prefix: "".
+func TokenVaultLocationToPlugin(l *aigw.TokenVaultCredentialLocation) map[string]any {
 	if l == nil {
 		return nil
 	}

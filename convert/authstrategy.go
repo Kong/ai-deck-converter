@@ -373,7 +373,7 @@ func (b *tvOIDC) set(field string, value any) {
 // strategy sets. A Token Vault route must list its methods, because the
 // plugin default enables every method.
 func (b *tvOIDC) forceAuthMethods(reason string, methods ...string) {
-	if old := configStrings(b.cfg, "auth_methods"); len(old) > 0 && !slices.Equal(old, methods) {
+	if old := aimap.ConfigStrings(b.cfg, "auth_methods"); len(old) > 0 && !slices.Equal(old, methods) {
 		b.report(ConfigFieldOverridden, "auth_methods",
 			"auth strategy %q sets config.auth_methods to %v. "+reason,
 			b.idp.Name, old)
