@@ -108,6 +108,8 @@ const (
 	// only way to run one instance of a plugin at another priority, because Kong
 	// has no per-instance priority.
 	FeatureClonedPlugins Feature = "cloned-plugins"
+	// FeatureBudgetStatus is the ai-proxy-advanced route_type llm/v1/budgets.
+	FeatureBudgetStatus Feature = "budget-status"
 )
 
 // featureSince maps each feature to its first AI Gateway release. The source
@@ -141,6 +143,7 @@ var featureSince = map[Feature]Version{
 	FeatureOIDCProtectedResourceMetadata: mustVersion("2.3"),
 	FeatureSanitizerAllWithCredentials:   mustVersion("2.3"),
 	FeatureClonedPlugins:                 mustVersion("2.1"),
+	FeatureBudgetStatus:                  mustVersion("2.4"),
 }
 
 // Since returns the first AI Gateway release that has f. It panics for an

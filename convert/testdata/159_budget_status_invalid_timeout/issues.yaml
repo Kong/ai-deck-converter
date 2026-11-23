@@ -1,0 +1,8 @@
+- code: CONFIG_FIELD_INVALID
+  reason: options.timeout 50 must be between 100 and 10000
+  source:
+    kind: budget_status
+    name: budget-status
+    fields:
+      - options.timeout
+  severity: ERROR

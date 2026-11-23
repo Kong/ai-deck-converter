@@ -3,6 +3,8 @@ package revert
 import (
 	"sort"
 
+	"github.com/Kong/ai-deck-converter/internal/aigw"
+	"github.com/Kong/ai-deck-converter/internal/aimap"
 	"github.com/Kong/ai-deck-converter/internal/kong"
 )
 
@@ -35,6 +37,8 @@ func (r *Reverter) revertServices() error {
 			rt := &svc.Routes[j]
 			plugins := inheritPlugins(r.routePlugins(rt), svcAIPlugins)
 			switch {
+			case isBudgetStatusRoute(plugins):
+				r.out.BudgetStatus = revertBudgetStatus(plugins)
 			case hasPlugin(plugins, "ai-proxy-advanced"):
 				if err := r.accumulateModelRoute(acc, rt, plugins); err != nil {
 					return err
@@ -69,6 +73,15 @@ func (r *Reverter) revertServices() error {
 			if err := r.revertAgent(svc, pr.route, name, pr.plugins, svcPlugins); err != nil {
 				return err
 			}
+		}
+	}
+
+	// Only the budget status endpoint is a Route without a Service.
+	for i := range r.src.Routes {
+		rt := &r.src.Routes[i]
+		routesSeen[rt.Name] = true
+		if plugins := r.routePlugins(rt); isBudgetStatusRoute(plugins) {
+			r.out.BudgetStatus = revertBudgetStatus(plugins)
 		}
 	}
 
@@ -121,4 +134,23 @@ func inheritPlugins(routePlugins, inherited []kong.Plugin) []kong.Plugin {
 		}
 	}
 	return out
+}
+
+// isBudgetStatusRoute reports whether plugins hold the budget status plugin.
+// Its auth plugins come from the model auth strategies, so revert drops them.
+func isBudgetStatusRoute(plugins []kong.Plugin) bool {
+	return hasPlugin(plugins, aimap.BudgetStatusPlugin)
+}
+
+func revertBudgetStatus(plugins []kong.Plugin) *aigw.BudgetStatus {
+	enabled := true
+	cfg := findPlugin(plugins, aimap.BudgetStatusPlugin).Config
+	return &aigw.BudgetStatus{
+		Enabled: &enabled,
+		Options: aigw.BudgetStatusOptions{
+			Timeout:  getInt(cfg, "timeout"),
+			Document: getStr(cfg, "document"),
+			Resource: getStr(cfg, "resource"),
+		},
+	}
 }

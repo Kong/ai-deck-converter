@@ -1,0 +1,86 @@
+models:
+  - type: model
+    name: keys
+    capabilities:
+      - generate
+    formats:
+      - type: openai
+    targets:
+      - name: gpt-5.4
+        provider: openai-ai
+        config:
+          type: openai
+    access:
+      auth_strategies:
+        - key-auth-1
+    config:
+      route:
+        paths:
+          - /keys
+      logging:
+        payloads: false
+        statistics: true
+      max_request_body_size: 50000000
+  - type: model
+    name: oidc
+    capabilities:
+      - generate
+    formats:
+      - type: openai
+    targets:
+      - name: gpt-5.4
+        provider: openai-ai
+        config:
+          type: openai
+    access:
+      auth_strategies:
+        - openid-connect-1
+        - key-auth-1
+    config:
+      route:
+        paths:
+          - /oidc
+      logging:
+        payloads: false
+        statistics: true
+      max_request_body_size: 50000000
+  - type: model
+    name: open
+    capabilities:
+      - generate
+    formats:
+      - type: openai
+    targets:
+      - name: gpt-5.4
+        provider: openai-ai
+        config:
+          type: openai
+    config:
+      route:
+        paths:
+          - /open
+      logging:
+        payloads: false
+        statistics: true
+      max_request_body_size: 50000000
+model_providers:
+  - type: openai
+    name: openai-ai
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: '{vault://ai/openai-token}'
+auth_strategies:
+  - type: key-auth
+    name: key-auth-1
+    config:
+      key_names:
+        - x-api-key
+  - type: openid-connect
+    name: openid-connect-1
+    config:
+      issuer: https://dev-123456.okta.com/oauth2/default
+budget_status:
+  enabled: true

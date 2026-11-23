@@ -1,0 +1,8 @@
+- code: BEHAVIOR_MAY_DIFFER
+  reason: no converted model has an auth strategy and no global authentication policy exists. The budget status endpoint answers 401 to every request.
+  source:
+    kind: budget_status
+    name: budget-status
+    fields:
+      - enabled
+  severity: WARNING
