@@ -39,6 +39,13 @@ type mockUpstream struct {
 // connection instead (see serveWebSocketEcho).
 func startMockUpstream(t *testing.T) *mockUpstream {
 	t.Helper()
+	return startMockUpstreamWithContent(t, "mock-chatcmpl", "hello from the mock upstream")
+}
+
+// startMockUpstreamWithContent serves a chat completion with the given response
+// id and content. A case with several mocks can then tell their answers apart.
+func startMockUpstreamWithContent(t *testing.T, id, content string) *mockUpstream {
+	t.Helper()
 	m := &mockUpstream{t: t}
 
 	mux := http.NewServeMux()
@@ -65,7 +72,9 @@ func startMockUpstream(t *testing.T) *mockUpstream {
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("X-Mock-Upstream", "ai-deck-converter-e2e")
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"id":"mock-chatcmpl","object":"chat.completion","choices":[{"index":0,"message":{"role":"assistant","content":"hello from the mock upstream"}}]}`))
+		_, _ = fmt.Fprintf(w,
+			`{"id":%q,"object":"chat.completion","choices":[{"index":0,"message":{"role":"assistant","content":%q}}]}`,
+			id, content)
 	})
 
 	m.Port = serveOnFreePort(t, mux)
