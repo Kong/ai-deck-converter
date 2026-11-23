@@ -319,14 +319,14 @@ These rules need no condition:
 ### Route types
 
 The table copies `SUPPORTED_ROUTE_TYPES` of `kong/llm/schemas/init.lua` for
-2.3, keyed by the plugin provider of the target:
+2.3 plus togetherai (2.4), keyed by the plugin provider of the target:
 
 | Route type                      | Plugin providers                                                                                                                                                                                                                    |
 |---------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `llm/v1/chat`                   | `openai`, `azure`, `anthropic`, `cohere`, `mistral`, `llama2`, `gemini`, `bedrock`, `databricks`, `huggingface`, `dashscope`, `xai`, `cerebras`, `vllm`, `deepseek`, `ollama`, `kimi`, `vercel`, `sagemaker`, `typesafe`, `baseten` |
+| `llm/v1/chat`                   | `openai`, `azure`, `anthropic`, `cohere`, `mistral`, `llama2`, `gemini`, `bedrock`, `databricks`, `huggingface`, `dashscope`, `xai`, `cerebras`, `vllm`, `deepseek`, `ollama`, `kimi`, `vercel`, `sagemaker`, `typesafe`, `baseten`, `togetherai` |
 | `llm/v1/completions`            | `openai`, `azure`, `anthropic`, `cohere`, `mistral`, `llama2`, `gemini`, `bedrock`, `huggingface`, `xai`, `ollama`                                                                                                                  |
 | `llm/v1/embeddings`             | `openai`, `azure`, `cohere`, `mistral`, `llama2`, `gemini`, `bedrock`, `databricks`, `huggingface`, `dashscope`, `ollama`, `vercel`                                                                                                 |
-| `llm/v1/responses`              | `openai`, `azure`, `xai`, `vercel`                                                                                                                                                                                                  |
+| `llm/v1/responses`              | `openai`, `azure`, `xai`, `vercel`, `togetherai`                                                                                                                                                                                              |
 | `llm/v1/assistants`             | `openai`, `azure`                                                                                                                                                                                                                   |
 | `llm/v1/batches`                | `openai`, `azure`, `bedrock`, `anthropic`, `gemini`, `kimi`                                                                                                                                                                         |
 | `llm/v1/files`                  | `openai`, `azure`, `kimi`                                                                                                                                                                                                           |
@@ -340,8 +340,8 @@ The table copies `SUPPORTED_ROUTE_TYPES` of `kong/llm/schemas/init.lua` for
 | `video/v1/videos/generations`   | `openai`, `azure`, `bedrock`, `gemini`, `huggingface`                                                                                                                                                                               |
 
 Earlier releases differ only by `sagemaker` (2.1), `typesafe` (2.2),
-`llm/v1/skills` (2.2), and `baseten` (2.3), which existing feature gates
-cover.
+`llm/v1/skills` (2.2), `baseten` (2.3) and `togetherai` (2.4), which existing
+feature gates cover.
 
 ### Plugin providers by format and capability
 
@@ -365,12 +365,13 @@ and `llm/v1/files`. A mantle target works only in the `openai` and
 "Chat providers" are the providers of `llm/v1/chat`: `openai`, `azure`,
 `anthropic`, `cohere`, `mistral`, `llama2`, `gemini`, `bedrock`,
 `databricks`, `huggingface`, `dashscope`, `xai`, `cerebras`, `vllm`,
-`deepseek`, `ollama`, `kimi`, `vercel`, `sagemaker`, `typesafe`, `baseten`.
+`deepseek`, `ollama`, `kimi`, `vercel`, `sagemaker`, `typesafe`, `baseten`,
+`togetherai`.
 
 | Format        | Capability            | Route type                      | Plugin providers                                                                                                                    | Conditions                                                                                    |
 |---------------|-----------------------|---------------------------------|-------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------|
-| `openai`      | `generate`            | `llm/v1/chat`                   | Chat providers                                                                                                                      | bedrock: mantle (≥ 2.3) or not. sagemaker ≥ 2.1. typesafe ≥ 2.2. baseten ≥ 2.3                |
-| `openai`      | `agentic`             | `llm/v1/responses`              | `openai`, `azure`, `xai`, `vercel`, `bedrock`                                                                                       | bedrock: mantle only, ≥ 2.3                                                                   |
+| `openai`      | `generate`            | `llm/v1/chat`                   | Chat providers                                                                                                                      | bedrock: mantle (≥ 2.3) or not. sagemaker ≥ 2.1. typesafe ≥ 2.2. baseten ≥ 2.3. togetherai ≥ 2.4                |
+| `openai`      | `agentic`             | `llm/v1/responses`              | `openai`, `azure`, `xai`, `vercel`, `bedrock`, `togetherai`                                                                         | bedrock: mantle only, ≥ 2.3. togetherai ≥ 2.4                                                 |
 | `openai`      | `embeddings`          | `llm/v1/embeddings`             | `openai`, `azure`, `cohere`, `mistral`, `llama2`, `gemini`, `bedrock`, `databricks`, `huggingface`, `dashscope`, `ollama`, `vercel` | bedrock: not mantle. llama2: not `format: raw`                                                |
 | `openai`      | `image`               | `image/v1/images/generations`   | `openai`, `azure`, `bedrock`, `gemini`, `dashscope`, `xai`, `vercel`                                                                | bedrock: not mantle                                                                           |
 | `openai`      | `audio/speech`        | `audio/v1/audio/speech`         | `openai`, `azure`                                                                                                                   |                                                                                               |
@@ -381,7 +382,7 @@ and `llm/v1/files`. A mantle target works only in the `openai` and
 | `openai`      | `batches`             | `llm/v1/batches`                | `openai`, `azure`, `bedrock`, `anthropic`, `gemini`, `kimi`                                                                         | bedrock: not mantle, needs `batch_bucket_prefix`                                              |
 | `openai`      | `files`               | `llm/v1/files`                  | `openai`, `azure`, `kimi`, `bedrock`                                                                                                | bedrock: mantle only, ≥ 2.3                                                                   |
 | `openai`      | `skills`              | `llm/v1/skills`                 | `openai`                                                                                                                            | ≥ 2.2. Needs the provider's own format                                                        |
-| `anthropic`   | `generate`            | `llm/v1/chat`                   | Chat providers                                                                                                                      | bedrock: mantle (≥ 2.3) or not. sagemaker ≥ 2.1. typesafe ≥ 2.2. baseten ≥ 2.3                |
+| `anthropic`   | `generate`            | `llm/v1/chat`                   | Chat providers                                                                                                                      | bedrock: mantle (≥ 2.3) or not. sagemaker ≥ 2.1. typesafe ≥ 2.2. baseten ≥ 2.3. togetherai ≥ 2.4                |
 | `anthropic`   | `batches`             | `llm/v1/batches`                | `anthropic`                                                                                                                         |                                                                                               |
 | `anthropic`   | `skills`              | `llm/v1/skills`                 | `anthropic`                                                                                                                         | ≥ 2.2                                                                                         |
 | `bedrock`     | `generate`            | `llm/v1/chat`                   | `bedrock`                                                                                                                           | Not mantle. Applies to the converse, invoke, `/openai/v1`, and `/anthropic/v1` routes         |

@@ -56,6 +56,7 @@ var allFeatures = []Feature{
 	FeatureMCPRateLimiting,
 	FeatureMCPACLWhen,
 	FeatureBaseten,
+	FeatureTogetherai,
 	FeatureGeminiAgenticCapability,
 	FeatureGeminiEndpointDerivation,
 	FeatureBedrockRuntimeResponses,
@@ -115,6 +116,9 @@ func TestFeatureLookups(t *testing.T) {
 	f, ok = ProviderFeature("baseten")
 	require.True(t, ok)
 	require.Equal(t, FeatureBaseten, f)
+	f, ok = ProviderFeature("togetherai")
+	require.True(t, ok)
+	require.Equal(t, FeatureTogetherai, f)
 	f, ok = ProviderFeature("sagemaker")
 	require.True(t, ok)
 	require.Equal(t, FeatureSagemaker, f)
