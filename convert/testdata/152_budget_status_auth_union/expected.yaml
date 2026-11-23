@@ -24,27 +24,21 @@ services:
           - POST
           - OPTIONS
         strip_path: false
+routes:
   - name: budget-status
-    host: localhost
-    routes:
-      - name: budget-status
-        paths:
-          - /budgets
-        methods:
-          - GET
-        plugins:
-          - name: key-auth
-            config:
-              anonymous: anonymous
-              key_names:
-                - x-api-key
-          - name: openid-connect
-            config:
-              anonymous: anonymous
-              issuer: https://dev-123456.okta.com/oauth2/default
-          - name: ai-proxy-advanced
-            config:
-              route_type: llm/v1/budgets
+    paths:
+      - /budgets
+    plugins:
+      - name: key-auth
+        config:
+          anonymous: anonymous
+          key_names:
+            - x-api-key
+      - name: openid-connect
+        config:
+          anonymous: anonymous
+          issuer: https://dev-123456.okta.com/oauth2/default
+      - name: ai-budget-status
 consumers:
   - username: anonymous
     custom_id: anonymous

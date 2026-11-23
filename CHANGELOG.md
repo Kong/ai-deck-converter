@@ -9,13 +9,12 @@
 ### Features
 
 - `budget_status: {enabled: true}` adds the budget status endpoint. The output is
-  a `budget-status` Service with one `GET /budgets` Route and an
-  `ai-proxy-advanced` plugin with `route_type: llm/v1/budgets`. The Route
-  authenticates with the auth strategies of all converted models. A
-  `BEHAVIOR_MAY_DIFFER` warning flags an endpoint without authentication,
-  because the data plane answers 401 then. `options.timeout`,
-  `options.document` and `options.resource` set the plugin's `budget_status`
-  record. A `resource` also adds `/.well-known/budget-status` to the Route.
+  a top-level `budget-status` Route on `/budgets`, with no Service, and an
+  `ai-budget-status` plugin. The Route authenticates with the auth strategies
+  of all converted models. A `BEHAVIOR_MAY_DIFFER` warning flags an endpoint
+  without authentication, because the data plane answers 401 then.
+  `options.timeout`, `options.document` and `options.resource` set the plugin
+  config. A `resource` also adds `/.well-known/budget-status` to the Route.
   Requires AI Gateway 2.4+. Revert lifts the Route and its options back.
 
 ### Bug Fixes

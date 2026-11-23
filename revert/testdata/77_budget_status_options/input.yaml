@@ -10,27 +10,21 @@ services:
           - POST
           - OPTIONS
         strip_path: false
+routes:
   - name: budget-status
-    host: localhost
-    routes:
-      - name: budget-status
-        paths:
-          - /budgets
-          - /.well-known/budget-status
-        methods:
-          - GET
-        plugins:
-          - name: key-auth
-            config:
-              key_names:
-                - x-api-key
-          - name: ai-proxy-advanced
-            config:
-              budget_status:
-                document: '{"currency":"USD","budgets":[]}'
-                resource: /budgets
-                timeout: 1000
-              route_type: llm/v1/budgets
+    paths:
+      - /budgets
+      - /.well-known/budget-status
+    plugins:
+      - name: key-auth
+        config:
+          key_names:
+            - x-api-key
+      - name: ai-budget-status
+        config:
+          document: '{"currency":"USD","budgets":[]}'
+          resource: /budgets
+          timeout: 1000
 plugins:
   - name: ai-model-selector
     config:

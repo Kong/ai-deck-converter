@@ -60,9 +60,9 @@ const (
 	// PassthroughFormat model emits. It requires AI Gateway 2.2 or later.
 	PassthroughRouteType = "passthrough"
 
-	// BudgetStatusRouteType is the route_type of the budget status endpoint.
-	// The plugin answers it on the data plane and calls no upstream.
-	BudgetStatusRouteType = "llm/v1/budgets"
+	// BudgetStatusPlugin is the plugin of the budget status endpoint. It
+	// answers on the data plane and calls no upstream.
+	BudgetStatusPlugin = "ai-budget-status"
 
 	DefaultLLMFormat      = "openai"
 	DefaultBasePath       = "/"

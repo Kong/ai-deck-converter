@@ -76,6 +76,15 @@ func (r *Reverter) revertServices() error {
 		}
 	}
 
+	// Only the budget status endpoint is a Route without a Service.
+	for i := range r.src.Routes {
+		rt := &r.src.Routes[i]
+		routesSeen[rt.Name] = true
+		if plugins := r.routePlugins(rt); isBudgetStatusRoute(plugins) {
+			r.out.BudgetStatus = revertBudgetStatus(plugins)
+		}
+	}
+
 	// Top-level plugins referencing routes that do not exist.
 	var unknownRoutes []string
 	for name := range r.idx.route {
@@ -130,19 +139,18 @@ func inheritPlugins(routePlugins, inherited []kong.Plugin) []kong.Plugin {
 // isBudgetStatusRoute reports whether plugins hold the budget status plugin.
 // Its auth plugins come from the model auth strategies, so revert drops them.
 func isBudgetStatusRoute(plugins []kong.Plugin) bool {
-	p := findPlugin(plugins, "ai-proxy-advanced")
-	return p != nil && getStr(p.Config, "route_type") == aimap.BudgetStatusRouteType
+	return hasPlugin(plugins, aimap.BudgetStatusPlugin)
 }
 
 func revertBudgetStatus(plugins []kong.Plugin) *aigw.BudgetStatus {
 	enabled := true
-	options, _ := findPlugin(plugins, "ai-proxy-advanced").Config["budget_status"].(map[string]any)
+	cfg := findPlugin(plugins, aimap.BudgetStatusPlugin).Config
 	return &aigw.BudgetStatus{
 		Enabled: &enabled,
 		Options: aigw.BudgetStatusOptions{
-			Timeout:  getInt(options, "timeout"),
-			Document: getStr(options, "document"),
-			Resource: getStr(options, "resource"),
+			Timeout:  getInt(cfg, "timeout"),
+			Document: getStr(cfg, "document"),
+			Resource: getStr(cfg, "resource"),
 		},
 	}
 }

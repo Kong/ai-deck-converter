@@ -1,7 +1,6 @@
 package convert
 
 import (
-	"net/http"
 	"regexp"
 	"slices"
 	"strings"
@@ -22,8 +21,8 @@ const (
 
 var budgetResourceURLPattern = regexp.MustCompile(`^https?://[^/\s]+`)
 
-// convertBudgetStatus makes one Service and Route for the budget status
-// endpoint. The Route authenticates with every auth strategy of a converted
+// convertBudgetStatus makes the Route of the budget status endpoint. The Route
+// has no Service. It authenticates with every auth strategy of a converted
 // model, because the endpoint answers 401 without a credential.
 func (c *Converter) convertBudgetStatus() {
 	b := c.src.BudgetStatus
@@ -55,11 +54,10 @@ func (c *Converter) convertBudgetStatus() {
 					"The budget status endpoint answers 401 to every request.")
 		}
 		route := kong.Route{
-			Name:    budgetStatusName,
-			Paths:   []string{budgetStatusPath},
-			Methods: []string{http.MethodGet},
+			Name:  budgetStatusName,
+			Paths: []string{budgetStatusPath},
 			Plugins: append(authPlugins, kong.Plugin{
-				Name:   "ai-proxy-advanced",
+				Name:   aimap.BudgetStatusPlugin,
 				Config: budgetStatusPluginConfig(b.Options),
 			}),
 		}
@@ -68,11 +66,7 @@ func (c *Converter) convertBudgetStatus() {
 		if b.Options.Resource != "" {
 			route.Paths = append(route.Paths, budgetStatusWellKnown)
 		}
-		c.out.Services = append(c.out.Services, kong.Service{
-			Name:   budgetStatusName,
-			Host:   placeholderHost,
-			Routes: []kong.Route{route},
-		})
+		c.out.Routes = append(c.out.Routes, route)
 		return nil
 	})
 }
@@ -96,15 +90,14 @@ func (c *Converter) budgetStatusAuthStrategies() []string {
 }
 
 func budgetStatusPluginConfig(o aigw.BudgetStatusOptions) map[string]any {
-	cfg := map[string]any{"route_type": aimap.BudgetStatusRouteType}
-	options := map[string]any{}
+	cfg := map[string]any{}
 	if o.Timeout != nil {
-		options["timeout"] = *o.Timeout
+		cfg["timeout"] = *o.Timeout
 	}
-	setIfNotEmpty(options, "document", o.Document)
-	setIfNotEmpty(options, "resource", o.Resource)
-	if len(options) > 0 {
-		cfg["budget_status"] = options
+	setIfNotEmpty(cfg, "document", o.Document)
+	setIfNotEmpty(cfg, "resource", o.Resource)
+	if len(cfg) == 0 {
+		return nil
 	}
 	return cfg
 }

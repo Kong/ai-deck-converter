@@ -10,18 +10,12 @@ services:
           - POST
           - OPTIONS
         strip_path: false
+routes:
   - name: budget-status
-    host: localhost
-    routes:
-      - name: budget-status
-        paths:
-          - /budgets
-        methods:
-          - GET
-        plugins:
-          - name: ai-proxy-advanced
-            config:
-              route_type: llm/v1/budgets
+    paths:
+      - /budgets
+    plugins:
+      - name: ai-budget-status
 plugins:
   - name: ai-model-selector
     config:
