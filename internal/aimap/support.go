@@ -41,7 +41,7 @@ var supportedRouteTypes = map[string][]string{
 	},
 	"llm/v1/embeddings": {
 		"openai", "azure", "cohere", "mistral", "llama2", "gemini", "bedrock", "databricks",
-		"huggingface", "dashscope", "ollama", "vercel", "fireworks",
+		"huggingface", "dashscope", "ollama", "vercel",
 	},
 	"llm/v1/responses":              {"openai", "azure", "xai", "vercel", "bedrock", "fireworks"},
 	"llm/v1/assistants":             {"openai", "azure"},
@@ -121,7 +121,6 @@ func TargetSupports(format string, target Target, spec EndpointSpec) bool {
 func GeminiInteractions(format, provider, routeType string) bool {
 	return format == "gemini" && provider == "gemini" && routeType == "llm/v1/responses"
 }
-
 
 // FireworksSystemOne reports whether the pair is Fireworks System One. The
 // data plane serves it as a TypeSafe-compatible provider.

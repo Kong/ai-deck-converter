@@ -67,8 +67,6 @@ var allFeatures = []Feature{
 	FeatureOIDCProtectedResourceMetadata,
 	FeatureSanitizerAllWithCredentials,
 	FeatureClonedPlugins,
-	FeatureSessionAffinity,
-	FeatureIntelligentBalancer,
 	FeatureFireworks,
 }
 

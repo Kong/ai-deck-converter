@@ -1,0 +1,24 @@
+- code: CONFIG_FIELD_INVALID
+  reason: 'model "fireworks-chat-embeddings": no target can serve capability "embeddings" with llm_format "openai"'
+  source:
+    kind: model
+    name: fireworks-chat-embeddings
+    fields:
+      - capabilities[1]
+  severity: ERROR
+- code: CONFIG_FIELD_INVALID
+  reason: 'model "fireworks-embeddings": no target can serve capability "embeddings" with llm_format "openai"'
+  source:
+    kind: model
+    name: fireworks-embeddings
+    fields:
+      - capabilities[0]
+  severity: ERROR
+- code: CONFIG_FIELD_INVALID
+  reason: 'model "fireworks-rerank": no target can serve capability "rerank" with llm_format "cohere"'
+  source:
+    kind: model
+    name: fireworks-rerank
+    fields:
+      - capabilities[0]
+  severity: ERROR
