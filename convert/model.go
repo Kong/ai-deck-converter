@@ -2001,7 +2001,8 @@ func normalizeModelDatastorePurpose(purpose string) string {
 
 // resolveModelDatastores resolves the model datastore references. It returns
 // the vector store datastore and the session affinity datastore. An entry
-// without a purpose is embeddings, and each purpose holds at most one datastore.
+// without a purpose is semantic-balancer, and each purpose holds at most one
+// datastore.
 func (c *Converter) resolveModelDatastores(
 	src ConversionIssueSource, m *aigw.Model,
 ) (embeddings, affinity *aigw.Datastore, err error) {

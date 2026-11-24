@@ -29,6 +29,7 @@ func testSessionAffinitySticksToTarget(t *testing.T, license string) {
 		patchSessionAffinityTargets(targetA.Port, targetB.Port))
 
 	gateway := startGateway(t, GatewayOptions{
+		// TODO: remove this note once kong/kong-ai-gateway:2.4.0 is published.
 		// shortcut: 2.4.0 is not published yet, run with
 		// AI_GATEWAY_IMAGE=kong/kong-ai-gateway-dev:aigw-master until it is.
 		Image:  gatewayImage(t, "kong/kong-ai-gateway:2.4.0"),

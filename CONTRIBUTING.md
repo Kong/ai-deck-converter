@@ -56,11 +56,10 @@ For golden test changes, the PR diff should clearly show what changed and why.
 
 ## Pull Request Process
 
-1. Update the CHANGELOG.md with any new features or breaking changes
-2. Ensure all tests pass locally
-3. Provide a clear description of the changes in your PR
-4. Link any related issues
-5. Wait for review and address feedback
+1. Ensure all tests pass locally
+2. Provide a clear description of the changes in your PR
+3. Link any related issues
+4. Wait for review and address feedback
 
 ## Reporting Issues
 
