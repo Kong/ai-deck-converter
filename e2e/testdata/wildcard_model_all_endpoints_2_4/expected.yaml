@@ -1,0 +1,3037 @@
+_format_version: "3.0"
+_transform: false
+services:
+  - id: 947a4e23-b483-5a65-8165-da9aed24565b
+    name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    host: ai-gateway.upstream.local
+    port: 80
+    protocol: http
+  - id: 81558bc1-3a1b-5dd1-b985-f764a06e74c3
+    name: ai-gateway-websocket
+    url: ws://ai-gateway.upstream.local
+    host: ai-gateway.upstream.local
+    port: 80
+    protocol: ws
+routes:
+  - id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+    name: openai-chat
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /ai/chat/completions
+    methods:
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: 1a3f650c-2709-5e79-a792-7ffd18243fbf
+    name: openai-responses
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /ai/responses
+    methods:
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: 740677ad-a667-5a50-a255-e369d244e981
+    name: openai-responses-lifecycle
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - ~/ai/responses/.+
+    methods:
+      - GET
+      - POST
+      - DELETE
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+    tags:
+      - aigw:responses-lifecycle
+  - id: 718639d6-1ff2-57e3-9528-df761b890443
+    name: openai-audio-speech
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /ai/audio/speech
+    methods:
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: cc97f945-f7ef-5ccf-aa4c-ed3489745d3a
+    name: openai-audio-transcribe
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /ai/audio/transcriptions
+    methods:
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: 43ea1e35-1444-56c0-8120-135c776376c4
+    name: openai-audio-translate
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /ai/audio/translations
+    methods:
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: 0da1097c-6edc-5c9c-a032-cd042d0db5e4
+    name: openai-embeddings
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /ai/embeddings
+    methods:
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: 67276980-b7e0-58ee-8c51-bafe739db8f8
+    name: openai-images
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /ai/images/generations
+    methods:
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: 5db3317e-efa0-532d-84a8-e42fdf5a90e9
+    name: openai-images-edits
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /ai/images/edits
+    methods:
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: f6304e3f-b5ab-5f47-9007-cbc2a95b6701
+    name: openai-videos
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /ai/videos
+    methods:
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: bb559a54-dc17-5c0f-b946-b0d9c5cebd7a
+    name: anthropic-messages
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /ai/v1/messages
+    methods:
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: fd509521-bbbc-518e-bc93-2088432bf86d
+    name: cohere-rerank
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /ai/v2/rerank
+    methods:
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: b4a57e40-147c-502b-a080-e3102a5c3273
+    name: gemini-generate
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - ~/ai/v1beta/models/(?<model_name>[^:/]+):(?:generateContent|streamGenerateContent)
+    methods:
+      - GET
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: 090ce054-21c9-5fd3-a8f0-e0733e5dcc43
+    name: gemini-enterprise-generate
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - ~/ai/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/(?<publisher>[^/]+)/models/(?<model_name>[^:/]+):(?:generateContent|streamGenerateContent)
+    methods:
+      - GET
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: d13c1734-7773-5150-a0c3-4e7816185423
+    name: gemini-responses
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /ai/v1/interactions
+    methods:
+      - GET
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: c1264434-e7f1-576d-ba87-6d40613b3401
+    name: gemini-beta-responses
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /ai/v1beta/interactions
+    methods:
+      - GET
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: a52aa612-4383-505f-8126-223ecf6adf57
+    name: gemini-embeddings
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - ~/ai/v1beta/models/(?<model_name>[^:/]+):(?:embedContent|batchEmbedContents)
+    methods:
+      - GET
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: 05b6b580-1be6-57bc-a0ac-403501e7e580
+    name: gemini-enterprise-embeddings
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - ~/ai/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/(?<publisher>[^/]+)/models/(?<model_name>[^:/]+):embedContent
+    methods:
+      - GET
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: f6269af6-c4d1-5182-bd8b-0277dc6dacec
+    name: gemini-predict
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - ~/ai/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/(?<publisher>[^/]+)/models/(?<model_name>[^:/]+):predict
+    methods:
+      - GET
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: d737a125-0d34-5ee4-b5ff-4900a3ac7761
+    name: gemini-ranking
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - ~/ai/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/rankingConfigs/(?<config_name>[^:/]+):rank
+    methods:
+      - GET
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: ec635808-315e-5e7d-9d25-1008e4e52862
+    name: gemini-predict-long-running
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - ~/ai/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/publishers/(?<publisher>[^/]+)/models/(?<model_name>[^:/]+):predictLongRunning
+    methods:
+      - GET
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: 934cbaf7-d722-5a54-ae50-48c0b63343dd
+    name: bedrock-converse
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - ~/ai/model/(?<model_name>[^/]+)/converse(?:-stream)?
+    methods:
+      - GET
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: df12ed34-44b5-5c3d-9c3d-908ece02fb32
+    name: bedrock-invoke
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - ~/ai/model/(?<model_name>[^/]+)/invoke(?:-with-response-stream)?
+    methods:
+      - GET
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: 3e5bbe5f-d382-52f7-837e-2701814528e5
+    name: bedrock-chat
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /ai/openai/v1/chat/completions
+    methods:
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: f389aa8d-e597-5c0f-8678-04572278e83e
+    name: bedrock-messages
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /ai/anthropic/v1/messages
+    methods:
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: 78397398-a48f-503c-ba71-7ac2ea7b5883
+    name: bedrock-retrieve
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - ~/ai/model/(?<model_name>[^/]+)/retrieveAndGenerate(?:Stream)?
+    methods:
+      - GET
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: 41282f10-4533-5f5a-bac3-cf0991d72913
+    name: bedrock-responses
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /ai/openai/v1/responses
+    methods:
+      - GET
+      - POST
+      - DELETE
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: 57dbc083-73ad-583e-b144-a4006f6e1721
+    name: bedrock-rerank
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - ~/ai/model/(?<model_name>[^/]+)/rerank
+    methods:
+      - GET
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: 751f3bc6-2b23-58c0-897a-ca3b20491b67
+    name: bedrock-async-invoke
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /ai/async-invoke
+    methods:
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: 2384fe9d-eacc-5ac2-ae4c-4752cc597f81
+    name: openai-chat-2
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /ai/v1/chat/completions
+      - /ai/openai/v1/chat/completions
+    methods:
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: d42385f3-0b4d-574b-8090-3625031103eb
+    name: openai-responses-2
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /ai/v1/responses
+      - /ai/openai/v1/responses
+    methods:
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: a5fe20b2-fe87-59f3-a7bf-b47efa1d5e4e
+    name: huggingface-generate
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /ai/v1/chat/completions
+    methods:
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: 96cb42a8-d9be-53d5-afe8-bad2af2d17f0
+    name: typesafe-decisions
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - ~/ai/v1/systemone
+    methods:
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: cbac5221-6bcd-5bfa-9575-4519bea13df0
+    name: openai-batches
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /jobs/batches
+    methods:
+      - GET
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: b433d478-0f40-5518-b6bb-815583936241
+    name: openai-files
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /jobs/files
+    methods:
+      - GET
+      - POST
+      - DELETE
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: 0aaa3657-2434-58f7-90bf-7e2930afabdb
+    name: openai-skills
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /jobs/skills
+    methods:
+      - GET
+      - POST
+      - DELETE
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: da59badf-6dcb-5328-8c6c-3784d8e14dd3
+    name: anthropic-batches
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /jobs/v1/messages/batches
+    methods:
+      - GET
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: a9529cc3-1568-5a89-9867-71939c502cbc
+    name: anthropic-skills
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /jobs/v1/skills
+    methods:
+      - GET
+      - POST
+      - DELETE
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: 0b3d41ee-cd0b-51a2-ba17-192fbf50cad8
+    name: gemini-batches
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /jobs/v1beta/batches
+    methods:
+      - GET
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: a77dd8e9-17ff-5236-b291-761e4874b365
+    name: gemini-enterprise-batches
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - ~/jobs/v1/projects/(?<project_id>[^/]+)/locations/(?<location_id>[^/]+)/batchPredictionJobs
+    methods:
+      - GET
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: cf8371c0-4886-5860-aba0-ddbf24d941a6
+    name: gemini-files
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - ~/jobs/(?:upload/)?v1beta/files
+    methods:
+      - GET
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: a65a9e4b-10b4-5de0-93ae-0173e5ae0346
+    name: bedrock-batches
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - ~/jobs/model-invocation-jobs?(?:/[^/]+(?:/stop)?)?
+    methods:
+      - GET
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: 9336ce94-9290-5d11-944d-2b3a489731e3
+    name: openai-videos-lifecycle
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /ai/videos
+    methods:
+      - GET
+      - DELETE
+    protocols:
+      - http
+      - https
+    strip_path: false
+    tags:
+      - aigw:video-lifecycle
+  - id: bd17fb45-7638-554f-b4ef-dd1aa6d158fa
+    name: bedrock-async-invoke-lifecycle
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /ai/async-invoke
+    methods:
+      - GET
+    protocols:
+      - http
+      - https
+    strip_path: false
+    tags:
+      - aigw:video-lifecycle
+  - id: b2ed74bc-70de-5c05-98a5-1ff4f804ad51
+    name: openai-realtime
+    service:
+      id: 81558bc1-3a1b-5dd1-b985-f764a06e74c3
+    paths:
+      - /ai/realtime
+    protocols:
+      - ws
+      - wss
+    strip_path: false
+plugins:
+  - id: 17fa8192-4b9f-5b5a-8379-20ad8bc836a7
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+  - id: f3adc007-171c-5519-8763-3a0eef79bde3
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: gpt-5.4
+            provider: openai
+          route_type: llm/v1/chat
+        - auth:
+            header_name: api-key
+            header_value: e2e-fake-azure-key
+          description: gpt-5-4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: gpt-5-4
+            options:
+              azure_api_version: "2024-10-21"
+              azure_deployment_id: gpt-5-4
+              azure_instance: kong-e2e
+            provider: azure
+          route_type: llm/v1/chat
+        - auth:
+            header_name: x-api-key
+            header_value: e2e-fake-anthropic-key
+          description: claude-sonnet-4-5
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: claude-sonnet-4-5
+            options:
+              anthropic_version: "2023-06-01"
+            provider: anthropic
+          route_type: llm/v1/chat
+        - description: command-r
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: command-r
+            provider: cohere
+          route_type: llm/v1/chat
+        - description: mistral-large
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: mistral-large
+            options:
+              mistral_format: openai
+            provider: mistral
+          route_type: llm/v1/chat
+        - description: llama-3
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: llama-3
+            options:
+              llama2_format: openai
+              upstream_url: http://llama.e2e.local:8080/v1/chat/completions
+            provider: llama2
+          route_type: llm/v1/chat
+        - auth:
+            header_name: x-goog-api-key
+            header_value: e2e-fake-gemini-key
+          description: gemini-2.5-pro
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: gemini-2.5-pro
+            provider: gemini
+          route_type: llm/v1/chat
+        - auth:
+            aws_access_key_id: e2e-fake-access-key-id
+            aws_secret_access_key: e2e-fake-secret-access-key
+          description: amazon.nova-pro-v1:0
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: amazon.nova-pro-v1:0
+            options:
+              bedrock:
+                aws_region: us-east-1
+            provider: bedrock
+          route_type: llm/v1/chat
+        - description: hf-zephyr
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: hf-zephyr
+            provider: huggingface
+          route_type: llm/v1/chat
+        - description: qwen-max
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: qwen-max
+            provider: dashscope
+          route_type: llm/v1/chat
+        - description: grok-4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: grok-4
+            provider: xai
+          route_type: llm/v1/chat
+        - description: llama-4-scout
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: llama-4-scout
+            provider: cerebras
+          route_type: llm/v1/chat
+        - description: dbrx-instruct
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: dbrx-instruct
+            options:
+              databricks:
+                workspace_instance_id: dbc-a1b2c3d4
+            provider: databricks
+          route_type: llm/v1/chat
+        - description: vllm-model
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: vllm-model
+            options:
+              upstream_url: http://vllm.e2e.local:8000/v1/chat/completions
+            provider: vllm
+          route_type: llm/v1/chat
+        - description: deepseek-chat
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: deepseek-chat
+            provider: deepseek
+          route_type: llm/v1/chat
+        - description: llama3.1
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: llama3.1
+            provider: ollama
+          route_type: llm/v1/chat
+        - description: v0-1.5-md
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: v0-1.5-md
+            provider: vercel
+          route_type: llm/v1/chat
+        - description: kimi-k2
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: kimi-k2
+            provider: kimi
+          route_type: llm/v1/chat
+        - auth:
+            aws_access_key_id: e2e-fake-access-key-id
+            aws_secret_access_key: e2e-fake-secret-access-key
+          description: sagemaker-endpoint
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: sagemaker-endpoint
+            options:
+              sagemaker:
+                aws_region: us-east-1
+            provider: sagemaker
+          route_type: llm/v1/chat
+        - description: jev-latest
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: jev-latest
+            provider: typesafe
+          route_type: llm/v1/chat
+        - description: deepseek-ai/DeepSeek-V4-Pro-0813
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: deepseek-ai/DeepSeek-V4-Pro-0813
+            provider: baseten
+          route_type: llm/v1/chat
+        - auth:
+            header_name: Authorization
+            header_value: Bearer e2e-fake-togetherai-key
+          description: meta-llama/Llama-3.3-70B-Instruct-Turbo
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: meta-llama/Llama-3.3-70B-Instruct-Turbo
+            provider: togetherai
+          route_type: llm/v1/chat
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+    model:
+      id: 290b3237-5b60-5df0-bfbe-912660aef648
+  - id: dcebfb31-cc0f-5469-b6d7-9d8807a4e8d2
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route:
+      id: 1a3f650c-2709-5e79-a792-7ffd18243fbf
+  - id: 75ff22ed-6245-594b-895f-6a9fa36f4581
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: gpt-5.4
+            provider: openai
+          route_type: llm/v1/responses
+        - auth:
+            header_name: api-key
+            header_value: e2e-fake-azure-key
+          description: gpt-5-4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: gpt-5-4
+            options:
+              azure_api_version: "2024-10-21"
+              azure_deployment_id: gpt-5-4
+              azure_instance: kong-e2e
+            provider: azure
+          route_type: llm/v1/responses
+        - description: grok-4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: grok-4
+            provider: xai
+          route_type: llm/v1/responses
+        - description: v0-1.5-md
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: v0-1.5-md
+            provider: vercel
+          route_type: llm/v1/responses
+        - auth:
+            header_name: Authorization
+            header_value: Bearer e2e-fake-togetherai-key
+          description: meta-llama/Llama-3.3-70B-Instruct-Turbo
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: meta-llama/Llama-3.3-70B-Instruct-Turbo
+            provider: togetherai
+          route_type: llm/v1/responses
+    route:
+      id: 1a3f650c-2709-5e79-a792-7ffd18243fbf
+    model:
+      id: 290b3237-5b60-5df0-bfbe-912660aef648
+  - id: 12106a5c-cbd2-5942-8432-ef9bc4adca1b
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: gpt-5.4
+            provider: openai
+          route_type: llm/v1/responses
+        - auth:
+            header_name: api-key
+            header_value: e2e-fake-azure-key
+          description: gpt-5-4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: gpt-5-4
+            options:
+              azure_api_version: "2024-10-21"
+              azure_deployment_id: gpt-5-4
+              azure_instance: kong-e2e
+            provider: azure
+          route_type: llm/v1/responses
+        - auth:
+            aws_access_key_id: e2e-fake-access-key-id
+            aws_secret_access_key: e2e-fake-secret-access-key
+          description: openai.gpt-oss-120b
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: openai.gpt-oss-120b
+            options:
+              bedrock:
+                aws_region: us-east-1
+                endpoint_type: mantle
+                mantle_openai_path_prefix: /v1
+            provider: bedrock
+          route_type: llm/v1/responses
+        - description: grok-4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: grok-4
+            provider: xai
+          route_type: llm/v1/responses
+        - description: v0-1.5-md
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: v0-1.5-md
+            provider: vercel
+          route_type: llm/v1/responses
+        - auth:
+            header_name: Authorization
+            header_value: Bearer e2e-fake-togetherai-key
+          description: meta-llama/Llama-3.3-70B-Instruct-Turbo
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: meta-llama/Llama-3.3-70B-Instruct-Turbo
+            provider: togetherai
+          route_type: llm/v1/responses
+    route:
+      id: 740677ad-a667-5a50-a255-e369d244e981
+  - id: 700ea379-9666-54e2-a9ab-a865ab879aa9
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route:
+      id: 718639d6-1ff2-57e3-9528-df761b890443
+  - id: 693f2c49-9a06-59cc-92cf-0747f3214011
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: audio/speech
+      llm_format: openai
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: false
+          model:
+            model_alias: every-endpoint
+            name: gpt-5.4
+            provider: openai
+          route_type: audio/v1/audio/speech
+        - auth:
+            header_name: api-key
+            header_value: e2e-fake-azure-key
+          description: gpt-5-4
+          logging:
+            log_payloads: false
+            log_statistics: false
+          model:
+            model_alias: every-endpoint
+            name: gpt-5-4
+            options:
+              azure_api_version: "2024-10-21"
+              azure_deployment_id: gpt-5-4
+              azure_instance: kong-e2e
+            provider: azure
+          route_type: audio/v1/audio/speech
+    route:
+      id: 718639d6-1ff2-57e3-9528-df761b890443
+    model:
+      id: 290b3237-5b60-5df0-bfbe-912660aef648
+  - id: 8be6e29e-0829-5501-80fb-fdfe8b43acca
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route:
+      id: cc97f945-f7ef-5ccf-aa4c-ed3489745d3a
+  - id: bcefe664-4bf5-5e5a-8fd0-386c330b967f
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: audio/transcription
+      llm_format: openai
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: false
+          model:
+            model_alias: every-endpoint
+            name: gpt-5.4
+            provider: openai
+          route_type: audio/v1/audio/transcriptions
+        - auth:
+            header_name: api-key
+            header_value: e2e-fake-azure-key
+          description: gpt-5-4
+          logging:
+            log_payloads: false
+            log_statistics: false
+          model:
+            model_alias: every-endpoint
+            name: gpt-5-4
+            options:
+              azure_api_version: "2024-10-21"
+              azure_deployment_id: gpt-5-4
+              azure_instance: kong-e2e
+            provider: azure
+          route_type: audio/v1/audio/transcriptions
+    route:
+      id: cc97f945-f7ef-5ccf-aa4c-ed3489745d3a
+    model:
+      id: 290b3237-5b60-5df0-bfbe-912660aef648
+  - id: 51b42192-4429-5743-97f6-7c1bc6da1813
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route:
+      id: 43ea1e35-1444-56c0-8120-135c776376c4
+  - id: d59d0f0a-e311-59af-937d-02dc12719ca2
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: audio/transcription
+      llm_format: openai
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: false
+          model:
+            model_alias: every-endpoint
+            name: gpt-5.4
+            provider: openai
+          route_type: audio/v1/audio/translations
+        - auth:
+            header_name: api-key
+            header_value: e2e-fake-azure-key
+          description: gpt-5-4
+          logging:
+            log_payloads: false
+            log_statistics: false
+          model:
+            model_alias: every-endpoint
+            name: gpt-5-4
+            options:
+              azure_api_version: "2024-10-21"
+              azure_deployment_id: gpt-5-4
+              azure_instance: kong-e2e
+            provider: azure
+          route_type: audio/v1/audio/translations
+    route:
+      id: 43ea1e35-1444-56c0-8120-135c776376c4
+    model:
+      id: 290b3237-5b60-5df0-bfbe-912660aef648
+  - id: 0c628171-03a6-5e5e-a900-b6a5651353b2
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route:
+      id: 0da1097c-6edc-5c9c-a032-cd042d0db5e4
+  - id: 0041d7bf-ccdd-5413-9839-9e1fa7ecc34e
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/embeddings
+      llm_format: openai
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: gpt-5.4
+            provider: openai
+          route_type: llm/v1/embeddings
+        - auth:
+            header_name: api-key
+            header_value: e2e-fake-azure-key
+          description: gpt-5-4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: gpt-5-4
+            options:
+              azure_api_version: "2024-10-21"
+              azure_deployment_id: gpt-5-4
+              azure_instance: kong-e2e
+            provider: azure
+          route_type: llm/v1/embeddings
+        - description: command-r
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: command-r
+            provider: cohere
+          route_type: llm/v1/embeddings
+        - description: mistral-large
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: mistral-large
+            options:
+              mistral_format: openai
+            provider: mistral
+          route_type: llm/v1/embeddings
+        - description: llama-3
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: llama-3
+            options:
+              llama2_format: openai
+              upstream_url: http://llama.e2e.local:8080/v1/chat/completions
+            provider: llama2
+          route_type: llm/v1/embeddings
+        - auth:
+            header_name: x-goog-api-key
+            header_value: e2e-fake-gemini-key
+          description: gemini-2.5-pro
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: gemini-2.5-pro
+            provider: gemini
+          route_type: llm/v1/embeddings
+        - auth:
+            aws_access_key_id: e2e-fake-access-key-id
+            aws_secret_access_key: e2e-fake-secret-access-key
+          description: amazon.nova-pro-v1:0
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: amazon.nova-pro-v1:0
+            options:
+              bedrock:
+                aws_region: us-east-1
+            provider: bedrock
+          route_type: llm/v1/embeddings
+        - description: hf-zephyr
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: hf-zephyr
+            provider: huggingface
+          route_type: llm/v1/embeddings
+        - description: qwen-max
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: qwen-max
+            provider: dashscope
+          route_type: llm/v1/embeddings
+        - description: dbrx-instruct
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: dbrx-instruct
+            options:
+              databricks:
+                workspace_instance_id: dbc-a1b2c3d4
+            provider: databricks
+          route_type: llm/v1/embeddings
+        - description: llama3.1
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: llama3.1
+            provider: ollama
+          route_type: llm/v1/embeddings
+        - description: v0-1.5-md
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: v0-1.5-md
+            provider: vercel
+          route_type: llm/v1/embeddings
+    route:
+      id: 0da1097c-6edc-5c9c-a032-cd042d0db5e4
+    model:
+      id: 290b3237-5b60-5df0-bfbe-912660aef648
+  - id: 6d3d68a8-0522-573e-8c28-82a375d27f7a
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route:
+      id: 67276980-b7e0-58ee-8c51-bafe739db8f8
+  - id: 7f38955a-5cc4-5370-b6ad-aae52d1f7c2f
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: image/generation
+      llm_format: openai
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: gpt-5.4
+            provider: openai
+          route_type: image/v1/images/generations
+        - auth:
+            header_name: api-key
+            header_value: e2e-fake-azure-key
+          description: gpt-5-4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: gpt-5-4
+            options:
+              azure_api_version: "2024-10-21"
+              azure_deployment_id: gpt-5-4
+              azure_instance: kong-e2e
+            provider: azure
+          route_type: image/v1/images/generations
+        - auth:
+            header_name: x-goog-api-key
+            header_value: e2e-fake-gemini-key
+          description: gemini-2.5-pro
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: gemini-2.5-pro
+            provider: gemini
+          route_type: image/v1/images/generations
+        - auth:
+            aws_access_key_id: e2e-fake-access-key-id
+            aws_secret_access_key: e2e-fake-secret-access-key
+          description: amazon.nova-pro-v1:0
+          logging:
+            log_payloads: false
+            log_statistics: false
+          model:
+            model_alias: every-endpoint
+            name: amazon.nova-pro-v1:0
+            options:
+              bedrock:
+                aws_region: us-east-1
+            provider: bedrock
+          route_type: image/v1/images/generations
+        - description: qwen-max
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: qwen-max
+            provider: dashscope
+          route_type: image/v1/images/generations
+        - description: grok-4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: grok-4
+            provider: xai
+          route_type: image/v1/images/generations
+        - description: v0-1.5-md
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: v0-1.5-md
+            provider: vercel
+          route_type: image/v1/images/generations
+    route:
+      id: 67276980-b7e0-58ee-8c51-bafe739db8f8
+    model:
+      id: 290b3237-5b60-5df0-bfbe-912660aef648
+  - id: 2c5720cd-c721-59b0-b582-74af3b8a50d4
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route:
+      id: 5db3317e-efa0-532d-84a8-e42fdf5a90e9
+  - id: bca10a79-b3a8-5f49-8fdf-1ce807de3324
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: image/generation
+      llm_format: openai
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: gpt-5.4
+            provider: openai
+          route_type: image/v1/images/edits
+        - auth:
+            header_name: api-key
+            header_value: e2e-fake-azure-key
+          description: gpt-5-4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: gpt-5-4
+            options:
+              azure_api_version: "2024-10-21"
+              azure_deployment_id: gpt-5-4
+              azure_instance: kong-e2e
+            provider: azure
+          route_type: image/v1/images/edits
+        - auth:
+            header_name: x-goog-api-key
+            header_value: e2e-fake-gemini-key
+          description: gemini-2.5-pro
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: gemini-2.5-pro
+            provider: gemini
+          route_type: image/v1/images/edits
+        - auth:
+            aws_access_key_id: e2e-fake-access-key-id
+            aws_secret_access_key: e2e-fake-secret-access-key
+          description: amazon.nova-pro-v1:0
+          logging:
+            log_payloads: false
+            log_statistics: false
+          model:
+            model_alias: every-endpoint
+            name: amazon.nova-pro-v1:0
+            options:
+              bedrock:
+                aws_region: us-east-1
+            provider: bedrock
+          route_type: image/v1/images/edits
+        - description: qwen-max
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: qwen-max
+            provider: dashscope
+          route_type: image/v1/images/edits
+    route:
+      id: 5db3317e-efa0-532d-84a8-e42fdf5a90e9
+    model:
+      id: 290b3237-5b60-5df0-bfbe-912660aef648
+  - id: 5f4b0e19-29d1-5ce6-b34f-3e1394bf878e
+    name: ai-proxy-advanced
+    protocols:
+      - ws
+      - wss
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: realtime/generation
+      llm_format: openai
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: gpt-5.4
+            provider: openai
+          route_type: realtime/v1/realtime
+        - auth:
+            header_name: api-key
+            header_value: e2e-fake-azure-key
+          description: gpt-5-4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: gpt-5-4
+            options:
+              azure_api_version: "2024-10-21"
+              azure_deployment_id: gpt-5-4
+              azure_instance: kong-e2e
+            provider: azure
+          route_type: realtime/v1/realtime
+    route:
+      id: b2ed74bc-70de-5c05-98a5-1ff4f804ad51
+    tags:
+      - ai-gateway-realtime-model:every-endpoint
+  - id: 4c3c42b4-138d-5f50-b141-efb32541e17c
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route:
+      id: f6304e3f-b5ab-5f47-9007-cbc2a95b6701
+  - id: 0f8844dd-7362-5ea0-8eeb-35ee0580b632
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: video/generation
+      llm_format: openai
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: gpt-5.4
+            provider: openai
+          route_type: video/v1/videos/generations
+        - auth:
+            header_name: api-key
+            header_value: e2e-fake-azure-key
+          description: gpt-5-4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: gpt-5-4
+            options:
+              azure_api_version: "2024-10-21"
+              azure_deployment_id: gpt-5-4
+              azure_instance: kong-e2e
+            provider: azure
+          route_type: video/v1/videos/generations
+        - auth:
+            header_name: x-goog-api-key
+            header_value: e2e-fake-gemini-key
+          description: gemini-2.5-pro
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: gemini-2.5-pro
+            provider: gemini
+          route_type: video/v1/videos/generations
+        - auth:
+            aws_access_key_id: e2e-fake-access-key-id
+            aws_secret_access_key: e2e-fake-secret-access-key
+          description: amazon.nova-pro-v1:0
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: amazon.nova-pro-v1:0
+            options:
+              bedrock:
+                aws_region: us-east-1
+            provider: bedrock
+          route_type: video/v1/videos/generations
+        - description: hf-zephyr
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: hf-zephyr
+            provider: huggingface
+          route_type: video/v1/videos/generations
+    route:
+      id: f6304e3f-b5ab-5f47-9007-cbc2a95b6701
+    model:
+      id: 290b3237-5b60-5df0-bfbe-912660aef648
+  - id: 5a7abd23-205f-5c84-b7f1-035c47aaeaf5
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route:
+      id: bb559a54-dc17-5c0f-b946-b0d9c5cebd7a
+  - id: 74150451-efc7-5a74-9754-5c27da9e52ac
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: gpt-5.4
+            provider: openai
+          route_type: llm/v1/chat
+        - auth:
+            header_name: api-key
+            header_value: e2e-fake-azure-key
+          description: gpt-5-4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: gpt-5-4
+            options:
+              azure_api_version: "2024-10-21"
+              azure_deployment_id: gpt-5-4
+              azure_instance: kong-e2e
+            provider: azure
+          route_type: llm/v1/chat
+        - auth:
+            header_name: x-api-key
+            header_value: e2e-fake-anthropic-key
+          description: claude-sonnet-4-5
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: claude-sonnet-4-5
+            options:
+              anthropic_version: "2023-06-01"
+            provider: anthropic
+          route_type: llm/v1/chat
+        - description: command-r
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: command-r
+            provider: cohere
+          route_type: llm/v1/chat
+        - description: mistral-large
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: mistral-large
+            options:
+              mistral_format: openai
+            provider: mistral
+          route_type: llm/v1/chat
+        - description: llama-3
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: llama-3
+            options:
+              llama2_format: openai
+              upstream_url: http://llama.e2e.local:8080/v1/chat/completions
+            provider: llama2
+          route_type: llm/v1/chat
+        - auth:
+            header_name: x-goog-api-key
+            header_value: e2e-fake-gemini-key
+          description: gemini-2.5-pro
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: gemini-2.5-pro
+            provider: gemini
+          route_type: llm/v1/chat
+        - auth:
+            aws_access_key_id: e2e-fake-access-key-id
+            aws_secret_access_key: e2e-fake-secret-access-key
+          description: amazon.nova-pro-v1:0
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: amazon.nova-pro-v1:0
+            options:
+              bedrock:
+                aws_region: us-east-1
+            provider: bedrock
+          route_type: llm/v1/chat
+        - auth:
+            aws_access_key_id: e2e-fake-access-key-id
+            aws_secret_access_key: e2e-fake-secret-access-key
+          description: openai.gpt-oss-120b
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: openai.gpt-oss-120b
+            options:
+              bedrock:
+                aws_region: us-east-1
+                endpoint_type: mantle
+                mantle_openai_path_prefix: /v1
+            provider: bedrock
+          route_type: llm/v1/chat
+        - description: hf-zephyr
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: hf-zephyr
+            provider: huggingface
+          route_type: llm/v1/chat
+        - description: qwen-max
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: qwen-max
+            provider: dashscope
+          route_type: llm/v1/chat
+        - description: grok-4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: grok-4
+            provider: xai
+          route_type: llm/v1/chat
+        - description: llama-4-scout
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: llama-4-scout
+            provider: cerebras
+          route_type: llm/v1/chat
+        - description: dbrx-instruct
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: dbrx-instruct
+            options:
+              databricks:
+                workspace_instance_id: dbc-a1b2c3d4
+            provider: databricks
+          route_type: llm/v1/chat
+        - description: vllm-model
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: vllm-model
+            options:
+              upstream_url: http://vllm.e2e.local:8000/v1/chat/completions
+            provider: vllm
+          route_type: llm/v1/chat
+        - description: deepseek-chat
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: deepseek-chat
+            provider: deepseek
+          route_type: llm/v1/chat
+        - description: llama3.1
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: llama3.1
+            provider: ollama
+          route_type: llm/v1/chat
+        - description: v0-1.5-md
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: v0-1.5-md
+            provider: vercel
+          route_type: llm/v1/chat
+        - description: kimi-k2
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: kimi-k2
+            provider: kimi
+          route_type: llm/v1/chat
+        - auth:
+            aws_access_key_id: e2e-fake-access-key-id
+            aws_secret_access_key: e2e-fake-secret-access-key
+          description: sagemaker-endpoint
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: sagemaker-endpoint
+            options:
+              sagemaker:
+                aws_region: us-east-1
+            provider: sagemaker
+          route_type: llm/v1/chat
+        - description: jev-latest
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: jev-latest
+            provider: typesafe
+          route_type: llm/v1/chat
+        - description: deepseek-ai/DeepSeek-V4-Pro-0813
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: deepseek-ai/DeepSeek-V4-Pro-0813
+            provider: baseten
+          route_type: llm/v1/chat
+        - auth:
+            header_name: Authorization
+            header_value: Bearer e2e-fake-togetherai-key
+          description: meta-llama/Llama-3.3-70B-Instruct-Turbo
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: meta-llama/Llama-3.3-70B-Instruct-Turbo
+            provider: togetherai
+          route_type: llm/v1/chat
+    route:
+      id: bb559a54-dc17-5c0f-b946-b0d9c5cebd7a
+    model:
+      id: 290b3237-5b60-5df0-bfbe-912660aef648
+  - id: 4ea90c46-4e21-5a47-b656-f67c908b7483
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route:
+      id: fd509521-bbbc-518e-bc93-2088432bf86d
+  - id: 732a022e-4d91-596a-9c3c-60772ba24ae0
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: cohere
+      targets:
+        - description: command-r
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: command-r
+            provider: cohere
+          route_type: llm/v1/chat
+    route:
+      id: fd509521-bbbc-518e-bc93-2088432bf86d
+    model:
+      id: 290b3237-5b60-5df0-bfbe-912660aef648
+  - id: 57aa58f8-ab0c-5912-87d0-4c630e5c6b8c
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - path_pattern: 'models/([%w%.%-]+):'
+          source: path
+    route:
+      id: b4a57e40-147c-502b-a080-e3102a5c3273
+  - id: f767a5a0-2605-5ec7-a54b-54b5ba91d32e
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: gemini
+      targets:
+        - auth:
+            header_name: x-goog-api-key
+            header_value: e2e-fake-gemini-key
+          description: gemini-2.5-pro
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: gemini-2.5-pro
+            provider: gemini
+          route_type: llm/v1/chat
+    route:
+      id: b4a57e40-147c-502b-a080-e3102a5c3273
+    model:
+      id: 290b3237-5b60-5df0-bfbe-912660aef648
+  - id: 7464aef6-9dba-5909-8dc8-d4000be2fc9e
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - path_pattern: 'models/([%w%.%-]+):'
+          source: path
+    route:
+      id: 090ce054-21c9-5fd3-a8f0-e0733e5dcc43
+  - id: 32c66b25-eee1-5606-ae08-3fbd6e58cfba
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: gemini
+      targets:
+        - auth:
+            header_name: x-goog-api-key
+            header_value: e2e-fake-gemini-key
+          description: gemini-2.5-pro
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: gemini-2.5-pro
+            provider: gemini
+          route_type: llm/v1/chat
+    route:
+      id: 090ce054-21c9-5fd3-a8f0-e0733e5dcc43
+    model:
+      id: 290b3237-5b60-5df0-bfbe-912660aef648
+  - id: 9f441429-2107-5112-a203-1310c082846a
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route:
+      id: d13c1734-7773-5150-a0c3-4e7816185423
+  - id: d70f9948-2d3c-5912-bf94-c6895cbb0563
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: gemini
+      targets:
+        - auth:
+            header_name: x-goog-api-key
+            header_value: e2e-fake-gemini-key
+          description: gemini-2.5-pro
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: gemini-2.5-pro
+            options:
+              upstream_url: https://generativelanguage.googleapis.com/v1/interactions
+            provider: gemini
+          route_type: llm/v1/responses
+    route:
+      id: d13c1734-7773-5150-a0c3-4e7816185423
+    model:
+      id: 290b3237-5b60-5df0-bfbe-912660aef648
+  - id: f3515fbe-04f7-51bb-99c3-f704adf55463
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route:
+      id: c1264434-e7f1-576d-ba87-6d40613b3401
+  - id: 21ffbeb8-dfe5-5e97-b16d-19a479b6367c
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: gemini
+      targets:
+        - auth:
+            header_name: x-goog-api-key
+            header_value: e2e-fake-gemini-key
+          description: gemini-2.5-pro
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: gemini-2.5-pro
+            options:
+              upstream_url: https://generativelanguage.googleapis.com/v1beta/interactions
+            provider: gemini
+          route_type: llm/v1/responses
+    route:
+      id: c1264434-e7f1-576d-ba87-6d40613b3401
+    model:
+      id: 290b3237-5b60-5df0-bfbe-912660aef648
+  - id: 87b6a1d3-f81e-5d03-a5c1-4516a12e4cb5
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - path_pattern: 'models/([%w%.%-]+):'
+          source: path
+    route:
+      id: a52aa612-4383-505f-8126-223ecf6adf57
+  - id: 0e90067c-b01d-519b-8c7a-d2571143396f
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/embeddings
+      llm_format: gemini
+      targets:
+        - auth:
+            header_name: x-goog-api-key
+            header_value: e2e-fake-gemini-key
+          description: gemini-2.5-pro
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: gemini-2.5-pro
+            provider: gemini
+          route_type: llm/v1/embeddings
+    route:
+      id: a52aa612-4383-505f-8126-223ecf6adf57
+    model:
+      id: 290b3237-5b60-5df0-bfbe-912660aef648
+  - id: 575b95e1-98d6-531d-8a29-202747a5786f
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - path_pattern: 'models/([%w%.%-]+):'
+          source: path
+    route:
+      id: 05b6b580-1be6-57bc-a0ac-403501e7e580
+  - id: 872f937c-ac5f-5057-8276-82da6badc516
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/embeddings
+      llm_format: gemini
+      targets:
+        - auth:
+            header_name: x-goog-api-key
+            header_value: e2e-fake-gemini-key
+          description: gemini-2.5-pro
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: gemini-2.5-pro
+            provider: gemini
+          route_type: llm/v1/embeddings
+    route:
+      id: 05b6b580-1be6-57bc-a0ac-403501e7e580
+    model:
+      id: 290b3237-5b60-5df0-bfbe-912660aef648
+  - id: f3ce365f-a20a-5cd2-926e-c61d53292a28
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - path_pattern: 'models/([%w%.%-]+):'
+          source: path
+    route:
+      id: f6269af6-c4d1-5182-bd8b-0277dc6dacec
+  - id: 2af31037-68b1-5181-9fb3-abfe385a2c2c
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: image/generation
+      llm_format: gemini
+      targets:
+        - auth:
+            header_name: x-goog-api-key
+            header_value: e2e-fake-gemini-key
+          description: gemini-2.5-pro
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: gemini-2.5-pro
+            provider: gemini
+          route_type: image/v1/images/generations
+    route:
+      id: f6269af6-c4d1-5182-bd8b-0277dc6dacec
+    model:
+      id: 290b3237-5b60-5df0-bfbe-912660aef648
+  - id: cdfbbbf9-c767-57d5-873c-daa4f220d92b
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: gemini
+      targets:
+        - auth:
+            header_name: x-goog-api-key
+            header_value: e2e-fake-gemini-key
+          description: gemini-2.5-pro
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: gemini-2.5-pro
+            provider: gemini
+          route_type: llm/v1/chat
+    route:
+      id: d737a125-0d34-5ee4-b5ff-4900a3ac7761
+    model:
+      id: 290b3237-5b60-5df0-bfbe-912660aef648
+  - id: bf5eac04-ee61-5717-a1ee-225c25c404ec
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - path_pattern: 'models/([%w%.%-]+):'
+          source: path
+    route:
+      id: ec635808-315e-5e7d-9d25-1008e4e52862
+  - id: 2c985393-f9f7-58d4-820a-72af137d4bf5
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: video/generation
+      llm_format: gemini
+      targets:
+        - auth:
+            header_name: x-goog-api-key
+            header_value: e2e-fake-gemini-key
+          description: gemini-2.5-pro
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: gemini-2.5-pro
+            provider: gemini
+          route_type: video/v1/videos/generations
+    route:
+      id: ec635808-315e-5e7d-9d25-1008e4e52862
+    model:
+      id: 290b3237-5b60-5df0-bfbe-912660aef648
+  - id: 5b0886e0-df81-56c7-9068-d07eb63fe9f9
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - path_pattern: model/([^/]+)/
+          source: path
+    route:
+      id: 934cbaf7-d722-5a54-ae50-48c0b63343dd
+  - id: 399a4aca-ed9a-564a-a9bd-930da3765c7a
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: bedrock
+      targets:
+        - auth:
+            aws_access_key_id: e2e-fake-access-key-id
+            aws_secret_access_key: e2e-fake-secret-access-key
+          description: amazon.nova-pro-v1:0
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: amazon.nova-pro-v1:0
+            options:
+              bedrock:
+                aws_region: us-east-1
+            provider: bedrock
+          route_type: llm/v1/chat
+    route:
+      id: 934cbaf7-d722-5a54-ae50-48c0b63343dd
+    model:
+      id: 290b3237-5b60-5df0-bfbe-912660aef648
+  - id: db4a72db-95f8-56c8-88d9-a7f402e61ff6
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - path_pattern: model/([^/]+)/
+          source: path
+    route:
+      id: df12ed34-44b5-5c3d-9c3d-908ece02fb32
+  - id: 2c7de7cf-712c-5e56-99ef-75711209024a
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: bedrock
+      targets:
+        - auth:
+            aws_access_key_id: e2e-fake-access-key-id
+            aws_secret_access_key: e2e-fake-secret-access-key
+          description: amazon.nova-pro-v1:0
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: amazon.nova-pro-v1:0
+            options:
+              bedrock:
+                aws_region: us-east-1
+            provider: bedrock
+          route_type: llm/v1/chat
+    route:
+      id: df12ed34-44b5-5c3d-9c3d-908ece02fb32
+    model:
+      id: 290b3237-5b60-5df0-bfbe-912660aef648
+  - id: 8bd31c5c-e416-5623-b681-0f886d7594f1
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route:
+      id: 3e5bbe5f-d382-52f7-837e-2701814528e5
+  - id: 6df7a848-5e92-5f9a-9bc6-0fafc8171afa
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: bedrock
+      targets:
+        - auth:
+            aws_access_key_id: e2e-fake-access-key-id
+            aws_secret_access_key: e2e-fake-secret-access-key
+          description: amazon.nova-pro-v1:0
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: amazon.nova-pro-v1:0
+            options:
+              bedrock:
+                aws_region: us-east-1
+            provider: bedrock
+          route_type: llm/v1/chat
+    route:
+      id: 3e5bbe5f-d382-52f7-837e-2701814528e5
+    model:
+      id: 290b3237-5b60-5df0-bfbe-912660aef648
+  - id: 80fddec6-ba35-54c0-986c-20590f9eded5
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route:
+      id: f389aa8d-e597-5c0f-8678-04572278e83e
+  - id: 06ba03c2-e867-50b5-84f8-b30c6f42d004
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: bedrock
+      targets:
+        - auth:
+            aws_access_key_id: e2e-fake-access-key-id
+            aws_secret_access_key: e2e-fake-secret-access-key
+          description: amazon.nova-pro-v1:0
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: amazon.nova-pro-v1:0
+            options:
+              bedrock:
+                aws_region: us-east-1
+            provider: bedrock
+          route_type: llm/v1/chat
+    route:
+      id: f389aa8d-e597-5c0f-8678-04572278e83e
+    model:
+      id: 290b3237-5b60-5df0-bfbe-912660aef648
+  - id: 5af4b4d6-4e86-5252-84c0-0d3ac225b81b
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - path_pattern: model/([^/]+)/
+          source: path
+    route:
+      id: 78397398-a48f-503c-ba71-7ac2ea7b5883
+  - id: 1e61edd5-e904-594c-b1e3-c71b9cb9c31c
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: bedrock
+      targets:
+        - auth:
+            aws_access_key_id: e2e-fake-access-key-id
+            aws_secret_access_key: e2e-fake-secret-access-key
+          description: amazon.nova-pro-v1:0
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: amazon.nova-pro-v1:0
+            options:
+              bedrock:
+                aws_region: us-east-1
+            provider: bedrock
+          route_type: llm/v1/chat
+    route:
+      id: 78397398-a48f-503c-ba71-7ac2ea7b5883
+    model:
+      id: 290b3237-5b60-5df0-bfbe-912660aef648
+  - id: 890bc4e3-1066-5bbc-a4af-181adf8c9e8e
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route:
+      id: 41282f10-4533-5f5a-bac3-cf0991d72913
+  - id: c89225ed-b7c6-5646-b288-3d675edef7f0
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: bedrock
+      targets:
+        - auth:
+            aws_access_key_id: e2e-fake-access-key-id
+            aws_secret_access_key: e2e-fake-secret-access-key
+          description: amazon.nova-pro-v1:0
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: amazon.nova-pro-v1:0
+            options:
+              bedrock:
+                aws_region: us-east-1
+            provider: bedrock
+          route_type: llm/v1/responses
+    route:
+      id: 41282f10-4533-5f5a-bac3-cf0991d72913
+    model:
+      id: 290b3237-5b60-5df0-bfbe-912660aef648
+  - id: 023fd608-9e24-577d-8bf2-50013bd3618b
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - path_pattern: model/([^/]+)/
+          source: path
+    route:
+      id: 57dbc083-73ad-583e-b144-a4006f6e1721
+  - id: 027cbe8c-1e9e-54e4-8f19-99f89b8ab282
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: bedrock
+      targets:
+        - auth:
+            aws_access_key_id: e2e-fake-access-key-id
+            aws_secret_access_key: e2e-fake-secret-access-key
+          description: amazon.nova-pro-v1:0
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: amazon.nova-pro-v1:0
+            options:
+              bedrock:
+                aws_region: us-east-1
+            provider: bedrock
+          route_type: llm/v1/chat
+    route:
+      id: 57dbc083-73ad-583e-b144-a4006f6e1721
+    model:
+      id: 290b3237-5b60-5df0-bfbe-912660aef648
+  - id: f891f456-7c56-51d5-ace6-fbfec51f3a5f
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: modelId
+          source: body
+    route:
+      id: 751f3bc6-2b23-58c0-897a-ca3b20491b67
+  - id: d5f89a84-f2f8-5804-bac5-ff97745f5927
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: video/generation
+      llm_format: bedrock
+      targets:
+        - auth:
+            aws_access_key_id: e2e-fake-access-key-id
+            aws_secret_access_key: e2e-fake-secret-access-key
+          description: amazon.nova-pro-v1:0
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: amazon.nova-pro-v1:0
+            options:
+              bedrock:
+                aws_region: us-east-1
+            provider: bedrock
+          route_type: video/v1/videos/generations
+    route:
+      id: 751f3bc6-2b23-58c0-897a-ca3b20491b67
+    model:
+      id: 290b3237-5b60-5df0-bfbe-912660aef648
+  - id: 38cd379f-d7e2-5e7b-9aa2-79bfabb6e378
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route:
+      id: 2384fe9d-eacc-5ac2-ae4c-4752cc597f81
+  - id: d789edc0-987b-548b-b941-d929c461cf69
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            aws_access_key_id: e2e-fake-access-key-id
+            aws_secret_access_key: e2e-fake-secret-access-key
+          description: openai.gpt-oss-120b
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: openai.gpt-oss-120b
+            options:
+              bedrock:
+                aws_region: us-east-1
+                endpoint_type: mantle
+                mantle_openai_path_prefix: /v1
+            provider: bedrock
+          route_type: llm/v1/chat
+    route:
+      id: 2384fe9d-eacc-5ac2-ae4c-4752cc597f81
+    model:
+      id: 290b3237-5b60-5df0-bfbe-912660aef648
+  - id: 31c0e500-b6ec-5a3f-b8bc-5499c9c1b3b9
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route:
+      id: d42385f3-0b4d-574b-8090-3625031103eb
+  - id: da1139e5-35db-5ca6-a75e-8851baa45a1f
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            aws_access_key_id: e2e-fake-access-key-id
+            aws_secret_access_key: e2e-fake-secret-access-key
+          description: openai.gpt-oss-120b
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: openai.gpt-oss-120b
+            options:
+              bedrock:
+                aws_region: us-east-1
+                endpoint_type: mantle
+                mantle_openai_path_prefix: /v1
+            provider: bedrock
+          route_type: llm/v1/responses
+    route:
+      id: d42385f3-0b4d-574b-8090-3625031103eb
+    model:
+      id: 290b3237-5b60-5df0-bfbe-912660aef648
+  - id: 76634acf-dc27-50b3-befe-6420ca38f505
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route:
+      id: a5fe20b2-fe87-59f3-a7bf-b47efa1d5e4e
+  - id: 098e7779-9500-5d64-a5b0-910b43964321
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: huggingface
+      targets:
+        - description: hf-zephyr
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: hf-zephyr
+            provider: huggingface
+          route_type: llm/v1/chat
+    route:
+      id: a5fe20b2-fe87-59f3-a7bf-b47efa1d5e4e
+    model:
+      id: 290b3237-5b60-5df0-bfbe-912660aef648
+  - id: 48174816-7d8b-590f-b714-c462f66dad84
+    name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route:
+      id: 96cb42a8-d9be-53d5-afe8-bad2af2d17f0
+  - id: eba6af44-82a5-5c6f-a764-90fb3ee050b0
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: typesafe
+      targets:
+        - description: jev-latest
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: every-endpoint
+            name: jev-latest
+            provider: typesafe
+          route_type: llm/v1/chat
+    route:
+      id: 96cb42a8-d9be-53d5-afe8-bad2af2d17f0
+    model:
+      id: 290b3237-5b60-5df0-bfbe-912660aef648
+  - id: 4c3f0a74-5f78-552b-8b01-4094cb876734
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      model_name_header: false
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: false
+          model:
+            name: gpt-5.4
+            provider: openai
+          route_type: llm/v1/batches
+        - auth:
+            header_name: api-key
+            header_value: e2e-fake-azure-key
+          description: gpt-5-4
+          logging:
+            log_payloads: false
+            log_statistics: false
+          model:
+            name: gpt-5-4
+            options:
+              azure_api_version: "2024-10-21"
+              azure_deployment_id: gpt-5-4
+              azure_instance: kong-e2e
+            provider: azure
+          route_type: llm/v1/batches
+        - auth:
+            header_name: x-api-key
+            header_value: e2e-fake-anthropic-key
+          description: claude-sonnet-4-5
+          logging:
+            log_payloads: false
+            log_statistics: false
+          model:
+            name: claude-sonnet-4-5
+            options:
+              anthropic_version: "2023-06-01"
+            provider: anthropic
+          route_type: llm/v1/batches
+        - auth:
+            header_name: x-goog-api-key
+            header_value: e2e-fake-gemini-key
+          description: gemini-2.5-pro
+          logging:
+            log_payloads: false
+            log_statistics: false
+          model:
+            name: gemini-2.5-pro
+            provider: gemini
+          route_type: llm/v1/batches
+        - auth:
+            aws_access_key_id: e2e-fake-access-key-id
+            aws_secret_access_key: e2e-fake-secret-access-key
+          description: batch-api
+          logging:
+            log_payloads: false
+            log_statistics: false
+          model:
+            name: batch-api
+            options:
+              bedrock:
+                aws_region: us-east-1
+                batch_bucket_prefix: s3://kong-e2e-batches/jobs/
+            provider: bedrock
+          route_type: llm/v1/batches
+        - description: kimi-k2
+          logging:
+            log_payloads: false
+            log_statistics: false
+          model:
+            name: kimi-k2
+            provider: kimi
+          route_type: llm/v1/batches
+    route:
+      id: cbac5221-6bcd-5bfa-9575-4519bea13df0
+  - id: 2c7c958f-aa48-580a-9610-de404a7e7892
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      model_name_header: false
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: gpt-5.4
+            provider: openai
+          route_type: llm/v1/files
+        - auth:
+            header_name: api-key
+            header_value: e2e-fake-azure-key
+          description: gpt-5-4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: gpt-5-4
+            options:
+              azure_api_version: "2024-10-21"
+              azure_deployment_id: gpt-5-4
+              azure_instance: kong-e2e
+            provider: azure
+          route_type: llm/v1/files
+        - description: kimi-k2
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: kimi-k2
+            provider: kimi
+          route_type: llm/v1/files
+    route:
+      id: b433d478-0f40-5518-b6bb-815583936241
+  - id: bacca35c-e603-5a2c-95e9-986629589785
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      model_name_header: false
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: false
+          model:
+            name: gpt-5.4
+            provider: openai
+          route_type: llm/v1/skills
+    route:
+      id: 0aaa3657-2434-58f7-90bf-7e2930afabdb
+  - id: eec1f4f2-3948-5679-9551-ad26b81cc998
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      model_name_header: false
+      targets:
+        - auth:
+            header_name: x-api-key
+            header_value: e2e-fake-anthropic-key
+          description: claude-sonnet-4-5
+          logging:
+            log_payloads: false
+            log_statistics: false
+          model:
+            name: claude-sonnet-4-5
+            options:
+              anthropic_version: "2023-06-01"
+            provider: anthropic
+          route_type: llm/v1/batches
+    route:
+      id: da59badf-6dcb-5328-8c6c-3784d8e14dd3
+  - id: c63d72b8-576d-5b03-a6b8-59f36efebca5
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      model_name_header: false
+      targets:
+        - auth:
+            header_name: x-api-key
+            header_value: e2e-fake-anthropic-key
+          description: claude-sonnet-4-5
+          logging:
+            log_payloads: false
+            log_statistics: false
+          model:
+            name: claude-sonnet-4-5
+            options:
+              anthropic_version: "2023-06-01"
+            provider: anthropic
+          route_type: llm/v1/skills
+    route:
+      id: a9529cc3-1568-5a89-9867-71939c502cbc
+  - id: 5935d3b2-0b7d-5266-b7ec-2fbf1438df04
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: gemini
+      model_name_header: false
+      targets:
+        - auth:
+            header_name: x-goog-api-key
+            header_value: e2e-fake-gemini-key
+          description: gemini-2.5-pro
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: gemini-2.5-pro
+            provider: gemini
+          route_type: llm/v1/batches
+    route:
+      id: 0b3d41ee-cd0b-51a2-ba17-192fbf50cad8
+  - id: 09004fd8-8c65-578c-9d79-fb96ba0c5e46
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: gemini
+      model_name_header: false
+      targets:
+        - auth:
+            header_name: x-goog-api-key
+            header_value: e2e-fake-gemini-key
+          description: gemini-2.5-pro
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: gemini-2.5-pro
+            provider: gemini
+          route_type: llm/v1/batches
+    route:
+      id: a77dd8e9-17ff-5236-b291-761e4874b365
+  - id: fac7b9c2-1250-500e-9fc0-660a8dee0d39
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: gemini
+      targets:
+        - auth:
+            header_name: x-goog-api-key
+            header_value: e2e-fake-gemini-key
+          description: gemini-2.5-pro
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: gemini-2.5-pro
+            provider: gemini
+          route_type: llm/v1/chat
+    route:
+      id: cf8371c0-4886-5860-aba0-ddbf24d941a6
+  - id: 6e554090-7dc0-55d3-8a9e-2a839a522e13
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: bedrock
+      model_name_header: false
+      targets:
+        - auth:
+            aws_access_key_id: e2e-fake-access-key-id
+            aws_secret_access_key: e2e-fake-secret-access-key
+          description: batch-api
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: batch-api
+            options:
+              bedrock:
+                aws_region: us-east-1
+                batch_bucket_prefix: s3://kong-e2e-batches/jobs/
+            provider: bedrock
+          route_type: llm/v1/batches
+    route:
+      id: a65a9e4b-10b4-5de0-93ae-0173e5ae0346
+  - id: 352b73b6-9e38-59eb-8415-c3dc746d19c2
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: video/generation
+      llm_format: openai
+      model_name_header: false
+      targets:
+        - description: gpt-5.4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: gpt-5.4
+            provider: openai
+          route_type: video/v1/videos/generations
+        - auth:
+            header_name: api-key
+            header_value: e2e-fake-azure-key
+          description: gpt-5-4
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: gpt-5-4
+            options:
+              azure_api_version: "2024-10-21"
+              azure_deployment_id: gpt-5-4
+              azure_instance: kong-e2e
+            provider: azure
+          route_type: video/v1/videos/generations
+        - auth:
+            header_name: x-goog-api-key
+            header_value: e2e-fake-gemini-key
+          description: gemini-2.5-pro
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: gemini-2.5-pro
+            provider: gemini
+          route_type: video/v1/videos/generations
+        - auth:
+            aws_access_key_id: e2e-fake-access-key-id
+            aws_secret_access_key: e2e-fake-secret-access-key
+          description: amazon.nova-pro-v1:0
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: amazon.nova-pro-v1:0
+            options:
+              bedrock:
+                aws_region: us-east-1
+            provider: bedrock
+          route_type: video/v1/videos/generations
+        - description: hf-zephyr
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: hf-zephyr
+            provider: huggingface
+          route_type: video/v1/videos/generations
+    route:
+      id: 9336ce94-9290-5d11-944d-2b3a489731e3
+  - id: bf7822e3-f2bc-512e-b850-13be67c35087
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: video/generation
+      llm_format: bedrock
+      model_name_header: false
+      targets:
+        - auth:
+            aws_access_key_id: e2e-fake-access-key-id
+            aws_secret_access_key: e2e-fake-secret-access-key
+          description: amazon.nova-pro-v1:0
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: amazon.nova-pro-v1:0
+            options:
+              bedrock:
+                aws_region: us-east-1
+            provider: bedrock
+          route_type: video/v1/videos/generations
+    route:
+      id: bd17fb45-7638-554f-b4ef-dd1aa6d158fa
+ai_models:
+  - id: 290b3237-5b60-5df0-bfbe-912660aef648
+    name: every-endpoint
+  - id: 5bbab5aa-99dd-59e1-adf0-e6fd79b5b1ec
+    name: every-api-endpoint

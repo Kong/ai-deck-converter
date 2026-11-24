@@ -681,12 +681,14 @@ Changed and unchanged cases:
 
 ## End-to-end tests
 
-- `wildcard_model_all_endpoints_2_0` to `_2_3` are new: the data plane of
+- `wildcard_model_all_endpoints_2_0` to `_2_4` are new: the data plane of
   each version must load every route of a `*` model. The model sets
   `[http, https, ws, wss]`, so it also gets `realtime`.
   - The 2.0, 2.1, and 2.2 cases pass.
   - The 2.3 case also has a mantle `bedrock` target. It fails only on the
     Gemini Interactions routes until a data plane release ships that API.
+  - The 2.4 case also has a togetherai target. It keeps the same Gemini
+    Interactions routes, so it has no recorded result yet.
 - `gemini_interactions_api` is new: the data plane accepts a `gemini`
   target on `llm/v1/responses` in the `gemini` format. It fails until a
   data plane release ships the Interactions API.
