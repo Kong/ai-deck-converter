@@ -1,0 +1,116 @@
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: openai-chat
+        paths:
+          - /routed/chat/completions
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-chat-2
+        paths:
+          - /default-tradeoff/chat/completions
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+plugins:
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 50000000
+      sources:
+        - body_path: model
+          source: body
+    route: openai-chat
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: intelligent
+        classifier:
+          auth:
+            header_name: Authorization
+            header_value: Bearer {vault://env/classifier-key}
+          context_window: 32768
+          format: /v1/systemone
+          name: jev-latest
+          timeout: 2000
+          type: custom
+          url: https://classifier.internal
+        cost_quality_tradeoff: 1
+        retries: 3
+      conversation_state:
+        enabled: true
+        strategy: local
+        ttl: 600
+      genai_category: text/generation
+      llm_format: openai
+      max_request_body_size: 50000000
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://env/openai-key}'
+          description: gpt-4o-mini
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: routed-model
+            name: gpt-4o-mini
+            provider: openai
+          route_type: llm/v1/chat
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://env/openai-key}'
+          description: gpt-4.1
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: routed-model
+            name: gpt-4.1
+            provider: openai
+          route_type: llm/v1/chat
+    route: openai-chat
+    model: routed-model
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 50000000
+      sources:
+        - body_path: model
+          source: body
+    route: openai-chat-2
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: intelligent
+        classifier:
+          context_window: 4096
+          format: /decide
+          name: jev-latest
+          type: custom
+          url: http://classifier.internal:8080
+        cost_quality_tradeoff: 0.5
+      genai_category: text/generation
+      llm_format: openai
+      max_request_body_size: 50000000
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://env/openai-key}'
+          description: gpt-4o-mini
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: default-tradeoff-model
+            name: gpt-4o-mini
+            provider: openai
+          route_type: llm/v1/chat
+    route: openai-chat-2
+    model: default-tradeoff-model
+ai_models:
+  - name: routed-model
+  - name: default-tradeoff-model

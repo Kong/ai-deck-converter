@@ -1,0 +1,178 @@
+_format_version: "3.0"
+_transform: false
+services:
+  - id: 947a4e23-b483-5a65-8165-da9aed24565b
+    name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    host: ai-gateway.upstream.local
+    port: 80
+    protocol: http
+routes:
+  - id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+    name: openai-chat
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /cheap/chat/completions
+    methods:
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+  - id: 2384fe9d-eacc-5ac2-ae4c-4752cc597f81
+    name: openai-chat-2
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /premium/chat/completions
+    methods:
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+plugins:
+  - id: 17fa8192-4b9f-5b5a-8379-20ad8bc836a7
+    name: ai-model-selector
+    config:
+      max_request_body_size: 50000000
+      sources:
+        - body_path: model
+          source: body
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+  - id: f3adc007-171c-5519-8763-3a0eef79bde3
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: intelligent
+        classifier:
+          auth:
+            header_name: Authorization
+            header_value: '{vault://env/classifier-key}'
+          context_window: 32768
+          format: /v1/systemone
+          name: jev-latest
+          timeout: 5000
+          type: custom
+          url: http://host.docker.internal:1
+        cost_quality_tradeoff: 0
+      conversation_state:
+        enabled: true
+        strategy: local
+      genai_category: text/generation
+      llm_format: openai
+      max_request_body_size: 50000000
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-4.1-mini
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: cheap-model
+            name: gpt-4.1-mini
+            options:
+              input_cost: 0.4
+              output_cost: 1.6
+              upstream_url: http://host.docker.internal:2
+            provider: openai
+          route_type: llm/v1/chat
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-4.1
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: cheap-model
+            name: gpt-4.1
+            options:
+              input_cost: 2
+              output_cost: 8
+              upstream_url: http://host.docker.internal:3
+            provider: openai
+          route_type: llm/v1/chat
+    route:
+      id: 8ae36805-da7a-55b9-b056-72bde6bb937d
+    model:
+      id: ec1da62e-5dfc-5fb6-b30e-2d59878a4d1d
+  - id: dcebfb31-cc0f-5469-b6d7-9d8807a4e8d2
+    name: ai-model-selector
+    config:
+      max_request_body_size: 50000000
+      sources:
+        - body_path: model
+          source: body
+    route:
+      id: 2384fe9d-eacc-5ac2-ae4c-4752cc597f81
+  - id: 75ff22ed-6245-594b-895f-6a9fa36f4581
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: intelligent
+        classifier:
+          auth:
+            header_name: Authorization
+            header_value: '{vault://env/classifier-key}'
+          context_window: 32768
+          format: /v1/systemone
+          name: jev-latest
+          timeout: 5000
+          type: custom
+          url: http://host.docker.internal:1
+        cost_quality_tradeoff: 1
+      conversation_state:
+        enabled: true
+        strategy: local
+      genai_category: text/generation
+      llm_format: openai
+      max_request_body_size: 50000000
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-4.1-mini
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: premium-model
+            name: gpt-4.1-mini
+            options:
+              input_cost: 0.4
+              output_cost: 1.6
+              upstream_url: http://host.docker.internal:2
+            provider: openai
+          route_type: llm/v1/chat
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-4.1
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: premium-model
+            name: gpt-4.1
+            options:
+              input_cost: 2
+              output_cost: 8
+              upstream_url: http://host.docker.internal:3
+            provider: openai
+          route_type: llm/v1/chat
+    route:
+      id: 2384fe9d-eacc-5ac2-ae4c-4752cc597f81
+    model:
+      id: e3e13590-7c91-5c77-9ef6-505107159737
+ai_models:
+  - id: ec1da62e-5dfc-5fb6-b30e-2d59878a4d1d
+    name: cheap-model
+  - id: e3e13590-7c91-5c77-9ef6-505107159737
+    name: premium-model

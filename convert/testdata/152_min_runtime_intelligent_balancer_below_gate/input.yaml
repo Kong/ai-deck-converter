@@ -1,0 +1,46 @@
+# A 2.4 data plane has no intelligent balancer. The intelligent model is left
+# out. The round-robin model still converts.
+models:
+  - name: routed-model
+    type: model
+    capabilities: [ generate ]
+    formats:
+      - type: openai
+    config:
+      route:
+        paths: [ /routed ]
+      balancer:
+        algorithm: intelligent
+        classifier:
+          type: custom
+          url: https://classifier.internal
+          format: /v1/systemone
+          name: jev-latest
+          context_window: 32768
+    targets:
+      - name: gpt-4o-mini
+        provider: openai-prod
+        config:
+          type: openai
+  - name: plain-model
+    type: model
+    capabilities: [ generate ]
+    formats:
+      - type: openai
+    config:
+      route:
+        paths: [ /plain ]
+    targets:
+      - name: gpt-4o-mini
+        provider: openai-prod
+        config:
+          type: openai
+model_providers:
+  - name: openai-prod
+    type: openai
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://env/openai-key}"

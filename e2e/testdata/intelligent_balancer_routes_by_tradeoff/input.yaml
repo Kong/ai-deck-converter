@@ -1,0 +1,98 @@
+# Two intelligent-balancer models over the same two targets. cheap-model
+# favors cost and premium-model favors quality. The harness rewrites the
+# target upstream_url values and the classifier url to its mock servers.
+models:
+  - name: cheap-model
+    type: model
+    capabilities: [ generate ]
+    formats:
+      - type: openai
+    config:
+      route:
+        paths: [ /cheap ]
+      balancer:
+        algorithm: intelligent
+        cost_quality_tradeoff: cost
+        session_affinity:
+          enabled: true
+          storage:
+            type: local
+        classifier:
+          type: custom
+          url: http://host.docker.internal:1
+          format: /v1/systemone
+          name: jev-latest
+          timeout: 5000
+          context_window: 32768
+          auth:
+            type: basic
+            headers:
+              - name: Authorization
+                value: "{vault://env/classifier-key}"
+    targets:
+      - name: gpt-4.1-mini
+        provider: openai-prod
+        config:
+          type: openai
+          upstream_url: http://host.docker.internal:2
+          input_cost: 0.4
+          output_cost: 1.6
+      - name: gpt-4.1
+        provider: openai-prod
+        config:
+          type: openai
+          upstream_url: http://host.docker.internal:3
+          input_cost: 2
+          output_cost: 8
+  - name: premium-model
+    type: model
+    capabilities: [ generate ]
+    formats:
+      - type: openai
+    config:
+      route:
+        paths: [ /premium ]
+      balancer:
+        algorithm: intelligent
+        cost_quality_tradeoff: quality
+        session_affinity:
+          enabled: true
+          storage:
+            type: local
+        classifier:
+          type: custom
+          url: http://host.docker.internal:1
+          format: /v1/systemone
+          name: jev-latest
+          timeout: 5000
+          context_window: 32768
+          auth:
+            type: basic
+            headers:
+              - name: Authorization
+                value: "{vault://env/classifier-key}"
+    targets:
+      - name: gpt-4.1-mini
+        provider: openai-prod
+        config:
+          type: openai
+          upstream_url: http://host.docker.internal:2
+          input_cost: 0.4
+          output_cost: 1.6
+      - name: gpt-4.1
+        provider: openai-prod
+        config:
+          type: openai
+          upstream_url: http://host.docker.internal:3
+          input_cost: 2
+          output_cost: 8
+model_providers:
+  - name: openai-prod
+    type: openai
+    display_name: OpenAI Prod
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://ai/openai-token}"

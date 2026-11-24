@@ -1,0 +1,74 @@
+# The intelligent balancer. The API enum cost_quality_tradeoff becomes a
+# number. version and strategy have no plugin field. The classifier auth
+# header becomes header_name and header_value.
+models:
+  - name: routed-model
+    type: model
+    capabilities: [ generate ]
+    formats:
+      - type: openai
+    config:
+      route:
+        paths: [ /routed ]
+      balancer:
+        algorithm: intelligent
+        version: v1
+        strategy: weighted
+        cost_quality_tradeoff: quality
+        retries: 3
+        session_affinity:
+          enabled: true
+          ttl: 600
+          storage:
+            type: local
+        classifier:
+          type: custom
+          url: https://classifier.internal
+          format: /v1/systemone
+          name: jev-latest
+          timeout: 2000
+          context_window: 32768
+          auth:
+            type: basic
+            headers:
+              - name: Authorization
+                value: "Bearer {vault://env/classifier-key}"
+    targets:
+      - name: gpt-4o-mini
+        provider: openai-prod
+        config:
+          type: openai
+      - name: gpt-4.1
+        provider: openai-prod
+        config:
+          type: openai
+  - name: default-tradeoff-model
+    type: model
+    capabilities: [ generate ]
+    formats:
+      - type: openai
+    config:
+      route:
+        paths: [ /default-tradeoff ]
+      balancer:
+        algorithm: intelligent
+        classifier:
+          type: custom
+          url: http://classifier.internal:8080
+          format: /decide
+          name: jev-latest
+          context_window: 4096
+    targets:
+      - name: gpt-4o-mini
+        provider: openai-prod
+        config:
+          type: openai
+model_providers:
+  - name: openai-prod
+    type: openai
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://env/openai-key}"
