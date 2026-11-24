@@ -5,4 +5,4 @@
     name: budget-status
     fields:
       - enabled
-  severity: ERROR
+  severity: WARNING

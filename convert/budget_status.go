@@ -32,7 +32,10 @@ func (c *Converter) convertBudgetStatus() {
 	src := issueSource(kindBudgetStatus, budgetStatusName)
 	c.convertEntity(src, func() error {
 		if !c.supports(aimap.FeatureBudgetStatus) {
-			return c.failUnsupported(src.at("enabled"), aimap.FeatureBudgetStatus, "budget_status")
+			// The plugin does not exist below the gate, so the endpoint stays
+			// out.
+			c.reportUnsupported(src.at("enabled"), Warning, aimap.FeatureBudgetStatus, "budget_status")
+			return errSkipEntity
 		}
 		if err := c.validateBudgetStatusOptions(src, b.Options); err != nil {
 			return err
