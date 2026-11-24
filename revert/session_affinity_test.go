@@ -37,3 +37,14 @@ func TestSessionAffinityFromConfig(t *testing.T) {
 		})
 	}
 }
+
+// Two plugins that differ only in conversation_state belong to different models.
+// The grouping compares modelProxyConfig, so it must keep the block.
+func TestModelProxyConfigKeepsConversationState(t *testing.T) {
+	t.Parallel()
+
+	local := map[string]any{"conversation_state": map[string]any{"strategy": "local"}}
+	redis := map[string]any{"conversation_state": map[string]any{"strategy": "redis"}}
+
+	require.NotEqual(t, modelProxyConfig(local), modelProxyConfig(redis))
+}

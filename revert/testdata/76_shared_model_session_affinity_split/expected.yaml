@@ -1,0 +1,66 @@
+models:
+  - type: model
+    name: gpt
+    capabilities:
+      - generate
+    formats:
+      - type: openai
+    targets:
+      - name: gpt-5.2
+        provider: openai-env
+        config:
+          type: openai
+    config:
+      route:
+        paths:
+          - /ai
+        methods:
+          - POST
+      logging:
+        payloads: false
+        statistics: true
+      balancer:
+        session_affinity:
+          enabled: true
+          storage:
+            type: local
+  - type: model
+    name: gpt-2
+    capabilities:
+      - embeddings
+    formats:
+      - type: openai
+    targets:
+      - name: text-embedding-3-large
+        provider: openai-env
+        config:
+          type: openai
+    config:
+      route:
+        paths:
+          - /ai
+        methods:
+          - POST
+        model:
+          values:
+            - gpt
+      logging:
+        payloads: false
+        statistics: true
+      balancer:
+        session_affinity:
+          enabled: true
+          storage:
+            host: redis.internal
+            port: 6379
+            type: redis
+          ttl: 600
+model_providers:
+  - type: openai
+    name: openai-env
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: Bearer {vault://env/openai-key}

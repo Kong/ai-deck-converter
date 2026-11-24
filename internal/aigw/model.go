@@ -20,7 +20,7 @@ type Model struct {
 }
 
 // ModelDatastoreRef references a top-level datastore by name. Purpose records
-// the model feature that uses the datastore: embeddings (the default) or
+// the model feature that uses the datastore: semantic-balancer (the default) or
 // session-affinity. Path is reserved and not honored yet.
 type ModelDatastoreRef struct {
 	Name    string  `yaml:"name"`

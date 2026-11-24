@@ -597,6 +597,7 @@ func (r *Reverter) modelGroupFor(
 // model config. Plugins with different values belong to different models.
 var modelProxyKeys = []string{
 	"max_request_body_size", "response_streaming", "proxy_config", "balancer", "vectordb", "embeddings",
+	"conversation_state",
 }
 
 // headerAgrees reports whether a plugin with cfg can join g by its
