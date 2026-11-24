@@ -1,0 +1,8 @@
+- code: UNSUPPORTED_IN_MIN_RUNTIME_VERSION
+  reason: 'config.balancer.algorithm: intelligent requires minimum runtime version "2.5", but the configured minimum is "2.4"'
+  source:
+    kind: model
+    name: routed-model
+    fields:
+      - config.balancer.algorithm
+  severity: ERROR

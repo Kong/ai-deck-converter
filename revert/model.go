@@ -1338,6 +1338,14 @@ func balancerFromConfig(cfg map[string]any, vectordb, embeddings, sessionAffinit
 			fields[k] = v
 		}
 	}
+	if algo == aimap.IntelligentAlgorithm {
+		if v, ok := fields["cost_quality_tradeoff"]; ok {
+			fields["cost_quality_tradeoff"] = aimap.CostQualityTradeoffFromPlugin(v)
+		}
+		if classifier, ok := fields["classifier"].(map[string]any); ok {
+			fields["classifier"] = aimap.ClassifierFromPlugin(classifier)
+		}
+	}
 	if vectordb != nil {
 		fields["vectordb"] = vectordb
 	}

@@ -70,6 +70,7 @@ func TestE2E(t *testing.T) {
 		{"token_vault_manager_session_enrollment", func(t *testing.T) { testTokenVaultManagerSessionEnrollment(t, license) }},
 		{"agent_targets_failover", func(t *testing.T) { testAgentTargetsFailover(t, license) }},
 		{"session_affinity_sticks_to_target", func(t *testing.T) { testSessionAffinitySticksToTarget(t, license) }},
+		{"intelligent_balancer_routes_by_tradeoff", func(t *testing.T) { testIntelligentBalancerRoutesByTradeoff(t, license) }},
 		{"model_body_size_2_3", func(t *testing.T) {
 			testModelBodySize(t, license, "model_body_size_2_3", "2.3", "kong/kong-ai-gateway:2.3.0", []bodySizeModel{
 				{name: "openai-default", limit: 8388608, selectorLimit: 8388608},

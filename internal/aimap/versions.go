@@ -16,7 +16,7 @@ type Version struct {
 var SupportFloor = mustVersion("2.0")
 
 // LatestVersion is the newest AI Gateway release that the converter knows.
-var LatestVersion = mustVersion("2.4")
+var LatestVersion = mustVersion("2.5")
 
 // versionPattern is the pattern of the Konnect min_runtime_version field. It
 // also rejects leading zeros, so each version has one spelling.
@@ -111,6 +111,8 @@ const (
 	// FeatureSessionAffinity is the model field config.balancer.session_affinity.
 	// It becomes the ai-proxy-advanced field conversation_state.
 	FeatureSessionAffinity Feature = "session-affinity"
+	// FeatureIntelligentBalancer is the model balancer algorithm intelligent.
+	FeatureIntelligentBalancer Feature = "intelligent-balancer"
 )
 
 // featureSince maps each feature to its first AI Gateway release. The source
@@ -145,6 +147,7 @@ var featureSince = map[Feature]Version{
 	FeatureSanitizerAllWithCredentials:   mustVersion("2.3"),
 	FeatureClonedPlugins:                 mustVersion("2.1"),
 	FeatureSessionAffinity:               mustVersion("2.4"),
+	FeatureIntelligentBalancer:           mustVersion("2.5"),
 }
 
 // Since returns the first AI Gateway release that has f. It panics for an

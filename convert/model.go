@@ -453,6 +453,12 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 				"model %q: the passthrough format cannot use the semantic balancer algorithm",
 				m.Name)
 		}
+		// The intelligent classifier reads the request body too.
+		if balancerAlgorithm(m.Config.Balancer) == aimap.IntelligentAlgorithm {
+			return c.fail(src.at("formats", "config.balancer.algorithm"), ConfigFieldInvalid,
+				"model %q: the passthrough format cannot use the intelligent balancer algorithm",
+				m.Name)
+		}
 		// Kong allows one plugin of a name per route, and without a selector nothing
 		// tells two ai-proxy-advanced plugins on one route apart. Two passthrough
 		// models whose routes match the same requests are just as ambiguous even when
@@ -1889,6 +1895,9 @@ func (c *Converter) checkModelFeatures(src ConversionIssueSource, m *aigw.Model)
 		return c.failUnsupported(src.at("config.balancer.session_affinity"), aimap.FeatureSessionAffinity,
 			"config.balancer.session_affinity")
 	}
+	if err := c.checkIntelligentBalancer(src, m); err != nil {
+		return err
+	}
 	if b := m.Config.Balancer; b != nil && !c.supports(aimap.FeatureFailoverHTTPCodes) {
 		criteria, _ := b.Fields["failover_criteria"].([]any)
 		for i, v := range criteria {
@@ -1971,7 +1980,74 @@ func (c *Converter) balancerConfig(b *aigw.Balancer) map[string]any {
 		algorithm = "round-robin"
 	}
 	cfg["algorithm"] = algorithm
+	if algorithm == aimap.IntelligentAlgorithm {
+		intelligentBalancerConfig(cfg)
+	}
 	return cfg
+}
+
+// intelligentBalancerConfig changes the intelligent balancer fields to the
+// ai-proxy-advanced form. checkIntelligentBalancer rejects the values that
+// cannot change.
+func intelligentBalancerConfig(cfg map[string]any) {
+	for _, key := range aimap.IntelligentAPIOnlyKeys {
+		delete(cfg, key)
+	}
+	tradeoff, ok := cfg["cost_quality_tradeoff"]
+	if !ok {
+		tradeoff = aimap.DefaultCostQualityTradeoff
+	}
+	if n, ok := aimap.CostQualityTradeoffToPlugin(tradeoff); ok {
+		cfg["cost_quality_tradeoff"] = n
+	}
+	if classifier, ok := cfg["classifier"].(map[string]any); ok {
+		cfg["classifier"] = aimap.ClassifierToPlugin(classifier)
+	}
+}
+
+// checkIntelligentBalancer fails the model when an intelligent balancer field
+// has no ai-proxy-advanced value. A strategy other than the data plane one
+// gives a warning, because the data plane has no strategy field.
+func (c *Converter) checkIntelligentBalancer(src ConversionIssueSource, m *aigw.Model) error {
+	b := m.Config.Balancer
+	if balancerAlgorithm(b) != aimap.IntelligentAlgorithm {
+		return nil
+	}
+	if !c.supports(aimap.FeatureIntelligentBalancer) {
+		return c.failUnsupported(src.at("config.balancer.algorithm"), aimap.FeatureIntelligentBalancer,
+			"config.balancer.algorithm: "+aimap.IntelligentAlgorithm)
+	}
+	if v, ok := b.Fields["version"]; ok && v != aimap.DefaultIntelligentVersion {
+		return c.fail(src.at("config.balancer.version"), ConfigFieldInvalid,
+			"model %q: intelligent balancer version %v is unknown", m.Name, v)
+	}
+	if v, ok := b.Fields["strategy"]; ok && v != aimap.DefaultIntelligentStrategy {
+		c.warn(src.at("config.balancer.strategy"), BehaviorMayDiffer,
+			"model %q: the data plane has no intelligent balancer strategy and uses %q, not %v",
+			m.Name, aimap.DefaultIntelligentStrategy, v)
+	}
+	if v, ok := b.Fields["cost_quality_tradeoff"]; ok {
+		if _, known := aimap.CostQualityTradeoffToPlugin(v); !known {
+			return c.fail(src.at("config.balancer.cost_quality_tradeoff"), ConfigFieldInvalid,
+				"model %q: cost_quality_tradeoff %v is not cost, balanced, quality or a number from 0 to 1",
+				m.Name, v)
+		}
+	}
+	classifier, ok := b.Fields["classifier"].(map[string]any)
+	if !ok {
+		return c.fail(src.at("config.balancer.classifier"), MissingRequiredConfigField,
+			"model %q: the intelligent balancer needs a classifier", m.Name)
+	}
+	if dropped := aimap.ClassifierAuthDropped(classifier); len(dropped) > 0 {
+		fields := make([]string, len(dropped))
+		for i, d := range dropped {
+			fields[i] = "config.balancer.classifier.auth." + d
+		}
+		c.warn(src.at(fields...), ConfigFieldDropped,
+			"model %q: the classifier auth keeps only its first header and drops %s",
+			m.Name, strings.Join(dropped, ", "))
+	}
+	return nil
 }
 
 // balancerExtra pulls a hoisted field out of the balancer block so it can be

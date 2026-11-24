@@ -68,6 +68,7 @@ var allFeatures = []Feature{
 	FeatureSanitizerAllWithCredentials,
 	FeatureClonedPlugins,
 	FeatureSessionAffinity,
+	FeatureIntelligentBalancer,
 }
 
 func TestFeatureTable(t *testing.T) {
