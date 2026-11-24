@@ -7,7 +7,16 @@
 > Release date: TBD
 
 ### Features
--
+
+- A model's `config.balancer.session_affinity` block now becomes the
+  `ai-proxy-advanced` `conversation_state` block, so a conversation sticks to the
+  target that served its first turn. The block needs AI Gateway 2.4+; an older
+  release reports `UNSUPPORTED_IN_MIN_RUNTIME_VERSION` and leaves the model out.
+  `session_affinity` on the `consistent-hashing` balancer is rejected, because that
+  algorithm has no affinity layer. A model's `datastores` list now carries a
+  `purpose` per entry (`semantic-balancer`, the default, or `session-affinity`), and
+  a `session-affinity` datastore replaces the inline Redis connection. A list with
+  one entry and no purpose converts as before.
 
 ### Bug Fixes
 

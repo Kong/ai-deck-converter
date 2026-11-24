@@ -142,6 +142,7 @@ type proxyGroup struct {
 	vectordb          any
 	datastoreName     string // datastore whose connection was injected into vectordb; empty when authored inline
 	tokenVault        map[string]any
+	conversationState map[string]any
 	embeddings        any
 	responseStreaming string
 	modelNameHeader   *bool
@@ -488,7 +489,11 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 	if modelScoped || passthrough {
 		ownerKey = m.Name
 	}
-	ds, err := c.resolveModelDatastore(src, m)
+	ds, affinityDS, err := c.resolveModelDatastores(src, m)
+	if err != nil {
+		return err
+	}
+	conversationState, err := c.modelConversationState(src, m, affinityDS)
 	if err != nil {
 		return err
 	}
@@ -757,6 +762,11 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 								"route-scoped ai-proxy-advanced would mix %s and %s",
 							m.Name, g.route.Name, existing, current)
 					}
+					if !reflect.DeepEqual(pg.conversationState, conversationState) {
+						return c.fail(src.at("config.balancer.session_affinity"), ConfigFieldInvalid,
+							"model %q cannot share route %q with another api model that uses "+
+								"a different balancer.session_affinity", m.Name, g.route.Name)
+					}
 					if !reflect.DeepEqual(pg.tokenVault, tokenVault) {
 						return c.fail(src.at("targets"), ConfigFieldInvalid,
 							"model %q cannot share route %q with another model that uses "+
@@ -812,6 +822,7 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 						vectordb:          vectordb,
 						datastoreName:     datastoreName,
 						tokenVault:        tokenVault,
+						conversationState: conversationState,
 						embeddings:        embeddings,
 						responseStreaming: m.Config.ResponseStreaming,
 						modelNameHeader:   modelNameHeader,
@@ -823,6 +834,10 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 							kong.FieldMapping{GeneratedPrefix: "config.model_name_header", SourcePrefix: "config.model.name_header"},
 							kong.FieldMapping{GeneratedPrefix: "config.vectordb", SourcePrefix: "config.balancer.vectordb"},
 							kong.FieldMapping{GeneratedPrefix: "config.embeddings", SourcePrefix: "config.balancer.embeddings"},
+							kong.FieldMapping{
+								GeneratedPrefix: "config.conversation_state",
+								SourcePrefix:    "config.balancer.session_affinity",
+							},
 						),
 						seen: map[string]int{},
 					}
@@ -1215,11 +1230,15 @@ func (c *Converter) convertVideoLifecycle(
 			Capabilities:     []string{"video"},
 		})
 	}
-	lifecycleDS, err := c.resolveModelDatastore(src, candidate.model)
+	lifecycleDS, lifecycleAffinity, err := c.resolveModelDatastores(src, candidate.model)
 	if err != nil {
 		return err
 	}
 	lifecycleVectorDB, err := c.modelVectorDB(src, candidate.model, lifecycleDS)
+	if err != nil {
+		return err
+	}
+	lifecycleConversationState, err := c.modelConversationState(src, candidate.model, lifecycleAffinity)
 	if err != nil {
 		return err
 	}
@@ -1230,6 +1249,7 @@ func (c *Converter) convertVideoLifecycle(
 		balancer:          c.balancerConfig(candidate.model.Config.Balancer),
 		vectordb:          lifecycleVectorDB,
 		tokenVault:        st.tokenVaults[candidate.model],
+		conversationState: lifecycleConversationState,
 		responseStreaming: candidate.model.Config.ResponseStreaming,
 		modelNameHeader:   boolPtr(false),
 		maxBodySize:       st.bodySizes[candidate.model],
@@ -1241,6 +1261,7 @@ func (c *Converter) convertVideoLifecycle(
 			kong.FieldMapping{GeneratedPrefix: "config.model_name_header", SourcePrefix: "config.model.name_header"},
 			kong.FieldMapping{GeneratedPrefix: "config.vectordb", SourcePrefix: "config.balancer.vectordb"},
 			kong.FieldMapping{GeneratedPrefix: "config.embeddings", SourcePrefix: "config.balancer.embeddings"},
+			kong.FieldMapping{GeneratedPrefix: "config.conversation_state", SourcePrefix: "config.balancer.session_affinity"},
 		),
 	}
 	c.out.Plugins = append(c.out.Plugins, kong.Plugin{
@@ -1701,6 +1722,9 @@ func (g *proxyGroup) proxyConfig() map[string]any {
 	if g.embeddings != nil {
 		cfg["embeddings"] = g.embeddings
 	}
+	if g.conversationState != nil {
+		cfg["conversation_state"] = g.conversationState
+	}
 	if g.responseStreaming != "" {
 		cfg["response_streaming"] = g.responseStreaming
 	}
@@ -1861,6 +1885,10 @@ func (c *Converter) checkModelFeatures(src ConversionIssueSource, m *aigw.Model)
 			return c.failUnsupported(src.at(field), f, fmt.Sprintf("%s: %s", field, format.Type))
 		}
 	}
+	if balancerExtra(m.Config.Balancer, "session_affinity") != nil && !c.supports(aimap.FeatureSessionAffinity) {
+		return c.failUnsupported(src.at("config.balancer.session_affinity"), aimap.FeatureSessionAffinity,
+			"config.balancer.session_affinity")
+	}
 	if b := m.Config.Balancer; b != nil && !c.supports(aimap.FeatureFailoverHTTPCodes) {
 		criteria, _ := b.Fields["failover_criteria"].([]any)
 		for i, v := range criteria {
@@ -1919,7 +1947,7 @@ func (c *Converter) supportedTargetOptions(opts map[string]any) map[string]any {
 
 // balancerHoisted are balancer-block fields that the plugin schema
 // expects as siblings of `balancer`, not nested inside it.
-var balancerHoisted = map[string]bool{"vectordb": true, "embeddings": true}
+var balancerHoisted = map[string]bool{"vectordb": true, "embeddings": true, "session_affinity": true}
 
 func (c *Converter) balancerConfig(b *aigw.Balancer) map[string]any {
 	if b == nil {
@@ -1946,8 +1974,8 @@ func (c *Converter) balancerConfig(b *aigw.Balancer) map[string]any {
 	return cfg
 }
 
-// balancerExtra pulls a hoisted field (vectordb/embeddings) out of the balancer
-// block so it can be emitted at the top level of the plugin config.
+// balancerExtra pulls a hoisted field out of the balancer block so it can be
+// emitted at the top level of the plugin config.
 func balancerExtra(b *aigw.Balancer, key string) any {
 	if b == nil {
 		return nil
@@ -1955,31 +1983,86 @@ func balancerExtra(b *aigw.Balancer, key string) any {
 	return b.Fields[key]
 }
 
-// resolveModelDatastore resolves m.Datastores (by-name references into the
-// top-level datastores list). An unknown name gives an Error issue, and the
-// model converts without the connection.
-func (c *Converter) resolveModelDatastore(src ConversionIssueSource, m *aigw.Model) (*aigw.Datastore, error) {
+// Model datastore purpose values. An empty purpose means the semantic balancer.
+const (
+	modelDatastorePurposeSemanticBalancer = "semantic-balancer"
+	modelDatastorePurposeSessionAffinity  = "session-affinity"
+)
+
+// normalizeModelDatastorePurpose returns the API spelling of a purpose. An
+// empty purpose means the semantic balancer.
+func normalizeModelDatastorePurpose(purpose string) string {
+	purpose = strings.ReplaceAll(purpose, "_", "-")
+	if purpose == "" {
+		return modelDatastorePurposeSemanticBalancer
+	}
+	return purpose
+}
+
+// resolveModelDatastores resolves the model datastore references. It returns
+// the vector store datastore and the session affinity datastore. An entry
+// without a purpose is embeddings, and each purpose holds at most one datastore.
+func (c *Converter) resolveModelDatastores(
+	src ConversionIssueSource, m *aigw.Model,
+) (embeddings, affinity *aigw.Datastore, err error) {
 	if len(m.Datastores) == 0 {
-		return nil, nil
+		return nil, nil, nil
 	}
-	if len(m.Datastores) > 1 {
-		return nil, c.fail(src.at("datastores"), ConfigFieldInvalid,
-			"model %q has %d datastores, but only one is allowed",
-			m.Name, len(m.Datastores))
+
+	embeddingsRef, affinityRef := -1, -1
+	for i, ref := range m.Datastores {
+		switch normalizeModelDatastorePurpose(ref.Purpose) {
+		case modelDatastorePurposeSemanticBalancer:
+			if embeddingsRef >= 0 {
+				return nil, nil, c.fail(src.at("datastores"), ConfigFieldInvalid,
+					"model %q has more than one datastore with purpose %q",
+					m.Name, modelDatastorePurposeSemanticBalancer)
+			}
+			embeddingsRef = i
+		case modelDatastorePurposeSessionAffinity:
+			if affinityRef >= 0 {
+				return nil, nil, c.fail(src.at("datastores"), ConfigFieldInvalid,
+					"model %q has more than one datastore with purpose %q",
+					m.Name, modelDatastorePurposeSessionAffinity)
+			}
+			affinityRef = i
+		default:
+			return nil, nil, c.fail(src.at("datastores"), ConfigFieldInvalid,
+				"model %q has unknown datastore purpose %q", m.Name, ref.Purpose)
+		}
 	}
-	if m.Config.Balancer == nil || m.Config.Balancer.Algorithm != "semantic" {
-		return nil, c.fail(src.at("datastores", "config.balancer.algorithm"), ConfigFieldInvalid,
-			"model %q references datastore %q, but datastores require the semantic balancer "+
-				"(set config.balancer.algorithm: semantic)",
-			m.Name, m.Datastores[0].Name)
+
+	if embeddingsRef >= 0 {
+		ref := m.Datastores[embeddingsRef]
+		if m.Config.Balancer == nil || m.Config.Balancer.Algorithm != "semantic" {
+			return nil, nil, c.fail(src.at("datastores", "config.balancer.algorithm"), ConfigFieldInvalid,
+				"model %q references datastore %q with purpose %q, but that purpose requires the "+
+					"semantic balancer (set config.balancer.algorithm: semantic)",
+				m.Name, ref.Name, modelDatastorePurposeSemanticBalancer)
+		}
+		embeddings = c.lookupModelDatastore(src, m, ref.Name,
+			fmt.Sprintf("datastores[%d].name", embeddingsRef))
 	}
-	ds := c.datastores[m.Datastores[0].Name]
+	if affinityRef >= 0 {
+		ref := m.Datastores[affinityRef]
+		affinity = c.lookupModelDatastore(src, m, ref.Name,
+			fmt.Sprintf("datastores[%d].name", affinityRef))
+	}
+	return embeddings, affinity, nil
+}
+
+// lookupModelDatastore resolves one reference. An unknown name gives an Error
+// issue, and the model converts without the connection.
+func (c *Converter) lookupModelDatastore(
+	src ConversionIssueSource, m *aigw.Model, name, field string,
+) *aigw.Datastore {
+	ds := c.datastores[name]
 	if ds == nil {
-		c.reportError(src.at("datastores[0].name"), UndefinedReference,
-			"model %q references unknown datastore %q", m.Name, m.Datastores[0].Name)
-		return nil, nil
+		c.reportError(src.at(field), UndefinedReference,
+			"model %q references unknown datastore %q", m.Name, name)
+		return nil
 	}
-	return ds, nil
+	return ds
 }
 
 // modelVectorDB lowers the model's balancer.vectordb to plugin shape, then
@@ -2015,6 +2098,118 @@ func (c *Converter) modelVectorDB(src ConversionIssueSource, m *aigw.Model, ds *
 			"model %q's datastore %q: %v", m.Name, ds.Name, err)
 	}
 	return out, nil
+}
+
+// modelConversationState changes balancer.session_affinity to the
+// ai-proxy-advanced conversation_state block. A session affinity datastore
+// overrides the inline Redis connection. The consistent-hashing balancer has
+// no affinity layer.
+func (c *Converter) modelConversationState(
+	src ConversionIssueSource, m *aigw.Model, affinityDS *aigw.Datastore,
+) (map[string]any, error) {
+	raw := balancerExtra(m.Config.Balancer, "session_affinity")
+	if balancerAlgorithm(m.Config.Balancer) == "consistent-hashing" {
+		if raw != nil || affinityDS != nil {
+			return nil, c.fail(src.at("config.balancer.session_affinity", "datastores"),
+				ConfigFieldInvalid,
+				"model %q sets session affinity on the consistent-hashing balancer, which has "+
+					"no session affinity layer", m.Name)
+		}
+		return nil, nil
+	}
+	if raw == nil {
+		if affinityDS != nil {
+			return nil, c.fail(src.at("datastores", "config.balancer.session_affinity"), ConfigFieldInvalid,
+				"model %q references a datastore with purpose %q, but the balancer has no "+
+					"session affinity block", m.Name, modelDatastorePurposeSessionAffinity)
+		}
+		return nil, nil
+	}
+	affinity, ok := raw.(map[string]any)
+	if !ok {
+		return nil, c.fail(src.at("config.balancer.session_affinity"), ConfigFieldInvalid,
+			"model %q's balancer.session_affinity is not a map", m.Name)
+	}
+
+	out := map[string]any{"strategy": "local"}
+	for _, key := range []string{"enabled", "ttl"} {
+		if v, ok := affinity[key]; ok {
+			out[key] = v
+		}
+	}
+	storage, _ := affinity["storage"].(map[string]any)
+	storageType, _ := storage["type"].(string)
+	if storageType != "redis" {
+		if storageType != "" && storageType != "local" {
+			return nil, c.fail(src.at("config.balancer.session_affinity.storage.type"),
+				ConfigFieldInvalid,
+				"model %q's session affinity storage type %q is unknown", m.Name, storageType)
+		}
+		if affinityDS != nil {
+			return nil, c.fail(src.at("config.balancer.session_affinity.storage"), ConfigFieldInvalid,
+				"model %q references a datastore with purpose %q, but the session affinity "+
+					"storage is not redis", m.Name, modelDatastorePurposeSessionAffinity)
+		}
+		return out, nil
+	}
+
+	ref, _ := storage["datastore"].(map[string]any)
+	legacyName, _ := ref["name"].(string)
+	if affinityDS != nil {
+		if legacyName != "" && legacyName != affinityDS.Name {
+			return nil, c.fail(src.at("config.balancer.session_affinity.storage.datastore.name",
+				"datastores"), ConfigFieldInvalid,
+				"model %q names datastore %q in the session affinity storage and datastore %q "+
+					"with purpose %q", m.Name, legacyName, affinityDS.Name,
+				modelDatastorePurposeSessionAffinity)
+		}
+		if affinityDS.Type != aimap.DatastoreTypeRedisEE {
+			return nil, c.fail(src.at("datastores"), ConfigFieldInvalid,
+				"model %q's session affinity datastore %q has type %q, expected %q",
+				m.Name, affinityDS.Name, affinityDS.Type, aimap.DatastoreTypeRedisEE)
+		}
+		out["strategy"] = "redis"
+		out["redis"] = maps.Clone(affinityDS.Config)
+		return out, nil
+	}
+
+	if legacyName != "" {
+		field := "config.balancer.session_affinity.storage.datastore.name"
+		ds := c.datastores[legacyName]
+		if ds == nil {
+			return nil, c.fail(src.at(field), UndefinedReference,
+				"model %q's balancer.session_affinity references unknown datastore %q", m.Name, legacyName)
+		}
+		if ds.Type != aimap.DatastoreTypeRedisEE {
+			return nil, c.fail(src.at(field), ConfigFieldInvalid,
+				"model %q's balancer.session_affinity datastore %q has type %q, expected %q",
+				m.Name, legacyName, ds.Type, aimap.DatastoreTypeRedisEE)
+		}
+		out["strategy"] = "redis"
+		out["redis"] = maps.Clone(ds.Config)
+		return out, nil
+	}
+
+	if inline := inlineRedisConfig(storage); len(inline) > 0 {
+		out["strategy"] = "redis"
+		out["redis"] = inline
+		return out, nil
+	}
+
+	return nil, c.fail(src.at("config.balancer.session_affinity.storage"), ConfigFieldInvalid,
+		"model %q's session affinity storage needs an inline redis connection or a datastore", m.Name)
+}
+
+// inlineRedisConfig returns the inline Redis connection from a session affinity
+// storage block. The type and datastore keys are not connection fields.
+func inlineRedisConfig(storage map[string]any) map[string]any {
+	out := map[string]any{}
+	for k, v := range storage {
+		if k != "type" && k != "datastore" {
+			out[k] = v
+		}
+	}
+	return out
 }
 
 func basePaths(m *aigw.Model) []string {
