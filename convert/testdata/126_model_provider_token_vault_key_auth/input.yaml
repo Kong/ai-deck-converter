@@ -1,7 +1,7 @@
 # The anthropic provider gets its credential from the Token Vault. A key-auth
 # model derives the inbound in its token-vault-exchange plugin. The models
-# cover the derived names, an explicit inbound, a body-only key, an inbound
-# block that names no location, and an outbound-only credential.
+# cover the derived names, an explicit inbound, a body-only key, an empty
+# inbound block, and an outbound-only credential.
 datastores:
   - name: vault-konnect-prod
     type: token-vault
@@ -109,8 +109,7 @@ models:
           type: anthropic
     access:
       auth_strategies: [api-key-multi]
-  # the inbound block names no location: it counts as unset, so the
-  # derivation applies
+  # the inbound block is empty: it counts as unset, so the derivation applies
   - name: claude-empty
     type: model
     capabilities: [generate]
@@ -168,7 +167,7 @@ model_providers:
       subject_token_type: api_key
       credential:
         outbound: {location: header, name: X-Upstream-Key, prefix: ""}
-  # the inbound block names no location: the derivation applies
+  # the inbound block is empty: the derivation applies
   - name: anthropic-empty
     type: anthropic
     datastores: [{name: vault-konnect-prod}]

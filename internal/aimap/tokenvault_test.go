@@ -357,7 +357,10 @@ func TestTokenVaultPluginNeedsInbound(t *testing.T) {
 		map[string]any{"credential": map[string]any{}}), "an empty credential block")
 	require.True(t, TokenVaultPluginNeedsInbound(
 		map[string]any{"credential": map[string]any{"inbound": map[string]any{}}}),
-		"an inbound block that names no location counts as unset")
+		"an empty inbound block counts as unset")
+	require.False(t, TokenVaultPluginNeedsInbound(
+		map[string]any{"credential": map[string]any{"inbound": map[string]any{"name": "apikey"}}}),
+		"a block with fields is user-set content, even without a location")
 	require.False(t, TokenVaultPluginNeedsInbound(map[string]any{"credential": map[string]any{
 		"inbound": map[string]any{"location": "header", "name": "apikey"},
 	}}), "an inbound block with a location is explicit")

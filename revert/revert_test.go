@@ -502,7 +502,7 @@ services:
 	require.Contains(t, strings.Join(warnings, "\n"),
 		"token-vault-exchange plugin has no credential.inbound")
 
-	// An inbound block that names no location counts as unset: the exchange
+	// An empty inbound block counts as unset: the exchange
 	// would keep the default, so the warning fires for it too.
 	emptyInbound := []byte(strings.Replace(string(in),
 		"storage: {backend: konnect}",

@@ -594,8 +594,7 @@ func TestDeriveExchangeInboundFirstHeaderStrategy(t *testing.T) {
 	require.Equal(t, "second-key", in["name"], "the header strategy is derived")
 	require.Empty(t, c.issues, "the derived default is silent")
 
-	// An inbound block that names no location counts as unset: the
-	// derivation still applies.
+	// An empty inbound block counts as unset: the derivation still applies.
 	c = &Converter{authStrategies: map[string]*aigw.AuthStrategy{
 		"header-key": {
 			Name: "header-key", Type: "key-auth",
