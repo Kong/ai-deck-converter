@@ -17,6 +17,17 @@ services:
           - POST
           - OPTIONS
         strip_path: false
+      - name: openai-responses-lifecycle
+        paths:
+          - ~/meta/responses/.+
+        methods:
+          - GET
+          - POST
+          - DELETE
+          - OPTIONS
+        strip_path: false
+        tags:
+          - aigw:responses-lifecycle
       - name: anthropic-messages
         paths:
           - /meta/v1/messages
@@ -81,6 +92,25 @@ plugins:
           route_type: llm/v1/responses
     route: openai-responses
     model: muse-spark
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: Bearer {vault://ai/meta-token}
+          description: muse-spark-1.3
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: muse-spark-1.3
+            provider: meta
+          route_type: llm/v1/responses
+    route: openai-responses-lifecycle
   - name: ai-model-selector
     config:
       max_request_body_size: 8388608
