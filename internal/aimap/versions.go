@@ -214,11 +214,11 @@ func FormatFeature(format string) (Feature, bool) {
 }
 
 var providerFeatures = map[string]Feature{
-	TypesafeProviderType:  FeatureTypesafe,
-	BasetenProviderType:   FeatureBaseten,
-	FireworksProviderType: FeatureFireworks,
-	SagemakerProviderType: FeatureSagemaker,
-	MetaProviderType:      FeatureMeta,
+	TypesafeProviderType:   FeatureTypesafe,
+	BasetenProviderType:    FeatureBaseten,
+	FireworksProviderType:  FeatureFireworks,
+	SagemakerProviderType:  FeatureSagemaker,
+	MetaProviderType:       FeatureMeta,
 	TogetheraiProviderType: FeatureTogetherai,
 }
 
