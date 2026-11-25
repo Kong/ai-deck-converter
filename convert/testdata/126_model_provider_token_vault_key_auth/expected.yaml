@@ -52,6 +52,13 @@ services:
           - POST
           - OPTIONS
         strip_path: false
+      - name: anthropic-messages-8
+        paths:
+          - /ai/claude-hidden/v1/messages
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
 routes:
   - name: token-vault-callback-handler
     paths:
@@ -359,6 +366,48 @@ plugins:
       subject_token_type: api_key
     route: anthropic-messages-7
     model: claude-outbound
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 32000000
+      sources:
+        - body_path: model
+          source: body
+    route: anthropic-messages-8
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      max_request_body_size: 32000000
+      targets:
+        - description: claude-sonnet
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: claude-hidden
+            name: claude-sonnet
+            options:
+              anthropic_version: "2023-06-01"
+            provider: anthropic
+          route_type: llm/v1/chat
+    route: anthropic-messages-8
+    model: claude-hidden
+  - name: token-vault-exchange
+    config:
+      credential:
+        inbound:
+          location: header
+          name: hidden-key
+          prefix: ""
+      directory: my-directory
+      provider: anthropic
+      storage:
+        backend: konnect
+      subject_token_type: api_key
+    route: anthropic-messages-8
+    model: claude-hidden
   - name: key-auth
     route: anthropic-messages
   - name: key-auth
@@ -383,6 +432,12 @@ plugins:
     route: anthropic-messages-6
   - name: key-auth
     route: anthropic-messages-7
+  - name: key-auth
+    config:
+      hide_credentials: false
+      key_names:
+        - hidden-key
+    route: anthropic-messages-8
 ai_models:
   - name: claude
   - name: claude-custom
@@ -391,3 +446,4 @@ ai_models:
   - name: claude-multi
   - name: claude-empty
   - name: claude-outbound
+  - name: claude-hidden

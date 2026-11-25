@@ -6,3 +6,11 @@
     fields:
       - targets[0].provider.token_vault.credential.inbound
   severity: WARNING
+- code: CONFIG_FIELD_OVERRIDDEN
+  reason: auth strategy "api-key-hidden" sets config.hide_credentials to true. On a route that uses a Token Vault, hide_credentials will be overridden to false, because the Token Vault reads the credential of the caller from the request.
+  source:
+    kind: auth_strategy
+    name: api-key-hidden
+    fields:
+      - config.hide_credentials
+  severity: WARNING
