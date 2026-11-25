@@ -1,0 +1,35 @@
+# KOKO-4862. Together AI is an OpenAI-compatible provider that also serves the
+# Anthropic Messages API. It needs AI Gateway 2.4.
+model_providers:
+  - name: togetherai-prod
+    type: togetherai
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: Bearer {vault://ai/togetherai-token}
+models:
+  - name: together-chat
+    type: model
+    capabilities: [generate, agentic]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/together]}
+    targets:
+      - name: Llama-3.3-70B-Instruct-Turbo
+        provider: togetherai-prod
+        config:
+          input_cost: 0.5
+          output_cost: 1.5
+  - name: together-messages
+    type: model
+    capabilities: [generate]
+    formats: [{type: anthropic}]
+    config:
+      route: {paths: [/together-messages]}
+    targets:
+      - name: Llama-3.3-70B-Instruct-Turbo
+        provider: togetherai-prod
+        config:
+          upstream_url: https://api.together.ai/v1/messages

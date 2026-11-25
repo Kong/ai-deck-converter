@@ -87,6 +87,7 @@ const (
 	FeatureBedrockRuntimeResponses    Feature = "bedrock-runtime-responses"
 	FeatureBaseten                    Feature = "baseten"
 	FeatureFireworks                  Feature = "fireworks"
+	FeatureTogetherai                 Feature = "togetherai"
 	FeatureSagemaker                  Feature = "sagemaker"
 	FeatureAuthStrategyTokenVault     Feature = "auth-strategy-token-vault"
 	FeatureAgentTargets               Feature = "agent-targets"
@@ -140,6 +141,7 @@ var featureSince = map[Feature]Version{
 	FeatureBedrockRuntimeResponses:       mustVersion("2.3"),
 	FeatureBaseten:                       mustVersion("2.3"),
 	FeatureFireworks:                     mustVersion("2.4"),
+	FeatureTogetherai:                    mustVersion("2.4"),
 	FeatureSagemaker:                     mustVersion("2.1"),
 	FeatureAuthStrategyTokenVault:        mustVersion("2.3"),
 	FeatureAgentTargets:                  mustVersion("2.4"),
@@ -190,6 +192,8 @@ const (
 	BasetenProviderType = "baseten"
 	// FireworksProviderType is the provider type that FeatureFireworks gates.
 	FireworksProviderType = "fireworks"
+	// TogetheraiProviderType is the provider type that FeatureTogetherai gates.
+	TogetheraiProviderType = "togetherai"
 	// SagemakerProviderType is the provider type that FeatureSagemaker gates.
 	SagemakerProviderType = "sagemaker"
 )
@@ -206,10 +210,11 @@ func FormatFeature(format string) (Feature, bool) {
 }
 
 var providerFeatures = map[string]Feature{
-	TypesafeProviderType:  FeatureTypesafe,
-	BasetenProviderType:   FeatureBaseten,
-	FireworksProviderType: FeatureFireworks,
-	SagemakerProviderType: FeatureSagemaker,
+	TypesafeProviderType:   FeatureTypesafe,
+	BasetenProviderType:    FeatureBaseten,
+	FireworksProviderType:  FeatureFireworks,
+	TogetheraiProviderType: FeatureTogetherai,
+	SagemakerProviderType:  FeatureSagemaker,
 }
 
 // ProviderFeature returns the feature that gates the provider type.

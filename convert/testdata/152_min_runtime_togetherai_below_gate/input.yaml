@@ -1,0 +1,40 @@
+# KOKO-4862. At 2.3 a togetherai target is left out. A mixed model keeps its
+# other target. A togetherai-only model fails.
+model_providers:
+  - name: togetherai-prod
+    type: togetherai
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: Bearer {vault://ai/togetherai-token}
+  - name: openai-prod
+    type: openai
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: Bearer {vault://ai/openai-token}
+models:
+  - name: mixed-gpt
+    type: model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/mixed]}
+    targets:
+      - name: gpt-4.1-mini
+        provider: openai-prod
+      - name: Llama-3.3-70B-Instruct-Turbo
+        provider: togetherai-prod
+  - name: together-only
+    type: model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/only]}
+    targets:
+      - name: Llama-3.3-70B-Instruct-Turbo
+        provider: togetherai-prod

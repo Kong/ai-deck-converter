@@ -65,6 +65,10 @@ func TestE2E(t *testing.T) {
 			testWildcardModelAllEndpoints(t, license, "wildcard_model_all_endpoints_2_3", "2.3",
 				"kong/kong-ai-gateway:2.3.0")
 		}},
+		{"wildcard_model_all_endpoints_2_4", func(t *testing.T) {
+			testWildcardModelAllEndpoints(t, license, "wildcard_model_all_endpoints_2_4", "2.4",
+				"kong/kong-ai-gateway-dev:latest")
+		}},
 		{"token_vault_exchange_credential_placement", func(t *testing.T) { testTokenVaultExchangeCredentialPlacement(t, license) }},
 		{"token_vault_callback_oidc_enrollment", func(t *testing.T) { testTokenVaultCallbackOIDCEnrollment(t, license) }},
 		{"token_vault_manager_session_enrollment", func(t *testing.T) { testTokenVaultManagerSessionEnrollment(t, license) }},

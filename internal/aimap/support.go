@@ -26,14 +26,16 @@ type Target struct {
 }
 
 // supportedRouteTypes copies SUPPORTED_ROUTE_TYPES of
-// kong/llm/schemas/init.lua for AI Gateway 2.3. A route type with no row
-// accepts every provider. The Responses row also needs the format rule in
-// TargetSupports. Gemini reaches it through GeminiInteractions.
+// kong/llm/schemas/init.lua for AI Gateway 2.3, plus togetherai at 2.4. A
+// route type with no row accepts every provider. The Responses row also
+// needs the format rule in TargetSupports. Gemini reaches it through
+// GeminiInteractions.
 var supportedRouteTypes = map[string][]string{
 	"llm/v1/chat": {
 		"openai", "azure", "anthropic", "cohere", "mistral", "llama2", "gemini", "bedrock",
 		"databricks", "huggingface", "dashscope", "xai", "cerebras", "vllm", "deepseek",
 		"ollama", "kimi", "vercel", "sagemaker", "typesafe", "baseten", "fireworks",
+		"togetherai",
 	},
 	"llm/v1/completions": {
 		"openai", "azure", "anthropic", "cohere", "mistral", "llama2", "gemini", "bedrock",
@@ -43,7 +45,7 @@ var supportedRouteTypes = map[string][]string{
 		"openai", "azure", "cohere", "mistral", "llama2", "gemini", "bedrock", "databricks",
 		"huggingface", "dashscope", "ollama", "vercel",
 	},
-	"llm/v1/responses":              {"openai", "azure", "xai", "vercel", "bedrock", "fireworks"},
+	"llm/v1/responses":              {"openai", "azure", "xai", "vercel", "bedrock", "fireworks", "togetherai"},
 	"llm/v1/assistants":             {"openai", "azure"},
 	"llm/v1/batches":                {"openai", "azure", "bedrock", "anthropic", "gemini", "kimi"},
 	"llm/v1/files":                  {"openai", "azure", "kimi"},

@@ -1,0 +1,155 @@
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    routes:
+      - name: openai-chat
+        paths:
+          - /together/chat/completions
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-responses
+        paths:
+          - /together/responses
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: openai-responses-lifecycle
+        paths:
+          - ~/together/responses/.+
+        methods:
+          - GET
+          - POST
+          - DELETE
+          - OPTIONS
+        strip_path: false
+        tags:
+          - aigw:responses-lifecycle
+      - name: anthropic-messages
+        paths:
+          - /together-messages/v1/messages
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+plugins:
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-chat
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: Bearer {vault://ai/togetherai-token}
+          description: Llama-3.3-70B-Instruct-Turbo
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: together-chat
+            name: Llama-3.3-70B-Instruct-Turbo
+            options:
+              input_cost: 0.5
+              output_cost: 1.5
+            provider: togetherai
+          route_type: llm/v1/chat
+    route: openai-chat
+    model: together-chat
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: openai-responses
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: Bearer {vault://ai/togetherai-token}
+          description: Llama-3.3-70B-Instruct-Turbo
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: together-chat
+            name: Llama-3.3-70B-Instruct-Turbo
+            options:
+              input_cost: 0.5
+              output_cost: 1.5
+            provider: togetherai
+          route_type: llm/v1/responses
+    route: openai-responses
+    model: together-chat
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: openai
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: Bearer {vault://ai/togetherai-token}
+          description: Llama-3.3-70B-Instruct-Turbo
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            name: Llama-3.3-70B-Instruct-Turbo
+            options:
+              input_cost: 0.5
+              output_cost: 1.5
+            provider: togetherai
+          route_type: llm/v1/responses
+    route: openai-responses-lifecycle
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 8388608
+      sources:
+        - body_path: model
+          source: body
+    route: anthropic-messages
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: Bearer {vault://ai/togetherai-token}
+          description: Llama-3.3-70B-Instruct-Turbo
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: together-messages
+            name: Llama-3.3-70B-Instruct-Turbo
+            options:
+              upstream_url: https://api.together.ai/v1/messages
+            provider: togetherai
+          route_type: llm/v1/chat
+    route: anthropic-messages
+    model: together-messages
+ai_models:
+  - name: together-chat
+  - name: together-messages
