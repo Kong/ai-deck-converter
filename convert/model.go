@@ -773,6 +773,11 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 							"model %q cannot share route %q with another api model that uses "+
 								"a different balancer.session_affinity", m.Name, g.route.Name)
 					}
+					if !reflect.DeepEqual(pg.balancer, c.balancerConfig(m.Config.Balancer)) {
+						return c.fail(src.at("config.balancer"), ConfigFieldInvalid,
+							"model %q cannot share route %q with another model that uses "+
+								"a different balancer", m.Name, g.route.Name)
+					}
 					if !reflect.DeepEqual(pg.tokenVault, tokenVault) {
 						return c.fail(src.at("targets"), ConfigFieldInvalid,
 							"model %q cannot share route %q with another model that uses "+
