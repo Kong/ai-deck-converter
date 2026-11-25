@@ -1,6 +1,7 @@
 package revert
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -159,4 +160,108 @@ func loadForwardOptions(t *testing.T, dir string) forwardOptions {
 	require.NoError(t, err, "read options")
 	require.NoError(t, yaml.Unmarshal(data, &opts), "parse options")
 	return opts
+}
+
+func TestStargateOverrideMatchesOneEndpointDefault(t *testing.T) {
+	t.Parallel()
+	src, err := os.ReadFile("../convert/testdata/153_kong_stargate/input.yaml")
+	require.NoError(t, err)
+	input := strings.ReplaceAll(string(src), "type: kong-stargate}",
+		"type: kong-stargate, upstream_url: 'https://us.inference.konghq.com/v1/chat/completions'}")
+	defaultTarget := strings.SplitN(string(src), "    targets:\n", 2)[1]
+	overrideTarget := strings.SplitN(input, "    targets:\n", 2)[1]
+	prefix := strings.SplitN(input, "    targets:\n", 2)[0] + "    targets:\n"
+	for _, tc := range []struct{ name, input string }{
+		{"override only", input},
+		{"override first", prefix + overrideTarget + defaultTarget},
+		{"default first", prefix + defaultTarget + overrideTarget},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			opts := convert.Options{MinRuntimeVersion: "2.4"}
+			first, err := convert.Convert([]byte(tc.input), opts)
+			require.NoError(t, err)
+			require.Empty(t, first.Issues)
+			deck, err := first.Output.ToYAML()
+			require.NoError(t, err)
+			restored, warnings, err := Revert(deck, Options{})
+			require.NoError(t, err)
+			require.Empty(t, warnings)
+			second, err := convert.Convert(restored, opts)
+			require.NoError(t, err)
+			reconverted, err := second.Output.ToYAML()
+			require.NoError(t, err)
+			require.Equal(t, string(deck), string(reconverted))
+		})
+	}
+}
+
+func TestStargateRoundTripPreservesInterleavedTargetOrder(t *testing.T) {
+	t.Parallel()
+
+	src, err := os.ReadFile("../convert/testdata/153_kong_stargate/input.yaml")
+	require.NoError(t, err)
+	prefix, defaultTarget, found := strings.Cut(string(src), "    targets:\n")
+	require.True(t, found)
+	prefix += "    targets:\n"
+	middle := strings.Replace(defaultTarget, "kong/model", "kong/middle", 1)
+	opts := convert.Options{MinRuntimeVersion: "2.4"}
+
+	for _, endpoint := range []string{"chat/completions", "responses", "messages"} {
+		override := strings.Replace(defaultTarget, "type: kong-stargate}",
+			"type: kong-stargate, upstream_url: 'https://us.inference.konghq.com/v1/"+endpoint+"'}", 1)
+		for _, tc := range []struct{ name, targets string }{
+			{"default first", defaultTarget + middle + override},
+			{"override first", override + middle + defaultTarget},
+		} {
+			t.Run(endpoint+"/"+tc.name, func(t *testing.T) {
+				first, err := convert.Convert([]byte(prefix+tc.targets), opts)
+				require.NoError(t, err)
+				require.Empty(t, first.Issues)
+				before, err := first.Output.ToYAML()
+				require.NoError(t, err)
+				restored, warnings, err := Revert(before, Options{})
+				require.NoError(t, err)
+				require.Empty(t, warnings)
+				second, err := convert.Convert(restored, opts)
+				require.NoError(t, err)
+				after, err := second.Output.ToYAML()
+				require.NoError(t, err)
+				require.Equal(t, string(before), string(after))
+			})
+		}
+	}
+}
+
+func TestStargateRoundTripWithAllDefaultURLOverrides(t *testing.T) {
+	t.Parallel()
+
+	src, err := os.ReadFile("../convert/testdata/153_kong_stargate/input.yaml")
+	require.NoError(t, err)
+	prefix, defaultTarget, found := strings.Cut(string(src), "    targets:\n")
+	require.True(t, found)
+	prefix += "    targets:\n"
+	var overrides []string
+	for _, endpoint := range []string{"chat/completions", "responses", "messages"} {
+		overrides = append(overrides, strings.Replace(defaultTarget, "type: kong-stargate}",
+			"type: kong-stargate, upstream_url: 'https://us.inference.konghq.com/v1/"+endpoint+"'}", 1))
+	}
+	opts := convert.Options{MinRuntimeVersion: "2.4"}
+	for i := 0; i <= len(overrides); i++ {
+		t.Run(fmt.Sprintf("default position %d", i), func(t *testing.T) {
+			input := prefix + strings.Join(overrides[:i], "") + defaultTarget + strings.Join(overrides[i:], "")
+			first, err := convert.Convert([]byte(input), opts)
+			require.NoError(t, err)
+			require.Empty(t, first.Issues)
+			before, err := first.Output.ToYAML()
+			require.NoError(t, err)
+			restored, warnings, err := Revert(before, Options{})
+			require.NoError(t, err)
+			require.Empty(t, warnings)
+			second, err := convert.Convert(restored, opts)
+			require.NoError(t, err)
+			after, err := second.Output.ToYAML()
+			require.NoError(t, err)
+			require.Equal(t, string(before), string(after))
+		})
+	}
 }

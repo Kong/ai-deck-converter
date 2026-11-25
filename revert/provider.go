@@ -212,7 +212,9 @@ func defoldOptions(options map[string]any, providerType string, d *defoldedTarge
 // provider-level pieces.
 func defoldTarget(target map[string]any, providerType string) defoldedTarget {
 	var d defoldedTarget
-	d.auth, d.allowOverride = defoldAuth(getMap(target, "auth"), providerType)
+	if providerType != aimap.KongStargateProvider {
+		d.auth, d.allowOverride = defoldAuth(getMap(target, "auth"), providerType)
+	}
 	defoldOptions(getMap(getMap(target, "model"), "options"), providerType, &d)
 	return d
 }
@@ -240,6 +242,9 @@ func (r *Reverter) providerFor(providerType string, d *defoldedTarget) string {
 			Service:   d.service,
 			ProjectID: d.projectID,
 		},
+	}
+	if providerType == aimap.KongStargateProvider {
+		p.Config.Region = aimap.KongStargateLaunchRegion
 	}
 	if d.foundryResource != "" || d.foundryDomain != "" {
 		p.Config.Foundry = &aigw.AzureFoundry{

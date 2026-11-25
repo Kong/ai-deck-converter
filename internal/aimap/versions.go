@@ -79,8 +79,9 @@ const (
 	FeatureFailoverHTTPCodes          Feature = "failover-http-codes"
 	FeatureBedrockVPCEndpoint         Feature = "bedrock-vpc-endpoint"
 	FeatureBedrockEndpointType        Feature = "bedrock-endpoint-type"
-	FeatureMCPTokenVault              Feature = "mcp-token-vault"      //nolint:gosec // a feature name, not a credential
-	FeatureProviderTokenVault         Feature = "provider-token-vault" //nolint:gosec // a feature name, not a credential
+	FeatureMCPTokenVault              Feature = "mcp-token-vault" //nolint:gosec // a feature name, not a credential
+	FeatureKongStargate               Feature = "kong-stargate"
+	FeatureProviderTokenVault         Feature = "provider-token-vault"
 	FeatureMCPRateLimiting            Feature = "mcp-rate-limiting"
 	FeatureMCPACLWhen                 Feature = "mcp-acl-when"
 	FeatureGeminiAgenticCapability    Feature = "gemini-agentic-capability"
@@ -131,6 +132,7 @@ var featureSince = map[Feature]Version{
 	FeatureBedrockVPCEndpoint:            mustVersion("2.3"),
 	FeatureBedrockEndpointType:           mustVersion("2.3"),
 	FeatureMCPTokenVault:                 mustVersion("2.3"),
+	FeatureKongStargate:                  mustVersion("2.4"),
 	FeatureProviderTokenVault:            mustVersion("2.3"),
 	FeatureMCPRateLimiting:               mustVersion("2.3"),
 	FeatureMCPACLWhen:                    mustVersion("2.3"),
@@ -204,6 +206,7 @@ func FormatFeature(format string) (Feature, bool) {
 var providerFeatures = map[string]Feature{
 	TypesafeProviderType:  FeatureTypesafe,
 	BasetenProviderType:   FeatureBaseten,
+	KongStargateProvider:  FeatureKongStargate,
 	SagemakerProviderType: FeatureSagemaker,
 }
 

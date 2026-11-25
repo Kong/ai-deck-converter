@@ -531,6 +531,9 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 		tm := &m.TargetModels[j]
 		provider, providerType, problem := c.checkTarget(m, j)
 		if problem != nil {
+			if problem.blocking {
+				return c.fail(src.at(problem.field), problem.code, "%s", problem.reason)
+			}
 			c.warn(src.at(problem.field), problem.code, "%s", problem.reason)
 			continue
 		}
@@ -610,6 +613,7 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 	// routed holds the capabilities that got a route. collapsed holds the
 	// first genai category collision of each capability.
 	routed := map[string]bool{}
+	routedTargets := map[int]bool{}
 	type collision struct{ category, route, existing string }
 	collapsed := map[string]collision{}
 	var collapsedOrder []string
@@ -858,6 +862,7 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 					continue
 				}
 				routed[capability] = true
+				routedTargets[j] = true
 				if lifecycle && !slices.Contains(pg.lifecycleProviders, provider.Name) {
 					// Every target on a lifecycle route sits in the one
 					// "<default>" pool, so the balancer picks between them
@@ -893,7 +898,11 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 				// A passthrough target carries no model_alias either (the plugin refuses
 				// it): fkScoped leaves pluginAliases empty, so emission never stamps one.
 				target := c.buildTarget(tm, provider, providerType, spec.RouteType, logging)
-				setEndpointUpstreamURL(target, sec, spec, tm)
+				if providerType == aimap.KongStargateProvider {
+					setKongStargateUpstreamURL(target, sec, spec, provider.Config.Region)
+				} else {
+					setEndpointUpstreamURL(target, sec, spec, tm)
+				}
 				// Dedup on the built target's full shape rather than
 				// (name, route_type): two targets can share a model name yet
 				// be genuinely distinct via different providers (distinct
@@ -937,6 +946,13 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 				"serves genai_category %q; a single ai-proxy-advanced cannot serve multiple genai "+
 				"categories, skipping this capability",
 			m.Name, capability, col.category, col.route, col.existing)
+	}
+
+	for _, target := range targets {
+		if target.providerType == aimap.KongStargateProvider && !routedTargets[target.index] {
+			return c.fail(src.at(fmt.Sprintf("targets[%d]", target.index)), ConfigFieldInvalid,
+				"model %q has no usable endpoint for Stargate target %q", m.Name, target.tm.Name)
+		}
 	}
 
 	st.tokenVaults[m] = tokenVault
@@ -1466,9 +1482,10 @@ func (c *Converter) videoLifecycleCandidates(skipped map[int][]ConversionIssue) 
 
 // targetProblem tells why checkTarget leaves out a target.
 type targetProblem struct {
-	field  string
-	code   ConversionIssueCode
-	reason string
+	blocking bool
+	field    string
+	code     ConversionIssueCode
+	reason   string
 }
 
 // checkTarget resolves the provider of target j of m. It returns a problem when
@@ -1478,15 +1495,17 @@ func (c *Converter) checkTarget(m *aigw.Model, j int) (*aigw.Provider, string, *
 	provider := c.providers[tm.Provider]
 	if tm.Provider == "" {
 		return nil, "", &targetProblem{
-			field:  fmt.Sprintf("targets[%d].provider", j),
-			code:   MissingRequiredConfigField,
-			reason: fmt.Sprintf("model %q target %q has no provider; the target is omitted", m.Name, tm.Name),
+			blocking: tm.Config.Type == aimap.KongStargateProvider,
+			field:    fmt.Sprintf("targets[%d].provider", j),
+			code:     MissingRequiredConfigField,
+			reason:   fmt.Sprintf("model %q target %q has no provider; the target is omitted", m.Name, tm.Name),
 		}
 	}
 	if provider == nil {
 		return nil, "", &targetProblem{
-			field: fmt.Sprintf("targets[%d].provider", j),
-			code:  UndefinedReference,
+			blocking: tm.Config.Type == aimap.KongStargateProvider,
+			field:    fmt.Sprintf("targets[%d].provider", j),
+			code:     UndefinedReference,
 			reason: fmt.Sprintf("model %q target %q references unknown provider %q; the target is omitted",
 				m.Name, tm.Name, tm.Provider),
 		}
@@ -1508,10 +1527,27 @@ func (c *Converter) checkTarget(m *aigw.Model, j int) (*aigw.Provider, string, *
 			field = fmt.Sprintf("targets[%d].provider", j)
 		}
 		return nil, "", &targetProblem{
-			field: field,
-			code:  UnsupportedInMinRuntimeVersion,
+			blocking: providerType == aimap.KongStargateProvider || provider.Type == aimap.KongStargateProvider,
+			field:    field,
+			code:     UnsupportedInMinRuntimeVersion,
 			reason: unsupportedReason(f, "provider type "+providerType, c.minRuntimeVersion) +
 				"; the target is omitted",
+		}
+	}
+	if providerType == aimap.KongStargateProvider || provider.Type == aimap.KongStargateProvider {
+		if isPassthrough(m) {
+			return nil, "", &targetProblem{
+				blocking: true, field: "formats", code: ConfigFieldInvalid,
+				reason: "Stargate requires an OpenAI or Anthropic format",
+			}
+		}
+		if field, reason := kongStargateTargetProblem(provider, tm, providerType); field != "" {
+			return nil, "", &targetProblem{
+				blocking: true,
+				field:    fmt.Sprintf("targets[%d].%s", j, field),
+				code:     ConfigFieldInvalid,
+				reason:   reason,
+			}
 		}
 	}
 	// Databricks has no fixed host: the plugin builds it from
@@ -1820,7 +1856,9 @@ func (c *Converter) buildTarget(
 		"route_type": routeType,
 		"model":      model,
 	}
-	if auth := resolveAuth(provider, cmp.Or(clientAuthOverride(provider), tm.AllowAuthOverride)); auth != nil {
+	if auth := resolveAuth(
+		provider, cmp.Or(clientAuthOverride(provider), tm.AllowAuthOverride),
+	); auth != nil && providerType != aimap.KongStargateProvider {
 		if providerType == "bedrock" {
 			fillBedrockOverrideHeader(auth)
 		}

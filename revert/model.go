@@ -18,12 +18,14 @@ import (
 // modelGroup accumulates one AI Gateway Model across the routes/targets that
 // share its model_alias (or, alias-less, its route).
 type modelGroup struct {
-	model       aigw.Model
-	caps        []string
-	capsSeen    map[string]bool
-	targetsSeen map[string]bool
-	aliasless   bool   // no model_alias on the targets; name is provisional
-	routeName   string // route the group was created from (for warnings)
+	stargateURLs map[string]*stargateURLSet
+	targetOrder  []targetObservation
+	model        aigw.Model
+	caps         []string
+	capsSeen     map[string]bool
+	targetsSeen  map[string]bool
+	aliasless    bool   // no model_alias on the targets; name is provisional
+	routeName    string // route the group was created from (for warnings)
 	// firstRoute is the acc.routes value of the route that made the group.
 	firstRoute int
 	// split is true when the group shares its ai-models entry with the
@@ -306,6 +308,11 @@ func (r *Reverter) accumulateModelRoute(acc *modelAcc, rt *kong.Route, plugins [
 					return err
 				}
 			}
+			observation := targetObservation{route: acc.routes, key: key}
+			if providerType == aimap.KongStargateProvider && spec != nil {
+				observation.endpoint = g.recordStargateURL(tm, section, *spec)
+			}
+			g.targetOrder = append(g.targetOrder, observation)
 			g.recordTransport(rt)
 			if seq := &acc.routeGroups[len(acc.routeGroups)-1]; !slices.Contains(*seq, g) {
 				*seq = append(*seq, g)
@@ -899,6 +906,9 @@ func selectorSourceEntries(selector *kong.Plugin) []map[string]any {
 // finalizeModels applies model-scoped (ai-models FK) plugins, classifies the
 // model type, emits the models in first-seen order, and reports orphans.
 func (r *Reverter) finalizeModels(acc *modelAcc) error {
+	for _, g := range acc.groups {
+		g.finishStargateURLs()
+	}
 	if err := r.nameAliaslessGroups(acc); err != nil {
 		return err
 	}
@@ -1423,4 +1433,154 @@ func dropEndpointUpstreamURL(d *defoldedTarget, section string, spec *aimap.Endp
 			return
 		}
 	}
+}
+
+type targetObservation struct {
+	route    int
+	key      string
+	endpoint string
+}
+
+type stargateURLSet struct {
+	endpoints map[string]bool
+	defaults  map[string]bool
+	overrides map[string]bool
+}
+
+func withoutUpstreamURL(tm aigw.TargetModel) aigw.TargetModel {
+	tm.Config.Options = maps.Clone(tm.Config.Options)
+	delete(tm.Config.Options, "upstream_url")
+	if len(tm.Config.Options) == 0 {
+		tm.Config.Options = nil
+	}
+	return tm
+}
+
+func (g *modelGroup) recordStargateURL(tm aigw.TargetModel, format string, spec aimap.EndpointSpec) string {
+	endpoint, ok := aimap.KongStargateEndpointURL(format, spec, aimap.KongStargateLaunchRegion)
+	if !ok {
+		return ""
+	}
+	if g.stargateURLs == nil {
+		g.stargateURLs = map[string]*stargateURLSet{}
+	}
+	key := targetFingerprint(withoutUpstreamURL(tm))
+	urls := g.stargateURLs[key]
+	if urls == nil {
+		urls = &stargateURLSet{
+			endpoints: map[string]bool{},
+			defaults:  map[string]bool{},
+			overrides: map[string]bool{},
+		}
+		g.stargateURLs[key] = urls
+	}
+	urls.endpoints[endpoint] = true
+	url, _ := tm.Config.Options["upstream_url"].(string)
+	if url == endpoint {
+		urls.defaults[url] = true
+	} else {
+		urls.overrides[url] = true
+	}
+	return endpoint
+}
+
+func (g *modelGroup) finishStargateURLs() {
+	if len(g.stargateURLs) == 0 {
+		return
+	}
+	type defaultURL struct {
+		key    string
+		url    string
+		shared bool
+	}
+	defaults := map[string]defaultURL{}
+	targets := map[string]aigw.TargetModel{}
+	var keys []string
+	add := func(key string, tm aigw.TargetModel) {
+		if _, ok := targets[key]; !ok {
+			targets[key] = tm
+			keys = append(keys, key)
+		}
+	}
+	hasSharedOverride := false
+	for _, tm := range g.model.TargetModels {
+		key := targetFingerprint(tm)
+		if tm.Config.Type == aimap.KongStargateProvider {
+			normalized := withoutUpstreamURL(tm)
+			defaultKey := targetFingerprint(normalized)
+			urls := g.stargateURLs[defaultKey]
+			url, _ := tm.Config.Options["upstream_url"].(string)
+			if urls != nil && len(urls.defaults) == len(urls.endpoints) && urls.defaults[url] {
+				shared := urls.overrides[url]
+				defaults[key] = defaultURL{key: defaultKey, url: url, shared: shared}
+				add(defaultKey, normalized)
+				if !shared {
+					continue
+				}
+				hasSharedOverride = true
+			}
+		}
+		add(key, tm)
+	}
+	if hasSharedOverride {
+		keys = orderObservedTargets(keys, g.targetOrder, func(item targetObservation) (string, string) {
+			if d, ok := defaults[item.key]; ok && item.endpoint == d.url {
+				if d.shared {
+					return item.key, d.key
+				}
+				return d.key, ""
+			}
+			return item.key, ""
+		})
+	}
+	g.model.TargetModels = g.model.TargetModels[:0]
+	clear(g.targetsSeen)
+	for _, key := range keys {
+		g.targetsSeen[key] = true
+		g.model.TargetModels = append(g.model.TargetModels, targets[key])
+	}
+}
+
+func orderObservedTargets(
+	keys []string, observations []targetObservation, resolve func(targetObservation) (string, string),
+) []string {
+	type position struct{ route, index int }
+	occurrences := make(map[string][]position, len(keys))
+	lengths := map[int]int{}
+	for _, item := range observations {
+		first, second := resolve(item)
+		pos := position{route: item.route, index: lengths[item.route]}
+		lengths[item.route]++
+		occurrences[first] = append(occurrences[first], pos)
+		if second != "" {
+			occurrences[second] = append(occurrences[second], pos)
+		}
+	}
+
+	next := map[int]int{}
+	added := make(map[string]bool, len(keys))
+	ordered := make([]string, 0, len(keys))
+	for len(ordered) < len(keys) {
+		n := len(ordered)
+		for _, key := range keys {
+			if added[key] || slices.ContainsFunc(occurrences[key], func(pos position) bool {
+				return pos.index > next[pos.route]
+			}) {
+				continue
+			}
+			ordered = append(ordered, key)
+			added[key] = true
+			for _, pos := range occurrences[key] {
+				// Either target can fill a position that the route combines.
+				if pos.index == next[pos.route] {
+					next[pos.route]++
+				}
+			}
+			break
+		}
+		if len(ordered) == n {
+			return keys
+		}
+	}
+	return ordered
 }
