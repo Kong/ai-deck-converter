@@ -112,10 +112,12 @@ func TokenVaultNeedsInbound(tv *aigw.TokenVaultConfig) bool {
 // block exists and names no inbound credential location. The token-vault-
 // exchange path works on the emitted plugin config, so it branches on this
 // rule the same way the ai-mcp-proxy path branches on TokenVaultNeedsInbound.
-// An empty inbound block counts as unset: lowering drops it, so the two rules
-// judge emptiness by lowering and cannot drift. A block with fields counts as
-// explicit even without a location: it is user-set content the lowering
-// preserves.
+// This rule reads the raw block: an empty inbound block counts as unset, and
+// a block with fields counts as explicit even without a location, because it
+// is user-set content the lifting preserves. TokenVaultNeedsInbound instead
+// lowers the typed location, so an inbound whose fields the model cannot
+// represent counts as unset there; the two agree on every inbound block the
+// model can represent.
 func TokenVaultPluginNeedsInbound(cfg map[string]any) bool {
 	cred := getAnyMap(cfg, "credential")
 	return cred == nil || tokenVaultLocationFromPlugin(getAnyMap(cred, "inbound")) == nil

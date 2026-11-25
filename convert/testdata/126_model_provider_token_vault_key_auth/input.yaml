@@ -166,6 +166,23 @@ models:
           type: anthropic
     access:
       auth_strategies: [api-key-hidden]
+  # the exchange reads an explicit inbound elsewhere, so the hidden key-auth
+  # header is unconsumed: the plugin keeps hide_credentials and warns nothing
+  - name: claude-explicit-hidden
+    type: model
+    capabilities: [generate]
+    formats:
+      - type: anthropic
+    config:
+      route:
+        paths: [/ai/claude-explicit-hidden]
+    targets:
+      - name: claude-sonnet
+        provider: anthropic-explicit
+        config:
+          type: anthropic
+    access:
+      auth_strategies: [api-key-hidden]
 
 model_providers:
   - name: anthropic-vault

@@ -576,6 +576,14 @@ func (c *Converter) revealedTokenVaultPlugins(
 		if !selected(p) {
 			continue
 		}
+		// A key-auth credential is only consumed when the route's exchange
+		// reads it from the key-auth header. An exchange that reads an
+		// explicit inbound elsewhere leaves the header unconsumed, so the
+		// credential stays hidden: revealing it would forward the caller's
+		// key to the upstream provider.
+		if p.Name == authStrategyTypeKeyAuth && !tokenVaultExchangeReadsKeyAuth(plugins, p) {
+			continue
+		}
 		if hide, _ := p.Config["hide_credentials"].(bool); !hide {
 			continue
 		}
@@ -604,6 +612,34 @@ func (c *Converter) revealedTokenVaultPlugins(
 		return plugins, false
 	}
 	return out, true
+}
+
+// tokenVaultExchangeReadsKeyAuth reports whether the token-vault-exchange
+// plugin of keyAuth's route reads its inbound credential from the location
+// the key-auth config derives. It returns false when the route has no
+// exchange plugin or when the exchange reads an explicit inbound elsewhere:
+// there nothing consumes the key-auth header, so the credential stays
+// hidden.
+func tokenVaultExchangeReadsKeyAuth(plugins []kong.Plugin, keyAuth kong.Plugin) bool {
+	if keyAuth.Route == nil {
+		return false
+	}
+	for _, q := range plugins {
+		if q.Name != tokenVaultExchangePlugin || q.Route == nil || *q.Route != *keyAuth.Route {
+			continue
+		}
+		cred, _ := q.Config["credential"].(map[string]any)
+		inbound, _ := cred["inbound"].(map[string]any)
+		if inbound == nil {
+			return false
+		}
+		loc := aimap.TokenVaultInboundFromKeyAuth(keyAuth.Config)
+		if loc == nil {
+			return false
+		}
+		return maps.Equal(inbound, aimap.TokenVaultLocationToPlugin(loc))
+	}
+	return false
 }
 
 // credentialManagerRoute adds the routes of the auth strategy that serve the
