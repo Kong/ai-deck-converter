@@ -1,0 +1,17 @@
+model_providers:
+  - name: stargate
+    type: kong-stargate
+    config: {region: us}
+models:
+  - name: inference
+    type: model
+    capabilities: ["*"]
+    formats: [{type: "*"}]
+    config:
+      route: {paths: [ /ai ]}
+      logging: {log_statistics: true}
+      response_streaming: allow
+    targets:
+      - name: kong/model
+        provider: stargate
+        config: {type: kong-stargate}

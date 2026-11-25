@@ -2,6 +2,9 @@ package aigw
 
 import "gopkg.in/yaml.v3"
 
+// KongStargateProvider is the Stargate provider type.
+const KongStargateProvider = "kong-stargate"
+
 // Provider is an AI Gateway provider (an upstream LLM provider with auth). It is
 // not emitted as a standalone Kong entity; its type and auth are folded into each
 // ai-proxy-advanced target that references it by name.
@@ -17,8 +20,31 @@ type Provider struct {
 	TokenVault *TokenVaultConfig `yaml:"token_vault,omitempty"`
 }
 
+// UnmarshalYAML reads config.region only for Stargate providers.
+func (p *Provider) UnmarshalYAML(node *yaml.Node) error {
+	type providerFields Provider
+	var fields providerFields
+	if err := node.Decode(&fields); err != nil {
+		return err
+	}
+	if fields.Type == KongStargateProvider {
+		var stargate struct {
+			Config struct {
+				Region string `yaml:"region"`
+			} `yaml:"config"`
+		}
+		if err := node.Decode(&stargate); err != nil {
+			return err
+		}
+		fields.Config.Region = stargate.Config.Region
+	}
+	*p = Provider(fields)
+	return nil
+}
+
 // ProviderConfig holds the provider auth plus provider-specific top-level fields.
 type ProviderConfig struct {
+	Region    string        `yaml:"-"`
 	Auth      ProviderAuth  `yaml:"auth,omitempty"`
 	Instance  string        `yaml:"instance,omitempty"`   // azure (azure-openai)
 	Service   string        `yaml:"service,omitempty"`    // azure (azure-openai | azure-foundry)
@@ -50,6 +76,18 @@ func (c *ProviderConfig) UnmarshalYAML(node *yaml.Node) error {
 		}
 	}
 	return nil
+}
+
+// MarshalYAML preserves config.region in Stargate output.
+func (c ProviderConfig) MarshalYAML() (any, error) {
+	type configFields ProviderConfig
+	return struct {
+		Region       string `yaml:"region,omitempty"`
+		configFields `yaml:",inline"`
+	}{
+		Region:       c.Region,
+		configFields: configFields(c),
+	}, nil
 }
 
 // ProviderAuth is the union of all provider auth variants (basic/aws/azure/gcp).
@@ -120,4 +158,9 @@ type AuthParam struct {
 	Name     string `yaml:"name,omitempty"`
 	Value    string `yaml:"value,omitempty"`
 	Location string `yaml:"location,omitempty"` // body | query
+}
+
+// HasAuth reports if the provider config has authentication.
+func (c ProviderConfig) HasAuth() bool {
+	return !c.Auth.isEmpty()
 }

@@ -75,6 +75,10 @@ var unsupportedLogStatistics = map[string][]string{
 // format.
 func TargetSupports(format string, target Target, spec EndpointSpec) bool {
 	provider := PluginProvider(target.ProviderType)
+	if provider == KongStargateProvider {
+		_, ok := KongStargateEndpointURL(format, spec, KongStargateLaunchRegion)
+		return ok
+	}
 	routeType := spec.RouteType
 	switch {
 	case format == "openai", format == provider:

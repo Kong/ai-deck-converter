@@ -155,6 +155,18 @@ func (c *Converter) resolveEmbeddings(src ConversionIssueSource, raw any) (any, 
 	}
 
 	modelMap, _ := emb["model"].(map[string]any)
+	if provider != nil && provider.Type == aimap.KongStargateProvider {
+		return nil, c.fail(src.at("config.balancer.embeddings.provider"), ConfigFieldInvalid,
+			"Stargate does not support semantic embeddings")
+	}
+	if cfg, _ := modelMap["config"].(map[string]any); cfg["type"] == aimap.KongStargateProvider {
+		return nil, c.fail(src.at("config.balancer.embeddings.model.config.type"), ConfigFieldInvalid,
+			"Stargate does not support semantic embeddings")
+	}
+	if modelMap["provider"] == aimap.KongStargateProvider {
+		return nil, c.fail(src.at("config.balancer.embeddings.model.provider"), ConfigFieldInvalid,
+			"Stargate does not support semantic embeddings")
+	}
 	if err := c.fillEmbeddingsGeminiEndpoint(src, modelMap); err != nil {
 		return nil, err
 	}
@@ -597,4 +609,37 @@ func (c *Converter) checkEmbeddingsTokenVault(src ConversionIssueSource, m *aigw
 				"the credential of the embeddings request", m.Name, name, tokenVaultExchangePlugin)
 	}
 	return nil
+}
+
+func kongStargateTargetProblem(p *aigw.Provider, tm *aigw.TargetModel, providerType string) (string, string) {
+	switch {
+	case p.Type != providerType:
+		return "config.type", "Stargate targets must use a Stargate provider type"
+	case p.Config.Region != aimap.KongStargateLaunchRegion:
+		return "provider", "Stargate provider region must be us"
+	case tm.AllowAuthOverride != nil && *tm.AllowAuthOverride:
+		return "allow_auth_override", "Stargate uses managed authentication"
+	case p.Config.HasAuth() || p.TokenVault != nil || len(p.Datastores) > 0:
+		return "provider", "Stargate uses managed authentication"
+	case tm.Config.Options["upstream_base_url"] != nil && tm.Config.Options["upstream_url"] != nil:
+		return "config.upstream_base_url", "upstream_base_url and upstream_url are mutually exclusive"
+	}
+	return "", ""
+}
+
+func setKongStargateUpstreamURL(target map[string]any, format string, spec aimap.EndpointSpec, region string) {
+	model := target["model"].(map[string]any)
+	opts, _ := model["options"].(map[string]any)
+	if opts["upstream_url"] != nil || opts["upstream_base_url"] != nil {
+		return
+	}
+	upstream, ok := aimap.KongStargateEndpointURL(format, spec, region)
+	if !ok {
+		return
+	}
+	if opts == nil {
+		opts = map[string]any{}
+		model["options"] = opts
+	}
+	opts["upstream_url"] = upstream
 }
