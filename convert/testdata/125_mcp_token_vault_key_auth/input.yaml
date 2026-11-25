@@ -108,3 +108,19 @@ mcp_servers:
     tools:
       - name: toolE
         description: A tool
+  # the inbound decodes with no fields: it counts as unset, so it is derived
+  # and no issue is reported
+  - type: conversion-listener
+    display_name: Empty Inbound
+    name: empty-inbound
+    config: {route: {paths: [/mcp/empty-inbound]}}
+    datastores: [{name: vault-konnect-prod}]
+    token_vault:
+      provider: outbound-api
+      credential:
+        inbound: {}
+    access:
+      auth_strategies: [api-key-default]
+    tools:
+      - name: toolG
+        description: A tool

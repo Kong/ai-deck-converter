@@ -220,6 +220,41 @@ services:
           - name: key-auth
             config:
               hide_credentials: false
+  - name: empty-inbound
+    host: localhost
+    routes:
+      - name: empty-inbound-route
+        paths:
+          - /mcp/empty-inbound
+        plugins:
+          - name: ai-mcp-proxy
+            config:
+              auth:
+                provider: token_vault
+                token_vault:
+                  credential:
+                    inbound:
+                      location: header
+                      name: apikey
+                      prefix: ""
+                  directory: my-directory
+                  provider: outbound-api
+                  storage:
+                    backend: konnect
+              include_consumer_groups: true
+              logging:
+                log_audits: false
+                log_payloads: false
+                log_statistics: true
+              mode: conversion-listener
+              server:
+                forward_client_headers: true
+              tools:
+                - description: A tool
+                  name: toolG
+          - name: key-auth
+            config:
+              hide_credentials: false
 routes:
   - name: token-vault-callback-handler
     paths:

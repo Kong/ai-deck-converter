@@ -121,7 +121,8 @@ const mcpAuthStrategyField = "access.auth_strategies[0]"
 // deriveTokenVaultInbound fills the ai-mcp-proxy token_vault inbound
 // credential from the server's key-auth strategy. The plugin default inbound
 // Authorization Bearer does not match where key-auth expects the credential.
-// An explicit inbound is never touched.
+// An explicit inbound is never touched. A derived default on an unset field
+// is not an issue (RFC 00207), so it applies silently.
 func (c *Converter) deriveTokenVaultInbound(
 	src ConversionIssueSource, m *aigw.MCPServer, idp *aigw.AuthStrategy, route *kong.Route,
 ) {
@@ -140,6 +141,9 @@ func (c *Converter) deriveTokenVaultInbound(
 		return
 	}
 	pi := slices.IndexFunc(route.Plugins, func(p kong.Plugin) bool { return p.Name == "ai-mcp-proxy" })
+	if pi < 0 {
+		return
+	}
 	auth, _ := route.Plugins[pi].Config["auth"].(map[string]any)
 	// mcpPlugin lowers token_vault into this plugin before the auth plugins.
 	block, _ := auth["token_vault"].(map[string]any)
@@ -149,11 +153,6 @@ func (c *Converter) deriveTokenVaultInbound(
 		block["credential"] = cred
 	}
 	cred["inbound"] = aimap.TokenVaultLocationToPlugin(loc)
-	c.warn(src.at("token_vault.credential.inbound"), ConfigFieldOverridden,
-		"MCP server %q: token_vault.credential.inbound is derived from the key-auth strategy %q "+
-			"(header %q, its first key name, no prefix), because the plugin default "+
-			"Authorization: Bearer does not match where key-auth reads the key.",
-		m.Name, idp.Name, loc.Name)
 }
 
 // mcpAccessAuthStrategy resolves the auth strategy referenced by an MCP
