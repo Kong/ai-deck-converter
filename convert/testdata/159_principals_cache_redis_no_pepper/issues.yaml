@@ -1,0 +1,16 @@
+- code: CONFIG_FIELD_INVALID
+  reason: auth strategy "key-auth-principals" uses a "redis-ee" datastore for config.principals_cache, but sets no pepper
+  source:
+    kind: auth_strategy
+    name: key-auth-principals
+    fields:
+      - config.principals_cache.pepper
+  severity: ERROR
+- code: CONFIG_FIELD_INVALID
+  reason: auth strategy "okta-oidc" uses a "redis-ee" datastore for config.principals_cache, but sets no pepper
+  source:
+    kind: auth_strategy
+    name: okta-oidc
+    fields:
+      - config.principals_cache.pepper
+  severity: ERROR

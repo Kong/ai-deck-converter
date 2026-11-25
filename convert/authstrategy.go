@@ -124,12 +124,18 @@ func (c *Converter) convertCredentialManagers() {
 // Any other strategy type with a token_vault fails.
 func (c *Converter) applyAuthStrategyTokenVault(idp *aigw.AuthStrategy) error {
 	src := issueSource(kindAuthStrategy, idp.Name)
+	if _, set := idp.Config["principals_cache"]; set && !c.supports(aimap.FeaturePrincipalsCache) {
+		return c.failUnsupported(src.at("config.principals_cache"), aimap.FeaturePrincipalsCache, "config.principals_cache")
+	}
 	if idp.TokenVault != nil && idp.Type != authStrategyTypeOpenIDConnect {
 		return c.fail(src.at("token_vault"), ConfigFieldInvalid,
 			"auth strategy %q: token_vault requires type %q, not %q",
 			idp.Name, authStrategyTypeOpenIDConnect, idp.Type)
 	}
 	if idp.Type != authStrategyTypeOpenIDConnect {
+		if idp.Type == authStrategyTypeKeyAuth {
+			return c.checkAuthStrategyDatastores(src, idp)
+		}
 		return nil
 	}
 	enabled, _ := idp.TokenVault[enableCredentialManagerKey].(bool)
@@ -140,6 +146,7 @@ func (c *Converter) applyAuthStrategyTokenVault(idp *aigw.AuthStrategy) error {
 	if err != nil || ds == nil {
 		return err
 	}
+	_, dsIndex := tokenVaultDatastore(c.datastores, idp)
 	if !slices.Contains(c.out.TokenVaultAuthStrategies, idp.Name) {
 		c.out.TokenVaultAuthStrategies = append(c.out.TokenVaultAuthStrategies, idp.Name)
 	}
@@ -148,10 +155,67 @@ func (c *Converter) applyAuthStrategyTokenVault(idp *aigw.AuthStrategy) error {
 	}
 	owner := fmt.Sprintf("auth strategy %q", idp.Name)
 	routeSource := source(kindAuthStrategy, idp.Name, "datastores")
-	if err := c.ensureTokenVaultCallbackRoute(src.at("datastores[0].name"), owner, ds, routeSource); err != nil {
+	if err := c.ensureTokenVaultCallbackRoute(src.at(datastoreRefField(dsIndex)), owner, ds, routeSource); err != nil {
 		return err
 	}
 	return c.credentialManagerRoute(src, idp, ds)
+}
+
+// checkAuthStrategyDatastores checks the Datastore references of an auth
+// strategy. A redis-ee Datastore without principals_cache has no effect.
+func (c *Converter) checkAuthStrategyDatastores(src ConversionIssueSource, idp *aigw.AuthStrategy) error {
+	if len(idp.Datastores) == 0 {
+		return nil
+	}
+	if len(idp.Datastores) > aimap.MaxAuthStrategyDatastores {
+		return c.fail(src.at("datastores"), ConfigFieldInvalid,
+			"auth strategy %q has %d datastores, but an auth strategy allows at most %d",
+			idp.Name, len(idp.Datastores), aimap.MaxAuthStrategyDatastores)
+	}
+	seen := map[string]bool{}
+	for i, ref := range idp.Datastores {
+		field := src.at(fmt.Sprintf("datastores[%d].name", i))
+		ds := c.datastores[ref.Name]
+		if ds == nil {
+			return c.fail(field, UndefinedReference,
+				"auth strategy %q references unknown datastore %q", idp.Name, ref.Name)
+		}
+		if _, ok := aimap.AuthStrategyDatastoreTypes[ds.Type]; !ok {
+			return c.fail(field, ConfigFieldInvalid,
+				"auth strategy %q does not support a %q datastore; use %q or %q instead",
+				idp.Name, ds.Type, aimap.DatastoreTypeTokenVault, aimap.DatastoreTypeRedisEE)
+		}
+		if seen[ds.Type] {
+			return c.fail(field, ConfigFieldInvalid,
+				"auth strategy %q references more than one %q datastore", idp.Name, ds.Type)
+		}
+		seen[ds.Type] = true
+	}
+	cache, hasCache := idp.Config["principals_cache"].(map[string]any)
+	if hasCache && seen[aimap.DatastoreTypeRedisEE] {
+		if pepper, _ := cache["pepper"].(string); pepper == "" {
+			return c.fail(src.at("config.principals_cache.pepper"), ConfigFieldInvalid,
+				"auth strategy %q uses a %q datastore for config.principals_cache, but sets no pepper",
+				idp.Name, aimap.DatastoreTypeRedisEE)
+		}
+	}
+	if !hasCache && seen[aimap.DatastoreTypeRedisEE] {
+		c.warn(src.at("datastores"), ConfigFieldIgnored,
+			"auth strategy %q references a %q datastore, but sets no config.principals_cache. "+
+				"The datastore is not used.", idp.Name, aimap.DatastoreTypeRedisEE)
+	}
+	return nil
+}
+
+// authStrategyRedisDatastore returns the redis-ee Datastore of an auth
+// strategy, or nil if it has none.
+func (c *Converter) authStrategyRedisDatastore(idp *aigw.AuthStrategy) *aigw.Datastore {
+	for _, ref := range idp.Datastores {
+		if ds := c.datastores[ref.Name]; ds != nil && ds.Type == aimap.DatastoreTypeRedisEE {
+			return ds
+		}
+	}
+	return nil
 }
 
 // authStrategyTokenVaultDatastore returns the token-vault Datastore of the
@@ -160,30 +224,40 @@ func (c *Converter) applyAuthStrategyTokenVault(idp *aigw.AuthStrategy) error {
 func (c *Converter) authStrategyTokenVaultDatastore(
 	src ConversionIssueSource, idp *aigw.AuthStrategy, required bool,
 ) (*aigw.Datastore, error) {
-	if len(idp.Datastores) == 0 && !required {
-		return nil, nil
+	if err := c.checkAuthStrategyDatastores(src, idp); err != nil {
+		return nil, err
 	}
-	if len(idp.Datastores) != 1 {
-		return nil, c.fail(src.at("datastores"), MissingRequiredConfigField,
-			"auth strategy %q: token_vault requires exactly one %q datastore",
-			idp.Name, aimap.DatastoreTypeTokenVault)
-	}
-	ds := c.datastores[idp.Datastores[0].Name]
+	ds, i := tokenVaultDatastore(c.datastores, idp)
 	if ds == nil {
-		return nil, c.fail(src.at("datastores[0].name"), UndefinedReference,
-			"auth strategy %q references unknown datastore %q", idp.Name, idp.Datastores[0].Name)
-	}
-	if ds.Type != aimap.DatastoreTypeTokenVault {
-		return nil, c.fail(src.at("datastores[0].name"), ConfigFieldInvalid,
-			"auth strategy %q does not support a %q datastore; use %q instead",
-			idp.Name, ds.Type, aimap.DatastoreTypeTokenVault)
+		if !required {
+			return nil, nil
+		}
+		return nil, c.fail(src.at("datastores"), MissingRequiredConfigField,
+			"auth strategy %q: token_vault requires a %q datastore",
+			idp.Name, aimap.DatastoreTypeTokenVault)
 	}
 	// Only the credential manager routes put the directory in plugin config.
 	if err := aimap.CheckTokenVaultDirectory(ds); required && err != nil {
-		return nil, c.fail(src.at("datastores[0].name"), ConfigFieldInvalid,
+		return nil, c.fail(src.at(datastoreRefField(i)), ConfigFieldInvalid,
 			"auth strategy %q: %v", idp.Name, err)
 	}
 	return ds, nil
+}
+
+// tokenVaultDatastore returns the first token-vault Datastore that the
+// strategy references, with its index in the reference list. It returns nil
+// when there is none.
+func tokenVaultDatastore(registry map[string]*aigw.Datastore, idp *aigw.AuthStrategy) (*aigw.Datastore, int) {
+	for i, ref := range idp.Datastores {
+		if ds := registry[ref.Name]; ds != nil && ds.Type == aimap.DatastoreTypeTokenVault {
+			return ds, i
+		}
+	}
+	return nil, -1
+}
+
+func datastoreRefField(index int) string {
+	return fmt.Sprintf("datastores[%d].name", index)
 }
 
 // tvManagerOIDCConfig returns the openid-connect config of the Token Vault
@@ -455,10 +529,10 @@ func (c *Converter) secureTokenVaultCallbackRoute() {
 	for _, name := range c.out.TokenVaultAuthStrategies {
 		idp := c.authStrategies[name]
 		src := issueSource(kindAuthStrategy, name)
-		ds := c.datastores[idp.Datastores[0].Name]
+		ds, dsIndex := tokenVaultDatastore(c.datastores, idp)
 		dsConfig, err := aimap.ApplyTokenVaultDatastore(nil, ds)
 		if err != nil || !reflect.DeepEqual(c.out.Routes[i].Plugins[0].Config, dsConfig) {
-			c.warn(src.at("datastores[0].name"), ConfigFieldIgnored,
+			c.warn(src.at(datastoreRefField(dsIndex)), ConfigFieldIgnored,
 				"auth strategy %q references datastore %q, but the Token Vault callback route "+
 					"uses a different token-vault datastore. The strategy does not protect the callback route.",
 				name, ds.Name)
@@ -663,7 +737,8 @@ func (c *Converter) credentialManagerRoute(
 	loginConfig := c.tvManagerLoginOIDCConfig(src, idp)
 	config, err := aimap.ApplyTokenVaultDatastore(nil, ds)
 	if err != nil {
-		return c.fail(src.at("datastores[0].name"), ConfigFieldInvalid, "auth strategy %q: %v", idp.Name, err)
+		_, dsIndex := tokenVaultDatastore(c.datastores, idp)
+		return c.fail(src.at(datastoreRefField(dsIndex)), ConfigFieldInvalid, "auth strategy %q: %v", idp.Name, err)
 	}
 	routeSource := source(kindAuthStrategy, idp.Name, "token_vault")
 	base := aimap.TokenVaultCredentialManagerPath + "/" + idp.Name
@@ -708,6 +783,7 @@ func (c *Converter) warnAuthStrategyOverrides(idp *aigw.AuthStrategy) {
 				"so the auth plugin rejects unauthenticated requests itself.",
 			idp.Name, v, anonymousConsumerName)
 	}
+	c.warnOIDCRedisOverride(src, idp)
 	if idp.Type == "key-auth" && keyAuthPrincipalsEnabled(idp.Config) {
 		if v, ok := idp.Config["identity_realms"]; ok && !isEmptyConfigValue(v) {
 			c.warn(src.at("config.identity_realms"), ConfigFieldOverridden,
@@ -717,6 +793,32 @@ func (c *Converter) warnAuthStrategyOverrides(idp *aigw.AuthStrategy) {
 					"because the key-auth schema requires it when principals is enabled.",
 				idp.Name)
 		}
+	}
+}
+
+// warnOIDCRedisOverride reports a config.redis that the redis-ee Datastore of
+// an openid-connect strategy replaces. The registry copy of idp already holds
+// the Datastore connection, so the check reads the source strategy.
+func (c *Converter) warnOIDCRedisOverride(src ConversionIssueSource, idp *aigw.AuthStrategy) {
+	if idp.Type != authStrategyTypeOpenIDConnect || c.authStrategyRedisDatastore(idp) == nil {
+		return
+	}
+	for i := range c.src.AuthStrategies {
+		orig := &c.src.AuthStrategies[i]
+		if orig.Name != idp.Name {
+			continue
+		}
+		if _, hasCache := orig.Config["principals_cache"].(map[string]any); !hasCache {
+			return
+		}
+		if v, ok := orig.Config["redis"]; ok && !isEmptyConfigValue(v) {
+			c.warn(src.at("config.redis"), ConfigFieldOverridden,
+				"auth strategy %q sets config.redis and references a %q datastore with config.principals_cache. "+
+					"This will be ignored, and config.redis will be overridden by the datastore connection. "+
+					"The openid-connect plugin has one redis block, which session storage also uses.",
+				idp.Name, aimap.DatastoreTypeRedisEE)
+		}
+		return
 	}
 }
 

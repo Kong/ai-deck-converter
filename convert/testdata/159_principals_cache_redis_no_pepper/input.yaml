@@ -1,0 +1,77 @@
+# A key-auth and an openid-connect strategy reference a redis-ee datastore and
+# set principals_cache without a pepper. Both strategies fail.
+datastores:
+  - type: redis-ee
+    name: shared-redis
+    config:
+      host: redis-ee.internal
+      port: 6379
+      password: "{vault://env/redis-password}"
+      ssl: true
+auth_strategies:
+  - display_name: Key Auth
+    name: key-auth-principals
+    type: key-auth
+    datastores:
+      - name: shared-redis
+    config:
+      principals:
+        enabled: true
+        directory: my-directory
+      principals_cache:
+        ttl: 60
+  - display_name: Okta OIDC
+    name: okta-oidc
+    type: openid-connect
+    datastores:
+      - name: shared-redis
+    config:
+      issuer: https://dev-123456.okta.com/oauth2/default
+      principals:
+        enabled: true
+        directory: my-directory
+      principals_cache:
+        ttl: 60
+models:
+  - display_name: Key Auth Model
+    name: key-auth-model
+    type: model
+    capabilities: [generate]
+    formats:
+      - type: openai
+    config:
+      route:
+        paths: [/key]
+    targets:
+      - name: gpt-5.4
+        provider: openai-prod
+        config:
+          type: openai
+    access:
+      auth_strategies: [key-auth-principals]
+  - display_name: OIDC Model
+    name: oidc-model
+    type: model
+    capabilities: [generate]
+    formats:
+      - type: openai
+    config:
+      route:
+        paths: [/oidc]
+    targets:
+      - name: gpt-5.4
+        provider: openai-prod
+        config:
+          type: openai
+    access:
+      auth_strategies: [okta-oidc]
+model_providers:
+  - name: openai-prod
+    type: openai
+    display_name: OpenAI Prod
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://ai/openai-token}"

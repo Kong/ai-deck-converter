@@ -14,6 +14,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+const noStrategyTokenVault = "revert does not lift auth strategy token_vault or the callback route"
+
 // roundTripSkip lists forward golden cases whose reverse direction is not (yet)
 // implemented, so the round-trip gate skips them instead of failing. The
 // forward golden itself is still asserted by convert's TestGolden.
@@ -28,6 +30,7 @@ var roundTripSkip = map[string]string{
 	"111_auth_strategy_token_vault_redirect_uri": "revert does not lift auth strategy token_vault or the callback route",
 	"149_shared_api_model_body_size":             "revert does not split type api models that share one route",
 	"151_token_vault_realtime_websocket":         "revert does not lift token-vault-exchange or the callback route",
+	"156_auth_strategy_token_vault_second_datastore": noStrategyTokenVault,
 }
 
 // TestRoundTrip verifies that reverting the forward converter's output and
