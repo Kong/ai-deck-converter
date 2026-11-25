@@ -390,6 +390,52 @@ func (c *Converter) appendTokenVaultExchange(pg *proxyGroup, model *kong.StringR
 	})
 }
 
+// deriveTokenVaultExchangeInbound fills the token-vault-exchange inbound
+// credential from the model's first key-auth strategy that reads a header.
+// The plugin default inbound Authorization Bearer does not match where
+// key-auth expects the credential. An explicit inbound is never touched.
+// The derived value is silent: it fills a field the user never set, and a
+// default the converter applies to an unset field is not an issue
+// (docs/decisions/00207).
+func (c *Converter) deriveTokenVaultExchangeInbound(
+	src ConversionIssueSource, m *aigw.Model, field string, cfg map[string]any,
+) {
+	if !aimap.TokenVaultPluginNeedsInbound(cfg) {
+		return
+	}
+	var loc *aigw.TokenVaultCredentialLocation
+	var keyAuthSeen bool
+	for _, ref := range m.Access.AuthStrategies {
+		s := c.authStrategies[ref]
+		if s == nil || s.Type != "key-auth" {
+			continue
+		}
+		keyAuthSeen = true
+		if l := aimap.TokenVaultInboundFromKeyAuth(s.Config); l != nil {
+			loc = l
+			break
+		}
+	}
+	if loc == nil {
+		// The model keeps the default inbound. No key-auth strategy can
+		// supply a header location for the exchange.
+		if keyAuthSeen {
+			c.warn(src.at(field), BehaviorMayDiffer,
+				"Model %q: no key-auth strategy reads its key from the headers, so "+
+					"token_vault.credential.inbound cannot be derived from one. The data plane keeps "+
+					"the default inbound (Authorization: Bearer), which the exchange will not find.",
+				m.Name)
+		}
+		return
+	}
+	cred, _ := cfg["credential"].(map[string]any)
+	if cred == nil {
+		cred = map[string]any{}
+		cfg["credential"] = cred
+	}
+	cred["inbound"] = aimap.TokenVaultLocationToPlugin(loc)
+}
+
 // convertModelOnce runs fn for the model at index i. A skipped model only
 // replays its issues. When fn fails, it records the model as skipped and
 // returns false.
@@ -574,6 +620,15 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 					m.Name, tm.Name, passthroughFormat, passthroughFormat, format)
 			}
 		}
+	}
+
+	// Every route of the model carries the same auth strategies. One
+	// derivation therefore serves the whole model. The token vault is the
+	// first target's, so targets[0] is its producing target.
+	if tokenVault != nil {
+		c.deriveTokenVaultExchangeInbound(src, m,
+			fmt.Sprintf("targets[%d].provider.token_vault.credential.inbound", targets[0].index),
+			tokenVault)
 	}
 
 	formats := c.effectiveFormats(lists, targets)

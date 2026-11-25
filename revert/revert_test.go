@@ -410,6 +410,200 @@ services:
 		"want a defaulting-to-generate warning")
 }
 
+// A key-auth plugin on an MCP route pairs with a token-vault auth record that
+// names its inbound credential. The plugin default Authorization Bearer does
+// not match key-auth. Revert warns when the record names none.
+func TestMCPTokenVaultInboundKeyAuthWarning(t *testing.T) {
+	in := []byte(`
+_format_version: "3.0"
+services:
+  - name: vaulted
+    host: localhost
+    routes:
+      - name: vaulted-route
+        paths: [/mcp/vaulted]
+        plugins:
+          - name: key-auth
+            config: {key_names: [apikey]}
+          - name: ai-mcp-proxy
+            config:
+              mode: listener
+              auth:
+                provider: token_vault
+                token_vault:
+                  provider: outbound-api
+`)
+	_, warnings, err := revertYAML(t, in, Options{})
+	require.NoError(t, err, "revert")
+	require.Contains(t, strings.Join(warnings, "\n"), "token-vault auth record has no credential.inbound")
+
+	// The same config with an explicit inbound carries no warning.
+	withInbound := []byte(strings.Replace(string(in),
+		"provider: outbound-api",
+		"provider: outbound-api\n"+
+			"                  credential:\n"+
+			"                    inbound: {location: header, name: apikey, prefix: \"\"}",
+		1))
+	_, warnings, err = revertYAML(t, withInbound, Options{})
+	require.NoError(t, err, "revert with inbound")
+	require.Empty(t, warnings, "warnings with explicit inbound")
+
+	// No key-auth plugin: the default inbound matches a bearer caller.
+	noKeyAuth := []byte(strings.Replace(string(in),
+		"          - name: key-auth\n"+
+			"            config: {key_names: [apikey]}\n", "", 1))
+	_, warnings, err = revertYAML(t, noKeyAuth, Options{})
+	require.NoError(t, err, "revert without key-auth")
+	require.Empty(t, warnings, "warnings without key-auth")
+
+	// A key-auth plugin that reads no header key has no derivable inbound.
+	// Convert warns for that shape itself, and revert stays silent there.
+	bodyKey := []byte(strings.Replace(string(in),
+		"config: {key_names: [apikey]}",
+		"config: {key_in_header: false, key_in_body: true}", 1))
+	_, warnings, err = revertYAML(t, bodyKey, Options{})
+	require.NoError(t, err, "revert with body-only key")
+	require.Empty(t, warnings, "warnings with body-only key")
+}
+
+// A key-auth plugin on a model route pairs with a token-vault-exchange plugin
+// that names its inbound credential. The plugin default Authorization Bearer
+// does not match key-auth. Revert warns when the plugin names none.
+func TestModelTokenVaultExchangeInboundKeyAuthWarning(t *testing.T) {
+	in := []byte(`
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    host: localhost
+    routes:
+      - name: claude-route
+        paths: [/ai/claude]
+        plugins:
+          - name: key-auth
+            config: {key_names: [apikey]}
+          - name: token-vault-exchange
+            config:
+              directory: my-directory
+              provider: anthropic
+              storage: {backend: konnect}
+          - name: ai-proxy-advanced
+            config:
+              llm_format: anthropic
+              targets:
+                - description: claude-sonnet
+                  model:
+                    model_alias: claude
+                    name: claude-sonnet
+                    options: {anthropic_version: "2023-06-01"}
+                  route_type: llm/v1/chat
+`)
+	_, warnings, err := revertYAML(t, in, Options{})
+	require.NoError(t, err, "revert")
+	require.Contains(t, strings.Join(warnings, "\n"),
+		"token-vault-exchange plugin has no credential.inbound")
+
+	// An empty inbound block counts as unset: the exchange
+	// would keep the default, so the warning fires for it too.
+	emptyInbound := []byte(strings.Replace(string(in),
+		"storage: {backend: konnect}",
+		"storage: {backend: konnect}\n"+
+			"              credential:\n"+
+			"                inbound: {}",
+		1))
+	_, warnings, err = revertYAML(t, emptyInbound, Options{})
+	require.NoError(t, err, "revert with an empty inbound block")
+	require.Contains(t, strings.Join(warnings, "\n"),
+		"token-vault-exchange plugin has no credential.inbound")
+
+	// The same config with an explicit inbound carries no warning.
+	withInbound := []byte(strings.Replace(string(in),
+		"storage: {backend: konnect}",
+		"storage: {backend: konnect}\n"+
+			"              credential:\n"+
+			"                inbound: {location: header, name: apikey, prefix: \"\"}",
+		1))
+	_, warnings, err = revertYAML(t, withInbound, Options{})
+	require.NoError(t, err, "revert with inbound")
+	require.Empty(t, warnings, "warnings with explicit inbound")
+
+	// No key-auth plugin: the default inbound matches a bearer caller.
+	noKeyAuth := []byte(strings.Replace(string(in),
+		"          - name: key-auth\n"+
+			"            config: {key_names: [apikey]}\n", "", 1))
+	_, warnings, err = revertYAML(t, noKeyAuth, Options{})
+	require.NoError(t, err, "revert without key-auth")
+	require.Empty(t, warnings, "warnings without key-auth")
+
+	// A key-auth plugin that reads no header key has no derivable inbound.
+	// Convert warns for that shape itself, and revert stays silent there.
+	bodyKey := []byte(strings.Replace(string(in),
+		"config: {key_names: [apikey]}",
+		"config: {key_in_header: false, key_in_body: true}", 1))
+	_, warnings, err = revertYAML(t, bodyKey, Options{})
+	require.NoError(t, err, "revert with body-only key")
+	require.Empty(t, warnings, "warnings with body-only key")
+}
+
+// A route may carry one token-vault-exchange plugin per model, each scoped by
+// its model FK. Revert warns per plugin that names no inbound and names the
+// model the plugin serves; a plugin with an explicit inbound stays silent.
+func TestModelTokenVaultExchangeInboundPerPluginWarning(t *testing.T) {
+	in := []byte(`
+_format_version: "3.0"
+services:
+  - name: ai-gateway
+    host: localhost
+    routes:
+      - name: claude-route
+        paths: [/ai/claude]
+        plugins:
+          - name: key-auth
+            config: {key_names: [apikey]}
+          - name: token-vault-exchange
+            model: claude
+            config:
+              directory: my-directory
+              provider: anthropic
+              storage: {backend: konnect}
+          - name: token-vault-exchange
+            model: claude-two
+            config:
+              directory: my-directory
+              provider: anthropic
+              storage: {backend: konnect}
+              credential:
+                inbound: {location: header, name: apikey, prefix: ""}
+          - name: ai-proxy-advanced
+            model: claude
+            config:
+              llm_format: anthropic
+              targets:
+                - description: claude-sonnet
+                  model:
+                    model_alias: claude
+                    name: claude-sonnet
+                    options: {anthropic_version: "2023-06-01"}
+                  route_type: llm/v1/chat
+          - name: ai-proxy-advanced
+            model: claude-two
+            config:
+              llm_format: anthropic
+              targets:
+                - description: claude-haiku
+                  model:
+                    model_alias: claude-two
+                    name: claude-haiku
+                    options: {anthropic_version: "2023-06-01"}
+                  route_type: llm/v1/chat
+`)
+	_, warnings, err := revertYAML(t, in, Options{})
+	require.NoError(t, err, "revert")
+	joined := strings.Join(warnings, "\n")
+	require.Len(t, warnings, 1, "only the plugin without an inbound warns: %v", warnings)
+	require.Contains(t, joined, `model "claude"`, "the warning names the model")
+	require.NotContains(t, joined, `model "claude-two"`, "the explicit plugin stays silent")
+}
+
 // The AI Gateway API does not accept rate_limiting on a listener.
 // Revert drops it to keep the output valid for convert.
 func TestMCPRateLimitingDroppedOnListener(t *testing.T) {

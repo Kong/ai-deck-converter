@@ -2,6 +2,7 @@ package convert
 
 import (
 	"maps"
+	"slices"
 
 	"github.com/Kong/ai-deck-converter/internal/aigw"
 	"github.com/Kong/ai-deck-converter/internal/aimap"
@@ -87,6 +88,9 @@ func (c *Converter) mcpAuthStrategyPlugins(
 		if reason := c.mcpKeyAuthRevealReason(m, idp); reason != "" {
 			c.revealMCPCredentials(src, m, idp, cfg, reason)
 		}
+		if idp.Type == "key-auth" {
+			c.deriveTokenVaultInbound(src, m, idp, route)
+		}
 		// The Token Vault reads the access token from the upstream header.
 		if idp.Type == authStrategyTypeOpenIDConnect && m.TokenVault == nil {
 			hideOIDCAccessToken(cfg)
@@ -113,6 +117,44 @@ func (c *Converter) mcpAuthStrategyPlugins(
 // mcpAuthStrategyField is the path of the auth strategy of an MCP server.
 // The schema allows at most one.
 const mcpAuthStrategyField = "access.auth_strategies[0]"
+
+// deriveTokenVaultInbound fills the ai-mcp-proxy token_vault inbound
+// credential from the server's key-auth strategy. The plugin default inbound
+// Authorization Bearer does not match where key-auth expects the credential.
+// An explicit inbound is never touched.
+func (c *Converter) deriveTokenVaultInbound(
+	src ConversionIssueSource, m *aigw.MCPServer, idp *aigw.AuthStrategy, route *kong.Route,
+) {
+	if !aimap.TokenVaultNeedsInbound(m.TokenVault) {
+		return
+	}
+	loc := aimap.TokenVaultInboundFromKeyAuth(idp.Config)
+	if loc == nil {
+		// The warning recurs on a re-conversion. The reverter synthesizes
+		// strategy names. It therefore names no strategy.
+		c.warn(src.at("token_vault.credential.inbound"), BehaviorMayDiffer,
+			"MCP server %q: the key-auth strategy does not read its key from the headers, so "+
+				"token_vault.credential.inbound cannot be derived from it. The data plane keeps "+
+				"the default inbound (Authorization: Bearer), which the exchange will not find.",
+			m.Name)
+		return
+	}
+	pi := slices.IndexFunc(route.Plugins, func(p kong.Plugin) bool { return p.Name == "ai-mcp-proxy" })
+	auth, _ := route.Plugins[pi].Config["auth"].(map[string]any)
+	// mcpPlugin lowers token_vault into this plugin before the auth plugins.
+	block, _ := auth["token_vault"].(map[string]any)
+	cred, _ := block["credential"].(map[string]any)
+	if cred == nil {
+		cred = map[string]any{}
+		block["credential"] = cred
+	}
+	cred["inbound"] = aimap.TokenVaultLocationToPlugin(loc)
+	c.warn(src.at("token_vault.credential.inbound"), ConfigFieldOverridden,
+		"MCP server %q: token_vault.credential.inbound is derived from the key-auth strategy %q "+
+			"(header %q, its first key name, no prefix), because the plugin default "+
+			"Authorization: Bearer does not match where key-auth reads the key.",
+		m.Name, idp.Name, loc.Name)
+}
 
 // mcpAccessAuthStrategy resolves the auth strategy referenced by an MCP
 // server's access block. An unknown reference fails the server.
@@ -179,7 +221,7 @@ func mcpEffectiveScopes(
 	meta *aigw.MCPProtectedResourceMetadata, idp *aigw.AuthStrategy,
 ) []string {
 	if len(meta.ScopesSupported) == 0 && idp != nil {
-		return configStrings(idp.Config, "scopes")
+		return aimap.ConfigStrings(idp.Config, "scopes")
 	}
 	return meta.ScopesSupported
 }
@@ -247,7 +289,7 @@ func (c *Converter) mcpOIDCPlugin(
 	maps.Copy(cfg, idp.Config)
 
 	// Interactive flows would break the MCP authorization challenge.
-	if methods := configStrings(idp.Config, "auth_methods"); len(methods) > 1 ||
+	if methods := aimap.ConfigStrings(idp.Config, "auth_methods"); len(methods) > 1 ||
 		(len(methods) == 1 && methods[0] != "bearer") {
 		c.warn(src.at(mcpAuthStrategyField), ConfigFieldOverridden,
 			"MCP server %q auth strategy %q sets auth_methods beyond bearer. This will be overridden to "+
@@ -376,23 +418,6 @@ func firstConfigString(config map[string]any, key string) string {
 		}
 	}
 	return ""
-}
-
-// configStrings reads config[key] as a []string, accepting []any or []string.
-func configStrings(config map[string]any, key string) []string {
-	switch v := config[key].(type) {
-	case []string:
-		return v
-	case []any:
-		out := make([]string, 0, len(v))
-		for _, e := range v {
-			if s, ok := e.(string); ok {
-				out = append(out, s)
-			}
-		}
-		return out
-	}
-	return nil
 }
 
 // mcpKeyAuthRevealReason returns why the key-auth plugin of m must send the

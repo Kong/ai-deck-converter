@@ -1,0 +1,8 @@
+- code: BEHAVIOR_MAY_DIFFER
+  reason: 'Model "claude-body": no key-auth strategy reads its key from the headers, so token_vault.credential.inbound cannot be derived from one. The data plane keeps the default inbound (Authorization: Bearer), which the exchange will not find.'
+  source:
+    kind: model
+    name: claude-body
+    fields:
+      - targets[0].provider.token_vault.credential.inbound
+  severity: WARNING

@@ -329,3 +329,39 @@ func TestTokenVaultCredentialEmptyPrefix(t *testing.T) {
 		block["credential"].(map[string]any)["outbound"])
 	require.Equal(t, tv, TokenVaultFromPlugin(block))
 }
+
+func TestTokenVaultInboundFromKeyAuth(t *testing.T) {
+	t.Parallel()
+
+	want := func(name string) any {
+		return &aigw.TokenVaultCredentialLocation{Location: "header", Name: name, Prefix: new("")}
+	}
+	require.Equal(t, want("apikey"), TokenVaultInboundFromKeyAuth(nil),
+		"a nil config means the key-auth defaults")
+	require.Equal(t, want("apikey"), TokenVaultInboundFromKeyAuth(map[string]any{}))
+	require.Equal(t, want("x-custom-key"),
+		TokenVaultInboundFromKeyAuth(map[string]any{"key_names": []any{"x-custom-key"}}))
+	require.Equal(t, want("first-key"),
+		TokenVaultInboundFromKeyAuth(map[string]any{"key_names": []any{"first-key", "second-key"}}),
+		"several key names take the first")
+	require.Nil(t, TokenVaultInboundFromKeyAuth(map[string]any{"key_in_header": false, "key_in_body": true}))
+}
+
+func TestTokenVaultPluginNeedsInbound(t *testing.T) {
+	t.Parallel()
+
+	require.True(t, TokenVaultPluginNeedsInbound(nil), "no config block at all")
+	require.True(t, TokenVaultPluginNeedsInbound(map[string]any{"directory": "d"}),
+		"no credential block")
+	require.True(t, TokenVaultPluginNeedsInbound(
+		map[string]any{"credential": map[string]any{}}), "an empty credential block")
+	require.True(t, TokenVaultPluginNeedsInbound(
+		map[string]any{"credential": map[string]any{"inbound": map[string]any{}}}),
+		"an empty inbound block counts as unset")
+	require.False(t, TokenVaultPluginNeedsInbound(
+		map[string]any{"credential": map[string]any{"inbound": map[string]any{"name": "apikey"}}}),
+		"a block with fields is user-set content, even without a location")
+	require.False(t, TokenVaultPluginNeedsInbound(map[string]any{"credential": map[string]any{
+		"inbound": map[string]any{"location": "header", "name": "apikey"},
+	}}), "an inbound block with a location is explicit")
+}
