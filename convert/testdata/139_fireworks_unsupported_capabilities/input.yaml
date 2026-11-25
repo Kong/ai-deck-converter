@@ -1,0 +1,43 @@
+# fireworks does not serve embeddings or rerank. Each model lists one of
+# them, so each model is absent with an error. This includes a model that
+# also lists generate.
+model_providers:
+  - name: fireworks-prod
+    type: fireworks
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "Bearer {vault://ai/fireworks-token}"
+models:
+  - name: fireworks-chat-embeddings
+    type: model
+    capabilities: [generate, embeddings]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/fireworks-chat]}
+    targets:
+      - name: accounts/fireworks/models/llama-v3p1-8b-instruct
+        provider: fireworks-prod
+        config: {type: fireworks}
+  - name: fireworks-embeddings
+    type: model
+    capabilities: [embeddings]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/fireworks-embeddings]}
+    targets:
+      - name: accounts/fireworks/models/nomic-embed-text-v1.5
+        provider: fireworks-prod
+        config: {type: fireworks}
+  - name: fireworks-rerank
+    type: model
+    capabilities: [rerank]
+    formats: [{type: cohere}]
+    config:
+      route: {paths: [/fireworks-rerank]}
+    targets:
+      - name: accounts/fireworks/models/qwen3-reranker-8b
+        provider: fireworks-prod
+        config: {type: fireworks}

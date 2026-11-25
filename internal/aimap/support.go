@@ -33,7 +33,7 @@ var supportedRouteTypes = map[string][]string{
 	"llm/v1/chat": {
 		"openai", "azure", "anthropic", "cohere", "mistral", "llama2", "gemini", "bedrock",
 		"databricks", "huggingface", "dashscope", "xai", "cerebras", "vllm", "deepseek",
-		"ollama", "kimi", "vercel", "sagemaker", "typesafe", "baseten",
+		"ollama", "kimi", "vercel", "sagemaker", "typesafe", "baseten", "fireworks",
 	},
 	"llm/v1/completions": {
 		"openai", "azure", "anthropic", "cohere", "mistral", "llama2", "gemini", "bedrock",
@@ -43,7 +43,7 @@ var supportedRouteTypes = map[string][]string{
 		"openai", "azure", "cohere", "mistral", "llama2", "gemini", "bedrock", "databricks",
 		"huggingface", "dashscope", "ollama", "vercel",
 	},
-	"llm/v1/responses":              {"openai", "azure", "xai", "vercel", "bedrock"},
+	"llm/v1/responses":              {"openai", "azure", "xai", "vercel", "bedrock", "fireworks"},
 	"llm/v1/assistants":             {"openai", "azure"},
 	"llm/v1/batches":                {"openai", "azure", "bedrock", "anthropic", "gemini", "kimi"},
 	"llm/v1/files":                  {"openai", "azure", "kimi"},
@@ -79,6 +79,7 @@ func TargetSupports(format string, target Target, spec EndpointSpec) bool {
 	switch {
 	case format == "openai", format == provider:
 	case format == "anthropic" && routeType == "llm/v1/chat":
+	case FireworksSystemOne(format, provider):
 	default:
 		return false
 	}
@@ -119,6 +120,12 @@ func TargetSupports(format string, target Target, spec EndpointSpec) bool {
 // which only the gemini format serves.
 func GeminiInteractions(format, provider, routeType string) bool {
 	return format == "gemini" && provider == "gemini" && routeType == "llm/v1/responses"
+}
+
+// FireworksSystemOne reports whether the pair is Fireworks System One. The
+// data plane serves it as a TypeSafe-compatible provider.
+func FireworksSystemOne(format, provider string) bool {
+	return format == "typesafe" && provider == "fireworks"
 }
 
 // LogStatisticsSupported reports whether the data plane accepts

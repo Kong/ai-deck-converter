@@ -1,0 +1,21 @@
+# fireworks serves System One decisions in the typesafe format.
+model_providers:
+  - name: fireworks-prod
+    type: fireworks
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "Bearer {vault://ai/fireworks-token}"
+models:
+  - name: fireworks-rune
+    type: model
+    capabilities: [decisions]
+    formats: [{type: typesafe}]
+    config:
+      route: {paths: [/fireworks-decisions]}
+    targets:
+      - name: accounts/fireworks/models/rune
+        provider: fireworks-prod
+        config: {type: fireworks}
