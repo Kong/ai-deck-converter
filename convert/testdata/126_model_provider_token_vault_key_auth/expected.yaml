@@ -40,6 +40,13 @@ services:
         strip_path: false
       - name: anthropic-messages-6
         paths:
+          - /ai/claude-empty/v1/messages
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: anthropic-messages-7
+        paths:
           - /ai/claude-outbound/v1/messages
         methods:
           - POST
@@ -284,13 +291,55 @@ plugins:
             log_payloads: false
             log_statistics: true
           model:
-            model_alias: claude-outbound
+            model_alias: claude-empty
             name: claude-sonnet
             options:
               anthropic_version: "2023-06-01"
             provider: anthropic
           route_type: llm/v1/chat
     route: anthropic-messages-6
+    model: claude-empty
+  - name: token-vault-exchange
+    config:
+      credential:
+        inbound:
+          location: header
+          name: apikey
+          prefix: ""
+      directory: my-directory
+      provider: anthropic
+      storage:
+        backend: konnect
+      subject_token_type: api_key
+    route: anthropic-messages-6
+    model: claude-empty
+  - name: ai-model-selector
+    config:
+      max_request_body_size: 32000000
+      sources:
+        - body_path: model
+          source: body
+    route: anthropic-messages-7
+  - name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/generation
+      llm_format: anthropic
+      max_request_body_size: 32000000
+      targets:
+        - description: claude-sonnet
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: claude-outbound
+            name: claude-sonnet
+            options:
+              anthropic_version: "2023-06-01"
+            provider: anthropic
+          route_type: llm/v1/chat
+    route: anthropic-messages-7
     model: claude-outbound
   - name: token-vault-exchange
     config:
@@ -308,7 +357,7 @@ plugins:
       storage:
         backend: konnect
       subject_token_type: api_key
-    route: anthropic-messages-6
+    route: anthropic-messages-7
     model: claude-outbound
   - name: key-auth
     route: anthropic-messages
@@ -332,10 +381,13 @@ plugins:
     route: anthropic-messages-5
   - name: key-auth
     route: anthropic-messages-6
+  - name: key-auth
+    route: anthropic-messages-7
 ai_models:
   - name: claude
   - name: claude-custom
   - name: claude-explicit
   - name: claude-body
   - name: claude-multi
+  - name: claude-empty
   - name: claude-outbound

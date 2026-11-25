@@ -589,9 +589,28 @@ func TestDeriveExchangeInboundFirstHeaderStrategy(t *testing.T) {
 		Access: aigw.ModelAccess{AuthStrategies: []string{"body-key", "header-key"}},
 	}
 	cfg := map[string]any{}
-	c.deriveTokenVaultExchangeInbound(src, m, "anthropic-vault", field, cfg)
+	c.deriveTokenVaultExchangeInbound(src, m, field, cfg)
 	in := cfg["credential"].(map[string]any)["inbound"].(map[string]any)
 	require.Equal(t, "second-key", in["name"], "the header strategy is derived")
+	require.Empty(t, c.issues, "the derived default is silent")
+
+	// An inbound block that names no location counts as unset: the
+	// derivation still applies.
+	c = &Converter{authStrategies: map[string]*aigw.AuthStrategy{
+		"header-key": {
+			Name: "header-key", Type: "key-auth",
+			Config: map[string]any{"key_names": []any{"second-key"}},
+		},
+	}}
+	m = &aigw.Model{
+		Name:   "claude",
+		Access: aigw.ModelAccess{AuthStrategies: []string{"header-key"}},
+	}
+	cfg = map[string]any{"credential": map[string]any{"inbound": map[string]any{}}}
+	c.deriveTokenVaultExchangeInbound(src, m, field, cfg)
+	in = cfg["credential"].(map[string]any)["inbound"].(map[string]any)
+	require.Equal(t, "second-key", in["name"], "the empty inbound block is derived")
+	require.Empty(t, c.issues, "the derived default is silent")
 
 	// Every key-auth strategy reads the body: the default stays, one warning.
 	c = &Converter{authStrategies: map[string]*aigw.AuthStrategy{
@@ -605,7 +624,7 @@ func TestDeriveExchangeInboundFirstHeaderStrategy(t *testing.T) {
 		Access: aigw.ModelAccess{AuthStrategies: []string{"body-key"}},
 	}
 	cfg = map[string]any{}
-	c.deriveTokenVaultExchangeInbound(src, m, "anthropic-vault", field, cfg)
+	c.deriveTokenVaultExchangeInbound(src, m, field, cfg)
 	require.Empty(t, cfg, "the default inbound stays")
 	require.Len(t, c.issues, 1)
 	require.Equal(t, BehaviorMayDiffer, c.issues[0].Code)
@@ -617,7 +636,7 @@ func TestDeriveExchangeInboundFirstHeaderStrategy(t *testing.T) {
 		Access: aigw.ModelAccess{AuthStrategies: []string{"oidc"}},
 	}
 	cfg = map[string]any{}
-	c.deriveTokenVaultExchangeInbound(src, m, "anthropic-vault", field, cfg)
+	c.deriveTokenVaultExchangeInbound(src, m, field, cfg)
 	require.Empty(t, cfg, "the default inbound stays")
 	require.Empty(t, c.issues, "no issue without a key-auth strategy")
 }

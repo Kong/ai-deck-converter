@@ -109,9 +109,11 @@ func TokenVaultNeedsInbound(tv *aigw.TokenVaultConfig) bool {
 // block exists and names no inbound credential location. The token-vault-
 // exchange path works on the emitted plugin config, so it branches on this
 // rule the same way the ai-mcp-proxy path branches on TokenVaultNeedsInbound.
+// An inbound block that names no location counts as unset: both rules lower
+// the block with tokenVaultLocationFromPlugin, so they cannot drift.
 func TokenVaultPluginNeedsInbound(cfg map[string]any) bool {
 	cred := getAnyMap(cfg, "credential")
-	return cred == nil || getAnyMap(cred, "inbound") == nil
+	return cred == nil || tokenVaultLocationFromPlugin(getAnyMap(cred, "inbound")) == nil
 }
 
 // TokenVaultInboundFromKeyAuth derives the token_vault inbound credential

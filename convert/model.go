@@ -394,13 +394,15 @@ func (c *Converter) appendTokenVaultExchange(pg *proxyGroup, model *kong.StringR
 // credential from the model's first key-auth strategy that reads a header.
 // The plugin default inbound Authorization Bearer does not match where
 // key-auth expects the credential. An explicit inbound is never touched.
+// The derived value is silent: it fills a field the user never set, and a
+// default the converter applies to an unset field is not an issue
+// (docs/decisions/00207).
 func (c *Converter) deriveTokenVaultExchangeInbound(
-	src ConversionIssueSource, m *aigw.Model, provider, field string, cfg map[string]any,
+	src ConversionIssueSource, m *aigw.Model, field string, cfg map[string]any,
 ) {
 	if !aimap.TokenVaultPluginNeedsInbound(cfg) {
 		return
 	}
-	var idp *aigw.AuthStrategy
 	var loc *aigw.TokenVaultCredentialLocation
 	var keyAuthSeen bool
 	for _, ref := range m.Access.AuthStrategies {
@@ -410,11 +412,11 @@ func (c *Converter) deriveTokenVaultExchangeInbound(
 		}
 		keyAuthSeen = true
 		if l := aimap.TokenVaultInboundFromKeyAuth(s.Config); l != nil {
-			idp, loc = s, l
+			loc = l
 			break
 		}
 	}
-	if idp == nil {
+	if loc == nil {
 		// The model keeps the default inbound. No key-auth strategy can
 		// supply a header location for the exchange.
 		if keyAuthSeen {
@@ -432,11 +434,6 @@ func (c *Converter) deriveTokenVaultExchangeInbound(
 		cfg["credential"] = cred
 	}
 	cred["inbound"] = aimap.TokenVaultLocationToPlugin(loc)
-	c.warn(src.at(field), ConfigFieldOverridden,
-		"Model %q: token_vault.credential.inbound of provider %q is derived from the key-auth strategy %q "+
-			"(header %q, its first key name, no prefix), because the plugin default "+
-			"Authorization: Bearer does not match where key-auth reads the key.",
-		m.Name, provider, idp.Name, loc.Name)
 }
 
 // convertModelOnce runs fn for the model at index i. A skipped model only
@@ -629,7 +626,7 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 	// derivation therefore serves the whole model. The token vault is the
 	// first target's, so targets[0] is its producing target.
 	if tokenVault != nil {
-		c.deriveTokenVaultExchangeInbound(src, m, targets[0].provider.Name,
+		c.deriveTokenVaultExchangeInbound(src, m,
 			fmt.Sprintf("targets[%d].provider.token_vault.credential.inbound", targets[0].index),
 			tokenVault)
 	}
