@@ -14,6 +14,10 @@ import (
 
 const authStrategyTypeOpenIDConnect = "openid-connect"
 
+// authStrategyTypeKeyAuth is the auth strategy type whose plugin carries the
+// caller's key in a configured header.
+const authStrategyTypeKeyAuth = "key-auth"
+
 // enableCredentialManagerKey is the token_vault key of an auth strategy that
 // turns on all Token Vault output.
 const enableCredentialManagerKey = "enable_credential_manager" //nolint:gosec
@@ -495,9 +499,9 @@ func (c *Converter) secureTokenVaultCallbackRoute() {
 	})
 }
 
-// revealTokenVaultCredentials sets hide_credentials to false on each
-// openid-connect plugin of a route that uses a Token Vault. The Token Vault
-// plugins read the subject token of the caller from the request.
+// revealTokenVaultCredentials sets hide_credentials to false on each key-auth
+// and openid-connect plugin of a route that uses a Token Vault. The Token
+// Vault plugins read the caller's credential from the request.
 func (c *Converter) revealTokenVaultCredentials() {
 	routes := c.tokenVaultRouteNames()
 	if len(routes) == 0 {
@@ -559,26 +563,43 @@ func (c *Converter) tokenVaultRouteNames() map[string]bool {
 }
 
 // revealedTokenVaultPlugins returns a copy of plugins in which each selected
-// openid-connect plugin has hide_credentials set to false. It reports false
-// when no plugin changes, and then returns plugins unchanged.
+// key-auth or openid-connect plugin has hide_credentials set to false. It
+// reports false when no plugin changes, and then returns plugins unchanged.
 func (c *Converter) revealedTokenVaultPlugins(
 	plugins []kong.Plugin, selected func(kong.Plugin) bool,
 ) ([]kong.Plugin, bool) {
 	var out []kong.Plugin
 	for i, p := range plugins {
-		if p.Name != authStrategyTypeOpenIDConnect || !selected(p) {
+		if p.Name != authStrategyTypeOpenIDConnect && p.Name != authStrategyTypeKeyAuth {
+			continue
+		}
+		if !selected(p) {
+			continue
+		}
+		// A key-auth credential is only consumed when the route's exchange
+		// reads it from the key-auth header. An exchange that reads an
+		// explicit inbound elsewhere leaves the header unconsumed, so the
+		// credential stays hidden: revealing it would forward the caller's
+		// key to the upstream provider.
+		if p.Name == authStrategyTypeKeyAuth && !tokenVaultExchangeReadsKeyAuth(plugins, p) {
 			continue
 		}
 		if hide, _ := p.Config["hide_credentials"].(bool); !hide {
 			continue
 		}
+		// The openid-connect subject token and the key-auth key are both
+		// credentials of the caller that the Token Vault reads from the
+		// request.
+		reason := "because the Token Vault reads the subject token of the caller from the request"
+		if p.Name == authStrategyTypeKeyAuth {
+			reason = "because the Token Vault reads the credential of the caller from the request"
+		}
 		if p.Source != nil {
 			c.warn(issueSource(kindAuthStrategy, p.Source.EntityName).at("config.hide_credentials"),
 				ConfigFieldOverridden,
 				"auth strategy %q sets config.hide_credentials to true. "+
-					"On a route that uses a Token Vault, hide_credentials will be overridden to false, "+
-					"because the Token Vault reads the subject token of the caller from the request.",
-				p.Source.EntityName)
+					"On a route that uses a Token Vault, hide_credentials will be overridden to false, %s.",
+				p.Source.EntityName, reason)
 		}
 		if out == nil {
 			out = slices.Clone(plugins)
@@ -591,6 +612,34 @@ func (c *Converter) revealedTokenVaultPlugins(
 		return plugins, false
 	}
 	return out, true
+}
+
+// tokenVaultExchangeReadsKeyAuth reports whether the token-vault-exchange
+// plugin of keyAuth's route reads its inbound credential from the location
+// the key-auth config derives. It returns false when the route has no
+// exchange plugin or when the exchange reads an explicit inbound elsewhere:
+// there nothing consumes the key-auth header, so the credential stays
+// hidden.
+func tokenVaultExchangeReadsKeyAuth(plugins []kong.Plugin, keyAuth kong.Plugin) bool {
+	if keyAuth.Route == nil {
+		return false
+	}
+	for _, q := range plugins {
+		if q.Name != tokenVaultExchangePlugin || q.Route == nil || *q.Route != *keyAuth.Route {
+			continue
+		}
+		cred, _ := q.Config["credential"].(map[string]any)
+		inbound, _ := cred["inbound"].(map[string]any)
+		if inbound == nil {
+			return false
+		}
+		loc := aimap.TokenVaultInboundFromKeyAuth(keyAuth.Config)
+		if loc == nil {
+			return false
+		}
+		return maps.Equal(inbound, aimap.TokenVaultLocationToPlugin(loc))
+	}
+	return false
 }
 
 // credentialManagerRoute adds the routes of the auth strategy that serve the

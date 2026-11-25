@@ -99,20 +99,25 @@ func TokenVaultFromPlugin(block map[string]any) *aigw.TokenVaultConfig {
 }
 
 // TokenVaultNeedsInbound reports whether tv exists and names no inbound
-// credential location. Convert derives the inbound when this holds. Revert
-// warns for the shapes it can pair with a key-auth plugin.
+// credential location. An inbound block that decodes with no fields (e.g.
+// `credential.inbound: {}`) names no location either: the serializer drops
+// it, so the rule lowers the location and counts it as unset. Convert derives
+// the inbound when this holds. Revert warns for the shapes it can pair with a
+// key-auth plugin.
 func TokenVaultNeedsInbound(tv *aigw.TokenVaultConfig) bool {
-	return tv != nil && (tv.Credential == nil || tv.Credential.Inbound == nil)
+	return tv != nil && (tv.Credential == nil || TokenVaultLocationToPlugin(tv.Credential.Inbound) == nil)
 }
 
 // TokenVaultPluginNeedsInbound reports whether a token-vault plugin config
 // block exists and names no inbound credential location. The token-vault-
 // exchange path works on the emitted plugin config, so it branches on this
 // rule the same way the ai-mcp-proxy path branches on TokenVaultNeedsInbound.
-// An empty inbound block counts as unset: lowering drops it, so both rules
-// judge the emptiness with tokenVaultLocationFromPlugin and cannot drift. A
-// block with fields counts as explicit even without a location: it is
-// user-set content the lowering preserves.
+// This rule reads the raw block: an empty inbound block counts as unset, and
+// a block with fields counts as explicit even without a location, because it
+// is user-set content the lifting preserves. TokenVaultNeedsInbound instead
+// lowers the typed location, so an inbound whose fields the model cannot
+// represent counts as unset there; the two agree on every inbound block the
+// model can represent.
 func TokenVaultPluginNeedsInbound(cfg map[string]any) bool {
 	cred := getAnyMap(cfg, "credential")
 	return cred == nil || tokenVaultLocationFromPlugin(getAnyMap(cred, "inbound")) == nil

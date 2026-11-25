@@ -29,6 +29,14 @@ auth_strategies:
     display_name: API Key Multi
     config:
       key_names: [multi-first, multi-second]
+  # hide_credentials: true would strip the derived header before the exchange
+  # reads it, so the plugin reveals the credential
+  - name: api-key-hidden
+    type: key-auth
+    display_name: API Key Hidden
+    config:
+      key_names: [hidden-key]
+      hide_credentials: true
 
 models:
   - name: claude
@@ -141,6 +149,40 @@ models:
           type: anthropic
     access:
       auth_strategies: [api-key-default]
+  # the strategy hides its key: the derived inbound survives only when the
+  # plugin reveals the credential
+  - name: claude-hidden
+    type: model
+    capabilities: [generate]
+    formats:
+      - type: anthropic
+    config:
+      route:
+        paths: [/ai/claude-hidden]
+    targets:
+      - name: claude-sonnet
+        provider: anthropic-vault
+        config:
+          type: anthropic
+    access:
+      auth_strategies: [api-key-hidden]
+  # the exchange reads an explicit inbound elsewhere, so the hidden key-auth
+  # header is unconsumed: the plugin keeps hide_credentials and warns nothing
+  - name: claude-explicit-hidden
+    type: model
+    capabilities: [generate]
+    formats:
+      - type: anthropic
+    config:
+      route:
+        paths: [/ai/claude-explicit-hidden]
+    targets:
+      - name: claude-sonnet
+        provider: anthropic-explicit
+        config:
+          type: anthropic
+    access:
+      auth_strategies: [api-key-hidden]
 
 model_providers:
   - name: anthropic-vault
