@@ -1,0 +1,23 @@
+# meta serves chat and responses in the openai format, and Messages in the
+# anthropic format. A target without upstream_url uses the Meta Model API
+# default.
+model_providers:
+  - name: meta-prod
+    type: meta
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "Bearer {vault://ai/meta-token}"
+models:
+  - name: muse-spark
+    type: model
+    capabilities: [generate, agentic]
+    formats: [{type: openai}, {type: anthropic}]
+    config:
+      route: {paths: [/meta]}
+    targets:
+      - name: muse-spark-1.3
+        provider: meta-prod
+        config: {type: meta}

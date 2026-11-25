@@ -1,0 +1,43 @@
+# meta needs 2.4. At 2.3:
+# - a meta target on another model is absent with a warning;
+# - a model whose only target is meta is absent with an error.
+model_providers:
+  - name: meta-prod
+    type: meta
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "Bearer {vault://ai/meta-token}"
+  - name: openai-prod
+    type: openai
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://ai/openai-token}"
+models:
+  - name: mixed-chat
+    type: model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/mixed]}
+    targets:
+      - name: gpt-4o
+        provider: openai-prod
+        config: {type: openai}
+      - name: muse-spark-1.3
+        provider: meta-prod
+        config: {type: meta}
+  - name: only-meta
+    type: model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/only]}
+    targets:
+      - name: muse-spark-1.3
+        provider: meta-prod
