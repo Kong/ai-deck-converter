@@ -47,6 +47,34 @@ func TestSessionAffinityBecomesConversationState(t *testing.T) {
 			balancer: `{algorithm: priority, session_affinity: {enabled: false}}`,
 			want:     map[string]any{"enabled": false, "strategy": "local"},
 		},
+		"inline redis nested blocks become flat fields": {
+			balancer: `{algorithm: round-robin, session_affinity: {enabled: true, ttl: 60, storage: ` +
+				`{type: redis, host: inline.internal, ` +
+				`keepalive: {pool_size: 256, backlog: 20}, ` +
+				`sentinel: {master: mymaster, role: master, nodes: [{host: sentinel.internal, port: 26379}]}, ` +
+				`cluster: {max_redirections: 5, nodes: [{ip: cluster.internal, port: 6379}]}, ` +
+				`cloud_authentication: {type: aws, cache_name: my-cache, region: us-east-1}}}}`,
+			want: map[string]any{
+				"enabled":  true,
+				"ttl":      60,
+				"strategy": "redis",
+				"redis": map[string]any{
+					"host":                     "inline.internal",
+					"keepalive_pool_size":      256,
+					"keepalive_backlog":        20,
+					"sentinel_master":          "mymaster",
+					"sentinel_role":            "master",
+					"sentinel_nodes":           []any{map[string]any{"host": "sentinel.internal", "port": 26379}},
+					"cluster_max_redirections": 5,
+					"cluster_nodes":            []any{map[string]any{"ip": "cluster.internal", "port": 6379}},
+					"cloud_authentication": map[string]any{
+						"auth_provider":  "aws",
+						"aws_cache_name": "my-cache",
+						"aws_region":     "us-east-1",
+					},
+				},
+			},
+		},
 		"redis gets the datastore connection": {
 			balancer: `{algorithm: round-robin, session_affinity: ` +
 				`{enabled: true, ttl: 21600, storage: {type: redis, datastore: {name: shared-redis}}}}`,

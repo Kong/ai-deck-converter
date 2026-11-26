@@ -2333,14 +2333,48 @@ func (c *Converter) modelConversationState(
 }
 
 // inlineRedisConfig returns the inline Redis connection from a session affinity
-// storage block. The type and datastore keys are not connection fields.
+// storage block, in the flat plugin shape. The type and datastore keys are not
+// connection fields.
 func inlineRedisConfig(storage map[string]any) map[string]any {
-	out := map[string]any{}
+	out := make(map[string]any, len(storage))
 	for k, v := range storage {
 		if k != "type" && k != "datastore" {
 			out[k] = v
 		}
 	}
+	return flattenRedisBlocks(out)
+}
+
+// flattenRedisBlocks changes the nested Redis blocks of the API form to the
+// flat plugin form. Flat input stays unchanged.
+func flattenRedisBlocks(in map[string]any) map[string]any {
+	out := maps.Clone(in)
+	for _, prefix := range []string{"cluster", "keepalive", "sentinel"} {
+		block, ok := out[prefix].(map[string]any)
+		if !ok {
+			continue
+		}
+		delete(out, prefix)
+		for k, v := range block {
+			out[prefix+"_"+k] = v
+		}
+	}
+
+	auth, ok := out["cloud_authentication"].(map[string]any)
+	if !ok {
+		return out
+	}
+	provider, _ := auth["type"].(string)
+	if provider == "" {
+		return out
+	}
+	flat := map[string]any{"auth_provider": provider}
+	for k, v := range auth {
+		if k != "type" {
+			flat[provider+"_"+k] = v
+		}
+	}
+	out["cloud_authentication"] = flat
 	return out
 }
 
