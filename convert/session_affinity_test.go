@@ -75,6 +75,22 @@ func TestSessionAffinityBecomesConversationState(t *testing.T) {
 				},
 			},
 		},
+		"alternate node spellings become canonical": {
+			balancer: `{algorithm: round-robin, session_affinity: {enabled: true, storage: ` +
+				`{type: redis, host: inline.internal, ` +
+				`sentinel: {master: mymaster, nodes: [{ip: sentinel.internal, port: 26379}]}, ` +
+				`cluster: {nodes: [{host: cluster.internal, port: 6379}]}}}}`,
+			want: map[string]any{
+				"enabled":  true,
+				"strategy": "redis",
+				"redis": map[string]any{
+					"host":            "inline.internal",
+					"sentinel_master": "mymaster",
+					"sentinel_nodes":  []any{map[string]any{"host": "sentinel.internal", "port": 26379}},
+					"cluster_nodes":   []any{map[string]any{"ip": "cluster.internal", "port": 6379}},
+				},
+			},
+		},
 		"redis gets the datastore connection": {
 			balancer: `{algorithm: round-robin, session_affinity: ` +
 				`{enabled: true, ttl: 21600, storage: {type: redis, datastore: {name: shared-redis}}}}`,

@@ -2356,6 +2356,9 @@ func flattenRedisBlocks(in map[string]any) map[string]any {
 		}
 		delete(out, prefix)
 		for k, v := range block {
+			if k == "nodes" {
+				v = canonicalNodes(prefix, v)
+			}
 			out[prefix+"_"+k] = v
 		}
 	}
@@ -2376,6 +2379,43 @@ func flattenRedisBlocks(in map[string]any) map[string]any {
 	}
 	out["cloud_authentication"] = flat
 	return out
+}
+
+// canonicalNodes changes the address key of each node to the one the plugin
+// declares. Sentinel nodes use host, cluster nodes use ip. The API accepts
+// either spelling, so the alternate one maps to the canonical key.
+func canonicalNodes(prefix string, raw any) any {
+	canonical, alternate := "host", "ip"
+	if prefix == "cluster" {
+		canonical, alternate = "ip", "host"
+	}
+	list, ok := raw.([]any)
+	if !ok {
+		return raw
+	}
+	nodes := make([]any, 0, len(list))
+	for _, rawNode := range list {
+		node, ok := rawNode.(map[string]any)
+		if !ok {
+			nodes = append(nodes, rawNode)
+			continue
+		}
+		addr := node[canonical]
+		if addr == nil {
+			addr = node[alternate]
+		}
+		flat := make(map[string]any, len(node))
+		for k, v := range node {
+			if k != "host" && k != "ip" {
+				flat[k] = v
+			}
+		}
+		if addr != nil {
+			flat[canonical] = addr
+		}
+		nodes = append(nodes, flat)
+	}
+	return nodes
 }
 
 func basePaths(m *aigw.Model) []string {
