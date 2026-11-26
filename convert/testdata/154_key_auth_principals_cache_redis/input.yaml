@@ -1,0 +1,49 @@
+# A key-auth strategy with a principals_cache pepper and a redis-ee datastore.
+# The datastore connection goes to config.principals_cache.redis.
+datastores:
+  - type: redis-ee
+    name: shared-redis
+    config:
+      host: redis-ee.internal
+      port: 6379
+      password: "{vault://env/redis-password}"
+      ssl: true
+auth_strategies:
+  - display_name: Key Auth
+    name: key-auth-principals
+    type: key-auth
+    datastores:
+      - name: shared-redis
+    config:
+      principals:
+        enabled: true
+        directory: my-directory
+      principals_cache:
+        pepper: '{vault://env/principals-cache-pepper}'
+models:
+  - display_name: OpenAI Prod - GPT-5.4
+    name: openai-gpt-5-4
+    type: model
+    capabilities: [generate]
+    formats:
+      - type: openai
+    config:
+      route:
+        paths: [/ai]
+    targets:
+      - name: gpt-5.4
+        provider: openai-prod
+        config:
+          type: openai
+    access:
+      auth_strategies: [key-auth-principals]
+model_providers:
+  - name: openai-prod
+    type: openai
+    display_name: OpenAI Prod
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://ai/openai-token}"

@@ -1,0 +1,8 @@
+- code: UNSUPPORTED_IN_MIN_RUNTIME_VERSION
+  reason: config.principals_cache requires minimum runtime version "2.4", but the configured minimum is "2.3"
+  source:
+    kind: auth_strategy
+    name: key-auth-principals
+    fields:
+      - config.principals_cache
+  severity: ERROR

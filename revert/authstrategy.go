@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"maps"
 	"reflect"
+	"slices"
 
 	"github.com/Kong/ai-deck-converter/internal/aigw"
+	"github.com/Kong/ai-deck-converter/internal/aimap"
 	"github.com/Kong/ai-deck-converter/internal/kong"
 )
 
@@ -19,22 +21,24 @@ import (
 // base plugin and the AI Gateway model has no clone type.
 func (r *Reverter) registerAuthStrategy(p kong.Plugin, idpType string) *aigw.AuthStrategy {
 	cfg := stripSyntheticAuthFields(idpType, p.Config)
+	cfg, datastores := r.liftPrincipalsCacheRedis(idpType, cfg)
 
 	for i := range r.authStrategies {
 		existing := &r.authStrategies[i]
 		if existing.Type != idpType {
 			continue
 		}
-		if !reflect.DeepEqual(existing.Config, cfg) {
+		if !reflect.DeepEqual(existing.Config, cfg) || !reflect.DeepEqual(existing.Datastores, datastores) {
 			continue
 		}
 		return existing
 	}
 
 	idp := aigw.AuthStrategy{
-		Type:   idpType,
-		Name:   r.uniqueAuthStrategyName(idpType),
-		Config: cfg,
+		Type:       idpType,
+		Name:       r.uniqueAuthStrategyName(idpType),
+		Config:     cfg,
+		Datastores: datastores,
 	}
 	r.authStrategies = append(r.authStrategies, idp)
 	return &r.authStrategies[len(r.authStrategies)-1]
@@ -105,4 +109,59 @@ func withoutHiddenAccessTokenHeader(cfg map[string]any) map[string]any {
 	out := maps.Clone(cfg)
 	delete(out, "upstream_access_token_header")
 	return out
+}
+
+// liftPrincipalsCacheRedis moves the principals cache connection of an auth
+// plugin config into a redis-ee Datastore. It returns the config without the
+// connection and a reference to the Datastore. Convert puts the connection at
+// principals_cache.redis for key-auth. It puts it at redis for openid-connect,
+// with principals_cache.strategy set to redis. Other configs stay as they are.
+func (r *Reverter) liftPrincipalsCacheRedis(idpType string, cfg map[string]any) (map[string]any, []aigw.DatastoreRef) {
+	cache, ok := cfg["principals_cache"].(map[string]any)
+	if !ok {
+		return cfg, nil
+	}
+	out := maps.Clone(cfg)
+	cacheOut := maps.Clone(cache)
+	out["principals_cache"] = cacheOut
+
+	var connection map[string]any
+	switch idpType {
+	case "key-auth":
+		connection, _ = cache["redis"].(map[string]any)
+		delete(cacheOut, "redis")
+	case "openid-connect":
+		if getStr(cache, "strategy") != aimap.PrincipalsCacheStrategyRedis {
+			return cfg, nil
+		}
+		connection, _ = cfg["redis"].(map[string]any)
+		delete(cacheOut, "strategy")
+		delete(out, "redis")
+	}
+	if connection == nil {
+		return cfg, nil
+	}
+	return out, []aigw.DatastoreRef{{Name: r.redisDatastoreName(connection)}}
+}
+
+// redisDatastoreName adds a redis-ee Datastore for the connection and returns
+// its name. Equal connections share one Datastore.
+func (r *Reverter) redisDatastoreName(connection map[string]any) string {
+	for _, ds := range r.out.Datastores {
+		if ds.Type == aimap.DatastoreTypeRedisEE && reflect.DeepEqual(ds.Config, connection) {
+			return ds.Name
+		}
+	}
+	name := aimap.DatastoreTypeRedisEE
+	for n := 2; r.datastoreNameUsed(name); n++ {
+		name = fmt.Sprintf("%s-%d", aimap.DatastoreTypeRedisEE, n)
+	}
+	r.out.Datastores = append(r.out.Datastores, aigw.Datastore{
+		Name: name, Type: aimap.DatastoreTypeRedisEE, Config: connection,
+	})
+	return name
+}
+
+func (r *Reverter) datastoreNameUsed(name string) bool {
+	return slices.ContainsFunc(r.out.Datastores, func(ds aigw.Datastore) bool { return ds.Name == name })
 }

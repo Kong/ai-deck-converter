@@ -897,7 +897,7 @@ func TestAuthStrategyTokenVaultNonTokenVaultDatastoreFails(t *testing.T) {
 	res, _ := Convert([]byte(`
 datastores:
   - name: redis
-    type: redis-ee
+    type: redis-ce
     config: {host: localhost}
 auth_strategies:
   - name: sso

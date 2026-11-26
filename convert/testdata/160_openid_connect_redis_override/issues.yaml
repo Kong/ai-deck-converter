@@ -1,0 +1,8 @@
+- code: CONFIG_FIELD_OVERRIDDEN
+  reason: auth strategy "okta-oidc" sets config.redis and references a "redis-ee" datastore with config.principals_cache. This will be ignored, and config.redis will be overridden by the datastore connection. The openid-connect plugin has one redis block, which session storage also uses.
+  source:
+    kind: auth_strategy
+    name: okta-oidc
+    fields:
+      - config.redis
+  severity: WARNING

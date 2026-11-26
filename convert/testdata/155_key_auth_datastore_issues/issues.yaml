@@ -1,0 +1,16 @@
+- code: CONFIG_FIELD_IGNORED
+  reason: auth strategy "no-cache" references a "redis-ee" datastore, but sets no config.principals_cache. The datastore is not used.
+  source:
+    kind: auth_strategy
+    name: no-cache
+    fields:
+      - datastores
+  severity: WARNING
+- code: CONFIG_FIELD_INVALID
+  reason: auth strategy "two-redis" references more than one "redis-ee" datastore
+  source:
+    kind: auth_strategy
+    name: two-redis
+    fields:
+      - datastores[1].name
+  severity: ERROR

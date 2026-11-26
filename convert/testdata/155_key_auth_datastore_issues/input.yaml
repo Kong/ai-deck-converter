@@ -1,0 +1,52 @@
+# Invalid key-auth datastore references. "no-cache" has a redis-ee datastore
+# but no principals_cache, so the datastore is unused. "two-redis" references
+# two redis-ee datastores.
+datastores:
+  - type: redis-ee
+    name: redis-a
+    config:
+      host: a.internal
+  - type: redis-ee
+    name: redis-b
+    config:
+      host: b.internal
+auth_strategies:
+  - display_name: No cache
+    name: no-cache
+    type: key-auth
+    datastores:
+      - name: redis-a
+  - display_name: Two redis
+    name: two-redis
+    type: key-auth
+    config:
+      principals_cache:
+        pepper: '{vault://env/pepper}'
+    datastores:
+      - name: redis-a
+      - name: redis-b
+models:
+  - display_name: M1
+    name: m1
+    type: model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    config: {route: {paths: [/m1]}}
+    targets: [{name: gpt, provider: p, config: {type: openai}}]
+    access: {auth_strategies: [no-cache]}
+  - display_name: M2
+    name: m2
+    type: model
+    capabilities: [generate]
+    formats: [{type: openai}]
+    config: {route: {paths: [/m2]}}
+    targets: [{name: gpt, provider: p, config: {type: openai}}]
+    access: {auth_strategies: [two-redis]}
+model_providers:
+  - name: p
+    type: openai
+    display_name: P
+    config:
+      auth:
+        type: basic
+        headers: [{name: Authorization, value: "{vault://ai/t}"}]

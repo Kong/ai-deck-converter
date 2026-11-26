@@ -94,6 +94,7 @@ const (
 	FeatureAuthStrategyTokenVault     Feature = "auth-strategy-token-vault"
 	FeatureMeta                       Feature = "meta"
 	FeatureAgentTargets               Feature = "agent-targets"
+	FeaturePrincipalsCache            Feature = "principals-cache"
 	// FeatureProviderBodySize gives a model without max_request_body_size the
 	// limit of its providers. Older releases keep the plugin default.
 	FeatureProviderBodySize Feature = "provider-body-size"
@@ -149,6 +150,7 @@ var featureSince = map[Feature]Version{
 	FeatureSagemaker:                     mustVersion("2.1"),
 	FeatureAuthStrategyTokenVault:        mustVersion("2.3"),
 	FeatureAgentTargets:                  mustVersion("2.4"),
+	FeaturePrincipalsCache:               mustVersion("2.4"),
 	FeatureProviderBodySize:              mustVersion("2.4"),
 	FeatureMCPTargets:                    mustVersion("2.4"),
 	FeatureOIDCProtectedResourceMetadata: mustVersion("2.3"),
