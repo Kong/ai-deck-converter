@@ -16,20 +16,22 @@ import (
 
 const noStrategyTokenVault = "revert does not lift auth strategy token_vault or the callback route"
 
+const noExchange = "revert does not lift token-vault-exchange or the callback route"
+
 // roundTripSkip lists forward golden cases whose reverse direction is not (yet)
 // implemented, so the round-trip gate skips them instead of failing. The
 // forward golden itself is still asserted by convert's TestGolden.
 var roundTripSkip = map[string]string{
-	"92_model_provider_token_vault":              "revert does not lift token-vault-exchange or the callback route",
-	"126_model_provider_token_vault_key_auth":    "revert lifts the exchange as a policy, so reconversion derives nothing",
-	"93_auth_strategy_token_vault_non_oidc":      "revert does not lift auth strategy token_vault or the callback route",
-	"94_token_vault_all_plugins_dbless":          "revert does not lift token-vault-exchange or the callback route",
-	"96_auth_strategy_token_vault_mcp_oauth2":    "revert does not lift auth strategy token_vault or the callback route",
-	"95_auth_strategy_token_vault":               "revert does not lift auth strategy token_vault or the callback route",
-	"98_auth_strategy_token_vault_callback_only": "revert does not lift auth strategy datastores or the callback route",
-	"111_auth_strategy_token_vault_redirect_uri": "revert does not lift auth strategy token_vault or the callback route",
-	"149_shared_api_model_body_size":             "revert does not split type api models that share one route",
-	"151_token_vault_realtime_websocket":         "revert does not lift token-vault-exchange or the callback route",
+	"92_model_provider_token_vault":                  noExchange,
+	"126_model_provider_token_vault_key_auth":        "revert lifts the exchange as a policy, so convert does nothing",
+	"93_auth_strategy_token_vault_non_oidc":          noStrategyTokenVault,
+	"94_token_vault_all_plugins_dbless":              noExchange,
+	"96_auth_strategy_token_vault_mcp_oauth2":        noStrategyTokenVault,
+	"95_auth_strategy_token_vault":                   noStrategyTokenVault,
+	"98_auth_strategy_token_vault_callback_only":     "revert does not lift strategy datastores or the callback route",
+	"111_auth_strategy_token_vault_redirect_uri":     noStrategyTokenVault,
+	"149_shared_api_model_body_size":                 "revert does not split type api models that share one route",
+	"151_token_vault_realtime_websocket":             noExchange,
 	"156_auth_strategy_token_vault_second_datastore": noStrategyTokenVault,
 }
 
