@@ -48,6 +48,7 @@ var allFeatures = []Feature{
 	FeatureTypesafe,
 	FeatureDecisionsCapability,
 	FeatureSkillsCapability,
+	FeatureOpenAIDecisions,
 	FeatureFailoverHTTPCodes,
 	FeatureBedrockVPCEndpoint,
 	FeatureBedrockEndpointType,
@@ -146,6 +147,12 @@ func TestFeatureLookups(t *testing.T) {
 	require.False(t, ok)
 	_, ok = CapabilityFeature("openai", "agentic")
 	require.False(t, ok)
+	f, ok = CapabilityFeature("openai", "decisions")
+	require.True(t, ok)
+	require.Equal(t, FeatureOpenAIDecisions, f)
+	f, ok = CapabilityFeature("typesafe", "decisions")
+	require.True(t, ok)
+	require.Equal(t, FeatureDecisionsCapability, f)
 	_, ok = CapabilityFeature("openai", "generate")
 	require.False(t, ok)
 }

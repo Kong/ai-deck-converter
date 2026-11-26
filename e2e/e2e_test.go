@@ -51,6 +51,7 @@ func TestE2E(t *testing.T) {
 		{"mcp_oidc_server_acls", func(t *testing.T) { testMCPOIDCServerACLs(t, license) }},
 		{"mcp_oidc_consumer_acl", func(t *testing.T) { testMCPOIDCConsumerACL(t, license) }},
 		{"token_vault_gates_tools_and_enrolls", func(t *testing.T) { testTokenVaultGatesToolsAndEnrolls(t, license) }},
+		{"openai_decisions_capability", func(t *testing.T) { testOpenAIDecisionsCapability(t, license) }},
 		{"realtime_model_websocket_transport", func(t *testing.T) { testRealtimeModelWebSocketTransport(t, license) }},
 		{"wildcard_model_all_endpoints_2_0", func(t *testing.T) {
 			testWildcardModelAllEndpoints(t, license, "wildcard_model_all_endpoints_2_0", "2.0", "kong/kong-ai-gateway:2.0.3")

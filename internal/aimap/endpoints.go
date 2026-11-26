@@ -40,6 +40,7 @@ type EndpointEntry struct {
 
 const (
 	catTextGen    = "text/generation"
+	catDecisions  = "text/decisions"
 	catEmbeddings = "text/embeddings"
 	catImage      = "image/generation"
 	catVideo      = "video/generation"
@@ -342,6 +343,12 @@ var EndpointTable = map[string]map[string]EndpointEntry{
 					"responses-lifecycle", "responses/.+", true, mGetPostDelete,
 					"llm/v1/responses", catTextGen, nil, true,
 				},
+			},
+		},
+		"decisions": {
+			Primary: EndpointSpec{
+				"decisions", "/v1/decisions", false, mPost, "llm/v1/decisions", catDecisions,
+				&defaultBodyModelSelectorConfig, true,
 			},
 		},
 		"realtime": {

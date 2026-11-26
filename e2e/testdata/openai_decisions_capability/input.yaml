@@ -1,0 +1,27 @@
+models:
+  - display_name: GPT-6 Luna decisions
+    name: gpt-6-luna
+    type: model
+    enabled: true
+    capabilities: [ decisions ]
+    formats:
+      - type: openai
+    config:
+      route:
+        paths: [ /ai-decisions ]
+        model:
+          values: [ gpt-6-luna ]
+    targets:
+      - name: gpt-6-luna
+        provider: openai-prod
+        config:
+          type: openai
+model_providers:
+  - name: openai-prod
+    type: openai
+    config:
+      auth:
+        type: basic
+        headers:
+          - name: Authorization
+            value: "{vault://ai/openai-token}"

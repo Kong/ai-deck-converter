@@ -1,0 +1,61 @@
+_format_version: "3.0"
+_transform: false
+services:
+  - id: 947a4e23-b483-5a65-8165-da9aed24565b
+    name: ai-gateway
+    url: http://ai-gateway.upstream.local
+    host: ai-gateway.upstream.local
+    port: 80
+    protocol: http
+routes:
+  - id: 52c3553f-4cf4-5d0f-a934-7e32ed395aa8
+    name: openai-decisions
+    service:
+      id: 947a4e23-b483-5a65-8165-da9aed24565b
+    paths:
+      - /ai-decisions/v1/decisions
+    methods:
+      - POST
+      - OPTIONS
+    protocols:
+      - http
+      - https
+    strip_path: false
+plugins:
+  - id: 17fa8192-4b9f-5b5a-8379-20ad8bc836a7
+    name: ai-model-selector
+    config:
+      max_request_body_size: 50000000
+      sources:
+        - body_path: model
+          source: body
+    route:
+      id: 52c3553f-4cf4-5d0f-a934-7e32ed395aa8
+  - id: f3adc007-171c-5519-8763-3a0eef79bde3
+    name: ai-proxy-advanced
+    config:
+      balancer:
+        algorithm: round-robin
+      genai_category: text/decisions
+      llm_format: openai
+      max_request_body_size: 50000000
+      targets:
+        - auth:
+            header_name: Authorization
+            header_value: '{vault://ai/openai-token}'
+          description: gpt-6-luna
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            model_alias: gpt-6-luna
+            name: gpt-6-luna
+            provider: openai
+          route_type: llm/v1/decisions
+    route:
+      id: 52c3553f-4cf4-5d0f-a934-7e32ed395aa8
+    model:
+      id: e4b3bab8-3ef1-577f-a0b5-60e36b28c2b1
+ai_models:
+  - id: e4b3bab8-3ef1-577f-a0b5-60e36b28c2b1
+    name: gpt-6-luna
