@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -85,6 +86,129 @@ func testSessionAffinitySticksToTarget(t *testing.T, license string) {
 	}
 
 	t.Logf("PASS: the second turn stayed on the first target and new conversations used both targets")
+}
+
+// testSessionAffinityRedisConfig proves a real gateway accepts a redis session
+// affinity storage written with the nested API blocks. The plugin schema has the
+// flat keepalive fields only.
+func testSessionAffinityRedisConfig(t *testing.T, license string) {
+	redisPort := startRedis(t)
+	targetA := startMockUpstreamWithContent(t, "mock-target-a", mockTargetAContent)
+	targetB := startMockUpstreamWithContent(t, "mock-target-b", mockTargetBContent)
+
+	configPath := convertCase(t, "session_affinity_redis", "2.4",
+		patchSessionAffinityRedisConfig(targetA.Port, targetB.Port, redisPort))
+
+	gateway := startGateway(t, GatewayOptions{
+		Image: gatewayImage(t, "kong/kong-ai-gateway:2.4.0"),
+		// shortcut: 2.4.0 is not published yet, run with
+		// AI_GATEWAY_IMAGE=kong/kong-ai-gateway-dev:aigw-master until it is.
+		Config: configPath,
+		Env:    []string{licenseEnv(license)},
+	})
+	gateway.waitReady()
+
+	status, _, body := httpGet(gateway.AdminURL() + "/plugins?size=1000")
+	if status != 200 {
+		t.Fatalf("GET /plugins returned %d:\n%s", status, body)
+	}
+	var plugins struct {
+		Data []struct {
+			Name   string `json:"name"`
+			Config struct {
+				ConversationState map[string]any `json:"conversation_state"`
+			} `json:"config"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(body), &plugins); err != nil {
+		t.Fatalf("decoding /plugins: %v", err)
+	}
+
+	for _, plugin := range plugins.Data {
+		if plugin.Name != "ai-proxy-advanced" {
+			continue
+		}
+		state := plugin.Config.ConversationState
+		redis, _ := state["redis"].(map[string]any)
+		if redis == nil {
+			t.Fatalf("conversation_state has no redis block: %#v", state)
+		}
+		if got := redis["keepalive_pool_size"]; got != float64(256) {
+			t.Fatalf("conversation_state.redis.keepalive_pool_size = %v, want 256", got)
+		}
+		if got := redis["keepalive_backlog"]; got != float64(20) {
+			t.Fatalf("conversation_state.redis.keepalive_backlog = %v, want 20", got)
+		}
+		if nested, ok := redis["keepalive"]; ok {
+			t.Fatalf("conversation_state.redis kept a nested keepalive block: %#v", nested)
+		}
+		if got := redis["host"]; got != "host.docker.internal" {
+			t.Fatalf("conversation_state.redis.host = %v, want the test redis", got)
+		}
+		t.Logf("PASS: the gateway accepted the redis session affinity config with flat keepalive fields")
+		return
+	}
+	t.Fatalf("no ai-proxy-advanced plugin in the loaded config")
+}
+
+// startRedis runs a Redis container for the affinity store and returns its
+// published port. The gateway reaches it through host.docker.internal.
+func startRedis(t *testing.T) int {
+	t.Helper()
+
+	d := dockerCLI{t: t}
+	name := fmt.Sprintf("aidc-e2e-redis-%d", time.Now().UnixNano()%1e6)
+	d.remove(name)
+	port := freePort(t)
+	d.run("run", "-d", "--name", name, "-p", fmt.Sprintf("%d:6379", port), "redis:7-alpine")
+	t.Cleanup(func() { d.remove(name) })
+
+	deadline := time.Now().Add(30 * time.Second)
+	for time.Now().Before(deadline) {
+		if out, err := execCommand("docker", "exec", name, "redis-cli", "ping"); err == nil &&
+			strings.Contains(out, "PONG") {
+			return port
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	t.Fatalf("redis did not become ready\n%s", d.run("logs", name))
+	return 0
+}
+
+// patchSessionAffinityRedisConfig points the targets at the mocks and the redis
+// storage at the test container.
+func patchSessionAffinityRedisConfig(firstPort, secondPort, redisPort int) func([]byte) ([]byte, error) {
+	targets := patchSessionAffinityTargets(firstPort, secondPort)
+	return func(src []byte) ([]byte, error) {
+		patched, err := targets(src)
+		if err != nil {
+			return nil, err
+		}
+
+		var doc yaml.Node
+		if err := yaml.Unmarshal(patched, &doc); err != nil {
+			return nil, fmt.Errorf("parsing patched input.yaml: %w", err)
+		}
+		models := mappingChild(&doc, "models")
+		if models == nil || models.Kind != yaml.SequenceNode || len(models.Content) == 0 {
+			return nil, errors.New("input.yaml has no models list")
+		}
+		storage := mappingChild(mappingChild(mappingChild(models.Content[0], "config"), "balancer"),
+			"session_affinity")
+		if storage != nil {
+			storage = mappingChild(storage, "storage")
+		}
+		if storage == nil {
+			return nil, errors.New("the model has no session affinity storage")
+		}
+		setScalar(storage, "host", "host.docker.internal")
+		setScalar(storage, "port", fmt.Sprint(redisPort))
+		// The plugin schema requires an integer port. setScalar writes strings.
+		if port := mappingChild(storage, "port"); port != nil {
+			port.Tag = "!!int"
+		}
+		return remarshal(&doc)
+	}
 }
 
 type chatMessage struct {

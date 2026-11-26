@@ -28,6 +28,51 @@ func TestSessionAffinityFromConfig(t *testing.T) {
 				"storage": map[string]any{"type": "redis", "host": "inline.internal", "port": 6390},
 			},
 		},
+		"flat blocks become nested again": {
+			cfg: map[string]any{
+				"enabled": true, "ttl": 60, "strategy": "redis",
+				"redis": map[string]any{
+					"host":                     "inline.internal",
+					"keepalive_pool_size":      256,
+					"keepalive_backlog":        20,
+					"sentinel_master":          "mymaster",
+					"sentinel_role":            "master",
+					"sentinel_nodes":           []any{map[string]any{"host": "sentinel.internal", "port": 26379}},
+					"cluster_max_redirections": 5,
+					"cluster_nodes":            []any{map[string]any{"ip": "cluster.internal", "port": 6379}},
+					"cloud_authentication": map[string]any{
+						"auth_provider":  "aws",
+						"aws_cache_name": "my-cache",
+						"aws_region":     "us-east-1",
+					},
+				},
+			},
+			want: map[string]any{
+				"enabled": true, "ttl": 60,
+				"storage": map[string]any{
+					"type": "redis",
+					"host": "inline.internal",
+					"keepalive": map[string]any{
+						"pool_size": 256,
+						"backlog":   20,
+					},
+					"sentinel": map[string]any{
+						"master": "mymaster",
+						"role":   "master",
+						"nodes":  []any{map[string]any{"host": "sentinel.internal", "port": 26379}},
+					},
+					"cluster": map[string]any{
+						"max_redirections": 5,
+						"nodes":            []any{map[string]any{"ip": "cluster.internal", "port": 6379}},
+					},
+					"cloud_authentication": map[string]any{
+						"type":       "aws",
+						"cache_name": "my-cache",
+						"region":     "us-east-1",
+					},
+				},
+			},
+		},
 	}
 
 	for name, tc := range cases {

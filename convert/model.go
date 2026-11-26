@@ -2333,15 +2333,89 @@ func (c *Converter) modelConversationState(
 }
 
 // inlineRedisConfig returns the inline Redis connection from a session affinity
-// storage block. The type and datastore keys are not connection fields.
+// storage block, in the flat plugin shape. The type and datastore keys are not
+// connection fields.
 func inlineRedisConfig(storage map[string]any) map[string]any {
-	out := map[string]any{}
+	out := make(map[string]any, len(storage))
 	for k, v := range storage {
 		if k != "type" && k != "datastore" {
 			out[k] = v
 		}
 	}
+	return flattenRedisBlocks(out)
+}
+
+// flattenRedisBlocks changes the nested Redis blocks of the API form to the
+// flat plugin form. Flat input stays unchanged.
+func flattenRedisBlocks(in map[string]any) map[string]any {
+	out := maps.Clone(in)
+	for _, prefix := range []string{"cluster", "keepalive", "sentinel"} {
+		block, ok := out[prefix].(map[string]any)
+		if !ok {
+			continue
+		}
+		delete(out, prefix)
+		for k, v := range block {
+			if k == "nodes" {
+				v = canonicalNodes(prefix, v)
+			}
+			out[prefix+"_"+k] = v
+		}
+	}
+
+	auth, ok := out["cloud_authentication"].(map[string]any)
+	if !ok {
+		return out
+	}
+	provider, _ := auth["type"].(string)
+	if provider == "" {
+		return out
+	}
+	flat := map[string]any{"auth_provider": provider}
+	for k, v := range auth {
+		if k != "type" {
+			flat[provider+"_"+k] = v
+		}
+	}
+	out["cloud_authentication"] = flat
 	return out
+}
+
+// canonicalNodes changes the address key of each node to the one the plugin
+// declares. Sentinel nodes use host, cluster nodes use ip. The API accepts
+// either spelling, so the alternate one maps to the canonical key.
+func canonicalNodes(prefix string, raw any) any {
+	canonical, alternate := "host", "ip"
+	if prefix == "cluster" {
+		canonical, alternate = "ip", "host"
+	}
+	list, ok := raw.([]any)
+	if !ok {
+		return raw
+	}
+	nodes := make([]any, 0, len(list))
+	for _, rawNode := range list {
+		node, ok := rawNode.(map[string]any)
+		if !ok {
+			nodes = append(nodes, rawNode)
+			continue
+		}
+		addr := node[canonical]
+		if addr == nil {
+			addr = node[alternate]
+		}
+		flat := make(map[string]any, len(node))
+		for k, v := range node {
+			if k != "host" && k != "ip" {
+				flat[k] = v
+			}
+		}
+		if addr != nil {
+			flat[canonical] = addr
+		}
+		nodes = append(nodes, flat)
+	}
+	return nodes
 }
 
 func basePaths(m *aigw.Model) []string {

@@ -1343,9 +1343,7 @@ func sessionAffinityFromConfig(cfg map[string]any) any {
 	if getStr(cfg, "strategy") == "redis" {
 		storage = map[string]any{"type": "redis"}
 		if redis, ok := cfg["redis"].(map[string]any); ok {
-			for k, v := range redis {
-				storage[k] = v
-			}
+			restoreRedisBlocks(storage, redis)
 		}
 	}
 	out := map[string]any{"storage": storage}
@@ -1353,6 +1351,59 @@ func sessionAffinityFromConfig(cfg map[string]any) any {
 		if v, ok := cfg[key]; ok {
 			out[key] = v
 		}
+	}
+	return out
+}
+
+// restoreRedisBlocks changes the flat plugin keys of a redis connection back to
+// the nested API blocks. Keys without a block stay where they are.
+func restoreRedisBlocks(storage, redis map[string]any) {
+	for k, v := range redis {
+		if k == "cloud_authentication" {
+			storage[k] = restoreCloudAuth(v)
+			continue
+		}
+		block, field, ok := cutRedisBlockPrefix(k)
+		if !ok {
+			storage[k] = v
+			continue
+		}
+		nested, _ := storage[block].(map[string]any)
+		if nested == nil {
+			nested = map[string]any{}
+			storage[block] = nested
+		}
+		nested[field] = v
+	}
+}
+
+// cutRedisBlockPrefix splits a flat plugin key into its block and field names.
+func cutRedisBlockPrefix(key string) (string, string, bool) {
+	for _, block := range []string{"cluster", "keepalive", "sentinel"} {
+		if field, ok := strings.CutPrefix(key, block+"_"); ok {
+			return block, field, true
+		}
+	}
+	return "", "", false
+}
+
+// restoreCloudAuth changes the flat cloud auth back to the API variant form.
+// The auth_provider value becomes the type discriminator.
+func restoreCloudAuth(v any) any {
+	auth, ok := v.(map[string]any)
+	if !ok {
+		return v
+	}
+	provider := getStr(auth, "auth_provider")
+	if provider == "" {
+		return auth
+	}
+	out := map[string]any{"type": provider}
+	for k, val := range auth {
+		if k == "auth_provider" {
+			continue
+		}
+		out[strings.TrimPrefix(k, provider+"_")] = val
 	}
 	return out
 }
