@@ -8,10 +8,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
 	"github.com/Kong/ai-deck-converter/convert"
+	"github.com/Kong/ai-deck-converter/internal/aimap"
 	"gopkg.in/yaml.v3"
 )
 
@@ -23,6 +25,7 @@ var flagUpdate bool
 // the snapshot (which stays port- and run-stable) and patched for the running
 // gateway. On -update the snapshot is (re)written instead of compared.
 // minRuntimeVersion is the minor release of the case's default image.
+// An older AI_GATEWAY_IMAGE release skips the case after the snapshot check.
 func convertCase(t *testing.T, caseName, minRuntimeVersion string, patch func(src []byte) ([]byte, error)) string {
 	t.Helper()
 
@@ -55,6 +58,8 @@ func convertCase(t *testing.T, caseName, minRuntimeVersion string, patch func(sr
 				expectedPath, sanitize(t.Name()))
 		}
 	}
+
+	skipOlderImageOverride(t, minRuntimeVersion)
 
 	converted := out
 	if patch != nil {
@@ -295,4 +300,42 @@ func patchIssuer(oldPort, newPort int) func([]byte) ([]byte, error) {
 		}
 		return remarshal(&doc)
 	}
+}
+
+// imageTagVersion matches the MAJOR.MINOR start of a release image tag.
+var imageTagVersion = regexp.MustCompile(`^(\d+\.\d+)(\.|-|$)`)
+
+// skipOlderImageOverride skips the case when AI_GATEWAY_IMAGE is a release
+// older than minRuntimeVersion.
+// That data plane rejects the converted config and never becomes ready.
+func skipOlderImageOverride(t *testing.T, minRuntimeVersion string) {
+	t.Helper()
+	image := os.Getenv("AI_GATEWAY_IMAGE")
+	imageVersion, ok := imageReleaseVersion(image)
+	if !ok {
+		return
+	}
+	caseVersion, err := aimap.ParseVersion(minRuntimeVersion)
+	if err != nil {
+		t.Fatalf("case min runtime version: %v", err)
+	}
+	if imageVersion.Less(caseVersion) {
+		t.Skipf("AI_GATEWAY_IMAGE %s is older than %s, the min runtime version of this case", image, caseVersion)
+	}
+}
+
+// imageReleaseVersion returns false for a tag without a version, for example
+// aigw-master.
+func imageReleaseVersion(image string) (aimap.Version, bool) {
+	name := image[strings.LastIndex(image, "/")+1:]
+	i := strings.LastIndex(name, ":")
+	if i < 0 {
+		return aimap.Version{}, false
+	}
+	m := imageTagVersion.FindStringSubmatch(name[i+1:])
+	if m == nil {
+		return aimap.Version{}, false
+	}
+	v, err := aimap.ParseVersion(m[1])
+	return v, err == nil
 }

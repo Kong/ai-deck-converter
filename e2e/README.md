@@ -40,6 +40,12 @@ The gateway image each case uses can be overridden via `AI_GATEWAY_IMAGE`
 AI_GATEWAY_IMAGE=kong/kong-ai-gateway-dev:2.1.0-rc.4 make e2e
 ```
 
+An image tag can start with a release version, for example `2.3.0` or
+`2.1.0-rc.4`. Then the test skips each case with a newer min runtime
+version after its snapshot check. That data plane rejects the converted config
+and never becomes ready. A tag without a version, for example `aigw-master`
+or `latest`, runs every case.
+
 Cases run sequentially because each one boots a full gateway; set
 `AIDC_E2E_PARALLEL=1` to run them concurrently (needs a Docker VM with room
 for three Kong nodes).
