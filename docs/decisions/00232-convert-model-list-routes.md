@@ -82,10 +82,14 @@ passthrough, `type: api`, Gemini Interactions, realtime, the Responses and video
 lifecycle routes, and OpenAI-format Bedrock Mantle. Anthropic-format Mantle
 uses the usual Anthropic list path if it meets the same rules.
 
+From 2.4, accept `listed: false` without a warning on a model with no listable
+routes. There are no entries to hide. `revert` leaves the field unset for
+these models.
+
 ## Route generation
 
-Add `convertModelLists` in `convert/model_list.go`. Run it after agents and
-before the final routing check. Models share a list when all three match.
+Add `convertModelLists` in `convert/model_list.go`. Run it just before `lint`,
+after all other routes exist. Models share a list when all three match.
 
 - The list path from `aimap.RoutePath`. `/team` and `/team/` give the same path.
 - The HTTP `protocols`, `hosts`, `headers`, `snis`, `sources`, and `destinations`
@@ -93,14 +97,17 @@ before the final routing check. Models share a list when all three match.
 - The set of auth strategies from `authStrategyKey`.
 
 For each group with entries, add a route under `ai-gateway` with its list path
-and `methods: [GET, OPTIONS]`. `OPTIONS` lets CORS preflights reach the route.
+and `methods: [GET, OPTIONS]`. The shared RFC shows `GET` alone. The converter
+follows the data-plane design and includes `OPTIONS` for CORS preflights.
 An OpenAI model on `/v1` and an Anthropic model on `/` can share `/v1/models`.
-Each entry carries its own format. [Data-plane design][dp-erd]
+Each entry carries its own format. [Shared model-list RFC][shared-rfc] ·
+[Data-plane design][dp-erd]
 
-Use `<format>-models` at the root and `<format>-models-<base>` elsewhere. Trim
-trailing slashes from the base and replace characters Kong rejects. Mixed
-formats use the OpenAI base, so the shared route above is `openai-models-v1` in
-either model order. Check all output route names before adding a number.
+Use `<format>-models` at the root and `<format>-models-<base>` elsewhere. Get
+the base by removing the format's suffix from the path `aimap.RoutePath` made.
+Replace characters Kong rejects. This rule also covers regex base paths.
+Mixed formats use the OpenAI base, so the shared route above is `openai-models-v1`
+in either model order. Check all output route names before adding a number.
 Keep the order of routes and entries stable. Use the models in each group as
 sources for routing warnings.
 
@@ -139,9 +146,21 @@ plugins:
 
 Reuse the model routes' auth plugins, including the anonymous consumer and
 `request-termination` fallback where needed. With no strategies, add just the
-list plugin to the route. Global auth still applies. Groups with the same
+list plugin to the route. Global policies still apply. Groups with the same
 match rules and different auth strategies get separate routes. The routing
 check reports their overlap as `ROUTING_CONFLICT`.
+
+The converter depends on three plugin rules.
+
+- Run after auth and `request-termination`. The plugin priority is `1`, below
+  `request-termination` at `2`. The fallback can then return `401` before the
+  list plugin runs.
+- Show only entries for the request's format on a shared route.
+- Use the same groups as the model route's `acl` plugin, including consumer
+  groups and groups from auth. On a public route, a caller without credentials
+  sees only entries without access rules.
+
+[Data-plane design][dp-erd]
 
 For models in a list, scan CEL rules for `http.`, `route.`, and `service.`. On a
 match, warn once per model with `BEHAVIOR_MAY_DIFFER` at `access.acls`. A caller
@@ -150,16 +169,25 @@ text check can also match a string literal.
 
 ## Existing agent routes
 
-Use `routesOverlap` in `convert/lint.go` to compare a `GET`-only copy of the
-list route with each enabled agent. An agent with no methods set matches
-`GET`. If they overlap, keep both only when `refines(agent, list)` holds with
-the full method sets. An agent with an extra host rule and `methods: [GET]`
-can keep that host while the list serves others. A list with an extra host
-rule would take requests from a broader agent. For any overlapping `GET`
-that fails the refinement check, skip the list. Warn with `ROUTING_CONFLICT`
-at the agent's `config.route` and name the list path. Run the usual routing
-check on all output routes, including overlaps on `OPTIONS`.
-[Routing conflict RFC][conflicts] · [AIXSM-104][agent-conflicts]
+Compare a `GET`-only copy of the list route with each enabled agent. Reuse
+the non-path checks from `routesOverlap` in `convert/lint.go`. An agent with
+no methods set matches `GET`.
+
+- A plain agent path covers the list path if it is equal to it or is a prefix
+  of it under Kong's path rules. An agent with no paths covers every path.
+  For example, `/claude-code` covers `/claude-code/v1/models`.
+- If either path is regex and the other match rules overlap, assume the paths
+  overlap. The converter does not try to compare regex matches.
+- For overlapping routes, keep both only when `refines(agent, list)` holds
+  with the full method sets. For example, an agent on the same path with an
+  extra host rule and `methods: [GET]` can keep that host while the list serves
+  others.
+
+For all other `GET` overlaps, skip the list and warn with `ROUTING_CONFLICT` at
+the agent's `config.route`. Name the list path. Keep the usual routing check
+for all output routes, including `OPTIONS`. Its path rules stay as defined in
+RFC 00229. [Routing conflict RFC][conflicts] · [AIXSM-104][agent-conflicts] ·
+[Kong path matching][kong-paths]
 
 ## Revert and output modes
 
@@ -182,20 +210,29 @@ route.
 
 1. Add the model field and version check. Collect list entries during model
    conversion, then add route and plugin output, warnings, and `revert` support.
-2. Check decK and DB-less output and refresh the 2.4 golden files. Cover the
-   root and multiple paths, name clashes, and stable names across trailing
-   slashes and mixed-format input order. Test default and explicit aliases,
-   shared aliases with different ACLs, skipped instances, and hidden models.
+2. Check decK and DB-less output. Refresh the default-version golden files
+   and add a case with `min_runtime_version: 2.4`. Cover the root and multiple
+   paths, route name clashes, trailing slashes, and both orders of a shared
+   format path. Test default and explicit aliases, shared aliases with
+   different ACLs, and hidden models.
 3. Test public routes, global auth, key auth, OIDC, and multiple strategies.
-   Cover HTTPS-only routes, host and header rules, and enabled and disabled
-   agents. Test `GET`, unset methods, `OPTIONS` only, and both sides of the
-   route refinement check. Below 2.4, expect no lists and a warning only for
-   an explicit `listed` value.
+   Cover HTTPS-only routes and host and header rules. Test exact, prefix, and
+   regex agent paths, including a regex agent on a different host. Cover
+   disabled agents, unset methods, `OPTIONS` only, and both sides of the
+   refinement check. Below 2.4, expect a warning only for an explicit
+   `listed` value and no lists. Check CEL warnings for rules that read the
+   request and no warnings for rules that only read the caller.
 4. Run `TestRoundTrip` with all models listed, some hidden, and all hidden.
    Cover a shared alias with different settings across endpoints, and a
-   model with both listable and skipped endpoints.
-5. On a 2.4 image with the plugin, test both client formats, auth, and ACLs.
-   Check a preflight with global CORS set and a `GET` on an existing agent.
+   model with both listable and skipped endpoints. Check each route kind
+   excluded above, including paths with passthrough alone or mixed with
+   listable models.
+5. On a 2.4 image with the plugin, test both client formats on `/v1/models`,
+   host isolation, OIDC claim groups, and a public list. Expect `401` with
+   no valid credential on key-auth and multi-strategy routes. Check that a
+   hidden model still serves calls, a passthrough-only path reaches the
+   provider, and a prefix agent still answers `GET`. Test global CORS and
+   a global rate limit on the list route.
 
 # Drawbacks
 [drawbacks]: #drawbacks
@@ -206,6 +243,10 @@ route.
   request. Give them different match rules to avoid the conflict.
 - An ACL that reads the request can let a caller see an alias they cannot use.
   Hide the model to keep that alias off the list.
+- With both passthrough and listable models on a path, the gateway list can
+  take the place of the provider list at that path.
+- A regex agent or list path can cause the converter to skip a list even if
+  the paths match different requests.
 
 # Rationale and alternatives
 [rationale-and-alternatives]: #rationale-and-alternatives
@@ -233,3 +274,4 @@ route.
 [conflicts]: 00229-routing-conflict-detection.md
 [agent-conflicts]: https://konghq.atlassian.net/browse/AIXSM-104
 [model-access]: https://konghq.atlassian.net/browse/AIXSM-105
+[kong-paths]: https://developer.konghq.com/gateway/routing/traditional/#path
