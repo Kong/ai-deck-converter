@@ -58,6 +58,61 @@ func TestIntelligentBalancerConfig(t *testing.T) {
 	}
 }
 
+func TestIntelligentBalancerOnSharedAPIRoute(t *testing.T) {
+	t.Parallel()
+
+	model := func(name, classifierFormat string) string {
+		return `  - name: ` + name + `
+    type: api
+    capabilities: [generate]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/ai]}
+      balancer: {algorithm: intelligent, classifier: {type: custom, url: "https://c.internal",
+        format: ` + classifierFormat + `, name: jev-latest, context_window: 4096}}
+    targets: [{name: gpt-4o-mini, provider: openai-prod, config: {type: openai}}]
+`
+	}
+
+	t.Run("the same balancer shares one plugin", func(t *testing.T) {
+		t.Parallel()
+		src := "models:\n" + model("first", "/v1/systemone") + model("second", "/v1/systemone") + overrideProvider
+		doc, warnings, err := convertDoc([]byte(src), false)
+		require.NoError(t, err)
+		require.Empty(t, warnings)
+		require.Len(t, pluginsNamed(doc, "ai-proxy-advanced"), 1)
+	})
+
+	t.Run("a different balancer fails the later model", func(t *testing.T) {
+		t.Parallel()
+		src := "models:\n" + model("first", "/v1/systemone") + model("second", "/v1/systemtwo") + overrideProvider
+		_, _, err := convertDoc([]byte(src), false)
+		require.ErrorContains(t, err, `model "second" cannot share route "openai-chat" with another `+
+			`model that uses a different balancer`)
+	})
+
+	// A lifecycle route carries one route-scoped plugin for every model that
+	// shares its base path.
+	t.Run("a lifecycle route fails a model with a different balancer", func(t *testing.T) {
+		t.Parallel()
+		agentic := func(name, classifierFormat string) string {
+			return `  - name: ` + name + `
+    capabilities: [agentic]
+    formats: [{type: openai}]
+    config:
+      route: {paths: [/ai]}
+      balancer: {algorithm: intelligent, classifier: {type: custom, url: "https://c.internal",
+        format: ` + classifierFormat + `, name: jev-latest, context_window: 4096}}
+    targets: [{name: gpt-4.1-mini, provider: openai-prod}]
+`
+		}
+		src := "models:\n" + agentic("first", "/v1/systemone") + agentic("second", "/v1/systemtwo") + overrideProvider
+		_, _, err := convertDoc([]byte(src), false)
+		require.ErrorContains(t, err, `model "second" cannot share route "openai-responses-lifecycle" `+
+			`with another model that uses a different balancer`)
+	})
+}
+
 func TestIntelligentBalancerIssues(t *testing.T) {
 	t.Parallel()
 
