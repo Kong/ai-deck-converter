@@ -16,16 +16,16 @@ services:
         methods:
           - POST
           - OPTIONS
-        strip_path: false
+        strip_path: true
       - name: openai-responses-lifecycle
         paths:
-          - ~/together/responses/.+
+          - ~/together/responses(/)?
         methods:
           - GET
           - POST
           - DELETE
           - OPTIONS
-        strip_path: false
+        strip_path: true
         tags:
           - aigw:responses-lifecycle
       - name: anthropic-messages

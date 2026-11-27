@@ -39,13 +39,13 @@ routes:
     protocols:
       - http
       - https
-    strip_path: false
+    strip_path: true
   - id: 740677ad-a667-5a50-a255-e369d244e981
     name: openai-responses-lifecycle
     service:
       id: 947a4e23-b483-5a65-8165-da9aed24565b
     paths:
-      - ~/ai/responses/.+
+      - ~/ai/responses(/)?
     methods:
       - GET
       - POST
@@ -54,7 +54,7 @@ routes:
     protocols:
       - http
       - https
-    strip_path: false
+    strip_path: true
     tags:
       - aigw:responses-lifecycle
   - id: 718639d6-1ff2-57e3-9528-df761b890443
@@ -450,7 +450,7 @@ routes:
     protocols:
       - http
       - https
-    strip_path: false
+    strip_path: true
   - id: a5fe20b2-fe87-59f3-a7bf-b47efa1d5e4e
     name: huggingface-generate
     service:
