@@ -16,16 +16,16 @@ services:
         methods:
           - POST
           - OPTIONS
-        strip_path: false
+        strip_path: true
       - name: openai-responses-lifecycle
         paths:
-          - ~/mantle-openai/responses/.+
+          - ~/mantle-openai/responses(/)?
         methods:
           - GET
           - POST
           - DELETE
           - OPTIONS
-        strip_path: false
+        strip_path: true
         tags:
           - aigw:responses-lifecycle
       - name: openai-embeddings
@@ -50,7 +50,7 @@ services:
         methods:
           - POST
           - OPTIONS
-        strip_path: false
+        strip_path: true
       - name: anthropic-messages
         paths:
           - /mantle-anthropic/v1/messages

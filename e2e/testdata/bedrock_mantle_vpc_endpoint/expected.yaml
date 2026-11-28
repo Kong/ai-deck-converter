@@ -35,13 +35,13 @@ routes:
     protocols:
       - http
       - https
-    strip_path: false
+    strip_path: true
   - id: 740677ad-a667-5a50-a255-e369d244e981
     name: openai-responses-lifecycle
     service:
       id: 947a4e23-b483-5a65-8165-da9aed24565b
     paths:
-      - ~/mantle-vpc-openai/responses/.+
+      - ~/mantle-vpc-openai/responses(/)?
     methods:
       - GET
       - POST
@@ -50,7 +50,7 @@ routes:
     protocols:
       - http
       - https
-    strip_path: false
+    strip_path: true
     tags:
       - aigw:responses-lifecycle
   - id: bb559a54-dc17-5c0f-b946-b0d9c5cebd7a

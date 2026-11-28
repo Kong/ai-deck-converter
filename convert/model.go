@@ -764,9 +764,15 @@ func (c *Converter) convertModel(st *modelPass, m *aigw.Model) error {
 						paths = append(paths, aimap.RoutePaths(b, spec, format, mantlePaths)...)
 					}
 					routeName := uniqueModelRouteName(sec+"-"+spec.RouteLabel, st.usedRouteNames)
+					routeConfig := m.Config.Route
+					// A Responses endpoint appends the path it receives to
+					// the target upstream. Its route strips the prefix.
+					if routeConfig.StripPath == nil && aimap.StripsOwnPath(sec, capability) {
+						routeConfig.StripPath = new(true)
+					}
 					g = &routeGroup{
 						route: buildModelRoute(
-							m.Config.Route, routeName,
+							routeConfig, routeName,
 							paths, spec.Methods, websocket),
 						websocket:    websocket,
 						proxyByOwner: map[string]*proxyGroup{},
@@ -1224,8 +1230,9 @@ func (c *Converter) attachLifecycleGuards(
 			}
 			c.warn(src.at(guardFields(m, plugins)...), BehaviorMayDiffer,
 				"model %q shares route %q with model %q, which has different policies or ACLs. That "+
-					"route serves requests addressed by a stored ID, which carry no model, so its "+
-					"policies and ACLs cannot be scoped per model: %s.",
+					"route serves every Responses request, including the create that carries a "+
+					"model. No ai-model-selector runs on it, so its policies and ACLs cannot be "+
+					"scoped per model: %s.",
 				m.Name, routeName, first.model, enforced)
 		}
 		return
